@@ -67,7 +67,12 @@ const config = {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
             position: 'left',
-            label: 'Tutorial',
+            label: 'Introduction',
+          },
+          {
+            position: 'left',
+            label: "Quickstart",
+            to: '/docs/getting-started/Quickstart',
           },
           // {to: '/blog', label: 'Blog', position: 'left'},
           {
@@ -84,13 +89,13 @@ const config = {
             title: 'Guides',
             items: [
               {
-                label: 'Getting Started',
-                to: '/docs/intro',
+                label: 'Quickstart',
+                to: '/docs/getting-started/Quickstart',
               },
             ],
           },
           {
-            title: 'Community',
+            title: 'Twitter',
             items: [
               {
                 label: 'Twitter',
