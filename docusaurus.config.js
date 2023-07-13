@@ -7,7 +7,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Turnkey Documentation',
-  tagline: 'Dinosaurs are cool',
+  tagline: 'Programmatic key management',
   favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
