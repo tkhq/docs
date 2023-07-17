@@ -1,13 +1,14 @@
 ---
-sidebar_position: 3
+sidebar_position: 2
 ---
+
 # Examples
 
 Turnkey infrastructure is flexible by default. We intentionally prioritize low-level primitives in our product to avoid creating blockers for developers that want to build new kinds of applications on Turnkey.
 
 That said, we have built out several example services and applications to help illustrate the types of functionality that Turnkey can enable.
 
-Clone the Turnkey sdk repo [here](https://github.com/tkhq/sdk) to explore a few “turnkey” examples:
+Clone the Turnkey SDK repo [here](https://github.com/tkhq/sdk) to explore a few “turnkey” examples:
 
 | Example                                                                | Description                                                                                                        |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
