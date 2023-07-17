@@ -1,10 +1,16 @@
+ifeq ($(shell uname -s), Darwin)
+BUILD_COMMAND = buildx build --platform linux/arm64/v8,linux/amd64,linux/arm/v7
+else
+BUILD_COMMAND = build
+endif
+
 .PHONY: image
 image:
-	docker build -t tkhq/docs --target production .
+	docker $(BUILD_COMMAND) -t tkhq/docs --target production .
 
 .PHONY: dev-image
 dev-image: Dockerfile
-	docker build -t tkhq/docs:dev --target development .
+	docker $(BUILD_COMMAND) -t tkhq/docs:dev --target development .
 
 .PHONY: run-dev
 run-dev: dev-image
