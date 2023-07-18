@@ -13,6 +13,14 @@ RUN mkdir /home/node/app
 
 # We'll run the app as the `node` user, so put it in their home directory
 WORKDIR /home/node/app
+
+# Install dependencies
+COPY --chown=node:node package.json /home/node/app/
+COPY --chown=node:node package-lock.json /home/node/app/
+COPY --chown=node:node yarn.lock /home/node/app/
+RUN npm install
+
+
 # Copy the source code over
 COPY --chown=node:node . /home/node/app/
 
@@ -20,8 +28,6 @@ COPY --chown=node:node . /home/node/app/
 # Define a development target that installs devDeps and runs in dev mode
 FROM base as development
 WORKDIR /home/node/app
-# Install (not ci) with dependencies, and for Linux vs. Linux Musl (which we use for -alpine)
-RUN npm install
 # Expose port 3000
 EXPOSE 3000
 # Start the app in debug mode so we can attach the debugger
