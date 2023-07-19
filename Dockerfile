@@ -28,6 +28,7 @@ COPY --chown=node:node . /home/node/app/
 # Define a development target that installs devDeps and runs in dev mode
 FROM base as development
 WORKDIR /home/node/app
+COPY --chown=node:node --from=base /home/node/app/node_modules /home/node/app/node_modules
 # Expose port 3000
 EXPOSE 3000
 # Start the app in debug mode so we can attach the debugger
