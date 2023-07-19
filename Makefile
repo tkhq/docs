@@ -1,5 +1,5 @@
 ifeq ($(shell uname -s), Darwin)
-BUILD_COMMAND = buildx build --platform linux/arm64/v8,linux/amd64,linux/arm/v7
+BUILD_COMMAND = buildx build --platform linux/arm64/v8,linux/amd64,linux/arm/v7 --load
 else
 BUILD_COMMAND = build
 endif
