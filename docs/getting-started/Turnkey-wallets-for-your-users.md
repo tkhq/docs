@@ -5,7 +5,7 @@ sidebar_position: 3
 
 Using Turnkey’s flexible infrastructure, you can programmatically create and manage wallets for your end users in a fully customized way, directly embedded into your application with no predefined user interfaces.
 
-Turnkey supports creating both wallets your application controls and wallets controlled by your end users. To create application-controlled wallets, with no approvals required by the end user, the implementation is simple: [create a private key](https://turnkey.readme.io/reference/publicapiservice_createprivatekeys) within your main Turnkey Organization, enable an [API user](https://turnkey.readme.io/reference/publicapiservice_createapionlyusers) to sign transactions on behalf of that private key via [policy](policy-overview), and use your own server to manage the association between your users and private keys created on Turnkey.
+Turnkey supports creating both wallets your application controls and wallets controlled by your end users. To create application-controlled wallets, with no approvals required by the end user, the implementation is simple: [create a private key](https://turnkey.readme.io/reference/publicapiservice_createprivatekeys) within your main Turnkey Organization, enable an [API user](https://turnkey.readme.io/reference/publicapiservice_createapionlyusers) to sign transactions on behalf of that private key via [policy](/docs/policy-management/policy-overview), and use your own server to manage the association between your users and private keys created on Turnkey.
 
 The rest of this guide walks through one potential implementation model for creating **wallets fully controlled by your end users**.
 
