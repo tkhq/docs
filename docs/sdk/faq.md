@@ -1,5 +1,6 @@
 ---
 sidebar_position: 3
+description: Common issues and errors using Turnkey's SDKs
 ---
 
 # FAQ and troubleshooting

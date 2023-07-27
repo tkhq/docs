@@ -1,5 +1,6 @@
 ---
 sidebar_position: 2
+description: Learn about the root quorum and how to manage it
 ---
 # Root Quorum
 

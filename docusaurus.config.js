@@ -38,6 +38,7 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          routeBasePath: '/',
           sidebarPath: require.resolve('./sidebars.js'),
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
@@ -60,24 +61,36 @@ const config = {
         title: '',
         logo: {
           alt: 'Turnkey Logo',
-          src: 'img/logo.png',
+          src: 'img/Logo_black.png',
+          srcDark: 'img/logo.png',
         },
         items: [
           {
             type: 'docSidebar',
             sidebarId: 'tutorialSidebar',
             position: 'left',
-            label: 'Introduction',
+            label: 'Guides',
           },
           {
             position: 'left',
             label: "Quickstart",
-            to: '/docs/getting-started/Quickstart',
+            to: '/getting-started/quickstart',
           },
+          {
+            position: 'left',
+            label: "API Reference",
+            to: 'https://turnkey.readme.io/reference/',
+          },
+          // Need to add API reference -- point this Nav heading there. 
           // {to: '/blog', label: 'Blog', position: 'left'},
           {
-            href: 'https://github.com/tkhq',
+            to: 'https://github.com/tkhq',
             label: 'GitHub',
+            position: 'right',
+          },
+          {
+            to: 'https://beta.turnkey.io',
+            label: 'Dashboard',
             position: 'right',
           },
         ],
@@ -90,7 +103,7 @@ const config = {
             items: [
               {
                 label: 'Quickstart',
-                to: '/docs/getting-started/Quickstart',
+                to: '/getting-started/quickstart',
               },
             ],
           },

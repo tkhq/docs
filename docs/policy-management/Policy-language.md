@@ -1,5 +1,7 @@
+---
+description: A guide to authoring policies with our policy lanugage
+---
 # Policy Language
-
 This page provides an overview of how to author policies using our policy language. To begin, we'll need to get familiar with the language's grammar, keywords, and types.
 
 ## Grammar

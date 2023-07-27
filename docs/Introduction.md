@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+slug: /
 ---
 
 Read here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](doc:quickstart).
@@ -17,22 +18,6 @@ At a structural level, a Turnkey Organization is comprised of a few core resourc
 - <b>Private Keys:</b> Crypto private keys, used to derive addresses and sign transactions
 - <b>Credentials:</b> Used to verify Users - WebAuthn authenticators for human Users and API keys for API Users
 
-[block:image]
-{
-  "images": [
-    {
-      "image": [
-        "https://files.readme.io/cd7aaa1-small-Screen_Shot_2023-05-11_at_2.27.06_PM.png",
-        null,
-        ""
-      ],
-      "align": "center",
-      "sizing": "70% "
-    }
-  ]
-}
-[/block]
-
 Turnkey enables two main types of actions via our REST API:
 
 - Change or retrieve Organization data
@@ -46,8 +31,8 @@ All secure workloads, including key management and transaction signing, are mana
 
 ### Where to head next
 
-<b>[Quickstart guide](doc:quickstart):</b> Walk through setup of the Turnkey API and Platform, create a crypto Private Key, and sign your first transaction via command line.
+[Quickstart guide](/getting-started/quickstart): Walk through setup of the Turnkey API and Platform, create a crypto Private Key, and sign your first transaction via command line.
 
-<b> [Examples](doc:examples):</b> Turnkey’s flexible infrastructure means there’s a lot you can build. Check out a few of our own examples to get a picture of what’s possible.
+[Examples](/getting-started/examples): Turnkey’s flexible infrastructure means there’s a lot you can build. Check out a few of our own examples to get a picture of what’s possible.
 
-<b>[Security architecture](doc:security-architecture)</b>: Turnkey’s unique security architecture is the foundation of our product. Dive in to understand how we secure your keys.
+[Security architecture](/security/overview): Turnkey’s unique security architecture is the foundation of our product. Dive in to understand how we secure your keys.
