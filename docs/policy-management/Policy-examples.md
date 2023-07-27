@@ -1,3 +1,6 @@
+---
+description: Check out some example policies to help write your own
+---
 # Policy Examples
 
 ## Access Control

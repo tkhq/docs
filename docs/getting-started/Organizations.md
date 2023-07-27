@@ -1,5 +1,6 @@
 ---
 sidebar_position: 4
+description: Learn about Orgnaizations on Turnkey  
 ---
 # Organizations
 
@@ -11,6 +12,5 @@ Organizations have resource limits, which are described in detail [here](https:/
 
 ## Sub Organization
 
-A sub-organization is just an organization that has read access by a parent organization. Generally you will setup one parent (or primary) organization and then set up any number of sub-organizations to create discrete resource groups. It is important to keep in mind that a sub-organization has the exact same behavior as any other organization,
+A sub-organization is an segregated organization that is nested within a parent organization. By default, the parent organization has read access to all sub-organizations, but no write access. That means users in the parent organization have no ability to use private keys or alter any resources in the sub-org by default. For more information on sub-organizations and common use cases for this functionality, keep reading.  
 
-For example, if you are a business building out building out end-user wallets, you would create (at least) one sub-organization per end user. Your business could create the sub-organization with an api user and the end user. To start, the business api user would be part the sole member of the org. The api user would then do various set up. The last two actions of the api user would be to change the root quorum to just the end-user. If the business wanted to still take some limited actions, they could add a policy granted themselves permissions prior to removing themselves from the root quorum.

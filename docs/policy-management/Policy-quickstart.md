@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+description: Add a new user to your Org and try out the policy engine
 ---
 # Policy Quickstart
 

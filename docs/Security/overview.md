@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+description: Learn about Turnkey's unique security framework
 ---
 # Overview
 

@@ -1,9 +1,8 @@
 ---
 sidebar_position: 1
+description: Learn about Users on Turnkey
 ---
-# Introduction
-
-Overview of the different types of users within Turnkey and their capabilities
+# Introduction to Users
 
 Turnkey Users are resources within an Organization. Their attributes are:
 

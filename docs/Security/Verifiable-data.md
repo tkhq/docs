@@ -1,3 +1,6 @@
+---
+description: Learn how we ensure an end-to-end audit trail
+---
 # Verifiable Data
 
 Enclave applications in Turnkey’s infrastructure are stateless meaning, there is no persistent data held behind the enclave boundary. Instead, data is held in a PostgreSQL instance in our primary AWS account. Before any enclave applications operate on the data in a Turnkey account, it first verifies that that data has been recently notarized by Turnkey’s notarizer. A recent stamp could be the result of an update or initiated by the heartbeat service.

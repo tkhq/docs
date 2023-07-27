@@ -1,5 +1,6 @@
 ---
 sidebar_position: 2
+description: Learn about Policies on Turnkey and how to manage them
 ---
 
 # Policy Overview

@@ -1,5 +1,6 @@
 ---
 sidebar_position: 3
+description: Check out some of our example apps and use cases
 ---
 # Examples
 

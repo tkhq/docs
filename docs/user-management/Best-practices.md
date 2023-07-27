@@ -1,5 +1,6 @@
 ---
 sidebar_position: 3
+description: Best practices as you set up users and policies
 ---
 # User and Policy Best Practices
 

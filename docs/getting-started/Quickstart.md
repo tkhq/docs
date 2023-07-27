@@ -1,5 +1,7 @@
 ---
+id: quickstart
 sidebar_position: 2
+description: Get onboarded and sign your first ETH transaction  
 ---
 # Quickstart 
 
@@ -91,7 +93,7 @@ turnkey request --host coordinator-beta.turnkey.io --path /public/v1/submit/sign
     "type": "ACTIVITY_TYPE_SIGN_TRANSACTION",
     "organizationId": "'"$ORGANIZATION_ID"'",
     "parameters": {
-       "privateKeyId": "'"$KEY_ID"'",
+      "privateKeyId": "'"$KEY_ID"'",
       "type": "TRANSACTION_TYPE_ETHEREUM",
       "unsignedTransaction": "<Your Transaction>"
     }
