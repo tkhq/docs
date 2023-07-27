@@ -50,6 +50,18 @@ const config = {
         },
       }),
     ],
+    [
+      'redocusaurus',
+      {
+        specs: [
+          {
+            spec: 'static/specs/public_api.swagger.json',
+            url: 'static/specs/public_api.swagger.json',
+            route: '/api/',
+          },
+        ],
+      },
+    ],
   ],
 
   themeConfig:
@@ -79,9 +91,8 @@ const config = {
           {
             position: 'left',
             label: "API Reference",
-            to: 'https://turnkey.readme.io/reference/',
+            to: '/api',
           },
-          // Need to add API reference -- point this Nav heading there. 
           // {to: '/blog', label: 'Blog', position: 'left'},
           {
             to: 'https://github.com/tkhq',
