@@ -31,8 +31,8 @@ All secure workloads, including key management and transaction signing, are mana
 
 ### Where to head next
 
-[Quickstart guide](/docs/getting-started/Quickstart): Walk through setup of the Turnkey API and Platform, create a crypto Private Key, and sign your first transaction via command line.
+[Quickstart guide](/getting-started/quickstart): Walk through setup of the Turnkey API and Platform, create a crypto Private Key, and sign your first transaction via command line.
 
-[Examples](/docs/getting-started/Examples): Turnkey’s flexible infrastructure means there’s a lot you can build. Check out a few of our own examples to get a picture of what’s possible.
+[Examples](/getting-started/examples): Turnkey’s flexible infrastructure means there’s a lot you can build. Check out a few of our own examples to get a picture of what’s possible.
 
-[Security architecture](/docs/Security/overview): Turnkey’s unique security architecture is the foundation of our product. Dive in to understand how we secure your keys.
+[Security architecture](/security/overview): Turnkey’s unique security architecture is the foundation of our product. Dive in to understand how we secure your keys.

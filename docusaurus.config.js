@@ -78,8 +78,8 @@ const config = {
           },
           {
             position: 'left',
-            label: "API",
-            to: '/docs/getting-started/quickstart',
+            label: "API Reference",
+            to: 'https://turnkey.readme.io/reference/',
           },
           // Need to add API reference -- point this Nav heading there. 
           // {to: '/blog', label: 'Blog', position: 'left'},
@@ -103,7 +103,7 @@ const config = {
             items: [
               {
                 label: 'Quickstart',
-                to: '/docs/getting-started/Quickstart',
+                to: '/getting-started/quickstart',
               },
             ],
           },
