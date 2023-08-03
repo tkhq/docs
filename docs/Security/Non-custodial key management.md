@@ -18,7 +18,7 @@ Turnkey’s services are functionally quite similar to the signing operations an
 
 ## Private key storage
 
-Turnkey does not store unencrypted private keys. Turnkey does persist encrypted private key ciphertext inside of our primary and disaster recovery databases. This ciphertext can only be decrypted from within the bounds of a secure enclave running verified Turnkey applications. Our [security docs](/security/overview) go in-depth with how the process works. Because Turnkey cannot access raw private key data or broadcast transactions, Turnkey is unable to unilaterally access or transfer customer assets. 
+Turnkey does not store unencrypted private keys. Turnkey does persist encrypted private key ciphertext inside of our primary and disaster recovery databases. This ciphertext can only be decrypted from within the bounds of a secure enclave running verified Turnkey applications. Our [security overview](/security/our-approach) goes in-depth with how the process works. Because Turnkey cannot access raw private key data or broadcast transactions, Turnkey is unable to unilaterally access or transfer customer assets. 
 
 ## Non-custodial wallets for end users
 
