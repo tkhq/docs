@@ -3,7 +3,7 @@ sidebar_position: 4
 description: Learn about Organizations on Turnkey
 slug: /getting-started/organizations  
 ---
-# Organizations
+# Organizations 
 
 An organization is a logical grouping of the resources: policies, users, and private keys.  These resources are encapsulated by an organization and cannot be shared between organizations. Depending on the use case, the name organization may be misleading and often times it can help to think about organizations as accounts or entities since a single business (or even human) may have many organizations.
 
