@@ -1,5 +1,6 @@
 ---
 sidebar_position: 5
+slug: /faq
 ---
 # FAQ
 
@@ -21,7 +22,7 @@ Concretely, Turnkey needs the following:
 
 1. **The original request you sent**: this is achieved by simply receiving the HTTP request and its body
 2. **That your API key was used to approve the request**: this is achieved by checking the signature contained in the `X-Stamp` header. For this verification we need the serialized POST body, your API public key, and the signature. This is all contained in the header value.
-3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](https://turnkey.readme.io/docs/security-architecture#secure-enclaves--quorum-os). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
+3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](/security/secure-enclaves). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
 
 Turnkey would not be able to have its enclaves verify signatures and check the request intent if we didn't have your signature on the whole payload.
 
@@ -29,7 +30,7 @@ Turnkey would not be able to have its enclaves verify signatures and check the r
 
 A Turnkey API key is simply a way to authenticate requests to Turnkey. Crypto assets are not tied to it in any way.
 
-Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](doc:policy-engine-language)!), and revocable if they are lost or compromised.
+Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](/managing-policies/overview)!), and revocable if they are lost or compromised.
 
 ### <b>What happens if I lose my API key? Do I lose my crypto?</b>
 
@@ -77,7 +78,8 @@ We currently have the following limits on organizational resources in place:
 | Tags                    | 100                    |
 | Authenticators per user | 10                     |
 | API keys per user       | 10                     |
+| Sub-Organizations       | unlimited              |
+
+Note that each deleted resource remains part of your organization's data and can slow performance at very large scales. In general, sub-organizations are an excellent way to manage scaling without losing performance. 
 
 If you are approaching any of these limits in your implementation, reach out to the Turnkey team to discuss remediations.
-
-Note that each deleted resources remains part of your Organization's data and can slow performance at very large scales. We recommend setting up multiple Turnkey Organizations within your implementation as necessary to reduce the likelihood of performance issues.

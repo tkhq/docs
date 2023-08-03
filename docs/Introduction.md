@@ -3,7 +3,11 @@ sidebar_position: 1
 slug: /
 ---
 
-Read here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](doc:quickstart).
+<img src="/img/diagrams/welcome_image.png" alt="welcome" />
+
+
+
+Read here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](/getting-started/quickstart).
 
 ### About Turnkey
 
@@ -18,6 +22,12 @@ At a structural level, a Turnkey Organization is comprised of a few core resourc
 - <b>Private Keys:</b> Crypto private keys, used to derive addresses and sign transactions
 - <b>Credentials:</b> Used to verify Users - WebAuthn authenticators for human Users and API keys for API Users
 
+
+<p style={{textAlign: 'center'}}>
+  <img src="/img/diagrams/resources.png" alt="resources" width="500px" />
+</p>
+
+    
 Turnkey enables two main types of actions via our REST API:
 
 - Change or retrieve Organization data

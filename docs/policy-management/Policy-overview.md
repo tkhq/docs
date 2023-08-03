@@ -1,13 +1,13 @@
 ---
 sidebar_position: 2
 description: Learn about Policies on Turnkey and how to manage them
+slug: /managing-policies/overview
 ---
-
-# Policy Overview
+# Policy overview
 
 Our policy engine is the foundation for flexible controls and permissions within your organization. This page provides an overview of how to author policies.
 
-## Policy Structure
+## Policy structure
 
 Our policies are defined using **JSON**. The `effect` determines if an activity should be allowed or denied based on the evaluation of the `consensus` and `condition` fields.
 
@@ -24,7 +24,7 @@ Our policies are defined using **JSON**. The `effect` determines if an activity 
 }
 ```
 
-## Policy Evaluation
+## Policy evaluation
 
 All policies defined within an Organization are evaluated on each request. The image below describes how an activity outcome is determined when resolving multiple policies. The rule follows the below steps:
 
@@ -35,21 +35,9 @@ All policies defined within an Organization are evaluated on each request. The i
 
 Stated differently:
 
-[block:image]
-{
-  "images": [
-    {
-      "image": [
-        "https://files.readme.io/681e936-image.png",
-        null,
-        ""
-      ],
-      "align": "center",
-      "sizing": "500px"
-    }
-  ]
-}
-[/block]
+<p style={{textAlign: 'center'}}>
+  <img src="/img/diagrams/policy_overview.png" alt="policy_overview" width="500px" />
+</p>
 
 - Root users bypass any policies
 - Otherwise, all actions on Turnkey are implicitly denied by default. They have to be explicitly allowed by a policy.

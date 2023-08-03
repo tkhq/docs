@@ -1,8 +1,9 @@
 ---
 sidebar_position: 3
 description: Best practices as you set up users and policies
+slug: /managing-users/best-practices
 ---
-# User and Policy Best Practices
+# User and policy best practices
 
 This page describes some best practices to consider as you set up users and policies while getting ready for production.
 

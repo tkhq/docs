@@ -1,13 +1,10 @@
 ---
 id: quickstart
 sidebar_position: 2
-description: Get onboarded and sign your first ETH transaction  
+description: Get onboarded and sign your first ETH transaction 
+slug: /getting-started/quickstart 
 ---
 # Quickstart 
-
-> 📘 Turnkey is currently in private beta.
->
-> Join the [waitlist](https://www.turnkey.io/waitlist) to request access.
 
 This quickstart will guide you through Turnkey’s onboarding, API key generation, and ETH signing via Turnkey’s CLI.
 
@@ -85,7 +82,7 @@ export KEY_ID="<Your Key ID>"
 
 ## Sign a Transaction
 
-Now you can sign any Ethereum transaction you like with this new key with our [`sign_transaction` endpoint](https://turnkey.readme.io/reference/publicapiservice_signtransaction). Make sure to replace the `unsignedTransaction` below with your own. You can use our [simple transaction generator](https://tx-generator.vercel.app/) if you need a quick transaction for testing:
+Now you can sign any Ethereum transaction you like with this new key with our [`sign_transaction` endpoint](https://turnkey.readme.io/reference/publicapiservice_signtransaction). Make sure to replace the `unsignedTransaction` below with your own. You can use our [simple transaction generator](https://build.tx.xyz) if you need a quick transaction for testing:
 
 ```sh
 turnkey request --host coordinator-beta.turnkey.io --path /public/v1/submit/sign_transaction --body '{

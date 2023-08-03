@@ -1,10 +1,11 @@
 ---
 sidebar_position: 2
 description: Learn about the root quorum and how to manage it
+slug: /managing-users/root-quorum
 ---
-# Root Quorum
+# Root quorum
 
-When you create a Turnkey organization, your user is created and will default to being the sole member of the root quorum. Because of the wide scope of permissions, it is important to take care when using any users in the root quorum. The following offers a [technical overview](#techinical-overview) and some [best practices](#best-practices)
+When you create a Turnkey organization, your user is created and will default to being the sole member of the root quorum. Because of the wide scope of permissions, it is important to take care when using any users in the root quorum. The following offers a technical overview and some best practices. 
 
 ## Technical overview
 

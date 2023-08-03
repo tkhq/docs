@@ -1,8 +1,9 @@
 ---
 sidebar_position: 1
 description: Learn about Users on Turnkey
+slug: /managing-users/introduction
 ---
-# Introduction to Users
+# Introduction to users
 
 Turnkey Users are resources within an Organization. Their attributes are:
 

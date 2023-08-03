@@ -1,4 +1,9 @@
-# Secure Enclaves
+---
+description: Overview of secure enclaves and how we use them
+slug: /security/secure-enclaves
+sidebar_position: 3
+---
+# Secure enclaves
 
 A core security anchor at Turnkey is the ability to prove to ourselves and our users that all systems within secure enclaves are running exactly the software we expect at any given time. To accomplish this, all security-critical Turnkey services, including key generation, signing, and our policy engine, are deployed in secure enclaves. 
 
@@ -6,21 +11,9 @@ Secure enclaves, also called Trusted Execution Environments, are highly constrai
 
 The following outlines the structure of a single enclave application:
 
-[block:image]
-{
-  "images": [
-    {
-      "image": [
-        "https://files.readme.io/e6e4861-small-Screen_Shot_2023-05-11_at_1.41.23_PM.png",
-        null,
-        ""
-      ],
-      "align": "center",
-      "sizing": "70% "
-    }
-  ]
-}
-[/block]
+<p style={{textAlign: 'center'}}>
+  <img src="/img/diagrams/secure_enclaves.png" alt="secure-enclaves" width="500px" />
+</p>
 
 In this diagram _Host_ represents a standard AWS virtual machine. We run a basic application that receives traffic from the network and calls into the enclave. This creates a layer of insulation from our most secure environment and offers a convenient place to gather metrics and other operational information about the enclaves.
 

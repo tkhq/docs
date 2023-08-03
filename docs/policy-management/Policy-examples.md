@@ -1,9 +1,10 @@
 ---
 description: Check out some example policies to help write your own
+slug: /managing-policies/examples
 ---
-# Policy Examples
+# Policy examples
 
-## Access Control
+## Access control
 
 #### Allow a specific user to create private keys
 
@@ -48,7 +49,7 @@ description: Check out some example policies to help write your own
 }    
 ```
 
-## Signing Control
+## Signing control
 
 #### Allow a user to sign transactions with a specific private key
 
