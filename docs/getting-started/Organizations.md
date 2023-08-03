@@ -1,6 +1,6 @@
 ---
 sidebar_position: 4
-description: Learn about Orgnaizations on Turnkey
+description: Learn about Organizations on Turnkey
 slug: /getting-started/organizations  
 ---
 # Organizations
