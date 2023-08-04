@@ -1,9 +1,10 @@
 ---
 sidebar_position: 3
 description: Common issues and errors using Turnkey's SDKs
+slug: /sdk-troubleshooting
 ---
 
-# FAQ and troubleshooting
+# Troubleshooting
 
 ## JS: Ethers
 

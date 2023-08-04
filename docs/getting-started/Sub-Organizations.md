@@ -1,8 +1,9 @@
 ---
 sidebar_position: 4
 description: Learn about sub-orgs and how you can use them
+slug: /getting-started/sub-organizations
 ---
-# Sub-Organizations
+# Sub-organizations
 
 Using Turnkey’s flexible infrastructure, you can programmatically create and manage Sub-Organizations for your end users. Sub-Organizations aren't subject to size limits: you can create as many Sub-Organizations as needed. The parent organization has **read-only** visibility into all of its Sub-Organization, and activities performed in Sub-Organizations roll up to the parent for billing purposes.
 

@@ -1,7 +1,9 @@
 ---
 description: Learn how we deploy our secure applications
+sidebar_position: 4
+slug: /security/quorum-deployments
 ---
-# Quorum Deployments for Secure Enclaves
+# Quorum deployments
 
 To run our applications in secure enclaves, we built QuorumOS: a minimal, immutable, and deterministic Linux unikernel build system for use cases that require high security and accountability. QuorumOS also contains an initialization and attestation framework for running applications within this environment.
 
@@ -9,11 +11,11 @@ Each instance of QOS is configured with a Quorum Set – A group of individuals 
 
 After the service is launched, QOS responds to attestation requests and waits to receive key shares from QOS Operators or members of the Quorum Set. Once a threshold number of shares have been sent into the enclave it will reconstruct its core secret and launch the application it was provisioned with. This process is outlined in the images below:
 
-![](https://files.readme.io/42afc42-small-Screen_Shot_2023-05-11_at_1.43.47_PM.png)
+<p style={{textAlign: 'center'}}>
+  <img src="/img/diagrams/deployment.png" alt="qos-deployments" width="500px" />
+</p>
 
 Remote attestation is the process by which core attributes of a machine can be retrieved and verified from a remote location. The enclave’s secure co-processor, in this case AWS’s NSM, observes the enclave as it is being launched and records certain important values such as the hash of the enclave image, the hash of the kernel, and the hash of the boot filesystem. This means that each attestation request verifies that the code actually running in the enclave is only the code we expect to be running.
-
-![](https://files.readme.io/2f62b80-small-Screen_Shot_2023-05-11_at_1.44.43_PM.png)
 
 After initialization, a user of the system can request an attestation document from the enclave. This document will be signed by AWS PKI and can be validated using the process outlined [here](https://docs.aws.amazon.com/enclaves/latest/user/verify-root.html#validation-process).
 

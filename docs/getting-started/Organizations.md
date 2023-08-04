@@ -1,14 +1,15 @@
 ---
 sidebar_position: 4
-description: Learn about Orgnaizations on Turnkey  
+description: Learn about Organizations on Turnkey
+slug: /getting-started/organizations  
 ---
-# Organizations
+# Organizations 
 
 An organization is a logical grouping of the resources: policies, users, and private keys.  These resources are encapsulated by an organization and cannot be shared between organizations. Depending on the use case, the name organization may be misleading and often times it can help to think about organizations as accounts or entities since a single business (or even human) may have many organizations.
 
 In general it is recommended to keep the number of resources in an organization, particularly policies, limited. Limited resources is recommended, in part, because it helps make it easier to reason about what actions will be accepted.
 
-Organizations have resource limits, which are described in detail [here](https://turnkey.readme.io/docs/faq#bare-there-limits-on-how-many-resources-i-can-create-or-activities-i-can-execute-b)
+Organizations have resource limits, which are described in detail [here](/faq)
 
 ## Sub Organization
 

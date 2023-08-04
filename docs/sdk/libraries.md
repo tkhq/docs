@@ -1,9 +1,10 @@
 ---
 sidebar_position: 1
-description: Javascript and Go SDK implementations
+description: Turnkey clients and libraries
+slug: /sdk/libraries
 ---
 
-# Implementations
+# Libraries
 
 Turnkey currently has SDK implementations in [JavaScript](https://github.com/tkhq/sdk) and [Go](https://github.com/tkhq/go-sdk). 
 
