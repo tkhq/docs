@@ -100,7 +100,7 @@ const config = {
             position: 'right',
           },
           {
-            to: 'https://beta.turnkey.io',
+            to: 'https://app.turnkey.com',
             label: 'Dashboard',
             position: 'right',
           },

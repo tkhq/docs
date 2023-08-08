@@ -55,7 +55,7 @@ Turnkey's primitive for private keys is cryptographic curves, not specific crypt
 
 We have deeper support for common Ethereum use cases in our API and SDKs, including address derivation and scripts to help you construct simple transactions.
 
-If there are specific cryptocurrencies you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.io>.
+If there are specific cryptocurrencies you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.com>.
 
 ### <b>Do you support transaction construction and broadcast?</b>
 

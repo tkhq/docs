@@ -16,7 +16,7 @@ Creating a new Sub-Organization is an activity in the parent organization. The a
 - a list of root users
 - a root quorum threshold
 
-Root users in the root users list can be programmatic or human, with one or many credentials attached. Below we explain how you might want to use this primitive as a way to model end-user controlled wallets, or custodial wallets. If you have another use-case in mind, or questions/feedback on this page, reach out to [welcome@turnkey.io](mailto:welcome@turnkey.io)!
+Root users in the root users list can be programmatic or human, with one or many credentials attached. Below we explain how you might want to use this primitive as a way to model end-user controlled wallets, or custodial wallets. If you have another use-case in mind, or questions/feedback on this page, reach out to [welcome@turnkey.com](mailto:welcome@turnkey.com)!
 
 ## Sub-Organizations as End-User controlled Wallets 
 
@@ -68,7 +68,7 @@ With this setup each end-user now has sole control over their Sub-Organization a
 
 A user interface on your application prompts users to sign with their passkey to create a new wallet. This signature is used to produce a signed Turnkey request. Here are the request components:
 
-- URL: `https://coordinator-beta.turnkey.io/api/v1/create_private_keys`
+- URL: `https://api.turnkey.com/api/v1/create_private_keys`
 - X-Stamp header: set to the WebAuthn stamp collected on the application's frontend (the End-User passkey signature)
 - The request body: `CREATE_PRIVATE_KEYS` activity request.
 
