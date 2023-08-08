@@ -10,7 +10,7 @@ This quickstart will guide you through Turnkey’s onboarding, API key generatio
 
 ## Create your Turnkey Organization
 
-- Visit [beta.turnkey.io/dashboard/auth/initial](https://beta.turnkey.io/dashboard/auth/initial) and enter your email address (note: you must be part of our private beta to sign up).
+- Visit [app.turnkey.com/dashboard/auth/initial](https://app.turnkey.com/dashboard/auth/initial) and enter your email address.
 - Confirm your email by clicking on the link inside of the confirmation email
 - Click "Continue" and choose your first authenticator (laptop biometrics or security key)
 - Pick a name for your organization click "Continue"
@@ -85,7 +85,7 @@ export KEY_ID="<Your Key ID>"
 Now you can sign any Ethereum transaction you like with this new key with our [`sign_transaction` endpoint](https://turnkey.readme.io/reference/publicapiservice_signtransaction). Make sure to replace the `unsignedTransaction` below with your own. You can use our [simple transaction generator](https://build.tx.xyz) if you need a quick transaction for testing:
 
 ```sh
-turnkey request --host coordinator-beta.turnkey.io --path /public/v1/submit/sign_transaction --body '{
+turnkey request --host api.turnkey.com --path /public/v1/submit/sign_transaction --body '{
     "timestampMs": "'"$(date +%s)"'000",
     "type": "ACTIVITY_TYPE_SIGN_TRANSACTION",
     "organizationId": "'"$ORGANIZATION_ID"'",
