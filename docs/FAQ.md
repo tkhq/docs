@@ -47,7 +47,7 @@ You can, but it doesn't mean you should. If you use your existing crypto private
 
 ### <b>Which cryptographic curves do you support?</b>
 
-Turnkey currently supports Secp256k1 private keys. We are also in the process of adding support for ED25519.
+Turnkey currently supports Secp256k1 and Ed25519 private keys.
 
 ### <b>Which cryptocurrencies do you support?</b>
 
