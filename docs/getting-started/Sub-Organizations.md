@@ -61,6 +61,7 @@ The application then uses an API-only user to create a new sub-organization on b
     }],
     "rootQuorumThreshold": 1
   }
+}
 ```
 With this setup each end-user now has sole control over their Sub-Organization and any resources created within it. Your application cannot take any actions on resources within the Sub-Organization without explicitly cryptographic authorization from the end user in the form of a passkey signature.
 
@@ -69,14 +70,47 @@ With this setup each end-user now has sole control over their Sub-Organization a
 A user interface on your application prompts users to sign with their passkey to create a new wallet. This signature is used to produce a signed Turnkey request. Here are the request components:
 
 - URL: `https://api.turnkey.com/api/v1/create_private_keys`
-- X-Stamp header: set to the WebAuthn stamp collected on the application's frontend (the End-User passkey signature)
+- `X-Stamp-Webauthn` header: set to the WebAuthn stamp collected on the application's frontend (the End-User passkey signature)
 - The request body: `CREATE_PRIVATE_KEYS` activity request.
 
-See [here](https://github.com/tkhq/sdk/blob/b35a25c4dab9de74e89f5b14aade721bea6f2234/examples/with-federated-passkeys/src/pages/index.tsx#L58) for an example in our SDK, we've abstracted getting WebAuthn signatures and creating signed Turnkey requests behind typed helpers (e.g. `federatedPostCreatePrivateKeys`)
+We've abstracted getting WebAuthn signatures and creating signed Turnkey requests behind typed methods (e.g. `stampCreatePrivateKeys`).
 
-The signed request is then forwarded to Turnkey unchanged, using the application backend as a proxy.
+Our `TurnkeyClient` (in (from [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http))) can be initialized with a `WebauthnStamper` (from [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper)):
 
-_Note: it's currently not possible to POST activities directly from your application frontend to Turnkey's backend without proxying because we do not set CORS headers. If this is blocking you, please reach out!_
+```js
+import { WebauthnStamper } from "@turnkey/webauthn-stamper";
+import { TurnkeyClient } from "@turnkey/http";
+
+const stamper = new WebAuthnStamper({
+  rpId: "your-domain.com",
+});
+
+// New HTTP client able to sign with passkeys!
+const httpClient = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  stamper
+);
+
+const signedRequest = await httpClient.stampCreatePrivateKeys({
+  type: "ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2",
+  organizationId: "<user sub-organization>",
+  timestampMs: String(Date.now()),
+  parameters: {
+    privateKeys: [
+      {
+        privateKeyName: "<name>",
+        curve: "CURVE_SECP256K1",
+        addressFormats: ["ADDRESS_FORMAT_ETHEREUM"],
+        privateKeyTags: [],
+      },
+    ],
+  },
+});
+```
+
+The `signedRequest` contains all the components needed to forward it to turnkey: URL, body, and a stamp header (with name and value properties).
+
+You can choose to send this request straight from your frontend, or proxy it through your backend server. If you want to send from the frontend, you can use `httpClient.createPrivateKeys` instead.
 
 #### Step 3: Transaction signing
 
