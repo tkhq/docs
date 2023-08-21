@@ -80,7 +80,7 @@ We currently have the following limits on organizational resources in place:
 | API keys per user       | 10                     |
 | Sub-Organizations       | unlimited              |
 
-If you find yourself reaching for higher limits, have a look at [sub-organizations](./getting-started/sub-organizations.md). They are an excellent way to manage scaling without losing performance. 
+If you find yourself reaching for higher limits, have a look at [sub-organizations](/getting-started/sub-organizations). They are an excellent way to manage scaling without losing performance. 
 
 If you are approaching any of these limits in your implementation, reach out to the Turnkey team (<hello@turnkey.com>) to discuss solutions.
 
