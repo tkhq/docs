@@ -61,7 +61,7 @@ If there are specific cryptocurrencies you'd like to see us offer deeper support
 
 Turnkey does not offer native support for transaction construction and broadcast, instead we focus on transaction signing.
 
-We suggest you use blockchain-specific libraries, like Ethers.js for Ethereum, to construct transactions. We offer simple [scripts](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/) leveraging `ethers.js`` to help you with basic transaction construction.
+We suggest you use blockchain-specific libraries, like Ethers.js for Ethereum, to construct transactions. We offer simple [scripts](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/) leveraging `ethers.js` to help you with basic transaction construction.
 
 You can use any blockchain node provider, like Infura or Alchemy, to broadcast your transactions.
 
