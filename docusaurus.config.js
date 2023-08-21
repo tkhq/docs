@@ -130,10 +130,6 @@ const config = {
           {
             title: 'More',
             items: [
-              // {
-              //   label: 'Blog',
-              //   to: '/blog',
-              // },
               {
                 label: 'GitHub',
                 href: 'https://github.com/tkhq/',
@@ -141,7 +137,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Turnkey. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Turnkey`,
       },
       prism: {
         theme: lightCodeTheme,

@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-description: Getting stated with Turnkey's API
+description: Getting started with the Turnkey API
 slug: /api-introduction
 ---
 
@@ -41,8 +41,12 @@ For reference, here is how we've implemented this:
 ## Queries and Submissions
 Our API endpoints are divided in 2 broad categories: queries and submissions.
 
-Queries are read requests
-Submission are requests to execute an activity on Turnkey
-We've separated these 2 categories because all submissions return an Activity and can be subject to consensus if your organization has consensus-based policies. It's best to think of a call to "/submit/..." as a request to start an asynchronous process. The Activity you get back has an ID you can use to poll if needed.
+- Queries are read requests (for example: "get users")
+- Submissions are requests to execute an activity on Turnkey (for example: "create policy")
 
-Queries return data synchronously, and are not subject to consensus.
+We've separated these 2 categories because all submissions return an Activity and can be subject to consensus if your organization has consensus-based policies. It's best to think of a call to "/submit/..." as a request to start an asynchronous process. The response to a submit request will contain new activity, with an ID you can use to poll until activity completion if needed.
+
+Our API is idempotent: for each activity submission, the whole request body is hashed into a fingerprint. If you resubmit the same payload, you'll get the same activity instead of a new one. This helps with idempotency, and helps with security too. Because each activity request must contain a recent timestamp (in the `timestampMs` field), this avoids replay attacks: a third party can't generate new activities by re-POSTing previous activity requests.
+
+Queries return data synchronously, do not generate activities, and are not subject to consensus.
+

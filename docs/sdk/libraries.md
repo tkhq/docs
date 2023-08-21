@@ -13,7 +13,7 @@ Turnkey currently has SDK implementations in [JavaScript](https://github.com/tkh
 The following are libraries we have direct compatibility with:
 
 ## Ethers
-`@turnkey/ethers` exports a `TurnkeySigner` that serves as a drop-in replacement for an Ethers signer. Out of the box, it supports `{ signTransaction | signMessage | signTypedData }`. See full implementation [here](https://github.com/tkhq/sdk/tree/main/packages/ethers) for more details and examples. Note that you must **bring your own provider and connect it** to the TurnkeySigner.
+[`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) exports a `TurnkeySigner` that serves as a drop-in replacement for an Ethers signer. Out of the box, it supports `{ signTransaction | signMessage | signTypedData }`. See full implementation [here](https://github.com/tkhq/sdk/tree/main/packages/ethers) for more details and examples. Note that you must **bring your own provider and connect it** to the TurnkeySigner.
 
 ```node
 // Initialize a Turnkey Signer
@@ -27,8 +27,14 @@ const provider = new ethers.providers.InfuraProvider(network);
 const connectedSigner = turnkeySigner.connect(provider);
 ```
 
+## Viem
+
+[`@turnkey/viem`](https://www.npmjs.com/package/@turnkey/viem) provides a Turnkey [Custom Account](https://viem.sh/docs/accounts/custom.html#custom-account) (signer) which implements the signing APIs expected by Viem clients.
+
+See [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem) and [`with-viem-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys) for examples.
+
 ## CosmJS
-Similarly, `@turnkey/cosmjs` exports a `TurnkeyDirectWallet` that serves as a drop-in replacement for a CosmJS direct wallet. It includes support for `signDirect`. See full implementation [here](https://github.com/tkhq/sdk/tree/main/packages/cosmjs) for more details and examples.
+Similarly, [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs) exports a `TurnkeyDirectWallet` that serves as a drop-in replacement for a CosmJS direct wallet. It includes support for `signDirect`. See full implementation [here](https://github.com/tkhq/sdk/tree/main/packages/cosmjs) for more details and examples.
 
 ```node
 // Initialize a Turnkey Signer
@@ -45,4 +51,5 @@ const selfAddress = account.address;
 ```
 
 ## @solana/web3
+
 While Turnkey does not yet export a package that wraps `@solana/web3.js` functionality, you can still sign Solana transactions using the Turnkey API directly. See [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana) for an example.
