@@ -12,19 +12,19 @@ The grammar has been designed for flexibility and expressiveness. We currently s
 | Operation  | Operators                     | Example                     | Types                            |
 | ---------- | ----------------------------- | --------------------------- | -------------------------------- |
 | logical    | &&, \|\|                      | "true && false"             | (bool, bool) -> bool             |
-| comparison | ==, !=, \<, >, \<=, >=        | "1 < 2"                     | (int, int)  -> bool              |
-| comparison | ==, !=,                       | "'a' != 'b'"                | (string, string)  -> bool        |
-| comparison | in                            | "1 in [1, 2, 3]"            | (T, list\<T\>) -> bool           |
-| access     | x[\<index\>]                  | \[1,2,3\]\[0\]              | (list\<T\>) -> T                 |
-| access     | x[\<index\>]                  | "'abc'[0]"                  | (string) -> string               |
-| access     | x[\<start\>..\<end\>]         | \[1,2,3\]\[0..2\]           | (list\<T\>) -> (list\<T\>)       |
-| access     | x[\<start\>..\<end\>]         | "'abc'[0..2]"               | (string) -> string               |
-| access     | x.\<field\>                   | "user.tags"                 | (struct) -> T                    |
-| function   | x.all(item, \<predicate\>)    | "[1,1,1].all(x, x == 1)"    | (list\<T\>) -> bool              |
-| function   | x.any(item, \<predicate\>)    | "[1,2,3].any(x, x == 1)"    | (list\<T\>) -> bool              |
-| function   | x.contains(\<value\>)         | "[1,2,3].contains(1)"       | (list\<T\>) -> bool              |
-| function   | x.count()                     | "[1,2,3].count()"           | (list\<T\>) -> int               |
-| function   | x.filter(item, \<predicate\>) | "[1,2,3].filter(x, x == 1)" | (list\<T\>) -> (list\<T\>)       |
+| comparison | ==, !=, <, >, <=, >=          | "1 < 2"                     | (int, int)  -> bool              |
+| comparison | ==, !=                        | "'a' != 'b'"                | (string, string)  -> bool        |
+| comparison | in                            | "1 in [1, 2, 3]"            | (T, list<T\>) -> bool            |
+| access     | x[<index\>]                   | \[1,2,3\]\[0\]              | (list<T\>) -> T                  |
+| access     | x[<index\>]                   | "'abc'[0]"                  | (string) -> string               |
+| access     | x[<start\>..<end\>]           | \[1,2,3\]\[0..2\]           | (list<T\>) -> (list<T\>)         |
+| access     | x[<start\>..<end\>]           | "'abc'[0..2]"               | (string) -> string               |
+| access     | x.<field\>                    | "user.tags"                 | (struct) -> T                    |
+| function   | x.all(item, <predicate\>)     | "[1,1,1].all(x, x == 1)"    | (list<T\>) -> bool               |
+| function   | x.any(item, <predicate\>)     | "[1,2,3].any(x, x == 1)"    | (list<T\>) -> bool               |
+| function   | x.contains(<value\>)          | "[1,2,3].contains(1)"       | (list<T\>) -> bool               |
+| function   | x.count()                     | "[1,2,3].count()"           | (list<T\>) -> int                |
+| function   | x.filter(item, <predicate\>)  | "[1,2,3].filter(x, x == 1)" | (list<T\>) -> (list<T\>)         |
 
 ## Keywords
 
@@ -34,7 +34,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 
 | Keyword       | Type         | Description                              |
 | ------------- | ------------ | ---------------------------------------- |
-| **approvers** | list\<User\> | The users that have approved an activity |
+| **approvers** | list<User\>  | The users that have approved an activity |
 
 ### Condition
 
@@ -55,7 +55,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | **bool**      | true          |                                                |
 | **int**       | 256           | i64                                            |
 | **string**    | 'a'           | only single quotes are supported               |
-| **list\<T\>** | [1, 2, 3]     | a list of type T                               |
+| **list<T\>**  | [1, 2, 3]     | a list of type T                               |
 | **struct**    | { id: 'abc' } | a key-value map of { field:T } (defined below) |
 
 ### Struct
@@ -63,14 +63,14 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | Struct                  | Field     | Type           | Description                                                                           |
 | ----------------------- | --------- | -------------- | ------------------------------------------------------------------------------------- |
 | **User**                | id        | string         | The identifier of the user                                                            |
-|                         | tags      | list\<string\> | The collection of tags for the user                                                   |
+|                         | tags      | list<string\>  | The collection of tags for the user                                                   |
 |                         | email     | string         | The email address of the user                                                         |
 |                         | alias     | string         | The alias of the user                                                                 |
 | **Activity**            | type      | string         | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION)                        |
 |                         | resource  | string         | The target resource of the activity (e.g. USER, PRIVATE_KEY, POLICY, CREDENTIAL, etc) |
 |                         | action    | string         | The action of the activity (e.g. CREATE, UPDATE, DELETE, SIGN, etc)                           |
 | **PrivateKey**          | id        | string         | The identifier of the private key                                                     |
-|                         | tags      | list\<string\> | The collection of tags for the private key                                            |
+|                         | tags      | list<string\>  | The collection of tags for the private key                                            |
 | **EthereumTransaction** | from      | string         | The sender address of the transaction                                                 |
 |                         | to        | string         | The receiver address of the transaction                                               |
 |                         | data      | string         | The arbitrary data of the transaction (hex-encoded)                                   |
