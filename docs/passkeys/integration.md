@@ -8,24 +8,24 @@ sidebar_position: 2
 
 ## Passkey flow
 
-A passkey flow is composed of 4 main steps, depicted below:
+A typical passkey flow is composed of 4 main steps, depicted below:
 
 <img src="/img/passkeys/passkey_flow.png" alt="Passkey prompt on Turnkey" width="920px" />
 
 1. Your app frontend triggers a passkey prompt
 2. Your end-user uses their device to produce a signature with their passkey, and a signed request is produced
-3. The signed is forwarded to your backend. This step is optional, see ["To Proxy or not to proxy"](#to-proxy-or-not-to-proxy-signed-requests) below for more information.
+3. The signed request is forwarded to your backend. This step is optional, see ["To Proxy or not to proxy"](#proxying-signed-requests) below for more information.
 4. The signed request is processed by Turnkey and its secure enclaves. This where signature verification and actions such as key generation or signing happens
 
-This flow happens once for **registration** and for each subsequent **authentication** or signature requests. The main difference is the browser APIs used to trigger the passkey prompt in step (1):
-- passkey registration uses `navigator.credentials.create`. This is described in [this guide](https://web.dev/passkey-registration/). This is the API which triggers the creation of a **new** passkey.
-- passkey authentication uses `navigator.credentials.get`. See [this guide](https://web.dev/passkey-form-autofill/) for more information. This is the API which triggers a signature prompt for an **existing** passkey.
+This flow happens once for **registration** and for each subsequent **authentication** or signature request. The main difference is the browser APIs used to trigger the passkey prompt in step (1):
+- **Passkey registration** uses `navigator.credentials.create`. This is described in [this guide](https://web.dev/passkey-registration/). This is the API which triggers the creation of a **new** passkey.
+- **Passkey authentication** uses `navigator.credentials.get`. See [this guide](https://web.dev/passkey-form-autofill/) for more information. This is the API which triggers a signature prompt for an **existing** passkey.
 
 ## Our SDK can help
 
 Our SDK has integrated passkey functionality, and we've built examples to help you get started.
 
-- [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http) has a helpers to trigger passkey registration (`getWebAuthnAttestation`). You can see it in action in our [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys) example: [direct code link](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88)
+- [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http) has a helper to trigger passkey registration (`getWebAuthnAttestation`). You can see it in action in our [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys) example: [direct code link](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88)
 - [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper) is a passkey-compatible stamper which integrates seamlessly with `TurnkeyClient`:
   ```js
   import { WebauthnStamper } from "@turnkey/webauthn-stamper";
@@ -58,9 +58,9 @@ Our SDK has integrated passkey functionality, and we've built examples to help y
     // (omitting the rest of this for brevity)
   })
   ```
-- [`@turnkey/viem`](https://www.npmjs.com/package/@turnkey/viem) is a package wrapping all of the above so that you work directly with Viem without worrying about passkeys. See [this demo](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys)
+- [`@turnkey/viem`](https://www.npmjs.com/package/@turnkey/viem) is a package wrapping all of the above so that you work directly with Viem without worrying about passkeys. See [this demo](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys).
 
-If you find yourself in need of an abstraction or integration that doesn't exist yet, please get in touch by [creating an issue on our sdk repo](https://github.com/tkhq/sdk/issues), or contact us at <hello@turnkey.com>. We're here to make this as easy as possible for you and your team!
+If you find yourself in need of an abstraction or integration that doesn't exist yet, please get in touch by [creating an issue on our SDK repo](https://github.com/tkhq/sdk/issues), starting a discussion in our [community repo](https://github.com/orgs/tkhq/discussions), or contacting us at <hello@turnkey.com>. We're here to make this as easy as possible for you and your team!
 
 Regardless of whether you use one of our abstractions, take a look at [our registration and authentication options guide](/passkeys/options). This will help you choose the right options for your passkey flow.
 
@@ -68,10 +68,10 @@ Regardless of whether you use one of our abstractions, take a look at [our regis
 
 If you're wondering how to create independent, non-custodial wallets for your end-users, head to [Sub-Organizations](/getting-started/sub-organizations). In short: you'll be able to pass the registered passkeys as part of a "create sub-organization" activity, making your end-users the sole owners of any resource created within the sub-organization (including private keys). Your organization will only have read permissions.
 
-It's important to note that the initial activity to create a sub-organization has to be authorized by an API key or a user in your main Turnkey organization (otherwise anyone would be able to create sub-organizations in your organization!). Here's an example where the initial registration is done, and posted to a NexJS backend: [code link](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116). The NexJS backend inserts the attestation and signs the "create sub-organization" activity here: [code link](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/api/subOrg.ts#L25-L82)
+It's important to note that the initial activity to create a sub-organization has to be authorized by an API key or a user in your main Turnkey organization. Otherwise anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the "create sub-organization" activity [here](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/api/subOrg.ts#L25-L82).
 
 
-## To Proxy or not to proxy signed requests
+## Proxying signed requests
 
 Turnkey has an open CORS policy for its public API. This means your frontend can choose to POST sign requests straight to `https://api.turnkey.com`. Your frontend can also choose to forward the requests via a backend server (which POSTs the signed request to Turnkey).
 

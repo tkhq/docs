@@ -6,11 +6,11 @@ sidebar_position: 3
 
 # Passkey options
 
-Whether you use the raw browser APIs or one of our helpers you'll have flexibility to set registration and authentication options. Let's go over them!
+Whether you use the raw browser APIs or one of our helpers you'll have flexibility to set registration and authentication options. This page provides an overview of potential implementation options.
 
 ## Registration options
 
-Mozilla also has good (but lengthy!) documentation on each option: [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/create). Below we detail the most relevant options you'll want to think about.
+Mozilla has good (but lengthy) documentation on each option: [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/create). Below we detail the most relevant options you'll want to think about.
 
 ### `challenge`
 
@@ -22,7 +22,7 @@ Number of seconds before "giving up". The browser will simply show a timeout pop
 
 <img src="/img/passkeys/timeout.png" alt="authenticatorAttachment unspecified" width="360px"/><br/><br/>
 
-This UI isn't very helpful, so we recommend making the timeout long to minimize user exposure. The less they see this, the better!
+This UI isn't very helpful, so we recommend making the timeout long to minimize user exposure. The less they see this, the better.
 
 ### `rp`
 
@@ -51,14 +51,14 @@ Turnkey currently supports P256 only. In the near future Turnkey will support RS
 ### `user`
 
 The `user` field has three sub-fields:
-- `id`: we recommend settings this to a random string. It won't be visible to the end user.
+- `id`: we recommend setting this to a random string. It won't be visible to the end user.
 - `name`: this will show up in the passkey list modal (see screenshot below). We recommend setting this to something the user will recognize: their email, the name of your app, or potentially leave this up to the user:<br/>
   <img src="/img/passkeys/user_name_and_display.png" alt="RPID in registration prompt" width="360px"/>
-- `displayName`: as far as we can tell this doesn't show up in current browser UIs. It might show up in future iterations so it's best to populate this with the same value than `name`.
+- `displayName`: as far as we can tell this doesn't show up in current browser UIs. It might show up in future iterations so it's best to populate this with the same value as `name`.
 
 ### `authenticatorSelection`
 
-This option has lots of consequences for UX, and it has many sub-options.
+This option has lots of consequences for UX, and it has many sub-options, outlined below.
 
 #### `authenticatorAttachment`
 This option, if set, restricts the type of authenticators that can be registered.
@@ -82,12 +82,12 @@ These options allow you to specify whether you want your users to create discove
 
 #### `userVerification`
 
-This flag defaults to "preferred" and referred to authentication mechanisms on the authenticator itself. If this is set to "required", the browser will prompt the user to create a PIN for their yubikey. We recommend setting this to "discouraged" or "preferred" to maximize compatibility (some authenticators do not support user verification).
+This flag defaults to "preferred" and referred to authentication mechanisms on the authenticator itself. If this is set to "required", the browser will prompt the user to create a PIN for their security key. We recommend setting this to "discouraged" or "preferred" to maximize compatibility (some authenticators do not support user verification).
 
 
 ## Authentication options
 
-Mozilla's documentation on authentication options can be found here: [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/get). Luckily there are fewer authentication options than registration! 
+Mozilla's documentation on authentication options can be found here: [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/get). Luckily there are fewer authentication options than registration.
 
 ### `challenge`
 
