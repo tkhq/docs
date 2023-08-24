@@ -5,9 +5,9 @@ slug: /getting-started/sub-organizations
 ---
 # Sub-organizations
 
-Using Turnkey’s flexible infrastructure, you can programmatically create and manage Sub-Organizations for your end users. Sub-Organizations aren't subject to size limits: you can create as many Sub-Organizations as needed. The parent organization has **read-only** visibility into all of its Sub-Organization, and activities performed in Sub-Organizations roll up to the parent for billing purposes.
+Using Turnkey’s flexible infrastructure, you can programmatically create and manage Sub-Organizations for your end users. Sub-Organizations aren't subject to size limits: you can create as many Sub-Organizations as needed. The parent organization has **read-only** visibility into all of its Sub-Organizations, and activities performed in Sub-Organizations roll up to the parent for billing purposes.
 
-We envision Sub-Organizations being very useful to model your End-Users if you're a business using Turnkey for key management. Let's explore how..
+We envision Sub-Organizations being very useful to model your End-Users if you're a business using Turnkey for key management. Let's explore how.
 
 ## Creating Sub-Organizations 
 
