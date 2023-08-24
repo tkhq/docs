@@ -5,9 +5,9 @@ slug: /getting-started/sub-organizations
 ---
 # Sub-organizations
 
-Using Turnkey’s flexible infrastructure, you can programmatically create and manage Sub-Organizations for your end users. Sub-Organizations aren't subject to size limits: you can create as many Sub-Organizations as needed. The parent organization has **read-only** visibility into all of its Sub-Organization, and activities performed in Sub-Organizations roll up to the parent for billing purposes.
+Using Turnkey’s flexible infrastructure, you can programmatically create and manage Sub-Organizations for your end users. Sub-Organizations aren't subject to size limits: you can create as many Sub-Organizations as needed. The parent organization has **read-only** visibility into all of its Sub-Organizations, and activities performed in Sub-Organizations roll up to the parent for billing purposes.
 
-We envision Sub-Organizations being very useful to model your End-Users if you're a business using Turnkey for key management. Let's explore how..
+We envision Sub-Organizations being very useful to model your End-Users if you're a business using Turnkey for key management. Let's explore how.
 
 ## Creating Sub-Organizations 
 
@@ -64,6 +64,8 @@ The application then uses an API-only user to create a new sub-organization on b
 }
 ```
 With this setup each end-user now has sole control over their Sub-Organization and any resources created within it. Your application cannot take any actions on resources within the Sub-Organization without explicitly cryptographic authorization from the end user in the form of a passkey signature.
+
+It's important to note that the initial activity to create a sub-organization has to be authorized by an API key or a user in your main Turnkey organization. Otherwise anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the "create sub-organization" activity [here](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/api/subOrg.ts#L25-L82).
 
 #### Step 2: Creating a wallet
 
