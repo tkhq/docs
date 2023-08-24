@@ -20,7 +20,7 @@ With terminology out of the way, what is a "discoverable" credential compared to
 
 ## Discoverable credentials
 
-A discoverable credential is a self-contained key pair, stored on the end-user's device. This is the model that passkeys work best in: because these keys are self-contained, they can easily be synced and used across devices independently. More importantly: the end-user is able to list their passkeys and choose which device/passkey they'd like to use:
+A discoverable credential is a self-contained key pair, stored on the end-user's device. Discoverable credentials are preferred because keys are self-contained, can easily be synced and can be used across devices independently. Crucially for UX, the end-user is able to list their passkeys and choose which device/passkey they'd like to use:
 
 <img src="/img/passkeys/discoverable_device_choice.png" alt="Device selection on Chrome" width="400px" />
 <img src="/img/passkeys/discoverable_passkey_choice.png" alt="Passkey selection on Chrome" width="321px" style={{marginLeft: '10px'}} />
