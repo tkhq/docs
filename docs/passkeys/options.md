@@ -6,7 +6,7 @@ sidebar_position: 3
 
 # Passkey options
 
-Whether you use the raw browser APIs or one of our helpers you'll have flexibility to set registration and authentication options. This page provides an overview of potential implementation options.
+Whether you use the raw browser APIs or one of our helpers you'll have flexibility to set your own registration and authentication options. This page provides an overview and some recommendations related to these options.
 
 ## Registration options
 

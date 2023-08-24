@@ -65,6 +65,8 @@ The application then uses an API-only user to create a new sub-organization on b
 ```
 With this setup each end-user now has sole control over their Sub-Organization and any resources created within it. Your application cannot take any actions on resources within the Sub-Organization without explicitly cryptographic authorization from the end user in the form of a passkey signature.
 
+It's important to note that the initial activity to create a sub-organization has to be authorized by an API key or a user in your main Turnkey organization. Otherwise anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the "create sub-organization" activity [here](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/api/subOrg.ts#L25-L82).
+
 #### Step 2: Creating a wallet
 
 A user interface on your application prompts users to sign with their passkey to create a new wallet. This signature is used to produce a signed Turnkey request. Here are the request components:
