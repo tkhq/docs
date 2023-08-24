@@ -31,7 +31,7 @@ For a live example using discoverable credentials, see [wallet.tx.xyz](https://w
 
 ## Non-Discoverable credentials
 
-A non-discoverable credential, on the other hand, isn’t stored on the end-user's device fully: Turnkey must store the generated credential ID; otherwise the user won’t be able to sign. This is because the actual signing key is a combination of an “on-device” secret and the credential ID. See cryptographic details [here](https://crypto.stackexchange.com/questions/105942/how-do-non-resident-keys-work-in-webauthn). A a high-level, non-discoverable credentials work like a HD wallet with random derivation paths: one seed stored on-device, combined with random credential IDs stored by RPs somewhere else.
+A non-discoverable credential isn’t stored on the end-user's device fully: Turnkey must store the generated credential ID; otherwise the user won’t be able to sign. This is because the actual signing key is a combination of an “on-device” secret and the credential ID (see details [here](https://crypto.stackexchange.com/questions/105942/how-do-non-resident-keys-work-in-webauthn)). At a high-level, non-discoverable credentials work like a HD wallet with random derivation paths: one seed stored on-device, combined with random credential IDs stored by RPs somewhere else.
 
 Why would you choose non-resident credentials?
 - Some older Yubikey models have limited key slots, and they’ll simply refuse to register if you require discoverable credentials. Non-discoverable credentials have a wider support.
