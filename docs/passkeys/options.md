@@ -84,8 +84,8 @@ These options allow you to specify whether you want your users to create discove
 
 "User verification" refers to mechanisms on the authenticators themselves such as PIN codes or biometric/fingerprint readers. This flag can be set to:
 - `discouraged`: yubikey PINs won't be required even if the device technically supports it. We've found that for TouchID/FaceID, authentication will still be required however.
-- `preferred`: yubikey PINs and other authentication mechanisms will be required if supported, but devices without them will be accepted
-- `required`: authenticators without user verification support won't be accepted
+- `preferred`: yubikey PINs and other authentication mechanisms will be required if supported, but devices without them will be accepted.
+- `required`: authenticators without user verification support won't be accepted.
 
 You should set this to "discouraged" or "preferred" to maximize compatibility (some authenticators do not support user verification).
 
