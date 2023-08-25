@@ -5,9 +5,9 @@ sidebar_position: 3
 ---
 # Secure enclaves
 
-A core security anchor at Turnkey is the ability to prove to ourselves and our users that all systems within secure enclaves are running exactly the software we expect at any given time. To accomplish this, all security-critical Turnkey services, including key generation, signing, and our policy engine, are deployed in secure enclaves. 
+A core security anchor at Turnkey is the ability to prove to ourselves and our users that all systems within secure enclaves are running exactly the software we expect at any given time. To accomplish this, all security-critical Turnkey services, which perform actions including key generation, signing, and our policy engine, are deployed in secure enclaves. 
 
-Secure enclaves, also called Trusted Execution Environments, are highly constrained compute environments that support cryptographic attestation to verify the enclave’s identity and ensure only authorized code is running. These enclaves operate in hardware-enforced isolation - they have no persistent storage, no interactive access, and no external networking. 
+Secure enclaves, also called Trusted Execution Environments, are highly constrained compute environments that support cryptographic attestation to verify the enclave’s identity and ensure that only authorized code is running. These enclaves operate in hardware-enforced isolation –– they have no persistent storage, no interactive access, and no external networking. 
 
 The following outlines the structure of a single enclave application:
 
