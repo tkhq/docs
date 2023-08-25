@@ -87,12 +87,11 @@ These options allow you to specify whether you want your users to create discove
 - `preferred`: yubikey PINs and other authentication mechanisms will be required if supported, but devices without them will be accepted.
 - `required`: authenticators without user verification support won't be accepted.
 
-You should set this to "discouraged" or "preferred" to maximize compatibility (some authenticators do not support user verification).
+To maximize compatibility we recommend setting `userVerification` to "discouraged" or "preferred" because some authenticators do not support user verification.
 
-The yubikey PIN UX in browsers isn't great so in practice, setting this to "discouraged" is best unless you operate with a strict security threat model where user verification makes a big difference.
+Due to poor yubikey PIN UX in browsers, setting `userVerification` to "discouraged" is best unless you operate with a strict security threat model where user verification makes a big difference.
 
 "preferred" is the default value if you don't specify this option.
-
 
 ## Authentication options
 
