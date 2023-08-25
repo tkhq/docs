@@ -22,7 +22,7 @@ Number of seconds before "giving up". The browser will simply show a timeout pop
 
 <img src="/img/passkeys/timeout.png" alt="authenticatorAttachment unspecified" width="360px"/><br/><br/>
 
-This UI isn't very helpful, so we recommend making the timeout long to minimize user exposure. The less they see this, the better.
+This UI isn't very helpful, so we recommend making the timeout long (5 minutes). The less your users see this, the better.
 
 ### `rp`
 
@@ -82,8 +82,16 @@ These options allow you to specify whether you want your users to create discove
 
 #### `userVerification`
 
-This flag defaults to "preferred" and referred to authentication mechanisms on the authenticator itself. If this is set to "required", the browser will prompt the user to create a PIN for their security key. We recommend setting this to "discouraged" or "preferred" to maximize compatibility (some authenticators do not support user verification).
+"User verification" refers to mechanisms on the authenticators themselves such as PIN codes or biometric/fingerprint readers. This flag can be set to:
+- `discouraged`: yubikey PINs won't be required even if the device technically supports it. We've found that for TouchID/FaceID, authentication will still be required however.
+- `preferred`: yubikey PINs and other authentication mechanisms will be required if supported, but devices without them will be accepted.
+- `required`: authenticators without user verification support won't be accepted.
 
+To maximize compatibility we recommend setting `userVerification` to "discouraged" or "preferred" because some authenticators do not support user verification.
+
+Due to poor yubikey PIN UX in browsers, setting `userVerification` to "discouraged" is best unless you operate with a strict security threat model where user verification makes a big difference.
+
+"preferred" is the default value if you don't specify this option.
 
 ## Authentication options
 
