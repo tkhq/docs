@@ -26,7 +26,7 @@ Passkeys come with big security upgrades compared to traditional passwords:
 
 If you know about Webauthn, congratulations: a lot of this will feel familiar. Passkeys rely on the [same web standard](https://www.w3.org/TR/webauthn-2/) and the same browser APIs: `navigator.credentials.create` and `navigator.credentials.get`.
 
-The difference? Passkeys are resident credentials and they can be synced between devices. As a result, they are **not** device-bound and can be used from any device. Say you are logged into both your iPhone and your Macbook with the same Apple ID, passkeys created on one device will be synced through [iCloud Keychain](https://support.apple.com/en-us/HT204085). If you're using Google browsers on different devices using the same Google account, [Google Password Manager](https://passwords.google/) will sync passkeys and make them available across devices seamlessly.
+The difference? Passkeys are resident credentials and they can be synced between devices. As a result, they are **not** device-bound and can be used from any device. Say you are logged into both your iPhone and your Macbook with the same Apple ID, passkeys created on one device will be synced through [iCloud Keychain](https://support.apple.com/en-us/HT204085). If you're using Chrome on different Android devices using the same Google account, [Google Password Manager](https://passwords.google/) will sync passkeys and make them available across devices seamlessly. Google has plans to support syncing more broadly across different operating systems, see [this support summary](https://developers.google.com/identity/passkeys/supported-environments#chrome-passkey-support-summary).
 
 ## Betting on Webauthn and Passkeys
 
