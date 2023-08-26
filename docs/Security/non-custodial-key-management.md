@@ -16,7 +16,7 @@ Although we’re not a bank, by analogy to physical security, Turnkey’s role i
 
 ## Private key storage
 
-Turnkey does not store unencrypted private keys, but rather persists encrypted private key ciphertext inside of our primary and disaster recovery databases. This ciphertext is only be decrypted from within the bounds of a secure enclave running verified Turnkey applications. Our [security overview](/security/our-approach) goes in-depth with how the process works. 
+Turnkey does not store unencrypted private keys, but rather persists encrypted private key ciphertext inside of our primary and disaster recovery databases. This ciphertext is only to be decrypted from within the bounds of a secure enclave running verified Turnkey applications. Our [security overview](/security/our-approach) goes over the process in depth. 
 
 ## Non-custodial wallets for end users
 
