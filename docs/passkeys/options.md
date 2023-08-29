@@ -101,7 +101,7 @@ Must match the `rp.id` option during passkey registration. Passkeys are domain b
 
 List of objects restricting which credentials can be used during authentication. This is crucial to specify if you're using [non-discoverable credentials](/passkeys/discoverable-vs-non-discoverable#non-discoverable-credentials) or if you want to tailor browser prompts to the right type of transport.
 
-Each object in this list has an ID (the credential ID) and a list of transports (e.g. "hybrid", "internal", "usb", etc). Transport is **optional** but results in better, more targeted prompts. For example, here are screenshot of targeted prompts on Chrome+MacOS:
+Each object in this list has an ID (the credential ID) and a list of transports (e.g. "hybrid", "internal", "usb", etc). The `transports` list is **optional** but results in better, more targeted prompts. For example, here are screenshot of targeted prompts captured on Chrome, on a MacBook laptop:
 
 | `transports: ["internal"]` | `transports: ["usb"]` | `transports: ["hybrid"]` |
 |----------------------------|-----------------------|--------------------------|
@@ -113,7 +113,7 @@ If the wrong credential ID is specified, `transports: ["internal"]` is set, brow
 
 <img src="/img/passkeys/no_passkey_available.png" alt="Chrome error when no matching passkey has been found for the provided Credential ID" width="360px"/>
 
-However, if the wrong credential ID is specified without `transports` set (or with other-than-internal `transports` set), browsers won't error right away because they can't enumerate credentials a priori. They will display an error once the user has pressed their security key or gone through the cross-device passkey flow:
+However, if the wrong credential ID is specified without `transports` set (or with other-than-internal `transports` set), browsers won't error right away because they can't enumerate external credentials. They will display an error once the user has pressed their security key or gone through the cross-device passkey flow:
 
 <img src="/img/passkeys/wrong_credential_id.png" alt="Chrome error when the credential ID used by the user is not in the allowCredentials list" width="360px"/>
 
