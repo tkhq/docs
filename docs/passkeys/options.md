@@ -61,20 +61,12 @@ The `user` field has three sub-fields:
 This option has lots of consequences for UX, and it has many sub-options, outlined below.
 
 #### `authenticatorAttachment`
-This option, if set, restricts the type of authenticators that can be registered.
+This option, if set, restricts the type of authenticators that can be registered. See the table below for the values this option can take and their effect on registration prompts (captured via Chrome on a MacBook Pro).
 
-If set to `platform`, only internal authenticators (face ID, touch ID, and so on) can be registered:
-
-<img src="/img/passkeys/attachment_platform.png" alt="authenticatorAttachment set to platform" width="360px"/><br/><br/>
-
-If set to `cross-platform`, only passkeys from other devices are allowed:
-
-<img src="/img/passkeys/attachment_cross_platform.png" alt="authenticatorAttachment set to cross-platform" width="360px"/><br/><br/>
-
-If you want broad compatibility, leave this option empty, and the browser UI will allow for both internal and external passkeys:
-
-<img src="/img/passkeys/attachment_unspecified.png" alt="authenticatorAttachment unspecified" width="360px"/><br/><br/>
-
+| Empty (default) | `platform` | `cross-platform` |
+|-----------------|------------|------------------|
+| If you want broad compatibility, leave this option empty, and the browser UI will allow for both internal and external passkeys. | If set to `platform`, only internal authenticators (face ID, touch ID, and so on) can be registered. | If set to `cross-platform`, only passkeys from other devices or attached via USB are allowed. |
+| <img src="/img/passkeys/attachment_unspecified.png" alt="authenticatorAttachment unspecified"/> | <img src="/img/passkeys/attachment_platform.png" alt="authenticatorAttachment set to platform"/> | <img src="/img/passkeys/attachment_cross_platform.png" alt="authenticatorAttachment set to cross-platform"/> |
 
 #### `requireResidentKey` and `residentKey`
 
@@ -107,9 +99,23 @@ Must match the `rp.id` option during passkey registration. Passkeys are domain b
 
 ### `allowCredentials`
 
-List of objects restricting which credentials can be used. This is crucial to specify if you're using [non-discoverable credentials](/passkeys/discoverable-vs-non-discoverable#non-discoverable-credentials) or if you want to tailor browser prompts to the right type of transport.
+List of objects restricting which credentials can be used during authentication. This is crucial to specify if you're using [non-discoverable credentials](/passkeys/discoverable-vs-non-discoverable#non-discoverable-credentials) or if you want to tailor browser prompts to the right type of transport.
 
-Each object in this list has an ID (the credential ID) and a list of transports (e.g. "hybrid", "internal", "usb", etc).
+Each object in this list has an ID (the credential ID) and a list of transports (e.g. "hybrid", "internal", "usb", etc). Transport is **optional** but results in better, more targeted prompts. For example, here are screenshot of targeted prompts on Chrome+MacOS:
+
+| `transports: ["internal"]` | `transports: ["usb"]` | `transports: ["hybrid"]` |
+|----------------------------|-----------------------|--------------------------|
+| <img src="/img/passkeys/transport_internal.png" alt="authentication prompt with transports: internal"/> | <img src="/img/passkeys/transport_usb.png" alt="authentication prompt with transports: usb"/> | <img src="/img/passkeys/transport_hybrid.png" alt="authentication prompt with transport: hybrid"/>
+
+The credential ID needs to be passed as a buffer but is returned from registration as a base64-encoded value: make sure to decode it (in JavaScript: `Buffer.from(storedCredentialId, "base64")`) to avoid issues.
+
+If the wrong credential ID is specified, `transports: ["internal"]` is set, browsers error right away because they can enumerate internal credentials. Chrome, for example, displays the following error:
+
+<img src="/img/passkeys/no_passkey_available.png" alt="Chrome error when no matching passkey has been found for the provided Credential ID" width="360px"/>
+
+However, if the wrong credential ID is specified without `transports` set (or with other-than-internal `transports` set), browsers won't error right away because they can't enumerate credentials a priori. They will display an error once the user has pressed their security key or gone through the cross-device passkey flow:
+
+<img src="/img/passkeys/wrong_credential_id.png" alt="Chrome error when the credential ID used by the user is not in the allowCredentials list" width="360px"/>
 
 ### `attestation`
 
