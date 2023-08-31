@@ -28,7 +28,7 @@ Our policies are defined using **JSON**. The `effect` determines if an activity 
 
 All policies defined within an Organization are evaluated on each request. The image below describes how an activity outcome is determined when resolving multiple policies. The rule follows the below steps:
 
-1. If a quorum of root users takes the action, the final outcome is `OUTCOME_DENY`
+1. If a quorum of root users takes the action, the final outcome is `OUTCOME_ALLOW`
 2. Else if any applicable policy has `EFFECT_DENY`, the final outcome is `OUTCOME_DENY`. This is also referred to as "explicit deny."
 3. Else if at least one applicable policy has `EFFECT_ALLOW`, then the final outcome is `OUTCOME_ALLOW`
 4. Else the final outcome is `OUTCOME_DENY`. This is also referred to as "implicit deny."
