@@ -127,7 +127,7 @@ This is the threat model we would suggest as a minimum for keys of any significa
 * Ensure no API keys exist with privileges that could do significant harm
 * Install the Turnkey CLI with reproducible build verification
     * Prove the Turnkey CLI was verified by multiple people
-    * See TkCLI [Moderate Trust](tkcli-moderate-trust) steps
+    * See TkCLI [Moderate Trust](https://github.com/tkhq/tkcli/#moderate-trust) steps
 * Verify public keys and policies with Turnkey CLI
     * A manipulated web interface could display false information to trick you
 
@@ -141,8 +141,6 @@ The following mitigations are not quite rolled out yet. If you want to use them,
 * Avoid using the Turnkey Web UI for all use cases
     * Supply chain or MITM attacks can manipulate most web UIs, including ours.
     * We -do- hope to reduce this risk with reproducible builds in the future
-
-[tkcli-moderate-trust]: https://github.com/tkhq/tkcli/#moderate-trust
 
 
 ### Level 4: Low trust
@@ -174,9 +172,7 @@ If you are willing to trust a single cloud provider, such as Amazon, we provide 
     * Prove the Turnkey CLI was verified by multiple people
     * Review relevant source code
     * Compile and sign binaries yourself
-    * See TkCLI [Zero Trust](tkcli-zero-trust) steps
-
-[tkcli-zero-trust]: https://github.com/tkhq/tkcli/#zero-trust
+    * See TkCLI [Zero Trust](https://github.com/tkhq/tkcli/#zero-trust) steps
 
 #### Mitigations on our roadmap
 
