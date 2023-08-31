@@ -32,6 +32,25 @@ A Turnkey API key is simply a way to authenticate requests to Turnkey. Crypto as
 
 Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](/managing-policies/overview)!), and revocable if they are lost or compromised.
 
+### Are there limits on how many resources I can create, or activities I can execute?
+
+We have limits on the number of resources within a single organization to avoid performance slowdowns. You can scale your organizational resources beyond these limits via [sub-organizations](/getting-started/sub-organizations). You can create an unlimited number of sub-organizations within a single organization.
+
+Currently, the resource limits within a single organization are as follows:
+
+| Resource                | Maximum number allowed |
+| :---------------------- | :--------------------- |
+| Private keys            | 1,000                  |
+| Users                   | 100                    |
+| Policies                | 100                    |
+| Invitations             | 100                    |
+| Tags                    | 100                    |
+| Authenticators per user | 10                     |
+| API keys per user       | 10                     |
+| Sub-Organizations       | unlimited              |
+
+If you are approaching any of these limits in your implementation and require support, reach out to the Turnkey team (<help@turnkey.com>).
+
 ### What happens if I lose my API key? Do I lose my crypto?
 
 Losing your Turnkey API key doesn't mean you'll lose your crypto:
@@ -65,27 +84,22 @@ We suggest you use blockchain-specific libraries, like Ethers.js for Ethereum, t
 
 You can use any blockchain node provider, like Infura or Alchemy, to broadcast your transactions.
 
-### Are there limits on how many resources I can create, or activities I can execute?
-
-We currently have the following limits on organizational resources in place:
-
-| Resource                | Maximum number allowed |
-| :---------------------- | :--------------------- |
-| Private keys            | 1,000                  |
-| Users                   | 100                    |
-| Policies                | 100                    |
-| Invitations             | 100                    |
-| Tags                    | 100                    |
-| Authenticators per user | 10                     |
-| API keys per user       | 10                     |
-| Sub-Organizations       | unlimited              |
-
-If you find yourself reaching for higher limits, have a look at [sub-organizations](/getting-started/sub-organizations). They are an excellent way to manage scaling without losing performance. 
-
-If you are approaching any of these limits in your implementation, reach out to the Turnkey team (<hello@turnkey.com>) to discuss solutions.
-
 ### How long is a signed activity request valid for?
 
 We require a recent timestamp in the `timestampMs` field for each new activity submission.
 
 Our secure enclaves have their own, independent, secure source of time. We currently require request timestamps to be **less than an hour old**, and **up to 5 minutes in the future**.
+
+### How do pricing and billing work? 
+
+Turnkey is priced per signature, i.e. any transaction or raw payload successfully signed by a private key created on Turnkey. Turnkey offers 25 free signatures each month. To execute more than 25 transactions in a given month, you are required to have a credit card on file or active enterprise plan on your account. To upgrade your plan, navigate to Account Settings from the menu in the top right-hand corner in the Turnkey dashboard and follow the instructions. 
+
+For more information about pricing and billing, check out the [pricing page](https://www.turnkey.com/pricing).
+
+### Where else can I get help with my Turnkey implementation?
+
+If you get stuck or have a one-off question, post it to our [developer forum](https://github.com/orgs/tkhq/discussions) or reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.  
+
+### Is my country supported?
+
+Turnkey is not currently available to users in Brazil, India, Japan, Singpore, or any countries currently subject to US OFAC sanctions. 
