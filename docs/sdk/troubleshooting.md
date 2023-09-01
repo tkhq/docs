@@ -13,5 +13,3 @@ Assuming the TurnkeySigner object was correctly instantiated, if you are running
 
 ### Using Sepolia for testing
 Ethers v5, which is the version that Turnkey's Ethers implementation relies on, is only compatible with the Sepolia network if paired with Infura (Ethers v5 does not supported Alchemy with Sepolia at this time).
-
-## Go
