@@ -19,7 +19,7 @@ yarn start
 #### With docker
 
 ```sh
-$ docker buildx create --use # This is only required on MacOS
+ç$ docker buildx create --use # This is only required on MacOS
 $ make run-dev
 ```
 
