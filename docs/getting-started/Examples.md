@@ -27,8 +27,8 @@ Clone the Turnkey sdk repo [here](https://github.com/tkhq/sdk) to explore a few 
 | [`with-viem-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys/)   | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                             |
 | [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                 | Sweep funds from one address to a different address                                                                          |
 | [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                               | Compile and deploy a smart contract                                                                                          |
-| [`rebalancer`](https://github.com/tkhq/sdk/examples/rebalancer/)                                     | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users              |
-| [`trading-runner`](https://github.com/tkhq/sdk/examples/trading-runner/)                             | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap. |
+| [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer)                                     | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users              |
+| [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner)                             | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap. |
 
 ## Demos built with Turnkey
 
