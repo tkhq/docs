@@ -9,6 +9,9 @@ It's built with [Docusaurus](https://docusaurus.io/).
 #### With yarn
 
 ```sh
+# Installs dependencies
+yarn
+
 # Compiles
 yarn build
 

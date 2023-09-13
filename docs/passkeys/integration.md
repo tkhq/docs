@@ -58,7 +58,10 @@ Our SDK has integrated passkey functionality, and we've built examples to help y
     // (omitting the rest of this for brevity)
   })
   ```
+
+### Examples
 - [`@turnkey/viem`](https://www.npmjs.com/package/@turnkey/viem) is a package wrapping all of the above so that you work directly with Viem without worrying about passkeys. See [this demo](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys).
+- [`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) is a similar package that works with Ethers. See [this demo](https://github.com/tkhq/sdk/tree/main/examples/with-ethers-and-passkeys).
 
 Regardless of whether you use our helpers and abstractions, take a look at [our registration and authentication options guide](/passkeys/options). This will help you choose the right options for your passkey flow.
 

@@ -11,12 +11,14 @@ That said, we have built out several example services and applications to help i
 
 ## SDK code examples
 
-Clone the Turnkey sdk repo [here](https://github.com/tkhq/sdk) to explore a few “turnkey” examples:
+Clone the Turnkey SDK repo [here](https://github.com/tkhq/sdk) to explore a few “turnkey” examples:
 
 | Example                                                                                                | Description                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | [`with-ethers`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/)                           | Create a new Ethereum address, then sign and broadcast a transaction using the Ethers signer with Infura                    |
 | [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem/)                               | Sign and broadcast a transaction using the Turnkey Custom Account and Infura                                                |
+| [`with-ethers-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers-and-passkeys/) | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                          |
+| [`with-viem-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys/)     | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                            |
 | [`with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs/)                           | Create a new Cosmos address, then sign and broadcast a transaction on Celestia testnet using the CosmJS signer              |
 | [`with-solana`](https://github.com/tkhq/sdk/tree/main/examples/with-solana/)                           | Create a new Solana address, then sign and broadcast a transaction on Solana's devnet                                       |
 | [`with-gnosis`](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis/)                           | Create new Ethereum addresses, configure a 3/3 Gnosis safe, and create + execute a transaction from it                      |
@@ -24,8 +26,6 @@ Clone the Turnkey sdk repo [here](https://github.com/tkhq/sdk) to explore a few 
 | [`with-nonce-manager`](https://github.com/tkhq/sdk/tree/main/examples/with-nonce-manager/)             | Create a new Ethereum address, then sign and broadcast multiple transactions in a sequential or optimistic manner           |
 | [`with-offline`](https://github.com/tkhq/sdk/tree/main/examples/with-offline/)                         | Sign a Turnkey request in offline context                                                                                   |
 | [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys/)   | A NextJS app that demonstrates how to use Turnkey to build a federated, webauthn powered authentication flow                |
-| [`with-ethers-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers-and-passkeys/) | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                          |
-| [`with-viem-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys/)     | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                            |
 | [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                   | Sweep funds from one address to a different address                                                                         |
 | [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                                 | Compile and deploy a smart contract                                                                                         |
 | [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer)                              | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users             |
