@@ -36,6 +36,12 @@ Synchronization and recovery are both supported natively by Apple and Google:
 - With Apple, Passkeys created on one device are synced through [iCloud Keychain](https://support.apple.com/en-us/HT204085) as long as the user is logged in with their Apple ID. Apple covers both syncing and recovery in ["About the security of passkeys"](https://support.apple.com/en-us/102195). For some additional detail, see [this Q&A with the passkey team](https://developer.apple.com/news/?id=21mnmxow). Apple's account recovery process is documented in [this support page](https://support.apple.com/en-us/HT204921).
 - With Google, [Google Password Manager](https://passwords.google/) syncs passkeys across devices seamlessly. Google has plans to support syncing more broadly across different operating systems, see [this support summary](https://developers.google.com/identity/passkeys/supported-environments#chrome-passkey-support-summary). Recovery is covered in [this FAQ ("What happens if a user loses their device?")](https://developers.google.com/identity/passkeys/faq#what_happens_if_a_user_loses_their_device): it relies on Google's overall [account recovery process](https://support.google.com/accounts/answer/7682439?hl=en) because passkeys are attached to Google accounts.
 
+## OS and browser support
+
+Modern browsers have great support for passkeys with the exception of Firefox, which only supports security keys. See [caniuse](https://caniuse.com/passkeys) for detailed information.
+
+Support also varies by operating system: [this matrix](https://passkeys.dev/device-support/#matrix) has detailed information about OS-level support.
+
 ## Betting on Webauthn and Passkeys
 
 We believe **it's time to move away from passwords** so we've built Turnkey without them. When you authenticate to Turnkey you'll be prompted to create a new passkey:
