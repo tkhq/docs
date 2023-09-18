@@ -72,6 +72,8 @@ This option, if set, restricts the type of authenticators that can be registered
 
 These options allow you to specify whether you want your users to create discoverable or non-discoverable credentials. See [Discoverable vs. non-discoverable](/passkeys/discoverable-vs-non-discoverable) for more information. Default values: `residentKey` is `discouraged` and `requireResidentKey` is `false`.
 
+Important note: the default for `requireResidentKey` (`discouraged`) results in different outcomes based on OS: Android devices create non-discoverable credentials whereas iOS devices create discoverable credentials. If you want to create discoverable credentials whenever possible, set `requireResidentKey` to `false` and `residentKey` to `preferred`, which work across Android and iOS devices.
+
 #### `userVerification`
 
 "User verification" refers to mechanisms on the authenticators themselves such as PIN codes or biometric/fingerprint readers. This flag can be set to:
