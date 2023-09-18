@@ -51,6 +51,19 @@ Currently, the resource limits within a single organization are as follows:
 
 If you are approaching any of these limits in your implementation and require support, reach out to the Turnkey team (<help@turnkey.com>).
 
+### Do you have any rate limits in place in your public API?
+
+Our public API currently limits users to a maximum of 20 requests per second. Specific headers are returned to indicate current quota:
+* `ratelimit-limit`: indicates the total quota (20)
+* `ratelimit-remaining`: indicates the current quota
+* `x-rate-limit-request-forwarded-for` and `x-rate-limit-request-remote-addr`: echo back your remote IP and forwarded-for IP for debugging purposes
+
+When rate limits are exceeded, an error with HTTP 429 is returned with the following message: `Too many requests. Please wait and try again in a few seconds`.
+
+This limit is on a **per IP address** basis: if you have multiple servers making requests to the turnkey API under a different IP address, each server is subject to the 20 RPS limit individually. 
+
+Please get in touch with us (<help@turnkey.com>) if you need this limit adjusted for your use-case.
+
 ### What happens if I lose my API key? Do I lose my crypto?
 
 Losing your Turnkey API key doesn't mean you'll lose your crypto:
