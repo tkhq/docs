@@ -31,9 +31,10 @@ The difference? Passkeys are resident credentials and they can be synced between
 
 ## How do cross-device syncing and recovery work? 
 
-Synchronization and recovery are both supported natively by Apple and Google. 
+Synchronization and recovery are both supported natively by Apple and Google:
 
-For example, say you are logged into both your iPhone and your Macbook with the same Apple ID. Passkeys created on one device will be synced through [iCloud Keychain](https://support.apple.com/en-us/HT204085). If you're using Chrome on different Android devices using the same Google account, [Google Password Manager](https://passwords.google/) will sync passkeys and make them available across devices seamlessly. Google has plans to support syncing more broadly across different operating systems, see [this support summary](https://developers.google.com/identity/passkeys/supported-environments#chrome-passkey-support-summary). If a passkey is lost, for example if a device was lost or damaged, both Apple and Google provide recovery processes to which you can refer your users. 
+- With Apple, Passkeys created on one device are synced through [iCloud Keychain](https://support.apple.com/en-us/HT204085) as long as the user is logged in with their Apple ID. Apple covers both syncing and recovery in ["About the security of passkeys"](https://support.apple.com/en-us/102195). For some additional detail, see [this Q&A with the passkey team](https://developer.apple.com/news/?id=21mnmxow). Apple's account recovery process is documented in [this support page](https://support.apple.com/en-us/HT204921).
+- With Google, [Google Password Manager](https://passwords.google/) syncs passkeys across devices seamlessly. Google has plans to support syncing more broadly across different operating systems, see [this support summary](https://developers.google.com/identity/passkeys/supported-environments#chrome-passkey-support-summary). Recovery is covered in [this FAQ ("What happens if a user loses their device?")](https://developers.google.com/identity/passkeys/faq#what_happens_if_a_user_loses_their_device): it relies on Google's overall [account recovery process](https://support.google.com/accounts/answer/7682439?hl=en) because passkeys are attached to Google accounts.
 
 ## Betting on Webauthn and Passkeys
 
