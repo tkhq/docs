@@ -11,7 +11,7 @@ Turnkey has built a new model for private key management that utilizes secure en
 
 This novel security architecture means raw private keys themselves are never exposed to Turnkey, your software, or your team. Specifically, Turnkey stores encrypted private keys that are only decrypted when you authenticate to an auditable, tamper-proof secure enclave with your secret (e.g., API key or Passkey credentials). You (and/or your end users, depending on your implementation) remain the owner of your private keys and the funds controlled by those private keys at all times. See [quorum deployments](/security/quorum-deployments) for more details on how we provision secure enclaves to ensure you’re always in control of your private keys.
 
-Although we’re not a bank, by analogy to physical security, Turnkey’s role is similar to that of a safety deposit box operator. Turnkey secures, and facilitates access to, the safety deposit boxes (wallets), but only the customer can unlock the safety deposit box and access the the contents (digital assets) inside.
+Although we’re not a bank, by analogy to physical security, Turnkey’s role is similar to that of a safety deposit box operator. Turnkey secures, and facilitates access to, the safety deposit boxes (wallets), but only the customer can unlock the safety deposit box and access the contents (digital assets) inside.
 
 
 ## Private key storage
