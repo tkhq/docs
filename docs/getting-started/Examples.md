@@ -3,6 +3,7 @@ sidebar_position: 3
 description: Check out some of our example apps and use cases
 slug: /getting-started/examples
 ---
+
 # Examples
 
 Turnkey infrastructure is flexible by default. We intentionally prioritize low-level primitives in our product to avoid creating blockers for developers building new kinds of applications on Turnkey.
@@ -11,10 +12,14 @@ That said, we have built out several example services and applications to help i
 
 ## SDK code examples
 
-Clone the Turnkey sdk repo [here](https://github.com/tkhq/sdk) to explore a few “turnkey” examples:
+Clone or fork the Turnkey SDK repo [here](https://github.com/tkhq/sdk) to explore a few “turnkey” examples:
 
 | Example                                                                                              | Description                                                                                                                  |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                               | Compile and deploy a smart contract                                                                                          |
+| [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer)                            | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users              |
+| [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                 | Sweep funds from one address to a different address                                                                          |
+| [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner)                    | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap. |
 | [`with-ethers`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/)                         | Create a new Ethereum address, then sign and broadcast a transaction using the Ethers signer with Infura                     |
 | [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem/)                             | Sign and broadcast a transaction using the Turnkey Custom Account and Infura                                                 |
 | [`with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs/)                         | Create a new Cosmos address, then sign and broadcast a transaction on Celestia testnet using the CosmJS signer               |
@@ -24,11 +29,6 @@ Clone the Turnkey sdk repo [here](https://github.com/tkhq/sdk) to explore a few 
 | [`with-nonce-manager`](https://github.com/tkhq/sdk/tree/main/examples/with-nonce-manager/)           | Create a new Ethereum address, then sign and broadcast multiple transactions in a sequential or optimistic manner.           |
 | [`with-offline`](https://github.com/tkhq/sdk/tree/main/examples/with-offline/)                       | Sign a Turnkey request in offline context                                                                                    |
 | [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys/) | A NextJS app that demonstrates how to use Turnkey to build a federated, webauthn powered authentication flow                 |
-| [`with-viem-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys/)   | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                             |
-| [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                 | Sweep funds from one address to a different address                                                                          |
-| [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                               | Compile and deploy a smart contract                                                                                          |
-| [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer)                                     | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users              |
-| [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner)                             | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap. |
 
 ## Demos built with Turnkey
 
@@ -40,7 +40,6 @@ A minimal consumer wallet app powered by Turnkey. Behind the scenes, it uses [`@
   <source src="https://github.com/tkhq/demo-consumer-wallet/assets/127255904/2c3409df-2d7c-4ec3-9aa8-e2944a0b0e0a"/>
 </video>
 
-
 See https://github.com/tkhq/demo-consumer-wallet for the code.
 
 ### Demo Passkey Wallet ([code](https://github.com/tkhq/demo-passkey-wallet), [live link](https://wallet.tx.xyz))
@@ -49,3 +48,21 @@ A wallet application showing how users can register and authenticate using passk
 This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](/getting-started/sub-organizations) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
 
 <img src="/demo-passkey-wallet.png" alt="homepage screenshot" width="800px"/>
+
+See https://wallet.tx.xyz (and https://github.com/tkhq/demo-passkey-wallet for the code).
+
+### Demo Ethers Passkeys ([code](https://github.com/tkhq/demo-ethers-passkeys))
+
+A simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/ethers`](https://github.com/tkhq/sdk/tree/main/packages/ethers) signer, using passkeys.
+
+<img src="/ethers-ui-screenshot.png" alt="homepage screenshot" width="800px"/>
+
+See https://github.com/tkhq/demo-ethers-passkeys for the code.
+
+### Demo Viem Passkeys ([code](https://github.com/tkhq/demo-viem-passkeys))
+
+A similar, simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/viem`](https://github.com/tkhq/sdk/tree/main/packages/viem) signer, using passkeys.
+
+<img src="/viem-ui-screenshot.png" alt="homepage screenshot" width="800px"/>
+
+See https://github.com/tkhq/demo-viem-passkeys for the code.
