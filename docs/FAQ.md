@@ -115,4 +115,4 @@ If you get stuck or have a one-off question, post it to our [developer forum](ht
 
 ### Is my country supported?
 
-Turnkey is not currently available to users in Brazil, India, Japan, Singpore, or any countries currently subject to US OFAC sanctions. 
+Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions. 
