@@ -42,6 +42,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | --------------- | ------------------- | -------------------------------------------- |
 | **activity**    | Activity            | The activity metadata of the request         |
 | **eth.tx**      | EthereumTransaction | The parsed Ethereum transaction payload      |
+| **wallet**      | Wallet              | The target wallet used in sign requests      |
 | **private_key** | PrivateKey          | The target private key used in sign requests |
 
 ## Types
@@ -66,9 +67,10 @@ Keywords are reserved words that are dynamically interchanged for real values at
 |                         | tags      | list<string\>  | The collection of tags for the user                                                   |
 |                         | email     | string         | The email address of the user                                                         |
 |                         | alias     | string         | The alias of the user                                                                 |
-| **Activity**            | type      | string         | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION)                        |
-|                         | resource  | string         | The target resource of the activity (e.g. USER, PRIVATE_KEY, POLICY, CREDENTIAL, etc) |
-|                         | action    | string         | The action of the activity (e.g. CREATE, UPDATE, DELETE, SIGN, etc)                           |
+| **Activity**            | type      | string         | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                     |
+|                         | resource  | string         | The resource type the activity targets (e.g. USER, PRIVATE_KEY, POLICY, etc)          |
+|                         | action    | string         | The action of the activity (e.g. CREATE, UPDATE, DELETE, SIGN, etc)                   |
+| **Wallet**              | id        | string         | The identifier of the wallet                                                          |
 | **PrivateKey**          | id        | string         | The identifier of the private key                                                     |
 |                         | tags      | list<string\>  | The collection of tags for the private key                                            |
 | **EthereumTransaction** | from      | string         | The sender address of the transaction                                                 |
@@ -80,31 +82,35 @@ Keywords are reserved words that are dynamically interchanged for real values at
 |                         | chain_id  | int            | The chain identifier for the transaction                                              |
 
 ## Activity Breakdown
-| Type                                       | Resource          | Action     | Notes |
-| :----------------------------------------- | ---------------   | ---------- | ----- |
-| ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V2   | ORGANIZATION      | CREATE     |       |
-| ACTIVITY_TYPE_CREATE_INVITATIONS           | INVITATION        | CREATE     |       |
-| ACTIVITY_TYPE_DELETE_INVITATION            | INVITATION        | DELETE     |       |
-| ACTIVITY_TYPE_CREATE_POLICY_V3             | POLICY            | CREATE     |       |
-| ACTIVITY_TYPE_UPDATE_POLICY                | POLICY            | UPDATE     |       |
-| ACTIVITY_TYPE_DELETE_POLICY                | POLICY            | DELETE     |       |
-| ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2       | PRIVATE_KEY       | CREATE     |       |
-| ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG       | PRIVATE_KEY       | CREATE     |       |
-| ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG       | PRIVATE_KEY       | UPDATE     |       |
-| ACTIVITY_TYPE_DISABLE_PRIVATE_KEY          | PRIVATE_KEY       | DELETE     |       |
-| ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS      | PRIVATE_KEY       | DELELE     |       |
-| ACTIVITY_TYPE_SIGN_RAW_PAYLOAD             | PRIVATE_KEY       | SIGN       |       |
-| ACTIVITY_TYPE_SIGN_TRANSACTION             | PRIVATE_KEY       | SIGN       |       |
-| ACTIVITY_TYPE_CREATE_USERS_V2              | USER              | CREATE     |       |
-| ACTIVITY_TYPE_CREATE_USER_TAG              | USER              | CREATE     |       |
-| ACTIVITY_TYPE_UPDATE_USER                  | USER              | UPDATE     |       |
-| ACTIVITY_TYPE_UPDATE_USER_TAG              | USER              | UPDATE     |       |
-| ACTIVITY_TYPE_DELETE_USERS                 | USER              | DELETE     |       |
-| ACTIVITY_TYPE_DELETE_USER_TAG              | USER              | DELETE     |       |
-| ACTIVITY_TYPE_CREATE_API_KEYS              | CREDENTIAL        | CREATE     |       |
-| ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2     | CREDENTIAL        | CREATE     |       |
-| ACTIVITY_TYPE_DELETE_API_KEYS              | CREDENTIAL        | DELETE     |       |
-| ACTIVITY_TYPE_DELETE_AUTHENTICATORS        | CREDENTIAL        | DELETE     |       |
+| Resource Type     | Action   | Activity Type                              |
+| ---------------   | -------- | :----------------------------------------- |
+| **ORGANIZATION**  | CREATE   | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V4   |
+| **INVITATION**    | CREATE   | ACTIVITY_TYPE_CREATE_INVITATIONS           |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_INVITATION            |
+| **POLICY**        | CREATE   | ACTIVITY_TYPE_CREATE_POLICY_V3             |
+|                   | UPDATE   | ACTIVITY_TYPE_UPDATE_POLICY                |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_POLICY                |
+| **WALLET**        | CREATE   | ACTIVITY_TYPE_CREATE_WALLET                |
+|                   | CREATE   | ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS       |
+|                   | EXPORT   | ACTIVITY_TYPE_EXPORT_WALLET                |
+| **PRIVATE_KEY**   | CREATE   | ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2       |
+|                   | CREATE   | ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG       |
+|                   | UPDATE   | ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG       |
+|                   | DELETE   | ACTIVITY_TYPE_DISABLE_PRIVATE_KEY          |
+|                   | DELELE   | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS      |
+|                   | EXPORT   | ACTIVITY_TYPE_EXPORT_PRIVATE_KEY           |
+|                   | SIGN     | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2          |
+|                   | SIGN     | ACTIVITY_TYPE_SIGN_TRANSACTION_V2          |
+| **USER**          | CREATE   | ACTIVITY_TYPE_CREATE_USERS_V2              |
+|                   | CREATE   | ACTIVITY_TYPE_CREATE_USER_TAG              |
+|                   | UPDATE   | ACTIVITY_TYPE_UPDATE_USER                  |
+|                   | UPDATE   | ACTIVITY_TYPE_UPDATE_USER_TAG              |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_USERS                 |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_USER_TAG              |
+| **CREDENTIAL**    | CREATE   | ACTIVITY_TYPE_CREATE_API_KEYS              |
+|                   | CREATE   | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2     |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_API_KEYS              |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_AUTHENTICATORS        |
 
 ## Coming soon
 
