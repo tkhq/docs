@@ -55,8 +55,8 @@ const config = {
       {
         specs: [
           {
-            spec: 'static/specs/public_api.swagger.json',
-            url: 'static/specs/public_api.swagger.json',
+            spec: 'api/public_api.swagger.json',
+            url: 'api/public_api.swagger.json',
             route: '/api/',
           },
         ],
