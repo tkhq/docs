@@ -63,7 +63,7 @@ The application then uses an API-only user to create a new sub-organization on b
     }],
     "rootQuorumThreshold": 1,
     "wallet": {
-      "walletName": "Default ETH Wallet",
+      "walletName": "Default Wallet",
       "accounts": [
         {
           "curve": "CURVE_SECP256K1",
@@ -73,6 +73,18 @@ The application then uses an API-only user to create a new sub-organization on b
         },
       ],
     },
+  }
+}
+```
+
+The response will resemble the following:
+
+```json
+{
+  "subOrganizationId": "<your-new-sub-org>", // the organization_id that the end-user must use when signing requests
+  "wallet": {
+    "walletId": "<your-new-wallet>", // the wallet ID used to generate more accounts
+    "addresses": "<your-new-addresses>" // the addresses you can now sign with
   }
 }
 ```
@@ -114,7 +126,7 @@ const signedRequest = await httpClient.stampCreateWallet({
   organizationId: "<user sub-organization>",
   timestampMs: String(Date.now()),
   parameters: {
-    walletName: "New ETH Wallet",
+    walletName: "New Wallet",
     accounts: [
       {
         curve: "CURVE_SECP256K1",
@@ -130,6 +142,29 @@ const signedRequest = await httpClient.stampCreateWallet({
 The `signedRequest` contains all the components needed to forward it to turnkey: URL, body, and a stamp header (with name and value properties).
 
 You can choose to send this request straight from your frontend, or proxy it through your backend server. If you want to send from the frontend, you can use `httpClient.createWallet` instead.
+
+#### Step 2a: Creating additional wallet accounts
+
+Next, we can derive additional accounts (addresses) given a single HD wallet. The shape of the request is as follows:
+
+```json
+{
+  "type": "ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS",
+  "timestampMs": "<time-in-ms>",
+  "organizationId": "<your-organization-id>",
+  "parameters": {
+    "walletId": "<your-wallet-id>",
+    "accounts": [
+      {
+        "curve": "CURVE_SECP256K1",
+        "pathFormat": "PATH_FORMAT_BIP32",
+        "path": "m/44'/60'/0'/0/0",
+        "addressFormat": "ADDRESS_FORMAT_ETHEREUM",
+      },
+    ]
+  }
+}
+```
 
 #### Step 3: Transaction signing
 
