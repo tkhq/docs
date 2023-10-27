@@ -25,11 +25,11 @@ Root users can be programmatic or human, with one or many credentials attached. 
 
 Turnkey has built a new model for private key management that utilizes secure enclaves. All transactions are signed within an enclave and private keys are never exposed to Turnkey, your software, or your team. Turnkey’s role is similar to that of a safety deposit box operator — Turnkey secures and provides access to the safety deposit boxes, but our system requires cryptographic proof of ownership to take any action with the keys held within.  
 
-In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](https://www.passkeys.io/) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing with their private key.
+In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](https://docs.turnkey.com/category/using-passkeys) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing with their private key.
 
 ### Before you start
 
-Make sure you’ve set up your primary Turkey organization as well as one or more users with API access that will programmatically manage user onboarding within your application. Check out the [quickstart guide](quickstart) if you need help getting started. 
+Make sure you’ve set up your primary Turnkey organization as well as one or more users with API access that will programmatically manage user onboarding within your application. Check out the [quickstart guide](quickstart) if you need help getting started. 
 
 Note also that unlike some wallet providers, Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, developers implement their own standard end-user authentication flows for user login, then employ passkeys behind that login for transaction signing.
 
@@ -94,6 +94,8 @@ Note: by default, root users created with sub-organizations will have both API a
 With this setup each end-user now has sole control over their sub-organization and any resources created within it. Your application cannot take any actions on resources within the sub-organization without explicitly cryptographic authorization from the end-user in the form of a passkey signature.
 
 It's important to note that the initial activity to create a sub-organization has to be authorized by an API key or a user in your main Turnkey organization. Otherwise anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the `CREATE_SUB_ORGANIZATION_V4` activity [here](https://github.com/tkhq/sdk/blob/ba360baeb60d80276f7faeca602b99190fe5affe/examples/with-federated-passkeys/src/pages/api/createSubOrg.ts#L27-L106).
+
+If you'd like to see a live example, head over to our [✨Demo Passkey Wallet✨](https://wallet.tx.xyz/), and follow along with the code [here](https://github.com/tkhq/demo-passkey-wallet).
 
 #### Step 2: Creating a wallet
 
