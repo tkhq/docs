@@ -14,7 +14,7 @@ Turnkey Users are resources within an Organization. Their attributes are:
 - API key: a list of API keys (see below for information)
 - User tags: a list of User Tag UUIDs
 
-A **user belongs to one organization**, and one organization can have many (**up to 500**) users. If you need to create more users, consider using Sub-Organizations.
+A **user belongs to one organization**, and one organization can have many (**up to 100**) users. If you need to create more users, consider using Sub-Organizations.
 
 ## User Credentials
 
