@@ -21,7 +21,7 @@ slug: /managing-policies/examples
 
 ```json JSON
 {
-  "policyName": "Allow user_tag <USER_TAG_ID> to create private users",
+  "policyName": "Allow user_tag <USER_TAG_ID> to create users",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
   "condition": "activity.resource == 'USER' && activity.action == 'CREATE'"
@@ -59,7 +59,7 @@ slug: /managing-policies/examples
     "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ID>",
     "effect": "EFFECT_ALLOW",
     "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-    "condition": "wallet.id == '<PRIVATE_KEY_ID>'"
+    "condition": "wallet.id == '<WALLET_ID>'"
 }
 ```
 

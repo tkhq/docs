@@ -41,6 +41,7 @@ Currently, the resource limits within a single organization are as follows:
 | Resource                | Maximum number allowed |
 | :---------------------- | :--------------------- |
 | Private keys            | 1,000                  |
+| Wallets                 | 100                    |
 | Users                   | 100                    |
 | Policies                | 100                    |
 | Invitations             | 100                    |

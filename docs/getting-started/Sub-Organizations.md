@@ -105,7 +105,7 @@ A user interface on your application prompts users to sign with their passkey to
 - `X-Stamp-Webauthn` header: set to the WebAuthn stamp collected on the application's frontend (the End-User passkey signature)
 - The request body: `CREATE_WALLET` activity request.
 
-We've abstracted getting WebAuthn signatures and creating signed Turnkey requests behind typed methods (e.g. `stampCreatePrivateKeys`).
+We've abstracted getting WebAuthn signatures and creating signed Turnkey requests behind typed methods (e.g. `stampCreateWallet`).
 
 Our `TurnkeyClient` (in (from [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http))) can be initialized with a `WebauthnStamper` (from [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper)):
 

@@ -53,5 +53,4 @@ Certain address formats can only be used with particular curves. See the table b
 You can use `ADDRESS_FORMAT_COMPRESSED` to generate a public key which can be used to sign with.
 
 #### What if I don't see the curve for my network?
-Contact us!
-
+Contact us at hello@turnkey.com.

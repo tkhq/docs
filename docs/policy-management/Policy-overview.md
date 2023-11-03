@@ -11,7 +11,7 @@ Our policy engine is the foundation for flexible controls and permissions within
 
 Our policies are defined using **JSON**. The `effect` determines if an activity should be allowed or denied based on the evaluation of the `consensus` and `condition` fields.
 
-`consensus` and `condition` are composed of ergonomic expressions written in our [policy language](/managing-polices/language) that must evaluate to a `bool`.  `consensus` determines which user(s) may take an action (e.g. a given user ID). `condition` determines the conditions under which the policy applies (e.g. signing with a specific private key). These fields can be used alone or together.
+`consensus` and `condition` are composed of ergonomic expressions written in our [policy language](/managing-polices/language) that must evaluate to a `bool`.  `consensus` determines which user(s) may take an action (e.g. a given user ID). `condition` determines the conditions under which the policy applies (e.g. signing with a specific wallet). These fields can be used alone or together.
 
 #### See below for an example policy that allows a single user to send transactions to a single address
 
