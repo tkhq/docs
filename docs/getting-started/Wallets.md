@@ -5,10 +5,7 @@ slug: /getting-started/wallets
 ---
 # Wallets
 
-A hierarchical deterministic (HD) Wallet is a collection of cryptographic private/public key pairs that share a common seed. Wallets offer several advantages over raw private keys:
-- They can be used across various cryptographic curves
-- They can generate millions of addresses for various digital assets
-- They can be represented by a checksummed, mnemonic phrase making them easier to backup and recover
+A hierarchical deterministic (HD) Wallet is a collection of cryptographic private/public key pairs that share a common seed.
 
 ```json
 {
@@ -54,3 +51,11 @@ You can use `ADDRESS_FORMAT_COMPRESSED` to generate a public key which can be us
 
 #### What if I don't see the curve for my network?
 Contact us at hello@turnkey.com.
+
+## Private Keys
+
+Turnkey also supports raw private keys, but we recommend using Wallets since they offer several advantages:
+- Wallets can be used across various cryptographic curves
+- Wallets can generate millions of addresses for various digital assets
+- Wallets can be represented by a checksummed, mnemonic phrase making them easier to backup and recover
+
