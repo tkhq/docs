@@ -17,7 +17,6 @@ Our policies are defined using **JSON**. The `effect` determines if an activity 
 
 ```json JSON
 {
-  "policyName": "Allowlist for one user",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '4b894565-fa11-42fc-b813-5bf4ea3d53f9')",
   "condition": "eth.tx.to == '<ALLOWED_ADDRESS>'"

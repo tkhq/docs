@@ -6,14 +6,14 @@ slug: /managing-policies/examples
 
 ## Access control
 
-#### Allow a specific user to create private keys
+#### Allow a specific user to create wallets
 
 ```json JSON
 {
-  "policyName": "Allow user <USER_ID> to create private keys",
+  "policyName": "Allow user <USER_ID> to create wallets",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'CREATE'"
+  "condition": "activity.resource == 'WALLET' && activity.action == 'CREATE'"
 }
 ```
 
@@ -51,6 +51,17 @@ slug: /managing-policies/examples
 ```
 
 ## Signing control
+
+#### Allow a specific user to sign transactions with a specific wallet
+
+```json
+{
+    "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ID>",
+    "effect": "EFFECT_ALLOW",
+    "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+    "condition": "wallet.id == '<PRIVATE_KEY_ID>'"
+}
+```
 
 #### Allow a specific user to sign transactions with a specific private key
 
