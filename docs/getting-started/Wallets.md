@@ -5,7 +5,7 @@ slug: /getting-started/wallets
 ---
 # Wallets
 
-A hierarchical deterministic (HD) Wallet is a collection of cryptographic private/public key pairs that share a common seed.
+A [hierarchical deterministic (HD) Wallet](https://learnmeabitcoin.com/technical/hd-wallets) is a collection of cryptographic private/public key pairs that share a common seed. A Wallet is used to generate Accounts.
 
 ```json
 {
@@ -32,16 +32,16 @@ An account contains the directions for deriving a cryptographic key pair and cor
 }
 ```
 
-The account address is used to sign with the underlying extended private key.
+**The account address is used to sign with the underlying extended private key.**
 
 #### Configuration
 
 Certain address formats can only be used with particular curves. See the table below:
 
-| Type           | Address Format               | Curve           | Path Format       | Path              |
+| Type           | Address Format               | Curve           | Path Format       | Standard Path     |
 | -------------- | ---------------------------- | --------------- | ----------------- | ----------------- |
-| **Public Key** | ADDRESS_FORMAT_COMPRESSED    | all             | PATH_FORMAT_BIP32 |                   |
-|                | ADDRESS_FORMAT_UNCOMPRESSED  | CURVE_SECP256K1 | PATH_FORMAT_BIP32 |                   |
+| **Public Key** | ADDRESS_FORMAT_COMPRESSED    | all             | PATH_FORMAT_BIP32 | none              |
+|                | ADDRESS_FORMAT_UNCOMPRESSED  | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | none              |
 | **Ethereum**   | ADDRESS_FORMAT_ETHEREUM      | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/60'/0'/0/0  |
 | **Cosmos**     | ADDRESS_FORMAT_COSMOS        | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/118'/0'/0/0 |
 | **Solana**     | ADDRESS_FORMAT_SOLANA        | CURVE_ED25519   | PATH_FORMAT_BIP32 | m/44'/501'/0'/0'  |
