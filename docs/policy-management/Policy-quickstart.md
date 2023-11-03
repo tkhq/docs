@@ -51,7 +51,7 @@ Choose a name and note to describe your new policy. Next, enter the following po
 
 Generate sample transactions using our [transaction tool](https://build.tx.xyz). **You'll want to create two transactions**: one transaction to the address you selected in your whitelist policy above, and one to any other address.
 
-Next, try signing these two different transactions by replacing `<YOUR_TRANSACTION>` in the code snippet below. As a reminder, this guide assumes you've completed the [Sign a transaction](/getting-started/quickstart) guide, and have set `$ORGANIZATION_ID` as shell variables.
+Next, try signing these two different transactions by replacing `<YOUR_TRANSACTION>` in the code snippet below. As a reminder, this guide assumes you've completed the [Quickstart](/getting-started/quickstart) guide, and have set `$ORGANIZATION_ID` as an environment variable.
 
 ```shell
 turnkey request --path /public/v1/submit/sign_transaction --body '{

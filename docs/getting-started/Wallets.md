@@ -16,7 +16,7 @@ A hierarchical deterministic (HD) Wallet is a collection of cryptographic privat
 
 ## Accounts
 
-An account contains the directions for deriving a cryptographic key pair and correspoding address from a Wallet. In practice, this looks like:
+An account contains the directions for deriving a cryptographic key pair and corresponding address from a Wallet. In practice, this looks like:
 - The Wallet seed and Account curve are used to create a root key pair
 - The Account path format and path are used to derive an extended key pair from the root key pair
 - The Account address format is used to derive the address from the extended public key
