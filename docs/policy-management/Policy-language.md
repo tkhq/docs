@@ -97,7 +97,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 |                   | CREATE   | ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG       |
 |                   | UPDATE   | ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG       |
 |                   | DELETE   | ACTIVITY_TYPE_DISABLE_PRIVATE_KEY          |
-|                   | DELELE   | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS      |
+|                   | DELETE   | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS      |
 |                   | EXPORT   | ACTIVITY_TYPE_EXPORT_PRIVATE_KEY           |
 |                   | SIGN     | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2          |
 |                   | SIGN     | ACTIVITY_TYPE_SIGN_TRANSACTION_V2          |
@@ -111,11 +111,5 @@ Keywords are reserved words that are dynamically interchanged for real values at
 |                   | CREATE   | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2     |
 |                   | DELETE   | ACTIVITY_TYPE_DELETE_API_KEYS              |
 |                   | DELETE   | ACTIVITY_TYPE_DELETE_AUTHENTICATORS        |
-
-## Coming soon
-
-Turnkey will expand the policy language significantly over the next few months. Soon you'll have access to new keywords:
-
-- Self-defined variables (e.g., allow arbitrary data to be considered in policy validation)
-- Time-based limits (e.g., limit total transaction size over a 24 hour period)
-- Dollar-based amount limits based on current price (e.g., limit total $-based transaction amount for a given user type)
+| **CONFIG**        | UPDATE   | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS       |
+| **RECOVERY**      | CREATE   | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY     |
