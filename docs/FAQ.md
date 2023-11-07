@@ -22,7 +22,7 @@ Concretely, Turnkey needs the following:
 
 1. **The original request you sent**: this is achieved by simply receiving the HTTP request and its body
 2. **That your API key was used to approve the request**: this is achieved by checking the signature contained in the `X-Stamp` header. For this verification we need the serialized POST body, your API public key, and the signature. This is all contained in the header value.
-3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](./security/Secure-enclaves.md). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
+3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](./Security/Secure-enclaves.md). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
 
 Turnkey would not be able to have its enclaves verify signatures and check the request intent if we didn't have your signature on the whole payload.
 

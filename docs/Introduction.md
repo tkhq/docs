@@ -45,4 +45,4 @@ All secure workloads, including key management and transaction signing, are mana
 
 [Examples](./getting-started/Examples.md): Turnkey’s flexible infrastructure means there’s a lot you can build. Check out a few of our own examples to get a picture of what’s possible.
 
-[Security architecture](./security/our-approach.md): Turnkey’s unique security architecture is the foundation of our product. Dive in to understand how we secure your keys.
+[Security architecture](./Security/our-approach.md): Turnkey’s unique security architecture is the foundation of our product. Dive in to understand how we secure your keys.
