@@ -38,7 +38,7 @@ Important note: recovery credentials automatically expire after **30 minutes** a
 
 ## Email recovery in your sub-organizations
 
-Email recovery works well with [sub-organization](./sub-organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
+Email recovery works well with [sub-organization](./Sub-Organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
 
 If you're looking for a more concrete implementation guide, head to [Sub-Organization Recovery](../integration-guides/email-recovery-in-sub-organizations.md) for more details.
 

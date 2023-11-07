@@ -7,7 +7,7 @@ slug: /integration-guides/sub-organizations-as-wallets
 
 Turnkey has built a new model for private key management that utilizes secure enclaves. All transactions are signed within an enclave and private keys are never exposed to Turnkey, your software, or your team. Turnkey’s role is similar to that of a safety deposit box operator — Turnkey secures and provides access to the safety deposit boxes, but our system requires cryptographic proof of ownership to take any action with the keys held within.
 
-We've seen in [Sub-Organizations](../getting-started/sub-organizations.md) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
+We've seen in [Sub-Organizations](../getting-started/Sub-Organizations.md) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
 
 ## Sub-Organizations as end-user controlled wallets  
 
@@ -19,7 +19,7 @@ If you'd like to see a live example, head over to our [✨Demo Passkey Wallet✨
 
 ### Before you start
 
-Make sure you’ve set up your primary Turnkey organization as well as one or more users with API access that will programmatically manage user onboarding within your application. Check out our [Quickstart guide](../getting-started/quickstart.md) if you need help getting started. 
+Make sure you’ve set up your primary Turnkey organization as well as one or more users with API access that will programmatically manage user onboarding within your application. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. 
 
 ### Step 1: create a sub-organization
 

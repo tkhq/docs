@@ -5,13 +5,13 @@ slug: /integration-guides/sub-organization-recovery
 ---
 # Sub-Organization Recovery
 
-Email recovery shines if you are leveraging [sub-organizations](../getting-started/sub-organizations.md) for each of your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
+Email recovery shines if you are leveraging [sub-organizations](../getting-started/Sub-Organizations.md) for each of your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
 Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 
 ## Pre-requisites
 
-Make sure you have set up your primary Turnkey organization as well as one or more users with API access that will programmatically initiate email recovery. Check out our [Quickstart guide](../getting-started/quickstart.md) if you need help getting started. To allow an API user to initiate recovery, you'll need the following policy in your main organization:
+Make sure you have set up your primary Turnkey organization as well as one or more users with API access that will programmatically initiate email recovery. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. To allow an API user to initiate recovery, you'll need the following policy in your main organization:
 ```json JSON
 { 
     "effect": "EFFECT_ALLOW",
