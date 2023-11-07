@@ -22,7 +22,7 @@ Concretely, Turnkey needs the following:
 
 1. **The original request you sent**: this is achieved by simply receiving the HTTP request and its body
 2. **That your API key was used to approve the request**: this is achieved by checking the signature contained in the `X-Stamp` header. For this verification we need the serialized POST body, your API public key, and the signature. This is all contained in the header value.
-3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](/security/secure-enclaves). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
+3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](./security/Secure-enclaves.md). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
 
 Turnkey would not be able to have its enclaves verify signatures and check the request intent if we didn't have your signature on the whole payload.
 
@@ -30,11 +30,11 @@ Turnkey would not be able to have its enclaves verify signatures and check the r
 
 A Turnkey API key is simply a way to authenticate requests to Turnkey. Crypto assets are not tied to it in any way.
 
-Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](/managing-policies/overview)!), and revocable if they are lost or compromised.
+Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](./policy-management/Policy-overview.md)!), and revocable if they are lost or compromised.
 
 ### Are there limits on how many resources I can create, or activities I can execute?
 
-We have limits on the number of resources within a single organization to avoid performance slowdowns. You can scale your organizational resources beyond these limits via [sub-organizations](/getting-started/sub-organizations). You can create an unlimited number of sub-organizations within a single organization.
+We have limits on the number of resources within a single organization to avoid performance slowdowns. You can scale your organizational resources beyond these limits via [sub-organizations](./getting-started/sub-organizations.md). You can create an unlimited number of sub-organizations within a single organization.
 
 Currently, the resource limits within a single organization are as follows:
 

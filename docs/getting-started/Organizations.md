@@ -9,7 +9,7 @@ An organization is a logical grouping of the resources: policies, users, and wal
 
 In general it is recommended to keep the number of resources in an organization, particularly policies, limited. Limited resources is recommended, in part, because it helps make it easier to reason about what actions will be accepted.
 
-Organizations have resource limits, which are described in detail [here](/faq)
+Organizations have resource limits, which are described in detail [here](../FAQ.md)
 
 ## Sub-Organization
 
