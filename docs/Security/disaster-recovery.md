@@ -12,4 +12,4 @@ We have a comprehensive disaster recovery process in place for all critical Turn
 
 For organization data, because all enclave applications are stateless, our persistence strategy is very similar to a traditional web application. Data is encrypted, stored redundantly across geographies, and consistently backed up and exported to our disaster recovery accounts.
 
-For Quorum Keys, as described in [Quorum deployments](/security/quorum-deployments), we split the key between members of the Quorum set and have a level of redundancy in those shards. In the unlikely event that all members of the Quorum Set were to lose their active shares, we have a set of offline backup shares securely stored across geographically distributed locations. 
+For Quorum Keys, as described in [Quorum deployments](./Quorum-deployment.md), we split the key between members of the Quorum set and have a level of redundancy in those shards. In the unlikely event that all members of the Quorum Set were to lose their active shares, we have a set of offline backup shares securely stored across geographically distributed locations. 
