@@ -35,7 +35,7 @@ Here's a diagram summarizing the email recovery flow step-by-step ([direct link]
 
 Let's review these steps in detail:
 
-1. User on `yoursite.xyz` clicks "recovery", and a new recovery UI is shown. While the widget is in a loading state your frontend uses [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to insert a new iframe element:
+1. User on `yoursite.xyz` clicks "recovery", and a new recovery UI is shown. We recommend this recovery UI be a new hosted page of your site or application, which contains language explaining to the user what steps they will need to take next to complete recovery. While the UI is in a loading state your frontend uses [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to insert a new iframe element:
     ```js
     const iframeStamper = new IframeStamper({
         iframeUrl: "https://recovery.turnkey.com",

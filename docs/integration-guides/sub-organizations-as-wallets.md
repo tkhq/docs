@@ -11,9 +11,9 @@ We've seen in [Sub-Organizations](../getting-started/Sub-Organizations.md) that 
 
 ## Sub-Organizations as end-user controlled wallets  
 
-In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](../passkeys/introduction.md) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing with their private key.
+In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](../passkeys/introduction.md) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing. Your application will construct transactions on behalf of the end-user, and then surface the relevant Turnkey activity request client-side for end-user approval.
 
-Note also unlike some wallet providers, Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
+Note that Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
 
 If you'd like to see a live example, head over to our [✨Demo Passkey Wallet✨](https://wallet.tx.xyz/), and follow along with the code [here](https://github.com/tkhq/demo-passkey-wallet).
 
@@ -21,7 +21,7 @@ If you'd like to see a live example, head over to our [✨Demo Passkey Wallet✨
 
 Make sure you’ve set up your primary Turnkey organization with at least one API user for programmatic user onboarding. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started.
 
-### Step 1: create a sub-organization
+### Step 1: Create a sub-organization
 
 After the end-user is logged in, your application prompts the user for passkey creation on the application domain. Our JavaScript SDK has a helper for this: `getWebAuthnAttestation`. See [this example](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys).
 
@@ -83,13 +83,13 @@ With this setup each end-user now has sole control over their sub-organization a
 
 It's important to note that the initial activity to create a sub-organization has to be authorized by an API key of a user in your main Turnkey organization. Otherwise anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the `CREATE_SUB_ORGANIZATION_V4` activity [here](https://github.com/tkhq/sdk/blob/ba360baeb60d80276f7faeca602b99190fe5affe/examples/with-federated-passkeys/src/pages/api/createSubOrg.ts#L27-L106).
 
-### Step 2: wallet creation
+### Step 2: Wallet creation
 
-While the **first wallet creation is already done** (our `CREATE_SUB_ORGANIZATION` activity accepts a `wallet` parameter!), your can derive more accounts or create more wallets after the fact by using their passkeys to sign a `CREATE_WALLET` activity.
+While the **first wallet creation is already done** (our `CREATE_SUB_ORGANIZATION` activity accepts a `wallet` parameter!), your end-users can derive more accounts or create more wallets after the fact by using their passkeys to sign a `CREATE_WALLET` activity.
 
 We've abstracted getting WebAuthn signatures and creating signed Turnkey requests behind typed methods (e.g. `createWallet`).
 
-Our `TurnkeyClient` (in (from [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http))) can be initialized with a `WebauthnStamper` (from [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper)):
+Our `TurnkeyClient` (from [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)) can be initialized with a `WebauthnStamper` (from [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper)):
 
 ```js
 import { WebauthnStamper } from "@turnkey/webauthn-stamper";
@@ -124,7 +124,7 @@ await httpClient.createWallet({
 });
 ```
 
-In the snippet above we send the activity directly to Turnkey's backend. Our SDK also comes with abstractions to create `signedRequest`, which contain all the components needed to forward it to turnkey: URL, body, and a stamp header (with name and value properties). Use `httpClient.stampCreateWallet` to get a signed request. Your backend server can then proxy it to Turnkey.
+In the snippet above we send the activity directly to Turnkey's backend. Our SDK also comes with abstractions to create `signedRequest`, which contain all the components needed to forward it to Turnkey: URL, body, and a stamp header (with name and value properties). Use `httpClient.stampCreateWallet` to get a signed request. Your backend server can then proxy it to Turnkey.
 
 Next, we can derive additional accounts (addresses) given a single HD wallet. The shape of the request is as follows:
 
@@ -149,7 +149,7 @@ Next, we can derive additional accounts (addresses) given a single HD wallet. Th
 
 ### Step 3: Transaction signing
 
-Similar to creating a wallet, the end-user must provide a signature over each `SIGN_TRANSACTION` activity with their passkey. A user action, for example clicking "Withdraw Rewards", might trigger the flow. The details of this transaction should be presented to the user for confirmation, followed by a passkey prompt to sign the Turnkey activity. An activity to sign a transaction looks like the following:
+The end-user must provide a signature over each `SIGN_TRANSACTION` activity with their passkey. In your application, a user action (for example tapping a "Withdraw Rewards" button) might trigger the flow. The details of this transaction should be presented to the user for confirmation, followed by a passkey prompt to sign the Turnkey activity. An activity to sign a transaction looks like the following:
 
 ```json
 {
@@ -170,7 +170,7 @@ Turnkey returns a signed transaction in the activity result which your applicati
 
 Most of the steps outlined in the previous section remain unchanged: applications creating custodial wallets should still create segregated sub-organizations for their end-users to avoid limits (we currently have a maximum of 100 users per organization, whereas an organization can have unlimited sub-organizations).
 
-The main difference is in the Root Quorum settings: upon creating a new sub-organization, your business' API key is used to bootstrap each end-user organization. The `CREATE_SUB_ORGANIZATION_V4` activity becomes:
+The main difference is in the Root Quorum settings: upon creating a new sub-organization, your business's API key is used to bootstrap each end-user organization. The `CREATE_SUB_ORGANIZATION_V4` activity becomes:
 
 ```json
 {
