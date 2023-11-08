@@ -22,7 +22,7 @@ Make sure you have set up your primary Turnkey organization with at least one AP
 
 ## Helper packages
 
-* We have released open-source code to abstract recovery credential decryption and signing with an iframe elements hosted on `recovery.turnkey.com` (see the code [here](https://github.com/tkhq/frames)). This ensures the recovery credentials are encrypted to keys that your organization doesn't have access to (because they live in the iframe, on a separate domain)
+* We have released open-source code to create target encryption keys, decrypt recovery credentials, and sign Turnkey activities. We've deployed this a static HTML page hosted on `recovery.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the recovery credentials are encrypted to keys that your organization doesn't have access to (because they live in the iframe, on a separate domain)
 * We have also built a package to help you insert this iframe and interact with it in the context of email recovery: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
 
 In the rest of this guide we'll assume you are using these helpers.
