@@ -11,7 +11,7 @@ Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functio
 
 ## Pre-requisites
 
-Make sure you have set up your primary Turnkey organization as well as one or more users with API access that will programmatically initiate email recovery. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. To allow an API user to initiate recovery, you'll need the following policy in your main organization:
+Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email recovery. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. To allow an API user to initiate email recovery, you'll need the following policy in your main organization:
 ```json JSON
 { 
     "effect": "EFFECT_ALLOW",
@@ -49,9 +49,9 @@ Let's review these steps in detail:
     ```
 2. Your code receives the iframe public key and shows the recovery form, and the user enters their email address.
 3. Your app can now create and sign a new `INIT_USER_EMAIL_RECOVERY` activity with the user email and the iframe public key in the parameters. Note: you'll need to retrieve the sub-organization ID based on the user email.
-4. Email is received by the user
-5. User copy/paste their recovery code into your app. Remember: this code is an encrypted credential which can only be decrypted within the iframe.
-6. Your app injects the recovery code into the iframe for decryption
+4. Email is received by the user.
+5. User copies and pastes their recovery code into your app. Remember: this code is an encrypted credential which can only be decrypted within the iframe.
+6. Your app injects the recovery code into the iframe for decryption:
     ```js
     await iframeStamper.injectRecoveryBundle(code);
     ```

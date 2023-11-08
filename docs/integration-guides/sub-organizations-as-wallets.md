@@ -13,13 +13,13 @@ We've seen in [Sub-Organizations](../getting-started/Sub-Organizations.md) that 
 
 In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](../passkeys/introduction.md) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing with their private key.
 
-Note also unlike some wallet providers, Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, developers implement their own standard end-user authentication flows for user login, then employ passkeys behind that login for transaction signing.
+Note also unlike some wallet providers, Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
 
 If you'd like to see a live example, head over to our [✨Demo Passkey Wallet✨](https://wallet.tx.xyz/), and follow along with the code [here](https://github.com/tkhq/demo-passkey-wallet).
 
 ### Before you start
 
-Make sure you’ve set up your primary Turnkey organization as well as one or more users with API access that will programmatically manage user onboarding within your application. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. 
+Make sure you’ve set up your primary Turnkey organization with at least one API user for programmatic user onboarding. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started.
 
 ### Step 1: create a sub-organization
 
@@ -77,7 +77,7 @@ The response will resemble the following:
 }
 ```
 
-Note: root users created with sub-organizations can both API keys and authenticators (e.g. passkeys). In this example we only expect passkeys. See [Sub-Organizations as shared wallets](#sub-organizations-as-shared-wallets) for a use case which requires both.
+Note: root users created with sub-organizations can have both API keys and authenticators (e.g. passkeys). In this example we only expect passkeys. See [Sub-Organizations as shared wallets](#sub-organizations-as-shared-wallets) for a use case which requires both.
 
 With this setup each end-user now has sole control over their sub-organization and any resources created within it. Your application cannot take any actions on resources within the sub-organization without explicit cryptographic authorization from the end-user in the form of a passkey signature.
 
