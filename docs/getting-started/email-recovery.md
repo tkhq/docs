@@ -5,7 +5,7 @@ slug: /getting-started/email-recovery
 ---
 # Email Recovery
 
-Email Recovery lets a user gain access to their Turnkey account via email, in cases where they've lost access to their API keys and authenticators.
+Email Recovery lets a user gain access to their Turnkey account via email in case they've lost access to their API keys and authenticators.
 
 ## User Experience
 This functionality is split in two phases: [Initiation](#initiation) and [Finalization](#finalization)
@@ -13,14 +13,14 @@ This functionality is split in two phases: [Initiation](#initiation) and [Finali
 ### Initiation
 
 Email recovery starts with a new activity posted to Turnkey. This activity has the type `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` and takes the following as parameters:
-* `email`: the email of the user who needs to start recovery. This email has to be the email in organization data. If you try to pass a different email address, the activity will fail.
+* `email`: the email of the user who needs to start recovery. This email must be the email already attached to the user in organization data (i.e., previously approved by the user). This prevents malicious account takeover. If you try to pass a different email address, the activity will fail.
 * `targetPublicKey`: the public key to which the recovery credential is encrypted (more on this later)
 
-This activity generates a new temporary API key pair (a "recovery credential"), saves the public key in organization data under the target user, and sends an email with the recovery credential, encrypted:
+This activity generates a new temporary API key pair (a "recovery credential"), saves the public key in organization data under the target user, and sends an email with the recovery credential encrypted recovery credential:
 
 <img src="/img/recovery_email.png" width="420" />
 
-Initiating a new email recovery requires proper permissions. It can't be done by anyone. See [Authorization](#authorization) for more details.
+Initiating a new email recovery require proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
 
 ### Finalization
 
@@ -38,7 +38,7 @@ Important note: recovery credentials automatically expire after **30 minutes** a
 
 ## Email recovery in your sub-organizations
 
-Email recovery works well with [sub-organization](./Sub-Organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
+Email recovery works well with [sub-organizations](./Sub-Organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
 
 If you're looking for a more concrete implementation guide, head to [Sub-Organization Recovery](../integration-guides/email-recovery-in-sub-organizations.md) for more details.
 
