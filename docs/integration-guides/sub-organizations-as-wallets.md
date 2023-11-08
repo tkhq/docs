@@ -25,7 +25,7 @@ Make sure you’ve set up your primary Turnkey organization with at least one AP
 
 After the end-user is logged in, your application prompts the user for passkey creation on the application domain. Our JavaScript SDK has a helper for this: `getWebAuthnAttestation`. See [this example](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys).
 
-The application then uses an API-only user to create a new sub-organization on behalf of the end-user. Here's what the activity would look like:
+Your application then uses an API-only user to create a new sub-organization on behalf of the end-user with a `CREATE_SUB_ORGANIZATION` activity. In the example below, the new sub-organization has one root user controlled by the end user's passkey, and an associated Ethereum wallet:
 
 ```json
 {
@@ -65,7 +65,7 @@ The application then uses an API-only user to create a new sub-organization on b
 }
 ```
 
-The response will resemble the following:
+The response will contain the new sub-organization ID as well as details about its associated Ethereum wallet:
 
 ```json
 {
@@ -81,7 +81,7 @@ Note: root users created with sub-organizations can have both API keys and authe
 
 With this setup each end-user now has sole control over their sub-organization and any resources created within it. Your application cannot take any actions on resources within the sub-organization without explicit cryptographic authorization from the end-user in the form of a passkey signature.
 
-It's important to note that the initial activity to create a sub-organization has to be authorized by an API key of a user in your main Turnkey organization. Otherwise anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the `CREATE_SUB_ORGANIZATION_V4` activity [here](https://github.com/tkhq/sdk/blob/ba360baeb60d80276f7faeca602b99190fe5affe/examples/with-federated-passkeys/src/pages/api/createSubOrg.ts#L27-L106).
+It's important to note that the initial activity to create a sub-organization has to be authorized by an API key of a user in your main Turnkey organization. Otherwise, anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the `CREATE_SUB_ORGANIZATION_V4` activity [here](https://github.com/tkhq/sdk/blob/ba360baeb60d80276f7faeca602b99190fe5affe/examples/with-federated-passkeys/src/pages/api/createSubOrg.ts#L27-L106).
 
 ### Step 2: Wallet creation
 
@@ -124,7 +124,7 @@ await httpClient.createWallet({
 });
 ```
 
-In the snippet above we send the activity directly to Turnkey's backend. Our SDK also comes with abstractions to create `signedRequest`, which contain all the components needed to forward it to Turnkey: URL, body, and a stamp header (with name and value properties). Use `httpClient.stampCreateWallet` to get a signed request. Your backend server can then proxy it to Turnkey.
+In the snippet above we send the activity directly to Turnkey's backend. Our SDK also comes with abstractions to create a `signedRequest`, which contain all the components needed to forward it to Turnkey: URL, body, and a stamp header (with name and value properties). Use `httpClient.stampCreateWallet` to get a signed request. Your backend server can then proxy it to Turnkey.
 
 Next, we can derive additional accounts (addresses) given a single HD wallet. The shape of the request is as follows:
 
