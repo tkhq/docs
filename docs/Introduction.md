@@ -20,6 +20,7 @@ At a structural level, a Turnkey Organization is comprised of a few core resourc
 - <b>Users:</b> Humans or machines with access to an Organization
 - <b>Policies:</b> Rules defining which users can take which actions within an Organization
 - <b>Private Keys:</b> Crypto private keys, used to derive addresses and sign transactions
+- <b>Wallets:</b> A collection of crypto private keys that share a common seed
 - <b>Credentials:</b> Used to verify Users - WebAuthn authenticators for human Users and API keys for API Users
 
 
