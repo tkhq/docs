@@ -1,55 +1,59 @@
-name: publish-container
+# We are currently using Vercel and do not have a need for a docker container.
+# Commenting this out for now, but leaving it so its easy to bring back if we
+# switch away from vercel.
 
-on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-    tags:
-      - "v*.*.*"
+# name: publish-container
 
-jobs:
-  docker:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175 # v4.6.0
-        with:
-          images: |
-            ghcr.io/tkhq/docs
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=sha,format=long
-      - name: Get committer date
-        run: |
-          echo "committer_date=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4c0219f9ac95b02789c1075625400b2acbff50b1 # v2.9.1
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825 # v4.1.1
-        with:
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            SOURCE_DATE_EPOCH=${{ env.committer_date }}
-          provenance: "false"
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#   push:
+#     branches:
+#       - main
+#     tags:
+#       - "v*.*.*"
+
+# jobs:
+#   docker:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: read
+#       packages: write
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+#         with:
+#           ref: ${{ github.event.pull_request.head.sha }}
+#       - name: Docker meta
+#         id: meta
+#         uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175 # v4.6.0
+#         with:
+#           images: |
+#             ghcr.io/tkhq/docs
+#           tags: |
+#             type=raw,value=latest,enable={{is_default_branch}}
+#             type=ref,event=pr
+#             type=semver,pattern={{version}}
+#             type=sha,format=long
+#       - name: Get committer date
+#         run: |
+#           echo "committer_date=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@4c0219f9ac95b02789c1075625400b2acbff50b1 # v2.9.1
+#       - name: Login to GHCR
+#         if: github.event_name != 'pull_request'
+#         uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2.2.0
+#         with:
+#           registry: ghcr.io
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Build and push
+#         uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825 # v4.1.1
+#         with:
+#           platforms: linux/amd64,linux/arm64
+#           build-args: |
+#             SOURCE_DATE_EPOCH=${{ env.committer_date }}
+#           provenance: "false"
+#           push: ${{ github.event_name != 'pull_request' }}
+#           tags: ${{ steps.meta.outputs.tags }}
