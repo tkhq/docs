@@ -52,28 +52,28 @@ Navigate to your user page by clicking on "User Details" in the user dropdown me
 
 <img src="/img/quickstart/find_user_details.png" alt="Find user details" width="940px" />
 
-Click on "Create API keys" and follow the prompts to add the generarated public API key. You'll be required to authenticate with the same authenticator used during onboarding. After this succeeds, you should be all set to interact with our API.
+Click on "Create API keys" and follow the prompts to add the generated public API key. You'll be required to authenticate with the same authenticator used during onboarding. After this succeeds, you should be all set to interact with our API.
 
 ## Create a Wallet
 
 Wallets are collections of cryptographic key pairs typically used for sending and receiving digital assets. To create one, we need to provide a name:
 
-```
-turnkey wallets create --name default
+```sj
+turnkey wallets create --name default --key-name quickstart
 ```
 
 ## Create an Ethereum account
 
 To create a cryptographic key pair on our new Wallet, we need to pass our desired address format:
 
-```
-turnkey wallets accounts create --wallet default --address-format ADDRESS_FORMAT_ETHEREUM
+```sh
+turnkey wallets accounts create --wallet default --address-format ADDRESS_FORMAT_ETHEREUM --key-name quickstart
 ```
 
 This command will produce an Ethereum address (e.g. `0x08cb1216C95149DF66978b574E484869512CE2bF`) that we'll need to sign a transaction. You can see your new Wallet account with:
 
-```
-turnkey wallets accounts list --wallet default
+```sh
+turnkey wallets accounts list --wallet default --key-name quickstart
 ```
 
 ## Sign a Transaction
@@ -90,7 +90,7 @@ turnkey request --path /public/v1/submit/sign_transaction --body '{
       "signWith": "<Your Ethereum address>",
       "unsignedTransaction": "<Your Transaction>"
     }
-}' -k quickstart
+}' --key-name quickstart
 ```
 
 If you'd like to broadcast your transaction, you can easily do so via [Etherscan](https://etherscan.io/pushTx).
