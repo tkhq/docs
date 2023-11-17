@@ -5,7 +5,7 @@ slug: /getting-started/export
 ---
 # Export
 
-Exporting a [Wallet](./wallets.md) or Private Key lets a user securely view their wallet as a mnemonic. This can be helpful for backup or transfer purposes.
+Exporting a [Wallet](./Wallets.md) or Private Key lets a user securely view their wallet as a mnemonic. This can be helpful for backup or transfer purposes.
 
 ## Cryptographic details
 

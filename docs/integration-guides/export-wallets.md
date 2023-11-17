@@ -5,7 +5,7 @@ slug: /integration-guides/export-wallets
 ---
 # Export Wallet
 
-Exporting a [Wallet](../getting-started/wallets.md) allows your users to back up or transfer a wallet by securely viewing the wallet's [mnemonic](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without needing you in the loop.
+Exporting a [Wallet](../getting-started/Wallets.md) allows your users to back up or transfer a wallet by securely viewing the wallet's [mnemonic](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without needing you in the loop.
 
 ## Before you start
 Make sure you have created a wallet for your user. 
@@ -75,4 +75,4 @@ To enable as much customization of brand, theme, and copy, we've limited the onl
 
 ## Private Keys
 
-Turnkey also supports exporting raw private keys. To implement export for private keys, follow the same [steps](#export-step-by-step) above, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method on the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). At the end of a successful private key export, the iframe displays a hexadecimal-encoded raw private key.
+Turnkey also supports exporting raw private keys. To implement export for private keys, follow the same steps above, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method on the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). At the end of a successful private key export, the iframe displays a hexadecimal-encoded raw private key.
