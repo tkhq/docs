@@ -28,9 +28,14 @@ Once a user receives a recovery email, recovery credential _decryption_ needs to
 
 ## Authorization
 
-Authorization for email recovery is based on our usual activity authorization: our [policy engine](../policy-management/Policy-overview.md) controls who can and cannot execute recovery-related activities.
-* `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` can be performed by the root user or by any user in an organization if authorized by policy. The activity can target any user in this organization **or any sub-organization user**. The activity will fail if a parent user tries to initiate recovery for a sub-organization which has [opted out of email recovery](#opting-out-of-email-recovery).
+Authorization for email recovery is based on our usual activity authorization: our [policy engine](../policy-management/Policy-overview.md) controls who can and cannot execute recovery-related activities. 
+* `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` can be performed by the root user or by any user in an organization if authorized by policy. The activity can target **any user** in this organization **or any sub-organization user**. The activity will fail if a parent user tries to initiate recovery for a sub-organization which has [opted out of email recovery](#opting-out-of-email-recovery).
 * `ACTIVITY_TYPE_RECOVER_USER` should be signed by the recovery credential sent via email. Even if not explicitly allowed by policy, a user is always able to add credentials to their own user. This includes adding a new authenticator when authenticated with a recovery credential. In other words, no special policy is needed to make this work: users are able to recover out-of-the-box.
+
+<p style={{textAlign: 'center'}}>
+    <img src="/img/diagrams/email_recovery_authorization.png" width="500" height="200"/>
+</p>
+
 
 Important note: recovery credentials automatically expire after **30 minutes** and are overridden when multiple `INIT_USER_EMAIL_RECOVERY` activities target the same user. Only the most recent recovery credential is valid.
 

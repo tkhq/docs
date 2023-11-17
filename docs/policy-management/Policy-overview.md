@@ -30,7 +30,7 @@ All policies defined within an Organization are evaluated on each request. The i
 1. If a quorum of root users takes the action, the final outcome is `OUTCOME_ALLOW`
 2. Else if any applicable policy has `EFFECT_DENY`, the final outcome is `OUTCOME_DENY`. This is also referred to as "explicit deny."
 3. Else if at least one applicable policy has `EFFECT_ALLOW`, then the final outcome is `OUTCOME_ALLOW`
-4. Else the final outcome is `OUTCOME_DENY`. This is also referred to as "implicit deny."
+4. Else the final outcome is `OUTCOME_DENY`. This is also referred to as "implicit deny." In cases of conflicts, `EFFECT_DENY` always wins.
 
 Stated differently:
 
@@ -38,6 +38,8 @@ Stated differently:
   <img src="/img/diagrams/policy_overview.png" alt="policy_overview" width="500px" />
 </p>
 
-- Root users bypass any policies
-- Otherwise, all actions on Turnkey are implicitly denied by default. They have to be explicitly allowed by a policy.
-- In cases of conflicts, `EFFECT_DENY` always wins
+Almost all actions on Turnkey are implicitly denied by default. There are a few exceptions, however: 
+- Root users bypass any policies.
+- All users have implicit GET (read) permissions in their own Organization and any associated Sub-Organizations. 
+- All users have implicit permission to change their own credentials.
+- All users have implicit permission to approve an activity if they were included in consensus (i.e., a user specified as part of the consensus required to approve a SIGN_TRANSACTION activity does not need separate, explicit permission to sign transactions).
