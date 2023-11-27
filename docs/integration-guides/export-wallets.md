@@ -102,11 +102,13 @@ Turnkey also supports exporting raw private keys. To implement export for privat
 
 ## Cryptographic details
 
-Turnkey's export functionality ensures that neither your application nor Turnkey can view the wallet mnemonic or private key. The following diagram summarizes the flow:
+Turnkey's export functionality ensures that neither your application nor Turnkey can view the wallet mnemonic or private key.
+
+It works by anchoring export in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
+
+ The following diagram summarizes the flow:
 
 <img src="/img/wallet_export_cryptography.png" />
-
-Our export flow works by anchoring export in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
 
 The public part of this key pair is passed as a parameter inside of a signed `EXPORT_WALLET` or `EXPORT_PRIVATE_KEY` activity.
 
