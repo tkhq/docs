@@ -7,7 +7,7 @@ slug: /integration-guides/export-wallets
 
 Turnkey's export functionality allows your end users to backup or transer a [Wallet](../getting-started/Wallets.md) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itsef to Turnkey or your application.
 
-Follow along with the guide below to set up Wallet export for your end users.
+Follow along with the guide below to set up Wallet Export for your end users.
 
 ## Before you start
 Make sure you have created a wallet for your user. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started.  
@@ -31,9 +31,9 @@ Here's a diagram summarizing the wallet export flow step-by-step ([direct link](
 
 Let's review these steps in detail:
 
-1. User on `yoursite.xyz` clicks "export", and a new export UI is shown. We recommend setting this export UI as a new hosted page of your site or application that contains language explaining to the user the security best practices they should follow once they've successfully exported their wallet. Remember: once the wallet has been exported, Turnkey can no longer ensure its security.
+1. When a user on your application clicks "export", display a new export UI. We recommend setting this export UI as a new hosted page of your application that contains language explaining the security best practices users should follow once they've successfully exported their wallet. Remember: once the wallet has been exported, Turnkey can no longer ensure its security.
 
-    While the UI is in a loading state, your frontend uses [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to insert a new iframe element:
+    While the UI is in a loading state, your application uses [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to insert a new iframe element:
     ```js
     const iframeStamper = new IframeStamper({
         iframeUrl: "https://export.turnkey.com",
@@ -50,16 +50,14 @@ Let's review these steps in detail:
 
     return (
         // The iframe element can be hidden until the wallet is exported
-        <div
-            style={{ display: displayIframe }}
-        />
+        <div style={{ display: displayIframe }} />
     );
     ```
-2. Your code receives the iframe public key. Your app prompts the user to sign a new `EXPORT_WALLET` activity with the wallet ID and the iframe public key in the parameters.
-3. Your app polls for the activity response, which contains an export bundle. Remember: this export bundle is an encrypted mnemonic which can only be decrypted within the iframe.
+2. Your code receives the iframe public key. Your application prompts the user to sign a new `EXPORT_WALLET` activity with the wallet ID and the iframe public key in the parameters.
+3. Your application polls for the activity response, which contains an export bundle. Remember: this export bundle is an encrypted mnemonic which can only be decrypted within the iframe.
 
     Need help setting up async polling? Checkout our guide and helper [here](https://github.com/tkhq/sdk/tree/main/packages/http#withasyncpolling-helper).
-4. Your app injects the export bundle into the iframe for decryption and displays the iframe upon success:
+4. Your application injects the export bundle into the iframe for decryption and displays the iframe upon success:
     ```js
     // Inject export bundle into iframe
     let success = await iframeStamper.injectWalletExportBundle(exportBundle);
@@ -91,7 +89,7 @@ iframe {
 `;
 
 return (
-    <div style={{ display: props.iframeDisplay }} id="your-container">
+    <div style={{ display: iframeDisplay }} id="your-container">
     <style>{iframeCss}</style>
     </div>
 );
