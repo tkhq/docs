@@ -31,7 +31,9 @@ In the rest of this guide we'll assume you are using these helpers.
 
 Here's a diagram summarizing the email recovery flow step-by-step ([direct link](/img/email_recovery_steps.png)):
 
-<img src="/img/email_recovery_steps.png" />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/email_recovery_steps.png" alt="email recovery steps" />
+</p>
 
 Let's review these steps in detail:
 

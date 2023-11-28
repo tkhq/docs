@@ -10,7 +10,9 @@ sidebar_position: 2
 
 A typical passkey flow is composed of 4 main steps, depicted below:
 
-<img src="/img/passkeys/turnkey_passkey_flow.png" alt="Passkey prompt on Turnkey" width="920px" />
+<p style={{ textAlign: "center" }}>
+  <img src="/img/passkeys/turnkey_passkey_flow.png" alt="passkey prompt on Turnkey" width="920px" />
+</p>
 
 1. Your app frontend triggers a passkey prompt.
 2. Your end-user uses their device to produce a signature with their passkey, and a signed request is produced.

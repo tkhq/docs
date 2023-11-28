@@ -19,6 +19,7 @@ That said, we have built out several example services and applications to help i
 | [`demo-ethers-passkeys`](https://github.com/tkhq/demo-ethers-passkeys) | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                          |
 | [`demo-viem-passkeys`](https://github.com/tkhq/demo-viem-passkeys)     | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                            |
 | [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                                      | Compile and deploy a smart contract                                                                                         |
+| [`email-recovery`](https://github.com/tkhq/sdk/tree/main/examples/email-recovery/)                          | A NextJS app that demonstrates how to use `@turnkey/iframe-stamper` to perform email |
 | [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer/)                                  | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users             |
 | [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                        | Sweep funds from one address to a different address                                                                         |
 | [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner/)                          | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap |
@@ -39,9 +40,11 @@ That said, we have built out several example services and applications to help i
 
 A minimal consumer wallet app powered by Turnkey. Behind the scenes, it uses [`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) for signing and WalletConnect (v1) for accessing dapps.
 
-<video controls width="800px">
-  <source src="https://github.com/tkhq/demo-consumer-wallet/assets/127255904/2c3409df-2d7c-4ec3-9aa8-e2944a0b0e0a"/>
-</video>
+<p style={{ textAlign: "center" }}>
+  <video controls width="800px">
+    <source src="https://github.com/tkhq/demo-consumer-wallet/assets/127255904/2c3409df-2d7c-4ec3-9aa8-e2944a0b0e0a"/>
+  </video>
+</p>
 
 See https://github.com/tkhq/demo-consumer-wallet for the code.
 
@@ -50,7 +53,9 @@ See https://github.com/tkhq/demo-consumer-wallet for the code.
 A wallet application showing how users can register and authenticate using passkeys.
 This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](./Sub-Organizations.md) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
 
-<img src="/demo-passkey-wallet.png" alt="homepage screenshot" width="800px"/>
+<p style={{ textAlign: "center" }}>
+  <img src="/demo-passkey-wallet.png" alt="demo passkey wallet screenshot" width="800px"/>
+</p>
 
 See https://wallet.tx.xyz (and https://github.com/tkhq/demo-passkey-wallet for the code).
 
@@ -58,7 +63,9 @@ See https://wallet.tx.xyz (and https://github.com/tkhq/demo-passkey-wallet for t
 
 A simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/ethers`](https://github.com/tkhq/sdk/tree/main/packages/ethers) signer, using passkeys.
 
-<img src="/ethers-ui-screenshot.png" alt="homepage screenshot" width="800px"/>
+<p style={{ textAlign: "center" }}>
+  <img src="/ethers-ui-screenshot.png" alt="ethers ui screenshot" width="800px"/>
+</p>
 
 See https://github.com/tkhq/demo-ethers-passkeys for the code.
 
@@ -66,7 +73,9 @@ See https://github.com/tkhq/demo-ethers-passkeys for the code.
 
 A similar, simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/viem`](https://github.com/tkhq/sdk/tree/main/packages/viem) signer, using passkeys.
 
-<img src="/viem-ui-screenshot.png" alt="homepage screenshot" width="800px"/>
+<p style={{ textAlign: "center" }}>
+  <img src="/viem-ui-screenshot.png" alt="viem ui screenshot" width="800px"/>
+</p>
 
 See https://github.com/tkhq/demo-viem-passkeys for the code.
 
@@ -74,6 +83,8 @@ See https://github.com/tkhq/demo-viem-passkeys for the code.
 
 A simple example using Turnkey and Figment to easily automate ETH staking.
 
-<img src="/img/staking_example.png" alt="turnkey figment integration" width="700px"/>
+<p style={{ textAlign: "center" }}>
+  <img src="/img/staking_example.png" alt="turnkey figment integration" width="700px"/>
+</p>
 
 See https://docs.figment.io/recipes/stake-eth-from-turnkey for the code.

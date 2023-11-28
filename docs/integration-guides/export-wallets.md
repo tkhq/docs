@@ -5,7 +5,7 @@ slug: /integration-guides/export-wallets
 ---
 # Export Wallet
 
-Turnkey's export functionality allows your end users to backup or transer a [Wallet](../getting-started/Wallets.md) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itsef to Turnkey or your application.
+Turnkey's export functionality allows your end users to backup or transfer a [Wallet](../getting-started/Wallets.md) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
 
 Follow along with the guide below to set up Wallet Export for your end users.
 
@@ -27,7 +27,9 @@ In the rest of this guide we'll assume you are using these helpers.
 
 Here's a diagram summarizing the wallet export flow step-by-step ([direct link](/img/wallet_export_steps.png)):
 
-<img src="/img/wallet_export_steps.png" />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/wallet_export_steps.png" alt="wallet export steps" height="200" />
+</p>
 
 Let's review these steps in detail:
 
@@ -72,9 +74,11 @@ Let's review these steps in detail:
 
 Export is complete! The iframe now displays a numbered 3-column grid of words that form the mnemonic, directly to your end user.
 
-<img src="/img/wallet_export_mnemonic.png" />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/wallet_export_mnemonic.png" alt="wallet mnemonic" height="280" />
+</p>
 
-The exported wallet will remain stored within Turnkey’s infrastructure. In your dashboard, the exported user Wallet will be flagged as “Exported”.  
+The exported wallet will remain stored within Turnkey’s infrastructure. In your Turnkey dashboard, the exported user Wallet will be flagged as “Exported”.  
 
 ## UI customization
 
@@ -108,7 +112,9 @@ It works by anchoring export in a **target encryption key** (TEK). This target e
 
  The following diagram summarizes the flow:
 
-<img src="/img/wallet_export_cryptography.png" />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/wallet_export_cryptography.png" alt="export cryptography" height="320" />
+</p>
 
 The public part of this key pair is passed as a parameter inside of a signed `EXPORT_WALLET` or `EXPORT_PRIVATE_KEY` activity.
 
