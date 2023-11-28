@@ -22,8 +22,10 @@ With terminology out of the way, what is a "discoverable" credential compared to
 
 A discoverable credential is a self-contained key pair, stored on the end-user's device. Discoverable credentials are preferred because keys are self-contained, can easily be synced and can be used across devices independently. Crucially for UX, the end-user is able to list their passkeys and choose which device/passkey they'd like to use:
 
-<img src="/img/passkeys/discoverable_device_choice.png" alt="Device selection on Chrome" width="400px" />
-<img src="/img/passkeys/discoverable_passkey_choice.png" alt="Passkey selection on Chrome" width="321px" style={{marginLeft: '10px'}} />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/passkeys/discoverable_device_choice.png" alt="device selection on Chrome" width="400px" />
+    <img src="/img/passkeys/discoverable_passkey_choice.png" alt="passkey selection on Chrome" width="321px" style={{marginLeft: '10px'}} />
+</p>
 
 With discoverable credentials you don't have to keep track of credential IDs. Your authentication flow can simply be: "prompt the user with passkey authentication", and let the browser or device native UX handle the rest! The downside is you lose some control over these prompts, because they will vary depending on your users' OS and browser.
 

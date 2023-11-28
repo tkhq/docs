@@ -18,7 +18,9 @@ Email recovery starts with a new activity posted to Turnkey. This activity has t
 
 This activity generates a new temporary API key pair (a "recovery credential"), saves the public key in organization data under the target user, and sends an email with the encrypted recovery credential:
 
-<img src="/img/recovery_email.png" width="420" />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/recovery_email.png" alt="recovery email" width="420" />
+</p>
 
 Initiating a new email recovery require proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
 
@@ -33,7 +35,7 @@ Authorization for email recovery is based on our usual activity authorization: o
 * `ACTIVITY_TYPE_RECOVER_USER` should be signed by the recovery credential sent via email. Even if not explicitly allowed by policy, a user is always able to add credentials to their own user. This includes adding a new authenticator when authenticated with a recovery credential. In other words, no special policy is needed to make this work: users are able to recover out-of-the-box.
 
 <p style={{textAlign: 'center'}}>
-    <img src="/img/diagrams/email_recovery_authorization.png" width="500" height="200"/>
+    <img src="/img/diagrams/email_recovery_authorization.png" alt="email recovery authorization" width="500" height="200"/>
 </p>
 
 
@@ -63,7 +65,9 @@ If you _never_ want to have email recovery enabled, our `CREATE_SUB_ORGANIZATION
 
 Unlike typical email recovery functionality, Turnkey's email recovery doesn't send unencrypted tokens via emails. This ensures no man-in-the-middle attack can happen: even if the content of the recovery email is leaked, an attacker wouldn't be able to decrypt the recovery credential. The following diagram summarizes the flow:
 
-<img src="/img/email_recovery_cryptography.png" />
+<p style={{ textAlign: "center" }}>
+    <img src="/img/email_recovery_cryptography.png" alt="email recovery cryptography" />
+</p>
 
 Our email recovery flow works by anchoring recovery in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
 
