@@ -12,5 +12,8 @@ By verifying the authenticity of data using cryptographic signatures (no passwor
 The entire Turnkey architecture including this verifiable data flow is described below:
 
 <p style={{textAlign: 'center'}}>
-  <img src="/img/diagrams/architecture.png" alt="turnkey_architecture" width="900px" />
+  <img
+    src="/img/diagrams/architecture.png"
+    alt="turnkey_architecture"
+    style={{ width: 900 }} />
 </p>

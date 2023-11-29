@@ -34,8 +34,12 @@ All policies defined within an Organization are evaluated on each request. The i
 
 Stated differently:
 
-<p style={{textAlign: 'center'}}>
-  <img src="/img/diagrams/policy_overview.png" alt="policy_overview" width="500px" />
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/img/diagrams/policy_overview.png"
+    alt="policy_overview"
+    style={{ width: 500 }}
+  />
 </p>
 
 Almost all actions on Turnkey are implicitly denied by default. There are a few exceptions, however: 

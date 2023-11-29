@@ -11,7 +11,11 @@ sidebar_position: 2
 A typical passkey flow is composed of 4 main steps, depicted below:
 
 <p style={{ textAlign: "center" }}>
-  <img src="/img/passkeys/turnkey_passkey_flow.png" alt="passkey prompt on Turnkey" width="920px" />
+  <img
+    src="/img/passkeys/turnkey_passkey_flow.png"
+    alt="passkey prompt on Turnkey"
+    style={{ width: 920 }}
+  />
 </p>
 
 1. Your app frontend triggers a passkey prompt.

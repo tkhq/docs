@@ -18,7 +18,11 @@ This quickstart will guide you through Turnkey’s onboarding, adding an API key
 
 All API requests require an organization ID. Yours can be located in the user dropdown menu at the top right corner of the dashboard.
 
-<img src="/img/quickstart/find_organization_id.png" alt="Find organization ID" width="940px" />
+<img
+  src="/img/quickstart/find_organization_id.png"
+  alt="Find organization ID"
+  style={{ 940 }}
+/>
 
 For convenience, it's worth setting this as a permanent shell variable:
 
@@ -50,7 +54,11 @@ When you run this command, Turnkey’s CLI generates an API key pair and **store
 
 Navigate to your user page by clicking on "User Details" in the user dropdown menu.
 
-<img src="/img/quickstart/find_user_details.png" alt="Find user details" width="940px" />
+<img
+  src="/img/quickstart/find_user_details.png"
+  alt="Find user details"
+  style={{ width: 940 }}
+/>
 
 Click on "Create API keys" and follow the prompts to add the generated public API key. You'll be required to authenticate with the same authenticator used during onboarding. After this succeeds, you should be all set to interact with our API.
 

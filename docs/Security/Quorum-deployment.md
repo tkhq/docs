@@ -11,8 +11,12 @@ Each instance of QOS is configured with a Quorum Set – A group of individuals 
 
 After the service is launched, QOS responds to attestation requests and waits to receive key shares from QOS Operators or members of the Quorum Set. Once a threshold number of shares have been sent into the enclave it will reconstruct its core secret and launch the application it was provisioned with. This process is outlined in the images below:
 
-<p style={{textAlign: 'center'}}>
-  <img src="/img/diagrams/deployment.png" alt="qos-deployments" width="500px" />
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/img/diagrams/deployment.png"
+    alt="qos-deployments"
+    style={{ width: 500 }}
+  />
 </p>
 
 Remote attestation is the process by which core attributes of a machine can be retrieved and verified from a remote location. The enclave’s secure co-processor, in this case AWS’s NSM, observes the enclave as it is being launched and records certain important values such as the hash of the enclave image, the hash of the kernel, and the hash of the boot filesystem. This means that each attestation request verifies that the code actually running in the enclave is only the code we expect to be running.

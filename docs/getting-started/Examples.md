@@ -54,7 +54,11 @@ A wallet application showing how users can register and authenticate using passk
 This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](./Sub-Organizations.md) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
 
 <p style={{ textAlign: "center" }}>
-  <img src="/demo-passkey-wallet.png" alt="demo passkey wallet screenshot" width="800px"/>
+  <img
+    src="/demo-passkey-wallet.png"
+    alt="demo passkey wallet screenshot"
+    style={{ width: 800 }}
+  />
 </p>
 
 See https://wallet.tx.xyz (and https://github.com/tkhq/demo-passkey-wallet for the code).
@@ -64,7 +68,11 @@ See https://wallet.tx.xyz (and https://github.com/tkhq/demo-passkey-wallet for t
 A simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/ethers`](https://github.com/tkhq/sdk/tree/main/packages/ethers) signer, using passkeys.
 
 <p style={{ textAlign: "center" }}>
-  <img src="/ethers-ui-screenshot.png" alt="ethers ui screenshot" width="800px"/>
+  <img
+    src="/ethers-ui-screenshot.png"
+    alt="ethers ui screenshot"
+    style={{ width: 800 }}
+  />
 </p>
 
 See https://github.com/tkhq/demo-ethers-passkeys for the code.
@@ -74,7 +82,11 @@ See https://github.com/tkhq/demo-ethers-passkeys for the code.
 A similar, simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/viem`](https://github.com/tkhq/sdk/tree/main/packages/viem) signer, using passkeys.
 
 <p style={{ textAlign: "center" }}>
-  <img src="/viem-ui-screenshot.png" alt="viem ui screenshot" width="800px"/>
+  <img
+    src="/viem-ui-screenshot.png"
+    alt="viem ui screenshot"
+    style={{ width: 800 }}
+  />
 </p>
 
 See https://github.com/tkhq/demo-viem-passkeys for the code.
@@ -84,7 +96,11 @@ See https://github.com/tkhq/demo-viem-passkeys for the code.
 A simple example using Turnkey and Figment to easily automate ETH staking.
 
 <p style={{ textAlign: "center" }}>
-  <img src="/img/staking_example.png" alt="turnkey figment integration" width="700px"/>
+  <img
+    src="/img/staking_example.png"
+    alt="turnkey figment integration"
+    style={{ width: 700 }}
+  />
 </p>
 
 See https://docs.figment.io/recipes/stake-eth-from-turnkey for the code.

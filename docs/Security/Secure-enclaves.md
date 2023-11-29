@@ -11,8 +11,12 @@ Secure enclaves, also called Trusted Execution Environments, are highly constrai
 
 The following outlines the structure of a single enclave application:
 
-<p style={{textAlign: 'center'}}>
-  <img src="/img/diagrams/secure_enclaves.png" alt="secure-enclaves" width="500px" />
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/img/diagrams/secure_enclaves.png"
+    alt="secure-enclaves"
+    style={{ width: 500 }}
+  />
 </p>
 
 In this diagram _Host_ represents a standard AWS virtual machine. We run a basic application that receives traffic from the network and calls into the enclave. This creates a layer of insulation from our most secure environment and offers a convenient place to gather metrics and other operational information about the enclaves.

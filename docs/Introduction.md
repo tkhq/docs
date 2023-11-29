@@ -25,7 +25,11 @@ At a structural level, a Turnkey Organization is comprised of a few core resourc
 
 
 <p style={{textAlign: 'center'}}>
-  <img src="/img/diagrams/resources.png" alt="resources" width="500px" />
+  <img
+    src="/img/diagrams/resources.png"
+    alt="resources"
+    style={{ width: 500 }}
+  />
 </p>
 
     
