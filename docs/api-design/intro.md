@@ -32,7 +32,7 @@ Each request made to Turnkey has to have an X-Stamp header attached to it. This 
 2. Sign that hash with either your API key or WebAuthn credential
 3. Create a JSON-encoded string with the appropriate properties depending on authenticator type:
     - If using an API Key, make a JSON-encoded string with public key, signature, and signature scheme
-    - If using an WebAuthn Credential, make a JSON-encoded string with the authenticator data, client data, credential ID and signature
+    - If using a WebAuthn Credential, make a JSON-encoded string with the authenticator data, client data, credential ID and signature
 4. Base64url encode this string
 5. Add this string to your request as an X-Stamp header
 
