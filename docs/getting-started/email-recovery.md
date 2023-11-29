@@ -19,7 +19,11 @@ Email recovery starts with a new activity posted to Turnkey. This activity has t
 This activity generates a new temporary API key pair (a "recovery credential"), saves the public key in organization data under the target user, and sends an email with the encrypted recovery credential:
 
 <p style={{ textAlign: "center" }}>
-    <img src="/img/recovery_email.png" alt="recovery email" width="420" />
+    <img
+        src="/img/recovery_email.png"
+        alt="recovery email"
+        style={{ width: 420 }}
+    />
 </p>
 
 Initiating a new email recovery require proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
@@ -35,7 +39,11 @@ Authorization for email recovery is based on our usual activity authorization: o
 * `ACTIVITY_TYPE_RECOVER_USER` should be signed by the recovery credential sent via email. Even if not explicitly allowed by policy, a user is always able to add credentials to their own user. This includes adding a new authenticator when authenticated with a recovery credential. In other words, no special policy is needed to make this work: users are able to recover out-of-the-box.
 
 <p style={{textAlign: 'center'}}>
-    <img src="/img/diagrams/email_recovery_authorization.png" alt="email recovery authorization" width="500" height="200"/>
+    <img
+        src="/img/diagrams/email_recovery_authorization.png"
+        alt="email recovery authorization"
+        style={{ width: 500 }}
+    />
 </p>
 
 

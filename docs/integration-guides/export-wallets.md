@@ -28,7 +28,11 @@ In the rest of this guide we'll assume you are using these helpers.
 Here's a diagram summarizing the wallet export flow step-by-step ([direct link](/img/wallet_export_steps.png)):
 
 <p style={{ textAlign: "center" }}>
-    <img src="/img/wallet_export_steps.png" alt="wallet export steps" height="200px" />
+    <img
+        src="/img/wallet_export_steps.png"
+        alt="wallet export steps"
+        style={{ width: 600 }}
+    />
 </p>
 
 Let's review these steps in detail:
@@ -75,7 +79,11 @@ Let's review these steps in detail:
 Export is complete! The iframe now displays a numbered 3-column grid of words that form the mnemonic, directly to your end user.
 
 <p style={{ textAlign: "center" }}>
-    <img src="/img/wallet_export_mnemonic.png" alt="wallet mnemonic" height="280px" />
+    <img
+        src="/img/wallet_export_mnemonic.png"
+        alt="wallet mnemonic"
+        style={{ width: 330 }}
+    />
 </p>
 
 The exported wallet will remain stored within Turnkey’s infrastructure. In your Turnkey dashboard, the exported user Wallet will be flagged as “Exported”.  
@@ -113,7 +121,11 @@ It works by anchoring export in a **target encryption key** (TEK). This target e
  The following diagram summarizes the flow:
 
 <p style={{ textAlign: "center" }}>
-    <img src="/img/wallet_export_cryptography.png" alt="export cryptography" height="320px" />
+    <img
+        src="/img/wallet_export_cryptography.png"
+        alt="export cryptography"
+        style={{ height: 460 }}
+    />
 </p>
 
 The public part of this key pair is passed as a parameter inside of a signed `EXPORT_WALLET` or `EXPORT_PRIVATE_KEY` activity.

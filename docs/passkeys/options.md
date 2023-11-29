@@ -21,10 +21,11 @@ This is the challenge signed by the end-user for registration. During registrati
 Number of seconds before "giving up". The browser will simply show a timeout popup:
 
 <p style={{ textAlign: "center" }}>
-  <img src="/img/passkeys/timeout.png" alt="authenticatorAttachment unspecified" width="360px"/>
+  <img
+    src="/img/passkeys/timeout.png"
+    alt="authenticatorAttachment unspecified"
+    style={{ width: 360 }} />
 </p>
-<br/>
-<br/>
 
 This UI isn't very helpful, so we recommend making the timeout long (5 minutes). The less your users see this, the better.
 
@@ -37,7 +38,11 @@ The `rp` options is an object with 2 fields: `id` and `name`.
 `rp.id` will show up in the initial registration popup:
 
 <p style={{ textAlign: "center" }}>
-  <img src="/img/passkeys/registration_options_rpid.png" alt="RPID in registration prompt" width="360px"/>
+  <img
+    src="/img/passkeys/registration_options_rpid.png"
+    alt="RPID in registration prompt"
+    style={{ width: 360 }}
+    />
 </p>
 
 `rp.name` doesn't show up in the popup so can be set to anything. We recommend setting it to the correctly capitalized name of your app, in case browsers start showing it in their native UIs in the future.
@@ -58,9 +63,9 @@ Turnkey currently supports P256 only. In the near future Turnkey will support RS
 
 The `user` field has three sub-fields:
 - `id`: also known as "user handle", isn't visible to the end-user. We **strongly recommend setting this to a random value** (e.g. `const id = new Uint8Array(32); crypto.getRandomValues(id)`) to make sure a new passkey is created. Be aware: **if you accidentally set this value to an existing user handle, the corresponding passkey will be overridden!**. [This section of spec](https://www.w3.org/TR/webauthn-2/#dictionary-user-credential-params) is clear on the matter: "the user handle ought not be a constant value across different accounts, even for non-discoverable credentials".
-- `name`: this will show up in the passkey list modal (see screenshot below). We recommend setting this to something the user will recognize: their email, the name of your app, or potentially leave this up to the user:<br/>
+- `name`: this will show up in the passkey list modal (see screenshot below). We recommend setting this to something the user will recognize: their email, the name of your app, or potentially leave this up to the user:
   <p style={{ textAlign: "center" }}>
-    <img src="/img/passkeys/user_name_and_display.png" alt="RPID in registration prompt" width="360px"/>
+    <img src="/img/passkeys/user_name_and_display.png" alt="RPID in registration prompt" style={{ width: 360 }} />
   </p>
 - `displayName`: as far as we can tell this doesn't show up in current browser UIs. It might show up in future iterations so it's best to populate this with the same value as `name`.
 
@@ -122,13 +127,20 @@ The credential ID needs to be passed as a buffer but is returned from registrati
 If the wrong credential ID is specified, `transports: ["internal"]` is set, browsers error right away because they can enumerate internal credentials. Chrome, for example, displays the following error:
 
 <p style={{ textAlign: "center" }}>
-  <img src="/img/passkeys/no_passkey_available.png" alt="Chrome error when no matching passkey has been found for the provided Credential ID" width="360px"/>
+  <img
+    src="/img/passkeys/no_passkey_available.png"
+    alt="Chrome error when no matching passkey has been found for the provided Credential ID"
+    style={{ width: 360 }} />
 </p>
 
 However, if the wrong credential ID is specified without `transports` set (or with other-than-internal `transports` set), browsers won't error right away because they can't enumerate external credentials. They will display an error once the user has pressed their security key or gone through the cross-device passkey flow:
 
 <p style={{ textAlign: "center" }}>
-  <img src="/img/passkeys/wrong_credential_id.png" alt="Chrome error when the credential ID used by the user is not in the allowCredentials list" width="360px"/>
+  <img
+    src="/img/passkeys/wrong_credential_id.png"
+    alt="Chrome error when the credential ID used by the user is not in the allowCredentials list"
+    style={{ width: 360 }}
+  />
 </p>
 
 ### `attestation`

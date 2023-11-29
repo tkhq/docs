@@ -47,8 +47,16 @@ Support also varies by operating system: [this matrix](https://passkeys.dev/devi
 We believe **it's time to move away from passwords** so we've built Turnkey without them. When you authenticate to Turnkey you'll be prompted to create a new passkey:
 
 <p style={{ textAlign: "center" }}>
-    <img src="/img/passkeys/turnkey_authenticator_selection.png" alt="Authenticator selection on Turnkey" width="400px" />
-    <img src="/img/passkeys/turnkey_passkey_prompt.png" alt="Passkey prompt on Turnkey" width="420px" style={{marginLeft: '10px'}} />
+    <img
+        src="/img/passkeys/turnkey_authenticator_selection.png"
+        alt="Authenticator selection on Turnkey"
+        style={{ width: 400 }}
+    />
+    <img
+        src="/img/passkeys/turnkey_passkey_prompt.png"
+        alt="Passkey prompt on Turnkey"
+        style={{ marginLeft: 10, width: 420 }}
+    />
 </p>
 
 Authentication to Turnkey requires a passkey signature. No password needed!
