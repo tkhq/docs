@@ -42,7 +42,7 @@ Authorization for email recovery is based on our usual activity authorization: o
     <img
         src="/img/diagrams/email_recovery_authorization.png"
         alt="email recovery authorization"
-        style={{ width: 500, height: 200 }}
+        style={{ width: 500 }}
     />
 </p>
 

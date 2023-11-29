@@ -26,8 +26,6 @@ Number of seconds before "giving up". The browser will simply show a timeout pop
     alt="authenticatorAttachment unspecified"
     style={{ width: 360 }} />
 </p>
-<br/>
-<br/>
 
 This UI isn't very helpful, so we recommend making the timeout long (5 minutes). The less your users see this, the better.
 
@@ -65,7 +63,7 @@ Turnkey currently supports P256 only. In the near future Turnkey will support RS
 
 The `user` field has three sub-fields:
 - `id`: also known as "user handle", isn't visible to the end-user. We **strongly recommend setting this to a random value** (e.g. `const id = new Uint8Array(32); crypto.getRandomValues(id)`) to make sure a new passkey is created. Be aware: **if you accidentally set this value to an existing user handle, the corresponding passkey will be overridden!**. [This section of spec](https://www.w3.org/TR/webauthn-2/#dictionary-user-credential-params) is clear on the matter: "the user handle ought not be a constant value across different accounts, even for non-discoverable credentials".
-- `name`: this will show up in the passkey list modal (see screenshot below). We recommend setting this to something the user will recognize: their email, the name of your app, or potentially leave this up to the user:<br/>
+- `name`: this will show up in the passkey list modal (see screenshot below). We recommend setting this to something the user will recognize: their email, the name of your app, or potentially leave this up to the user:
   <p style={{ textAlign: "center" }}>
     <img src="/img/passkeys/user_name_and_display.png" alt="RPID in registration prompt" style={{ width: 360 }} />
   </p>
