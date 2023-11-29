@@ -24,28 +24,33 @@ So why is a POST-only API a better fit? That's because of signatures. With GET r
 
 By switching to a POST-only API and moving all critical request parameters to the body, we simplify the definition of what has to be signed with each request: it's simply the POST body. Read the next section for more details on API signatures.
 
-## API signatures and X-Stamp header
+## API signatures and stamp headers
 
-Each request made to Turnkey has to have an X-Stamp header attached to it. This signature is checked in our secure enclave applications. The scheme to sign is as follows:
+Every request made to Turnkey must include a signature inside a stamp header. Our secure enclave applications use this signature to verify the integrity and authenticity of the request. To sign your requests, follow these steps:
 
-1. SHA256 hash a JSON-encoded string of your request's body
-2. Sign that hash with either your API key or WebAuthn credential
-3. Create a JSON-encoded string with the appropriate properties depending on authenticator type:
-    - If using an API Key, make a JSON-encoded string with public key, signature, and signature scheme
-    - If using a WebAuthn Credential, make a JSON-encoded string with the authenticator data, client data, credential ID and signature
-4. Base64url encode this string
-5. Add this string to your request as an X-Stamp header
+### Initial steps for all requests
+1. SHA256 hash a JSON-encoded string of your request's body.
+2. Sign the hash with either your API key or WebAuthn credential.
 
-In practice you should not have to worry about this step: our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) will take care of it for you. If you write an independent client however, you'll have to implement this yourself.
+### If using an API key
+1. Create a JSON-encoded string with the public key, signature, and signature scheme.
+2. Base64url encode the string.
+3. Add the string to your request as a `X-Stamp` header.
 
-For reference, here is how we've implemented this in our:
+### If using a WebAuthn credential
+1. Create a JSON-encoded string with the authenticator data, client data, credential ID, and signature.
+2. Add the string to your request as a `X-Stamp-Webauthn` header
+
+In practice you should not have to worry about this step: our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) will take care of it for you. However, if you write an independent client, you will need to implement this yourself.
+
+For reference, check out our implementations:
 
 - [JS SDK's API Key stamper](https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper)
 - [JS SDK's WebAuthn stamper](https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper)
 - [CLI](https://github.com/tkhq/tkcli/blob/main/src/cmd/turnkey/pkg/request.go)
 
 ## Queries and Submissions
-Our API endpoints are divided in 2 broad categories: queries and submissions.
+Our API endpoints are divided into 2 broad categories: queries and submissions.
 
 - Queries are read requests (for example: "get users")
 - Submissions are requests to execute an activity on Turnkey (for example: "create policy")
