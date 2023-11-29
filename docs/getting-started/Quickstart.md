@@ -21,7 +21,7 @@ All API requests require an organization ID. Yours can be located in the user dr
 <img
   src="/img/quickstart/find_organization_id.png"
   alt="Find organization ID"
-  style={{ 940 }}
+  style={{ width: 940 }}
 />
 
 For convenience, it's worth setting this as a permanent shell variable:
