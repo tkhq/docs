@@ -2,6 +2,7 @@
 sidebar_position: 8
 slug: /faq
 ---
+
 # FAQ
 
 ### Why do you require a public / private key pair to access Turnkey API?
@@ -38,26 +39,28 @@ We have limits on the number of resources within a single organization to avoid 
 
 Currently, the resource limits within a single organization are as follows:
 
-| Resource                | Maximum number allowed |
-| :---------------------- | :--------------------- |
-| Private keys            | 1,000                  |
-| Wallets                 | 100                    |
-| Users                   | 100                    |
-| Policies                | 100                    |
-| Invitations             | 100                    |
-| Tags                    | 100                    |
-| Authenticators per user | 10                     |
-| API keys per user       | 10                     |
-| Sub-Organizations       | unlimited              |
+| Resource                       | Maximum number allowed |
+| :----------------------------- | :--------------------- |
+| Private keys                   | 1,000                  |
+| Wallets                        | 100                    |
+| Users                          | 100                    |
+| Policies                       | 100                    |
+| Invitations                    | 100                    |
+| Tags                           | 100                    |
+| Authenticators per user        | 10                     |
+| API keys per user (long-lived) | 10                     |
+| API keys per user (expiring)   | 10                     |
+| Sub-Organizations              | unlimited              |
 
 If you are approaching any of these limits in your implementation and require support, reach out to the Turnkey team (<help@turnkey.com>).
 
 ### Do you have any rate limits in place in your public API?
 
 Our public API currently limits users to a maximum of 60 RPS (Requests Per Second). Specific headers are returned to indicate current quota:
-* `ratelimit-limit`: indicates the total quota (60)
-* `ratelimit-remaining`: indicates the current quota
-* `x-rate-limit-request-forwarded-for` and `x-rate-limit-request-remote-addr`: echo back your remote IP and forwarded-for IP for debugging purposes
+
+- `ratelimit-limit`: indicates the total quota (60)
+- `ratelimit-remaining`: indicates the current quota
+- `x-rate-limit-request-forwarded-for` and `x-rate-limit-request-remote-addr`: echo back your remote IP and forwarded-for IP for debugging purposes
 
 When rate limits are exceeded, an error with HTTP 429 is returned with the following message: `Too many requests. Please wait and try again in a few seconds`.
 
@@ -104,16 +107,16 @@ We require a recent timestamp in the `timestampMs` field for each new activity s
 
 Our secure enclaves have their own, independent, secure source of time. We currently require request timestamps to be **less than an hour old**, and **up to 5 minutes in the future**.
 
-### How do pricing and billing work? 
+### How do pricing and billing work?
 
-Turnkey is priced per signature, i.e. any transaction or raw payload successfully signed by a private key created on Turnkey. Turnkey offers 25 free signatures each month. To execute more than 25 transactions in a given month, you are required to have a credit card on file or active enterprise plan on your account. To upgrade your plan, navigate to Account Settings from the menu in the top right-hand corner in the Turnkey dashboard and follow the instructions. 
+Turnkey is priced per signature, i.e. any transaction or raw payload successfully signed by a private key created on Turnkey. Turnkey offers 25 free signatures each month. To execute more than 25 transactions in a given month, you are required to have a credit card on file or active enterprise plan on your account. To upgrade your plan, navigate to Account Settings from the menu in the top right-hand corner in the Turnkey dashboard and follow the instructions.
 
 For more information about pricing and billing, check out the [pricing page](https://www.turnkey.com/pricing).
 
 ### Where else can I get help with my Turnkey implementation?
 
-If you get stuck or have a one-off question, post it to our [developer forum](https://github.com/orgs/tkhq/discussions) or reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.  
+If you get stuck or have a one-off question, post it to our [developer forum](https://github.com/orgs/tkhq/discussions) or reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.
 
 ### Is my country supported?
 
-Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions. 
+Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions.
