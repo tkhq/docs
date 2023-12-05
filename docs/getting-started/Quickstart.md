@@ -62,6 +62,8 @@ Navigate to your user page by clicking on "User Details" in the user dropdown me
 
 Click on "Create API keys" and follow the prompts to add the generated public API key. You'll be required to authenticate with the same authenticator used during onboarding. After this succeeds, you should be all set to interact with our API.
 
+NOTE: if you would like to manually your locally stored public/private API key files (e.g. `key.public`, `key.private`), you will have to save the files without newlines (which occupy extra bytes). For example, for VIM, use `:set binary noeol` or `:set binary noendofline` before writing.
+
 ## Create a Wallet
 
 Wallets are collections of cryptographic key pairs typically used for sending and receiving digital assets. To create one, we need to provide a name:

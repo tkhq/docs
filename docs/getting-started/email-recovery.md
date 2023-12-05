@@ -47,7 +47,7 @@ Authorization for email recovery is based on our usual activity authorization: o
 </p>
 
 
-Important note: recovery credentials automatically expire after **30 minutes** and are overridden when multiple `INIT_USER_EMAIL_RECOVERY` activities target the same user. Only the most recent recovery credential is valid.
+Important note: recovery credentials automatically expire after **15 minutes** and are overridden when multiple `INIT_USER_EMAIL_RECOVERY` activities target the same user. Only the most recent recovery credential is valid.
 
 ## Email recovery in your sub-organizations
 
