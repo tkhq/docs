@@ -124,7 +124,7 @@ It works by anchoring export in a **target encryption key** (TEK). This target e
     <img
         src="/img/wallet_export_cryptography.png"
         alt="export cryptography"
-        style={{ height: 460 }}
+        style={{ height: 280 }}
     />
 </p>
 
