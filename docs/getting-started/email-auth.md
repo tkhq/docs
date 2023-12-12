@@ -8,6 +8,10 @@ slug: /getting-started/email-auth
 
 Email Auth enables a user to authenticate their Turnkey account via email. In this process, the user is granted an expiring API key that is held in local storage. This expiring API key can be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth).
 
+#### Mechanism
+
+In short, Email Auth is built on top of the expiring API keys primitive: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [cryptographic details](#cryptographic-details) section for more info.
+
 ## User Experience
 
 Email auth starts with a new activity posted to Turnkey. This activity has the type `ACTIVITY_TYPE_EMAIL_AUTH` and takes the following as parameters:
@@ -15,7 +19,7 @@ Email auth starts with a new activity posted to Turnkey. This activity has the t
 - `email`: the email of the user who would like to authenticate. This email must be the email already attached to the user in organization data (i.e., previously approved by the user). This prevents malicious account takeover. If you try to pass a different email address, the activity will fail.
 - `targetPublicKey`: the public key to which the auth credential is encrypted (more on this later)
 - `apiKeyName`: an optional name for the API Key. If none is provided, we will default to `Email Auth - <Timestamp>`
-- `expirationSeconds`: an optional window (in seconds) indicating how long the API Key should last. Default to 30 minutes.
+- `expirationSeconds`: an optional window (in seconds) indicating how long the API Key should last. Default to 15 minutes.
 - `emailCustomization`: optional parameters for customizing emails. If not provided, use defaults. This is currently a WIP. 🚧
 
 This activity generates a new API key pair (an "auth credential"), saves the public key in organization data under the target user, and sends an email with the encrypted auth credential:
@@ -58,7 +62,7 @@ Similar to email recovery, depending on your threat model, it may be unacceptabl
 
 If you _never_ want to have email auth enabled for sub-organizations, our `CREATE_SUB_ORGANIZATION` activity takes a `disableEmailAuth` boolean in its parameters. Set it to `true` and the sub-organization will be created without the organization feature.
 
-## Cryptographic details
+## Mechanism and cryptographic details
 
 Note: if the following section looks familiar, it is! It shares the same cryptographic innerworkings as Email Recovery.
 
