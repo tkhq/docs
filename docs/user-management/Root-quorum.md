@@ -1,7 +1,7 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 description: Learn about the root quorum and how to manage it
-slug: /managing-users/root-quorum
+slug: /users/root-quorum
 ---
 # Root quorum
 
