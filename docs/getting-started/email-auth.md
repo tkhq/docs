@@ -85,7 +85,7 @@ Users currently have a limit of 10 long-lived API keys, and 10 expiring API keys
 NOTE: feature must be enabled. For top-level orgs, by default, Email Auth is not enabled. It must be enabled via the `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activity. Here's an example, using our CLI:
 
 ```
-turnkey request --host api.turnkey.com --path /public/v1/submit/email_auth --body '{
+turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization_feature --body '{
         "timestampMs": "'"$(date +%s)"'000",
         "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
         "organizationId": "<YOUR-ORG-ID>",
