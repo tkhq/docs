@@ -35,7 +35,7 @@ Once a user receives a recovery email, recovery credential _decryption_ needs to
 ## Authorization
 
 Authorization for email recovery is based on our usual activity authorization: our [policy engine](../policy-management/Policy-overview.md) controls who can and cannot execute recovery-related activities. 
-* `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` can be performed by the root user or by any user in an organization if authorized by policy. The activity can target **any user** in this organization **or any sub-organization user**. The activity will fail if a parent user tries to initiate recovery for a sub-organization which has [opted out of email recovery](#opting-out-of-email-recovery).
+* `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` can be performed by the root user or by any user in an organization if authorized by policy, but **only if the feature is enabled**. The activity can target **any user** in this organization **or any sub-organization user**. The activity will fail if a parent user tries to initiate recovery for a sub-organization which has [opted out of email recovery](#opting-out-of-email-recovery).
 * `ACTIVITY_TYPE_RECOVER_USER` should be signed by the recovery credential sent via email. Even if not explicitly allowed by policy, a user is always able to add credentials to their own user. This includes adding a new authenticator when authenticated with a recovery credential. In other words, no special policy is needed to make this work: users are able to recover out-of-the-box.
 
 <p style={{textAlign: 'center'}}>
@@ -65,7 +65,7 @@ If you're a root user and you have lost access to your authenticators, **Turnkey
 
 ## Opting out of email recovery
 
-Depending on your threat model it may be unacceptable to rely on email as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable email recovery with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`.
+Depending on your threat model it may be unacceptable to rely on email as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable email recovery with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_EMAIL_RECOVERY`.
 
 If you _never_ want to have email recovery enabled, our `CREATE_SUB_ORGANIZATION` activity takes a `disableEmailRecovery` boolean in its parameters. Set it to `true` and the sub-organization will be created without the organization feature.
 
