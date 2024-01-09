@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 description: Check out some of our example apps and use cases
 slug: /getting-started/examples
 ---
@@ -23,7 +23,7 @@ That said, we have built out several example services and applications to help i
 | [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer/)                                  | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users             |
 | [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                        | Sweep funds from one address to a different address                                                                         |
 | [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner/)                          | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap |
-| [`wallet-export`](https://github.com/tkhq/sdk/tree/main/examples/wallet-export/)                            | A NextJS app that demonstrates how to use `@turnkey/iframe-stamper` to export a wallet as a mnemonic | 
+| [`wallet-export`](https://github.com/tkhq/sdk/tree/main/examples/wallet-export/)                            | A NextJS app that demonstrates how to use `@turnkey/iframe-stamper` to export a wallet as a mnemonic |
 | [`with-ethers`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/)                                | Create a new Ethereum address, then sign and broadcast a transaction using the Ethers signer with Infura                    |
 | [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem/)                                    | Sign and broadcast a transaction using the Turnkey Custom Account and Infura                                                |
 | [`with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs/)                                | Create a new Cosmos address, then sign and broadcast a transaction on Celestia testnet using the CosmJS signer              |

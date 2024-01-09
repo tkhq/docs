@@ -1,5 +1,5 @@
 ---
-sidebar_position: 8
+sidebar_position: 9
 description: Learn about Email Auth on Turnkey
 slug: /getting-started/email-auth
 ---

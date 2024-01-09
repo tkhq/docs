@@ -144,12 +144,12 @@ const config = {
         darkTheme: darkCodeTheme,
       },
       algolia: {
-        appId: '89KSB43UFT',  
+        appId: '89KSB43UFT',
         // Public API key: it is safe to commit it
         apiKey: 'a0740f141135937727389d897f51fb56',
         indexName: 'turnkey',
         contextualSearch: true,
-        searchPagePath: false,  
+        searchPagePath: false,
       },
     }),
 };

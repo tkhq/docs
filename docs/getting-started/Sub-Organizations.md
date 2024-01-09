@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 description: Learn about sub-orgs and how you can use them
 slug: /getting-started/sub-organizations
 ---
@@ -9,15 +9,15 @@ Using Turnkey’s flexible infrastructure, you can programmatically create and m
 
 We envision sub-organizations being very useful to model your End-Users if you're a business using Turnkey for key management. Let's explore how.
 
-## Creating Sub-Organizations 
+## Creating Sub-Organizations
 
-Creating a new sub-organization is an activity performed by the parent organization. The activity itself takes the following attributes as inputs: 
+Creating a new sub-organization is an activity performed by the parent organization. The activity itself takes the following attributes as inputs:
 - organization name
 - a list of root users
 - a root quorum threshold
 - [optional] a wallet (note: in versions prior to V4, this was a private key)
 
-Root users can be programmatic or human, with one or many credentials attached. 
+Root users can be programmatic or human, with one or many credentials attached.
 
 ## Using Sub-Organizations
 
