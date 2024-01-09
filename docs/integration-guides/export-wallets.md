@@ -83,7 +83,7 @@ Export is complete! The iframe now displays a sentence of words separated by spa
     <img
         src="/img/wallet_export_mnemonic.png"
         alt="wallet mnemonic"
-        style={{ width: 330 }}
+        style={{ width: 420 }}
     />
 </p>
 
@@ -127,7 +127,7 @@ Follow the same steps above for exporting Wallets as mnemonics, but instead use 
     <img
         src="/img/private_key_export.png"
         alt="private key export"
-        style={{ width: 330 }}
+        style={{ width: 420 }}
     />
 </p>
 
