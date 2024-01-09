@@ -1,10 +1,10 @@
 ---
-id: quickstart-cli
+id: using-the-cli
 sidebar_position: 3
 description: Onboard and sign your first Ethereum transaction
-slug: /getting-started/quickstart-cli
+slug: /getting-started/using-the-cli
 ---
-# Quickstart CLI
+# Using the CLI
 
 This quickstart will guide you through Turnkey’s onboarding, adding an API key, creating a wallet, and signing your first Ethereum transaction.
 
