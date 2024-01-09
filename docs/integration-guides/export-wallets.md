@@ -10,6 +10,7 @@ Turnkey's export functionality allows your end users to backup or transfer a [Wa
 Follow along with the guide below to set up Wallet Export for your end users.
 
 ## Before you start
+
 Make sure you have created a wallet for your user. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started.  
 
  
@@ -44,7 +45,7 @@ Let's review these steps in detail:
     const iframeStamper = new IframeStamper({
         iframeUrl: "https://export.turnkey.com",
         // Configure how the iframe element is inserted on the page
-        iframeContainerId: "your-container",
+        iframeContainer: yourContainer,
         iframeElementId: "turnkey-iframe",
     });
 
@@ -76,7 +77,7 @@ Let's review these steps in detail:
     iframeDisplay = "block";
     ```
 
-Export is complete! The iframe now displays a numbered 3-column grid of words that form the mnemonic, directly to your end user.
+Export is complete! The iframe now displays a sentence of words separated by spaces.
 
 <p style={{ textAlign: "center" }}>
     <img
@@ -90,13 +91,18 @@ The exported wallet will remain stored within Turnkey’s infrastructure. In you
 
 ## UI customization
 
-Everything is customizable in the export iframe except the 3-column grid of mnemonic words. Here's an example of how you can configure the styling of the iframe.
+Everything is customizable in the export iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
 ```js
 const iframeCss = `
 iframe {
+    box-sizing: border-box;
     width: 400px;
-    height: 330px;
-    border: none;
+    height: 120px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: rgba(216, 219, 227, 1);
+    padding: 20px;
 }
 `;
 
@@ -107,9 +113,25 @@ return (
 );
 ```
 
-## Private Keys
+## Export as Private Keys
 
-Turnkey also supports exporting raw private keys. To implement export for private keys, follow the same steps above, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). At the end of a successful private key export, the iframe displays a hexadecimal-encoded raw private key.
+Turnkey also supports exporting Wallet Accounts and Private Keys as raw private keys.
+
+### Wallet Accounts
+Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_WALLET_ACCOUNT` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper).
+
+### Private Keys
+Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper).
+
+<p style={{ textAlign: "center" }}>
+    <img
+        src="/img/private_key_export.png"
+        alt="private key export"
+        style={{ width: 330 }}
+    />
+</p>
+
+At the end of a successful private key export, the iframe displays a hexadecimal-encoded raw private key.
 
 
 ## Cryptographic details
@@ -128,7 +150,7 @@ It works by anchoring export in a **target encryption key** (TEK). This target e
     />
 </p>
 
-The public part of this key pair is passed as a parameter inside of a signed `EXPORT_WALLET` or `EXPORT_PRIVATE_KEY` activity.
+The public part of this key pair is passed as a parameter inside of a signed `EXPORT_WALLET`,  `EXPORT_PRIVATE_KEY`, or `EXPORT_WALLET_ACCOUNT` activity.
 
 Our enclave encrypts the wallet's mnemonic or raw private key to the user's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/).
 
