@@ -54,6 +54,7 @@ Turnkey API Keys are generic public / private key pairs that allow you to make r
 A couple of notes:
 - You will need both the public and private key to sign requests to the Turnkey API.
 - **Any code using a Turnkey API private key should only ever be run server-side.**
+- PLACEHOLDER: Explanation of Turnkey Activities -> Direct to relavant link
 
 ## Require the Turnkey Libraries
 
@@ -61,16 +62,16 @@ There are two libraries that you will need to make API requests to Turnkey:
  1. The Turnkey HTTP library.
  2. A Turnkey "stamper" library.
 
-The stamper library is responsible for signing the operation into Turnkey, and comes in 3 different flavors:
+The stamper library is responsible for signing a request into Turnkey, and comes in 3 different flavors:
   1. `api-key-stamper` which signs requests with your Turnkey API key
   2. `webauthn-stamper` which signs requests with a end-user's passkey
-  3. `iframe-stamper` which is used for ...
+  3. `iframe-stamper` which is a wrapper around the api-key-stamper and used specifically for Email Recovery and Email Auth
 
 The simplest way to get started, is to use the API Key Stamper to make requests to Turnkey that are signed with the API key pair you created in the previous step.
 
 ```shell
-  yarn add @turnkey/http
-  yarn add @turnkey/api-key-stamper
+npm install @turnkey/http
+npm install @turnkey/api-key-stamper
 ```
 
 ## Initialize the Turnkey Client
@@ -95,10 +96,10 @@ const turnkeyClient = new TurnkeyClient(
 
 ## Create a Wallet
 
-A `wallet` on Turnkey represents a multi-chain seed phrase from which many individual `accounts` can be derived. An `account` represents an individual index on a derivation path that contains the blockchain address you can send funds to and sign on-chain transactions with. The only thing a wallet needs to be initialized is a name for the wallet.
+A `wallet` on Turnkey represents a multi-chain seed phrase from which many individual `accounts` can be derived. An `account` represents a specific index on a derivation path and contains the blockchain address that you can send funds to and sign on-chain transactions with. The only thing a wallet needs to be initialized is a name for the wallet.
 
 ```javascript
-await turnkeyClient.createWallet({
+const response = await turnkeyClient.createWallet({
   organizationId: TURNKEY_ORGANIZATION_ID,
   type: 'ACTIVITY_TYPE_CREATE_WALLET',
   timestampMs: String(Date.now()),
@@ -107,13 +108,15 @@ await turnkeyClient.createWallet({
     accounts: []
   }
 })
+
+const walletId = response.activity.result.createWalletResult.walletId;
 ```
 
 ## Create an Ethereum Account
 
-Once a wallet has been created, an account can be created against that wallet by passing in the [INSERT HERE] ...
+Once a wallet has been created, accounts can be created against that wallet by passing in the derivation path information for any accounts that you want to derive. In this example we will derive Ethereum accounts, using the standard BIP44 Path format. The final number at the end of the path string represents the index in the derivation path that you want to derive the account for.
 
-Note: The account specification could also be passed into the initial createWallet call if desired.
+Note: You can also create the accounts atomically when you create the wallet by passing in the account derivation paths to the initial createWallet call if desired.
 
 ```javascript
 await client.createWalletAccounts({
@@ -121,22 +124,22 @@ await client.createWalletAccounts({
   type: 'ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS',
   timestampMs: String(Date.now()),
   parameters: {
-    walletId: '1ce716fa-9d40-5371-9c1a-3e95e4663ff5',
+    walletId: "<Your wallet id>",
     accounts: [
       {
-        path: "m/44'/60'/0'/0/0",
+        path: "m/44'/60'/0'/0/0", // account at index 0
         pathFormat: "PATH_FORMAT_BIP32",
         curve: "CURVE_SECP256K1",
         addressFormat: "ADDRESS_FORMAT_ETHEREUM"
       },
       {
-        path: "m/44'/60'/0'/0/1",
+        path: "m/44'/60'/0'/0/1", // account at index 1
         pathFormat: "PATH_FORMAT_BIP32",
         curve: "CURVE_SECP256K1",
         addressFormat: "ADDRESS_FORMAT_ETHEREUM"
       },
       {
-        path: "m/44'/60'/0'/0/2",
+        path: "m/44'/60'/0'/0/2", // account at index 2
         pathFormat: "PATH_FORMAT_BIP32",
         curve: "CURVE_SECP256K1",
         addressFormat: "ADDRESS_FORMAT_ETHEREUM"
@@ -146,24 +149,12 @@ await client.createWalletAccounts({
 })
 ```
 
-You can view the created accounts with
+You can view the created accounts and their associated Ethereum addresses with
 
 ```javascript
-await client.createWalletAccounts({
+await client.getWalletAccounts({
   organizationId: TURNKEY_ORGANIZATION_ID,
-  type: 'ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS',
-  timestampMs: String(Date.now()),
-  parameters: {
-    walletId: '1ce716fa-9d40-5371-9c1a-3e95e4663ff5',
-    accounts: [
-      {
-        path: "m/44'/60'/0'/0/0",
-        pathFormat: "PATH_FORMAT_BIP32",
-        curve: "CURVE_SECP256K1",
-        addressFormat: "ADDRESS_FORMAT_ETHEREUM"
-      }
-    ]
-  }
+  walletId: "<Your wallet id>"
 })
 ```
 
@@ -186,22 +177,27 @@ await turnkeyClient.signTransaction({
 
 Make sure to replace the `unsignedTransaction` below with your own. You can use our [simple transaction generator](https://build.tx.xyz) if you need a quick transaction for testing.
 
+If you'd like to broadcast your transaction, you can easily do so via [Etherscan](https://etherscan.io/pushTx).
+
+
 ## Using the Webauthn Stamper
 
-The previous actions all had to be signed server-side in our code using a Turnkey API key, but you can also have individual end-users sign Turnkey activities using their own passkeys using the client-side webauthn stamper library. You can learn more about the specifics of the passkeys implementation in the [Passkey guide](../passkeys/introduction)
+The previous actions all had to be signed server-side in our code using a Turnkey API key, but you can also have individual end-users sign Turnkey activities using their own passkeys using the webauthn stamper library. You can learn more about the specifics of the passkeys implementation in the [Passkey guide](../passkeys/introduction)
+
+The following example will show a simple example of having an end-user sign a request with a passkey and send it to a dapp developer's endpoint.
 
 ```shell
-yarn add @turnkey/webauthn-stamper
+npm install @turnkey/webauthn-stamper
 ```
 
 ```javascript
 import { WebauthnStamper } from "@turnkey/webauthn-stamper";
-import { TurnkeyClient } from '@turnkey/http';
+import { TurnkeyClient, createActivityPoller } from '@turnkey/http';
 
 const TURNKEY_ORGANIZATION_ID = "<Your Org ID>";
 
-new WebauthnStamper({
-  rpId: process.env.NEXT_PUBLIC_RPID,
+const stamper = new WebauthnStamper({
+  rpId: "<Your domain name here>" // i.e. "wallet.xyz" or "localhost"
 })
 
 const turnkeyClient = new TurnkeyClient(
@@ -210,79 +206,28 @@ const turnkeyClient = new TurnkeyClient(
   },
   stamper
 );
-```
 
-## Using the IFrame Stamper
-```shell
-yarn add @turnkey/iframe-stamper
-```
+// This will produce a signed request that can be POSTed from anywhere.
+// The `signedRequest` has a URL, a POST body, and a "stamp" (HTTP header name and value)
+const signedRequest = await turnkeyClient.stampCreatePrivateKeys(...);
 
-```javascript
-import { IframeStamper } from "@turnkey/iframe-stamper";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+// Alternatively, you can POST directly from your frontend.
+// Our HTTP client will use the webauthn stamper and the configured baseUrl automatically!
+const activityPoller = createActivityPoller({
+  client: client,
+  requestFn: client.createPrivateKeys,
+});
 
-interface ExportProps {
-  iframeUrl: string;
-  iframeDisplay: string;
-  setIframeStamper: Dispatch<SetStateAction<IframeStamper | null>>;
-}
-
-const TurnkeyIframeContainerId = "turnkey-export-iframe-container-id";
-const TurnkeyIframeElementId = "turnkey-export-iframe-element-id";
-
-export function Export(props: ExportProps) {
-  const [iframeStamper, setIframeStamper] = useState<IframeStamper | null>(
-    null
-  );
-  const iframeUrl = props.iframeUrl;
-  const setParentIframeStamper = props.setIframeStamper;
-
-  useEffect(() => {
-    if (!iframeStamper) {
-      const iframeStamper = new IframeStamper({
-        iframeUrl: iframeUrl,
-        iframeContainerId: TurnkeyIframeContainerId,
-        iframeElementId: TurnkeyIframeElementId,
-      });
-
-      iframeStamper.init().then(() => {
-        setIframeStamper(iframeStamper);
-        setParentIframeStamper(iframeStamper);
-      });
-    }
-
-    return () => {
-      if (iframeStamper) {
-        iframeStamper.clear();
-        setIframeStamper(null);
-        setParentIframeStamper(null);
-      }
-    };
-  }, [iframeUrl, iframeStamper, setIframeStamper, setParentIframeStamper]);
-
-  const iframeCss = `
-  iframe {
-      width: 100%;
-      height: 340px;
-  }
-  `;
-
-  return (
-    <div
-      className="space-y-4 p-4 max-w-lg m-auto"
-      style={{ display: props.iframeDisplay }}
-      id={TurnkeyIframeContainerId}
-    >
-      <style>{iframeCss}</style>
-    </div>
-  );
-}
+// Contains the activity result; no backend proxy needed!
+const completedActivity = await activityPoller({
+  type: "ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2",
+  // (omitting the rest of this for brevity)
+})
 ```
 
 ## Best Practices (Using Sub-Organizations)
 
 Due to cryptographic limitations of how much data can be signed at once, generally speaking, a common pattern is to create sub-organizations for each individual user, instead of creating wallets for each user directly on the parent organization. You can read more about how to properly do this in the [Suborganization Guide](../integration-guides/sub-organizations-as-wallets.md)
-
 
 ## Next Steps
 - Check out our [examples](/getting-started/examples) to see what can be built
