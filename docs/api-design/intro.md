@@ -41,6 +41,7 @@ Every request made to Turnkey must include a signature inside a stamp header. Ou
 1. Create a JSON-encoded string with the authenticator data, client data, credential ID, and signature.
 2. Add the string to your request as a `X-Stamp-Webauthn` header
 
+### If using a custom stamper
 In practice you should not have to worry about this step: our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) will take care of it for you. However, if you write an independent client, you will need to implement this yourself.
 
 For reference, check out our implementations:

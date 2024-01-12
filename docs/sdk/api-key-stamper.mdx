@@ -1,0 +1,192 @@
+---
+title: "ApiKeyStamper"
+sidebar_position: 2
+description: Guide on using the ApiKeyStamper.
+slug: /sdk/api-key-stamper
+---
+
+import Tabs from '@theme/Tabs'
+import TabItem from '@theme/TabItem'
+import CodeBlock from '@theme/CodeBlock'
+import Parameter from '@site/src/components/parameter'
+
+## Introduction
+
+The `@turnkey/api-key-stamper` module is an abstraction for stamping requests made to Turnkey's API using your public and private API keys.
+For more information on API keys refer to [this section](../faq#why-do-you-require-a-public--private-key-pair-to-access-turnkey-api).
+
+The stamper can be used to initiate select requests on behalf of the end-user.
+For instance, your app can create a new sub-organization on behalf of the end-user. See our integration guide
+[Sub-Organizations as Wallets](../integration-guides/sub-organizations-as-wallets#step-1-create-a-sub-organization) for a complete example.
+
+:::note
+
+This module is intended to be used on the **server** as you would **_not_** want to expose your private API key to the client.
+
+:::
+
+## Installing
+
+To get started install the [`@turnkey/api-key-stamper`](https://www.npmjs.com/package/@turnkey/api-key-stamper) client.
+
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+      <CodeBlock
+        language="bash">
+        {`npm i @turnkey/api-key-stamper`}
+      </CodeBlock>
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+      <CodeBlock
+        language="bash">
+        {`pnpm i @turnkey/api-key-stamper`}
+      </CodeBlock>
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+    <CodeBlock
+        language="bash">
+        {` yarn add @turnkey/api-key-stamper`}
+      </CodeBlock>
+  </TabItem>
+</Tabs>
+
+
+## Initializing
+The **`ApiKeyStamper`** class is a helper, which abstracts away the required stamp headers when making request to Turnkey's API.
+You can initialize a new **`ApiKeyStamper`** using the **`ApiKeyStamper`** constructor:
+
+### `constructor(config: TApiKeyStamperConfig): TStamper`
+
+The `ApiKeyStamper` class is responsible for creating a digital stamp using API keys.
+This stamp is used for authenticating requests made with the `@turnkey/http`'s `TurnkeyClient`.
+
+#### Parameters
+
+
+
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'config',
+    type: {
+      name: 'TApiKeyStamperConfig',
+      link: 'https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper/src/index.ts#L8-L11'
+    }
+  }}
+  isRequired
+>
+
+An object containing configuration settings for the stamper.
+
+</Parameter>
+
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: '.apiPrivateKey',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+Your Turnkey api private key.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: '.apiPublicKey',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+Your Turnkey api public key.
+
+</Parameter>
+
+
+
+#### Types
+
+##### `TApiKeyStamperConfig`
+```ts
+type TApiKeyStamperConfig = {
+  apiPublicKey: string;
+  apiPrivateKey: string;
+}
+```
+
+##### `TStamper`
+```ts
+interface TStamper {
+  stamp: (input: string) => Promise<TStamp>;
+}
+```
+
+#### Example
+
+The example below shows how to initialze and use the `ApiKeyStamper` with the `TurnkeyClient` to make a request
+to Turnkey's [`/public/v1/query/whoami`](https://docs.turnkey.com/api#tag/Sessions/operation/GetWhoami) endpoint:
+
+```ts
+import { TurnkeyClient } from "@turnkey/http"
+import { ApiKeyStamper } from "@turnkey/api-key-stamper"
+
+// Following best practices, define parameters in your .env file
+const baseUrl = process.env.TURNKEY_BASE_URL || "https://api.turnkey.com"
+const apiPublicKey = process.env.TURNKEY_API_PUBLIC_KEY
+const apiPrivateKey = process.env.TURNKEY_API_PRIVATE_KEY
+
+// Initialize the API key stamper
+const stamper = new ApiKeyStamper({ apiPublicKey, apiPrivateKey })
+
+// Initialize the Turnkey client
+const tk = new TurnkeyClient({ baseUrl }, stamper)
+
+// Now you can make authenticated requests using the APIKeyStamper
+const whoami = await tk.getWhoami({
+    organizationId: "<Your Org ID>",
+})
+```
+
+## Methods
+
+
+### `stamp: (input: string) => Promise<TStamp>`
+
+Creates a digital stamp which includes the public key, signature scheme, and a signature.
+This stamp is used in the `X-Stamp` header of HTTP requests to authenticate.
+
+#### Parameters
+
+<Parameter
+  param={{
+    name: 'payload',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The payload that needs to be stamped.
+
+</Parameter>
+
+#### Types
+
+##### `TStamp`
+
+```ts
+type TStamp = {
+  stampHeaderName: string;
+  stampHeaderValue: string;
+}
+```
