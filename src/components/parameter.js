@@ -1,6 +1,12 @@
 import React from "react"
 
-export default function Parameter({ children, param, isRequired, style }) {
+export default function Parameter({
+  children,
+  param,
+  isRequired,
+  style,
+  note,
+}) {
   return (
     <div
       style={{
@@ -39,6 +45,7 @@ export default function Parameter({ children, param, isRequired, style }) {
             <span>{param.type.name}</span>
           </code>
         )}
+
         {isRequired && (
           <code
             style={{
@@ -50,6 +57,16 @@ export default function Parameter({ children, param, isRequired, style }) {
           >
             required
           </code>
+        )}
+        {param?.type?.note && (
+          <div
+            style={{
+              color: "var(--ifm-font-color-base)",
+              fontSize: "0.75rem",
+            }}
+          >
+            {param?.type?.note}
+          </div>
         )}
       </div>
       <p

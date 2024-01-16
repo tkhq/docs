@@ -12,6 +12,13 @@ import Parameter from '@site/src/components/parameter'
 
 ## Introduction
 
+
+The [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper)
+module is used for stamping requests made to Turnkey's API with WebAuthn credentials, but specifically for use with passkeys.
+
+For more information on passkeys and WebAuthn refer to [this section](../passkeys/introduction).
+
+
 ## Installing
 
 To get started install the [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper) client.
@@ -39,7 +46,11 @@ To get started install the [`@turnkey/webauthn-stamper`](https://www.npmjs.com/p
 
 ## Initializing
 
-### `constructor(config: TWebauthnStamperConfig)`
+The `WebauthnStamper` class is a utility designed to facilitate the process of creating a digital stamp using WebAuthn credentials.
+This stamp is essential for authenticating requests made to a web server or API that utilizes WebAuthn for secure, passwordless authentication.
+You can initialize a new `WebauthnStamper` using the WebauthnStamper constructor:
+
+### `constructor(config: TWebauthnStamperConfig): WebauthnStamper`
 
 #### Parameters
 
@@ -71,8 +82,8 @@ An object containing configuration settings for the stamper.
 >
 
 The RPID ("Relying Party ID") for your origin.
-For an origin named "https://www.example.com", the RPID is typically "example.com".
-If you're testing on localhost, the RPID should be "localhost".
+For an origin named `https://www.example.com`, the RPID is typically `example.com`.
+If you're testing on localhost, the RPID should be `localhost`.
 
 </Parameter>
 
@@ -86,7 +97,7 @@ If you're testing on localhost, the RPID should be "localhost".
   }}
 >
 
-Optional timeout value. Defaults to 5 minutes.
+The time in milliseconds before the stamp request times out. Defaults to 300000 milliseconds (5 minutes) if not specified.
 
 </Parameter>
 
@@ -96,12 +107,12 @@ Optional timeout value. Defaults to 5 minutes.
     name: 'userVerification',
     type: {
       name: 'UserVerificationRequirement',
-      link: 'https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper/src/index.ts#L9-L20'
+      link: 'https://github.com/microsoft/TypeScript/blob/d69757e3d39d48eaa798e6e542dd416f8aac2c93/src/lib/dom.generated.d.ts',
     }
   }}
 >
 
-Optional override for UV flag. Defaults to "preferred".
+Specifies the user verification requirements. Can be set to values like `required`, `preferred`, or `discouraged`. Defaults to `preferred` if not provided.
 
 </Parameter>
 
@@ -111,12 +122,12 @@ Optional override for UV flag. Defaults to "preferred".
     name: 'allowCredentials',
     type: {
       name: 'PublicKeyCredentialDescriptor[]',
-      link: 'https://github.com/microsoft/TypeScript/blob/main/src/lib/dom.generated.d.ts#L1235-L1239'
+      link: 'https://github.com/microsoft/TypeScript/blob/d69757e3d39d48eaa798e6e542dd416f8aac2c93/src/lib/dom.generated.d.ts',
     }
   }}
 >
 
-The list of credentials to pass. Defaults to empty.
+An array of credential descriptors specifying the credentials to be allowed during authentication. This is optional and defaults to an empty array.
 
 </Parameter>
 
@@ -133,26 +144,63 @@ type TWebauthnStamperConfig = {
 }
 ```
 
-
-
 ##### `UserVerificationRequirement`
 
-```
-type UserVerificationRequirement = "discouraged" | "preferred" | "required"
-```
+DOM API type. See [lib/dom.generated.d.ts](https://github.com/microsoft/TypeScript/blob/d69757e3d39d48eaa798e6e542dd416f8aac2c93/src/lib/dom.generated.d.ts) for full type definition.
+
 
 ##### `PublicKeyCredentialDescriptor`
 
-```
-interface PublicKeyCredentialDescriptor {
-    id: BufferSource;
-    transports?: AuthenticatorTransport[];
-    type: PublicKeyCredentialType;
-}
-```
+DOM API type. See [lib/dom.generated.d.ts](https://github.com/microsoft/TypeScript/blob/d69757e3d39d48eaa798e6e542dd416f8aac2c93/src/lib/dom.generated.d.ts) for full type definition.
+
 
 #### Example
 
+```ts
+import { WebauthnStamper } from "@turnkey/webauthn-stamper";
+import { TurnkeyClient } from "@turnkey/http";
+
+const stamper = new WebAuthnStamper({
+  rpId: "example.com",
+});
+
+// New HTTP client able to sign with passkeys!
+const httpClient = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  stamper
+);
+```
+
 ## Methods
 
+### `stamp: (input: string) => Promise<TStamp>`
+
+Creates a digital stamp, which includes the public key, signature scheme, and a signature based on WebAuthn credentials.
+This generated stamp is used in the `X-Stamp` header of HTTP requests to authenticate.
+
+#### Parameters
+
+<Parameter
+  param={{
+    name: 'payload',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The payload should contain relevant data that needs to be authenticated, often related to the user's session or specific request.
+
+</Parameter>
+
 #### Types
+
+##### `TStamp`
+
+```ts
+type TStamp = {
+  stampHeaderName: string;
+  stampHeaderValue: string;
+}
+```
