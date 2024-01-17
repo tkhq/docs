@@ -14,6 +14,10 @@ A [hierarchical deterministic (HD) Wallet](https://learnmeabitcoin.com/technical
 }
 ```
 
+#### Configuration
+
+Wallet seeds are generated with a default mnemonic length of 12 words. The [BIP-39 specification](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) supports mnemonic lengths of 12, 15, 18, 21, and 24 words. To enhance your Wallet's security, you may consider opting for a longer mnemonic length. This optional `mnemonicLength` field can be set when creating a Wallet. It's important to note that once the Wallet seed is generated, the mnemonic is permanent and cannot be altered.
+
 ## Accounts
 
 An account contains the directions for deriving a cryptographic key pair and corresponding address from a Wallet. In practice, this looks like:
