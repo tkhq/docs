@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 description: Best practices as you set up users and policies
 slug: /users/best-practices
 ---
