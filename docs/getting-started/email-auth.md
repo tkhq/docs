@@ -10,7 +10,7 @@ Email Auth enables a user to authenticate their Turnkey account via email. In th
 
 #### Mechanism
 
-In short, Email Auth is built with expiring API keys as the foundation: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [cryptographic details](#cryptographic-details) section for more info on how we achieve secure delivery.
+In short, Email Auth is built with expiring API keys as the foundation: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [cryptographic details](#mechanism-and-cryptographic-details) section for more info on how we achieve secure delivery.
 
 ## User Experience
 

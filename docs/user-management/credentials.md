@@ -25,4 +25,4 @@ Turnkey API requests are authenticated with API key signatures. When you generat
 
 Requests made via SDK or CLI use the private API key to sign requests. Turnkey's public API expects all requests (e.g. to get data or to submit activities) to be signed.
 
-See our [API reference](./api#tag/API-Keys/operation/CreateApiKeys) for how to programmatically create API keys.
+See our [API reference](../../api/#tag/API-Keys/operation/CreateApiKeys) for how to programmatically create API keys.
