@@ -190,6 +190,6 @@ Due to cryptographic limitations of how much data can be signed at once, general
 
 ## Next Steps
 
-- Check out our [examples](/getting-started/examples) to see what can be built
-- Learn more about [Organizations](/getting-started/organizations) and [Wallets](/getting-started/wallets)
-- See our [API design](/api-introduction) or dive into our [API reference](/api)
+- Check out our [examples](/getting-started/examples) to see what can be built.
+- Learn more about [Organizations](/getting-started/organizations) and [Wallets](/getting-started/wallets).
+- See our [API design](/api-introduction) or dive into our [API reference](/api).
