@@ -54,7 +54,7 @@ Turnkey API Keys are generic public / private key pairs that allow you to make r
 A couple of notes:
 - You will need both the public and private key to sign requests to the Turnkey API.
 - **Any code using a Turnkey API private key should only ever be run server-side.**
-- PLACEHOLDER: Explanation of Turnkey Activities -> Direct to relavant link
+- Every action on Turnkey will return an `activity`, including creating the API key pair in the previous step. You can read more about the [Turnkey Activity Model here](../policy-management/Policy-language.md#activity-breakdown).
 
 ## Require the Turnkey Libraries
 
@@ -114,9 +114,9 @@ const walletId = response.activity.result.createWalletResult.walletId;
 
 ## Create an Ethereum Account
 
-Once a wallet has been created, accounts can be created against that wallet by passing in the derivation path information for any accounts that you want to derive. In this example we will derive Ethereum accounts, using the standard BIP44 Path format. The final number at the end of the path string represents the index in the derivation path that you want to derive the account for.
+Once a `wallet` has been created, `accounts` can be created against that `wallet` by passing in the derivation path information for any `accounts` that you want to derive. In this example we will derive Ethereum accounts, using the standard BIP44 Path format. The final number at the end of the path string represents the index in the derivation path that you want to derive the account for.
 
-Note: You can also create the accounts atomically when you create the wallet by passing in the account derivation paths to the initial createWallet call if desired.
+Note: If desired, you can also create `accounts` in the same API call where you create the `wallet` by passing in the account derivation paths as arguments to the `createWallet` call.
 
 ```javascript
 await client.createWalletAccounts({
@@ -182,54 +182,14 @@ If you'd like to broadcast your transaction, you can easily do so via [Etherscan
 
 ## Using the Webauthn Stamper
 
-The previous actions all had to be signed server-side in our code using a Turnkey API key, but you can also have individual end-users sign Turnkey activities using their own passkeys using the webauthn stamper library. You can learn more about the specifics of the passkeys implementation in the [Passkey guide](../passkeys/introduction)
-
-The following example will show a simple example of having an end-user sign a request with a passkey and send it to a dapp developer's endpoint.
-
-```shell
-npm install @turnkey/webauthn-stamper
-```
-
-```javascript
-import { WebauthnStamper } from "@turnkey/webauthn-stamper";
-import { TurnkeyClient, createActivityPoller } from '@turnkey/http';
-
-const TURNKEY_ORGANIZATION_ID = "<Your Org ID>";
-
-const stamper = new WebauthnStamper({
-  rpId: "<Your domain name here>" // i.e. "wallet.xyz" or "localhost"
-})
-
-const turnkeyClient = new TurnkeyClient(
-  {
-    baseUrl: 'https://api.turnkey.com'
-  },
-  stamper
-);
-
-// This will produce a signed request that can be POSTed from anywhere.
-// The `signedRequest` has a URL, a POST body, and a "stamp" (HTTP header name and value)
-const signedRequest = await turnkeyClient.stampCreatePrivateKeys(...);
-
-// Alternatively, you can POST directly from your frontend.
-// Our HTTP client will use the webauthn stamper and the configured baseUrl automatically!
-const activityPoller = createActivityPoller({
-  client: client,
-  requestFn: client.createPrivateKeys,
-});
-
-// Contains the activity result; no backend proxy needed!
-const completedActivity = await activityPoller({
-  type: "ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2",
-  // (omitting the rest of this for brevity)
-})
-```
+The previous actions all had to be signed server-side in our code using a Turnkey API key, but you can also have individual end-users sign Turnkey activities using their own passkeys using the webauthn stamper library. You can learn more about the specifics of the passkey implementation in the [Passkey guide](../passkeys/introduction). You can also see an example of having an end-user sign a request with a passkey in our public [Demo Passkey Wallet](https://github.com/tkhq/demo-passkey-wallet) repository.
 
 ## Best Practices (Using Sub-Organizations)
 
-Due to cryptographic limitations of how much data can be signed at once, generally speaking, a common pattern is to create sub-organizations for each individual user, instead of creating wallets for each user directly on the parent organization. You can read more about how to properly do this in the [Suborganization Guide](../integration-guides/sub-organizations-as-wallets.md)
+Due to cryptographic limitations of how much data can be signed at once, generally speaking, a common pattern is to create sub-organizations for each individual user, instead of creating wallets for each user directly on the parent organization. You can read more about how to properly do this in the [Suborganization Guide](../integration-guides/sub-organizations-as-wallets.md).
 
 ## Next Steps
+
 - Check out our [examples](/getting-started/examples) to see what can be built
 - Learn more about [Organizations](/getting-started/organizations) and [Wallets](/getting-started/wallets)
 - See our [API design](/api-introduction) or dive into our [API reference](/api)
