@@ -13,7 +13,9 @@ When you authenticate to the Turnkey dashboard, your email is used to lookup you
 
 Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.
 
-To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground. Reach out (<help@turnkey.com>) if you need many test organizations or if you have specific question, our team is happy to help you get set up!
+To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground.
+
+If you need many test organizations or if you have specific questions, our team is happy to help you get set up.
 
 ### Why do you require a public / private key pair to access Turnkey API?
 
