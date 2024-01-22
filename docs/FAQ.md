@@ -7,7 +7,7 @@ slug: /faq
 
 ### Can I sign up for Turnkey multiple times with the same email?
 
-When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and your credential. Currently we do not allow multiple users to be associated with the same email address.
+When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and associated credentials. Currently we do not allow multiple users to be associated with the same email address.
 
 ### How do you recommend testing the Turnkey API and functionality safely?
 
