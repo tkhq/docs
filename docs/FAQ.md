@@ -98,7 +98,7 @@ For more information about pricing and billing, check out the [pricing page](htt
 
 ### Where else can I get help with my Turnkey implementation?
 
-If you get stuck or have a one-off question, post it to our [developer forum](https://github.com/orgs/tkhq/discussions) or reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.
+Join our slack community [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw) to get support with your integration, share product feedback, and connect with other crypto builders. Or, reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.
 
 ### Is my country supported?
 
