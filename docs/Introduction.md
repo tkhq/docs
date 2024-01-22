@@ -3,11 +3,12 @@ sidebar_position: 1
 slug: /
 ---
 
-<img src="/img/diagrams/welcome_image.png" alt="welcome" />
+<img src="/img/diagrams/welcome_image.png" alt="welcome" />  
 
 
+### Welcome to the Turnkey docs!  
 
-Read here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](./getting-started/Quickstart.md).
+Start here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](./getting-started/Quickstart.md). Or, join our Slack group [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw) to get support with your integration, share product feedback, and connect with other crypto builders. 
 
 ### About Turnkey
 
