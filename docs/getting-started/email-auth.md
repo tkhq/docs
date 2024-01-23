@@ -6,15 +6,15 @@ slug: /getting-started/email-auth
 
 # Email Auth
 
-Email Auth enables a user to authenticate their Turnkey account via email. In this process, the user is granted an expiring API key that is held in local storage. This expiring API key can be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth).
+Email Auth enables a user to authenticate their Turnkey account via email. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth).
 
 #### Mechanism
 
-In short, Email Auth is built on top of the expiring API keys primitive: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [cryptographic details](#cryptographic-details) section for more info.
+In short, Email Auth is built with expiring API keys as the foundation: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [cryptographic details](#mechanism-and-cryptographic-details) section for more info on how we achieve secure delivery.
 
 ## User Experience
 
-Email auth starts with a new activity posted to Turnkey. This activity has the type `ACTIVITY_TYPE_EMAIL_AUTH` and takes the following as parameters:
+Email Auth starts with a new activity posted to Turnkey. This activity has the type `ACTIVITY_TYPE_EMAIL_AUTH` and takes the following as parameters:
 
 - `email`: the email of the user who would like to authenticate. This email must be the email already attached to the user in organization data (i.e., previously approved by the user). This prevents malicious account takeover. If you try to pass a different email address, the activity will fail.
 - `targetPublicKey`: the public key to which the auth credential is encrypted (more on this later)
@@ -32,7 +32,7 @@ This activity generates a new API key pair (an "auth credential"), saves the pub
     />
 </p>
 
-Calling email auth requires proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
+Calling Email Auth requires proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
 
 ## Authorization
 

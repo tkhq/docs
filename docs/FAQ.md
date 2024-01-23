@@ -5,6 +5,18 @@ slug: /faq
 
 # FAQ
 
+### Can I sign up for Turnkey multiple times with the same email?
+
+When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and associated credentials. Currently we do not allow multiple users to be associated with the same email address.
+
+### How do you recommend testing the Turnkey API and functionality safely?
+
+Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.
+
+To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground.
+
+If you need many test organizations or if you have specific questions, our team is happy to help you get set up.
+
 ### Why do you require a public / private key pair to access Turnkey API?
 
 Asymmetric cryptography offers various security benefits to you:
@@ -98,7 +110,7 @@ For more information about pricing and billing, check out the [pricing page](htt
 
 ### Where else can I get help with my Turnkey implementation?
 
-If you get stuck or have a one-off question, post it to our [developer forum](https://github.com/orgs/tkhq/discussions) or reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.
+Join our slack community [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw) to get support with your integration, share product feedback, and connect with other crypto builders. Or, reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.
 
 ### Is my country supported?
 

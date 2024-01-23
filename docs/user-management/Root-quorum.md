@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 description: Learn about the root quorum and how to manage it
 slug: /users/root-quorum
 ---
