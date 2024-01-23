@@ -1,16 +1,17 @@
 ---
 sidebar_position: 100
 description: A checklist to help you get your app to production!
-slug: /integration-guides/production-checklist
+slug: /integration-guides/launch-checklist
 ---
-# Production checklist
+# Launch checklist
 
 Before deploying your Turnkey integration in production, take a look at our recommendations below. This checklist will guide you through a few important steps and considerations to help ensure your setup is secure, efficient and ready for prime time. 
 
 ## Production Setup
 
-- [ ] Many of our customers prefer to maintain separate Development and Production [organizations](../getting-started/Organizations.md). If you choose to do so, ensure your production environment is referencing the correct organization ID and
-- [ ] If you are on a subscription plan, confirm your production organization ID with your account rep. 
+- [ ] Many of our customers prefer to maintain separate Development and Production [organizations](../getting-started/Organizations.md). If you choose to do so, ensure your production environment is referencing the correct organization ID.
+- [ ] Ensure you have an active subscription via the Account Settings page in the Turnkey dashboard.
+- [ ] If you are on an Enterprise plan, confirm your production organization ID with your account rep.
 - [ ] Double check our [resource limits](../getting-started/resource-limits.md) and [rate limits](../FAQ.md#do-you-have-any-rate-limits-in-place-in-your-public-api) to ensure your implementation will not trigger these limits at production scale.  
 
 ## Security
