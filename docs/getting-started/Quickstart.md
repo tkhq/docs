@@ -24,7 +24,7 @@ All API requests require an organization ID. Yours can be located in the user dr
   style={{ width: 940 }}
 />
 
-You'll want to save this somewhere in your code, as you'll need it to make requests to the Turnkey API.
+You'll want to reference this in your code or as an environment variable, as you'll need it to make requests to the Turnkey API.
 
 ```javascript
 const TURNKEY_ORGANIZATION_ID = "<Your Org ID>";
@@ -56,9 +56,9 @@ A couple of notes:
 - **Any code using a Turnkey API private key should only ever be run server-side.**
 - Every action on Turnkey will return an `activity`, including creating the API key pair in the previous step. You can read more about the [Turnkey Activity Model here](../policy-management/Policy-language.md#activity-breakdown).
 
-## Require the Turnkey Libraries
+## Require the Turnkey Packages
 
-There are two libraries that you will need to make API requests to Turnkey:
+There are two packages that you will need to make API requests to Turnkey:
  1. The Turnkey HTTP library.
  2. A Turnkey "stamper" library.
 
@@ -67,7 +67,7 @@ The stamper library is responsible for signing a request into Turnkey, and comes
   2. `webauthn-stamper` which signs requests with a end-user's passkey
   3. `iframe-stamper` which is a wrapper around the api-key-stamper and used specifically for Email Recovery and Email Auth
 
-The simplest way to get started, is to use the API Key Stamper to make requests to Turnkey that are signed with the API key pair you created in the previous step.
+The simplest way to get started is to use the API Key Stamper to make requests to Turnkey that are signed with the API key pair you created in the previous step.
 
 ```shell
 npm install @turnkey/http
@@ -96,7 +96,7 @@ const turnkeyClient = new TurnkeyClient(
 
 ## Create a Wallet
 
-A `wallet` on Turnkey represents a multi-chain seed phrase from which many individual `accounts` can be derived. An `account` represents a specific index on a derivation path and contains the blockchain address that you can send funds to and sign on-chain transactions with. The only thing a wallet needs to be initialized is a name for the wallet.
+A `wallet` on Turnkey represents a multi-chain seed phrase from which many individual `accounts` can be derived. An `account` represents a specific index on a derivation path and contains the blockchain address that you can send funds to and sign on-chain transactions with. You can learn more about the specifics of Turnkey wallets [here](/getting-started/wallets). The only thing a wallet needs to be initialized is a name for the wallet.
 
 ```javascript
 const response = await turnkeyClient.createWallet({
@@ -116,7 +116,7 @@ const walletId = response.activity.result.createWalletResult.walletId;
 
 Once a `wallet` has been created, `accounts` can be created against that `wallet` by passing in the derivation path information for any `accounts` that you want to derive. In this example we will derive Ethereum accounts, using the standard BIP44 Path format. The final number at the end of the path string represents the index in the derivation path that you want to derive the account for.
 
-Note: If desired, you can also create `accounts` in the same API call where you create the `wallet` by passing in the account derivation paths as arguments to the `createWallet` call.
+Note: If desired, you can also create `accounts` in the same API call where you create the `wallet` by passing in the account derivation paths as parameters to the `createWallet` call.
 
 ```javascript
 await client.createWalletAccounts({
