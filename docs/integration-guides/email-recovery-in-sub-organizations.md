@@ -59,7 +59,7 @@ Let's review these steps in detail:
 5. User copies and pastes their recovery code into your app. Remember: this code is an encrypted credential which can only be decrypted within the iframe.
 6. Your app injects the recovery code into the iframe for decryption:
    ```js
-   await iframeStamper.injectRecoveryBundle(code);
+   await iframeStamper.injectCredentialBundle(code);
    ```
 7. Your app prompts the user to create a new passkey (using our SDK functionality):
    ```js
