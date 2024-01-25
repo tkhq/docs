@@ -5,17 +5,11 @@ slug: /faq
 
 # FAQ
 
+## Authentication and credentials
+
 ### Can I sign up for Turnkey multiple times with the same email?
 
 When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and associated credentials. Currently we do not allow multiple users to be associated with the same email address.
-
-### How do you recommend testing the Turnkey API and functionality safely?
-
-Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.
-
-To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground.
-
-If you need many test organizations or if you have specific questions, our team is happy to help you get set up.
 
 ### Why do you require a public / private key pair to access Turnkey API?
 
@@ -45,6 +39,36 @@ A Turnkey API key is simply a way to authenticate requests to Turnkey. Crypto as
 
 Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](./policy-management/Policy-overview.md)!), and revocable if they are lost or compromised.
 
+### What happens if I lose my API key? Do I lose my crypto?
+
+Losing your Turnkey API key doesn't mean you'll lose your crypto:
+
+- By default, your API key is not able to move funds
+- If you've changed policies so that your API key is allowed to unilaterally move funds, you may be at risk. Leverage the Turnkey UI to revoke your API key as soon as possible.
+
+Talk to our team (<hello@turnkey.com>) if you want to get in touch and talk more in-depth.
+
+### How long is a signed activity request valid for?
+
+We require a recent timestamp in the `timestampMs` field for each new activity submission.
+
+Our secure enclaves have their own, independent, secure source of time. We currently require request timestamps to be **less than an hour old**, and **up to 5 minutes in the future**.
+
+### Can I use my existing crypto private key as a Turnkey API key?
+
+You can, but it doesn't mean you should. If you use your existing crypto private key as a turnkey API key, you are coupling Turnkey access with your crypto wallet. In essence, the risk profile of this key goes up. It's a bit like re-using passwords across many sites. Turnkey highly recommends creating a fresh public/private key pair if you need programmatic Turnkey access.
+
+### How can I safely rotate API key credentials?
+
+While we don't have an off the shelf recipe, one potential approach is:
+
+- At sub-org creation, create your root user with 2+ API keys. One for day-to-day signing, and the other(s) securely stored.
+- If the day-to-day key is leaked, then you can use one of the secure, additional keys to remove it from all impacted sub-orgs via `ACTIVITY_TYPE_DELETE_API_KEYS`.
+
+Reach out to our team (<hello@turnkey.com>) for additional guidance.
+
+## Limits
+
 ### Are there limits on how many resources I can create, or activities I can execute?
 
 See [resource limits](./getting-started/resource-limits).
@@ -63,18 +87,7 @@ This limit is on a **per IP address** basis: if you have multiple servers making
 
 Please get in touch with us (<help@turnkey.com>) if you need this limit adjusted for your use-case.
 
-### What happens if I lose my API key? Do I lose my crypto?
-
-Losing your Turnkey API key doesn't mean you'll lose your crypto:
-
-- By default, your API key is not able to move funds
-- If you've changed policies so that your API key is allowed to unilaterally move funds, you may be at risk. Leverage the Turnkey UI to revoke your API key as soon as possible.
-
-Talk to our team (<hello@turnkey.com>) if you want to get in touch and talk more in-depth.
-
-### Can I use my existing crypto private key as a Turnkey API key?
-
-You can, but it doesn't mean you should. If you use your existing crypto private key as a turnkey API key, you are coupling Turnkey access with your crypto wallet. In essence, the risk profile of this key goes up. It's a bit like re-using passwords across many sites. Turnkey highly recommends creating a fresh public/private key pair if you need programmatic Turnkey access.
+## Supported functionality
 
 ### Which cryptographic curves do you support?
 
@@ -96,11 +109,24 @@ We suggest you use blockchain-specific libraries, like Ethers.js for Ethereum, t
 
 You can use any blockchain node provider, like Infura or Alchemy, to broadcast your transactions.
 
-### How long is a signed activity request valid for?
+### What's the difference between `HASH_FUNCTION_NOT_APPLICABLE` and `HASH_FUNCTION_NO_OP` (in the signing context)?
 
-We require a recent timestamp in the `timestampMs` field for each new activity submission.
+In short, if you use Solana, you’re using Ed25519 and so you should use `HASH_FUNCTION_NOT_APPLICABLE`. If you’re working with Bitcoin/Ethereum, `HASH_FUNCTION_NO_OP` is what you need if you want to sign raw hashes.
 
-Our secure enclaves have their own, independent, secure source of time. We currently require request timestamps to be **less than an hour old**, and **up to 5 minutes in the future**.
+This is related to ECDSA vs EdDSA. These are two separate algorithms to produce digital signatures. When you use ECDSA, any hash function can be used to hash a message, then sign the resulting hash. It’s a 2 step process: first hash the message, then sign. This is why we offer different hash functions: the Ethereum ecosystem standardized on keccak256, Bitcoin uses sha256, etc. Our API also lets you sign a raw hash if you’ve already hashed the message yourself. That’s where `HASH_FUNCTION_NO_OP` is useful: it’ll tell our signer: “please don’t hash the message. Just treat it as a hash already, and simply sign it!”
+When using Ed25519, the choice of the hash function is dictated by the standard:  https://datatracker.ietf.org/doc/html/rfc8032#section-5.1 (“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512").
+
+And the standard goes one step further: the hash function is actually part of signature computation, so it’s not possible to skip it (unlike ECDSA where hash computation is a separate, optional “pre” step). That’s why we have this special `HASH_FUNCTION_NOT_APPLICABLE` value when you use ed25519/EdDSA.
+
+## Guidance
+
+### How do you recommend testing the Turnkey API and functionality safely?
+
+Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.
+
+To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground.
+
+If you need many test organizations or if you have specific questions, our team is happy to help you get set up.
 
 ### How do pricing and billing work?
 
