@@ -117,7 +117,7 @@ As an example, in our Viem package, the message is [hashed](https://github.com/t
 
 ### What is `HASH_FUNCTION_NOT_APPLICABLE` and how does it differ from `HASH_FUNCTION_NO_OP`?
 
-Unlike ECDSA, in which a message is hashed as a separate step *before* signing, when using Ed25519, hashing is performed *during* signature confirmation, and thus cannot be skipped (for more details on the standard, see https://datatracker.ietf.org/doc/html/rfc8032#section-5.1: `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
+Unlike ECDSA, in which a message is hashed as a separate step *before* signing, when using Ed25519, hashing is performed *during* signature computation, and thus cannot be skipped (for more details on the standard, see [RFC 8032](https://datatracker.ietf.org/doc/html/rfc8032#section-5.1): `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
 
 An example for this case can be found in our [Solana signer](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/solana/src/index.ts#L64).
 
