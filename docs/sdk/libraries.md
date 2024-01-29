@@ -52,4 +52,4 @@ const selfAddress = account.address;
 
 ## @solana/web3
 
-While Turnkey does not yet export a package that completely wraps `@solana/web3.js` functionality, we do have an experimental library for signing transactions and messages: [`@turnkey/solana`](https://www.npmjs.com/package/@turnkey/solana). See [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana) for an example.
+We have released a package that you can use to sign transactions and messages: [`@turnkey/solana`](https://www.npmjs.com/package/@turnkey/solana). See [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana) for an example.

@@ -109,14 +109,17 @@ We suggest you use blockchain-specific libraries, like Ethers.js for Ethereum, t
 
 You can use any blockchain node provider, like Infura or Alchemy, to broadcast your transactions.
 
-### What's the difference between `HASH_FUNCTION_NOT_APPLICABLE` and `HASH_FUNCTION_NO_OP` (in the signing context)?
+### What does `HASH_FUNCTION_NO_OP` mean?
 
-In short, if you use Solana, you’re using Ed25519 and so you should use `HASH_FUNCTION_NOT_APPLICABLE`. If you’re working with Bitcoin/Ethereum, `HASH_FUNCTION_NO_OP` is what you need if you want to sign raw hashes.
+In the ECDSA context, messages are hashed before signing. Turnkey can perform this hashing for you, as we support two hash functions: `HASH_FUNCTION_KECCAK256` and `HASH_FUNCTION_SHA256` (for Ethereum and Bitcoin ecosystems respectively). If your message had already been hashed, you should use the `HASH_FUNCTION_NO_OP` option to sign the raw hash, in which case Turnkey will sign the payload as is. `HASH_FUNCTION_NO_OP` also has privacy implications: if a raw hashed message is passed in, Turnkey has no knowledge of the underlying pre-image.
 
-This is related to ECDSA vs EdDSA. These are two separate algorithms to produce digital signatures. When you use ECDSA, any hash function can be used to hash a message, then sign the resulting hash. It’s a 2 step process: first hash the message, then sign. This is why we offer different hash functions: the Ethereum ecosystem standardized on keccak256, Bitcoin uses sha256, etc. Our API also lets you sign a raw hash if you’ve already hashed the message yourself. That’s where `HASH_FUNCTION_NO_OP` is useful: it’ll tell our signer: “please don’t hash the message. Just treat it as a hash already, and simply sign it!”
-When using Ed25519, the choice of the hash function is dictated by the standard:  https://datatracker.ietf.org/doc/html/rfc8032#section-5.1 (“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512").
+As an example, in our Viem package, the message is [hashed](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L201) before [signing](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L348). 
 
-And the standard goes one step further: the hash function is actually part of signature computation, so it’s not possible to skip it (unlike ECDSA where hash computation is a separate, optional “pre” step). That’s why we have this special `HASH_FUNCTION_NOT_APPLICABLE` value when you use ed25519/EdDSA.
+### What is `HASH_FUNCTION_NOT_APPLICABLE` and how does it differ from `HASH_FUNCTION_NO_OP`?
+
+Unlike ECDSA, in which a message is hashed as a separate step *before* signing, when using Ed25519, hashing is performed *during* signature confirmation, and thus cannot be skipped (for more details on the standard, see https://datatracker.ietf.org/doc/html/rfc8032#section-5.1: `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
+
+An example for this case can be found in our [Solana signer](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/solana/src/index.ts#L64).
 
 ## Guidance
 

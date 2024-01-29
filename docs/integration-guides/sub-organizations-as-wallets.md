@@ -219,4 +219,4 @@ For the sake of completeness: it is possible to create "shared custody" wallets 
   - 1 user representing the end-user (with their Passkey as an authenticator)
   - 1 user representing the business (with an API key attached)
 
-The signing process would then have to involve **both** the user and the business since the root quorum threshold is 2.
+The signing process would then have to involve **both** the user and the business since the root quorum threshold is 2. To reduce friction for the end-user, many clients opt to start with a root quorum of 1. This way, you can take certain actions with your business's API key root user **prior** to updating the root quorum threshold to 2.
