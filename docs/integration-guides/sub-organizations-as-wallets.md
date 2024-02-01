@@ -33,7 +33,7 @@ Your application then uses an API-only user to create a new sub-organization on 
   "timestampMs": "<time-in-ms>",
   "organizationId": "<your-organization-id>",
   "parameters": {
-    "subOrganizationName": "<sub-org-name>",
+    "subOrganizationName": "<sub-org-name>", // do not use PII or other confidential info about end users 
     "rootUsers": [{
       "userName": "<end-user-name>",
       "userEmail": "<email>(optional)",
