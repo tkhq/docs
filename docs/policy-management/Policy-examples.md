@@ -2,6 +2,7 @@
 description: Check out some example policies to help write your own
 slug: /managing-policies/examples
 ---
+
 # Policy examples
 
 ## Access control
@@ -43,10 +44,43 @@ slug: /managing-policies/examples
 
 ```json JSON
 {
-    "policyName": "Only user_tag <USER_TAG_ID> can take actions",
-    "effect": "EFFECT_DENY",
-    "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
-    "condition": "activity.action == 'DELETE'"
+  "policyName": "Only user_tag <USER_TAG_ID> can take actions",
+  "effect": "EFFECT_DENY",
+  "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
+  "condition": "activity.action == 'DELETE'"
+}
+```
+
+#### Allow a specific user (e.g. API-only user) to create a sub-org
+
+```json JSON
+{
+  "policyName": "Allow user <USER_ID> to create a sub-org",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'ORGANIZATION' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow a specific user to initiate user email recovery
+
+```json JSON
+{
+  "policyName": "Allow user <USER_ID> to initiate user email recovery",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'RECOVERY' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow a specific user to initiate email auth
+
+```json JSON
+{
+  "policyName": "Allow user <USER_ID> to initiate email auth",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'AUTH' && activity.action == 'CREATE'"
 }
 ```
 
@@ -56,10 +90,10 @@ slug: /managing-policies/examples
 
 ```json
 {
-    "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ID>",
-    "effect": "EFFECT_ALLOW",
-    "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-    "condition": "wallet.id == '<WALLET_ID>'"
+  "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ID>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet.id == '<WALLET_ID>'"
 }
 ```
 
@@ -67,10 +101,10 @@ slug: /managing-policies/examples
 
 ```json
 {
-    "policyName": "Allow <USER_ID> to sign transactions with <PRIVATE_KEY_ID>",
-    "effect": "EFFECT_ALLOW",
-    "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-    "condition": "private_key.id == '<PRIVATE_KEY_ID>'"
+  "policyName": "Allow <USER_ID> to sign transactions with <PRIVATE_KEY_ID>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "private_key.id == '<PRIVATE_KEY_ID>'"
 }
 ```
 
