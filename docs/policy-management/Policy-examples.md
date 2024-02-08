@@ -51,6 +51,17 @@ slug: /managing-policies/examples
 }
 ```
 
+#### Allow a specific user (e.g. API-only user) to create a sub-org
+
+```json JSON
+{
+  "policyName": "Allow user <USER_ID> to create a sub-org",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'ORGANIZATION' && activity.action == 'CREATE'"
+}
+```
+
 #### Allow a specific user to initiate user email recovery
 
 ```json JSON
