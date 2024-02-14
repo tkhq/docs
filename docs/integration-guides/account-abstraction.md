@@ -13,8 +13,8 @@ You can use Turnkey with Alchemy's Account Kit via the [aa-signers](https://acco
 
 Visit [the Alchemy Account Kit documentation](https://accountkit.alchemy.com/smart-accounts/signers/guides/turnkey.html) for more information.
 
-## ZeroDev Custodial Wallets
+## ZeroDev Wallets
 
-By combining Turnkey with ZeroDev you can create custodial AA wallets with powerful functionalities such as sponsoring gas, batching transactions, and more.
+By combining Turnkey with ZeroDev you can create AA wallets with powerful functionalities such as sponsoring gas, batching transactions, and more.
 
 Visit [the ZeroDev documentation](https://docs-v4.zerodev.app/create-wallets/integrations/turnkey) for more information.
