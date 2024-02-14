@@ -16,12 +16,12 @@ From a technical point of view, passkeys are cryptographic key pairs created on 
 
 - Key generation happens in secure end-user hardware.
 - Using passkeys is easy thanks to native browser UIs and cross-device syncing.
-- Passkey recovery for users is supported natively by Apple via iCloud keychain and Google via the Google Password Manager. 
+- Passkey recovery for users is supported natively by Apple via iCloud Keychain and Google via the Google Password Manager. 
 
 Passkeys come with big security upgrades compared to traditional passwords:
 - Access to passkeys is gated with OS-level biometrics: faceID, touchID, lock screen patterns, and so on.
 - Passkeys are bound to the web domain that creates them. This is important to thwart phishing attacks, where an attacker hosts a similar-looking website to steal user credentials. This is doable with passwords; impossible with passkeys.
-- Because passkeys rely on public key cryptography, passkeys have two components: a public key and a private key. Private keys are never disclosed to websites, making them a lot harder to steal. Only public keys are sent. To authenticate, passkeys sign messages (with their private keys) and provide signatures as proofs, similar to crypto wallets.
+- Because passkeys rely on public key cryptography, passkeys have two components: a public key and a private key. Private keys are never disclosed to websites or apps, making them a lot harder to steal. Only public keys are sent. To authenticate, passkeys sign messages (with their private keys) and provide signatures as proofs, similar to crypto wallets.
 
 ## Isn't this similar to Webauthn?
 

@@ -1,7 +1,7 @@
 ---
 description: Learn about discoverable vs. non-discoverable credentials and how they affect UX
 slug: /passkeys/discoverable-vs-non-discoverable
-sidebar_position: 4
+sidebar_position: 5
 ---
 
 # Discoverable vs. non-discoverable
