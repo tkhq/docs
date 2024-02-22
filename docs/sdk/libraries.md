@@ -6,13 +6,14 @@ slug: /sdk/libraries
 
 # Libraries
 
-Turnkey currently has SDK implementations in [JavaScript](https://github.com/tkhq/sdk) and [Go](https://github.com/tkhq/go-sdk). 
+Turnkey currently has SDK implementations in [JavaScript](https://github.com/tkhq/sdk) and [Go](https://github.com/tkhq/go-sdk).
 
 ---
 
 The following are libraries we have direct compatibility with:
 
 ## Ethers
+
 [`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) exports a `TurnkeySigner` that serves as a drop-in replacement for an Ethers signer. Out of the box, it supports `{ signTransaction | signMessage | signTypedData }`. See full implementation [here](https://github.com/tkhq/sdk/tree/main/packages/ethers) for more details and examples. Note that you must **bring your own provider and connect it** to the TurnkeySigner.
 
 ```node
@@ -21,7 +22,7 @@ const turnkeySigner = new TurnkeySigner({
   ...
 });
 
-// Bring your own provider (such as Alchemy or Infura: https://docs.ethers.org/v5/api/providers/)
+// Bring your own provider (such as Alchemy or Infura: https://docs.ethers.org/v6/api/providers/)
 const network = "goerli";
 const provider = new ethers.providers.InfuraProvider(network);
 const connectedSigner = turnkeySigner.connect(provider);
@@ -34,6 +35,7 @@ const connectedSigner = turnkeySigner.connect(provider);
 See [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem) and [`with-viem-and-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys) for examples.
 
 ## CosmJS
+
 Similarly, [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs) exports a `TurnkeyDirectWallet` that serves as a drop-in replacement for a CosmJS direct wallet. It includes support for `signDirect`. See full implementation [here](https://github.com/tkhq/sdk/tree/main/packages/cosmjs) for more details and examples.
 
 ```node
