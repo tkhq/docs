@@ -55,7 +55,7 @@ This option indicates whether an attestation is needed, to prove the authenticat
 
 The `pubKeyCredParams` is a list of supported algorithms. If you're relying on Turnkey to validate passkey signatures, this list should be: `[{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}]`.
 
-The integers `-7` and `-257` are algorithm identifiers for P256 and RSA (the full list is part of the [COSE standard, maintained by IANA](https://www.iana.org/assignments/cose/cose.xhtml#algorithms)). Currently Turnkey supports ES256 and RS256 only.
+The integers `-7` and `-257` are algorithm identifiers for ES256 (aka P256) and RS256 (aka RSA), respectively. The full list of possible values is part of the [COSE standard, maintained by IANA](https://www.iana.org/assignments/cose/cose.xhtml#algorithms). Currently Turnkey only supports ES256 and RS256.
 
 ### `user`
 
