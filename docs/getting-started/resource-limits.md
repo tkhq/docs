@@ -6,7 +6,7 @@ slug: /getting-started/resource-limits
 
 # Resource Limits
 
-We have limits on the number of resources within a single organization to avoid performance slowdowns. You can scale your organizational resources beyond these limits via [sub-organizations](./Sub-Organizations.md). You can create an unlimited number of sub-organizations within a single organization.
+We have limits on the number of resources within a single organization to avoid performance slowdowns and overly complex permission models. You can scale your organizational resources beyond these limits via [sub-organizations](./Sub-Organizations.md). You can create an unlimited number of sub-organizations within a single organization.
 
 Currently, the resource limits within a single organization are as follows:
 
