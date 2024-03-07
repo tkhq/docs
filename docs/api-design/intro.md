@@ -6,58 +6,24 @@ slug: /api-introduction
 
 # Introduction
 
-## REST/HTTP
+## RPC/HTTP
 
-Turnkey's Public API is a REST API. We chose REST-over-HTTP for convenience and ease-of-use: most of our customers should be able to integrate with Turnkey's public API without a major re-architecture of their existing systems.
+Turnkey's API is a remote procedure call (RPC) API. We chose RPC-over-HTTP for convenience and ease-of-use. Most of our users should be able to integrate with our API without a major re-architecture of their existing systems.
 
-Many client libraries are available to make requests to a REST/HTTP API, across many languages. Turnkey will provide SDKs for the most popular programming languages. For other languages, a REST/HTTP API ensures there is an easy integration path available via raw http clients.
+Many client libraries are available to make requests to a RPC/HTTP API, across many languages. Turnkey will provide SDKs for the most popular programming languages. For other languages, a RPC/HTTP API ensures there is an easy integration path available via raw http clients.
 
 ## POST-only
 
-If you look at our [API reference](./api) you'll notice that Turnkey is not strictly following the REST convention:
+If you look at the [API reference](./api) you'll notice that all API calls to Turnkey are HTTP POST requests. Requests contain a POST body and a header with a digital signature over the POST body. We call this digitial signature a [Stamp](./stamps.md).
 
-We use POST exclusively
-We do not have full resource paths in the URL (for example, "/submit/sign")
-This decision comes from a security guarantee we're making to our customers: requests must be signed by end-users, and verified by Turnkey's secure enclaves. Unlike other companies, we do not modify your request while in transit. This ensures cryptographic integrity, end-to-end: what is signed with your API key is what is seen and checked by our secure enclaves.
+Requests must be stamped by registered user credentials and verified by Turnkey's secure enclaves before they are processed. This ensures cryptographic integrity end-to-end which eliminates the ability for any party to modify a user's request.
 
-So why is a POST-only API a better fit? That's because of signatures. With GET requests, the URL and URL params need to be signed. With POST requests, the body and URL need to be signed.
+### Queries and Submissions
+Turnkey's API is divided into 2 broad categories: queries and submissions.
+- Queries are read requests (e.g. `get_users`, `list_users`)
+- Submissions are requests to execute a workload (e.g. `create_policy`, `sign_transaction`, `delete_user`)
 
-By switching to a POST-only API and moving all critical request parameters to the body, we simplify the definition of what has to be signed with each request: it's simply the POST body. Read the next section for more details on API signatures.
-
-## API signatures and stamp headers
-
-Every request made to Turnkey must include a signature inside a stamp header. Our secure enclave applications use this signature to verify the integrity and authenticity of the request. To sign your requests, follow these steps:
-
-### Initial steps for all requests
-1. SHA256 hash a JSON-encoded string of your request's body.
-2. Sign the hash with either your API key or WebAuthn credential.
-
-### If using an API key
-1. Create a JSON-encoded string with the public key, signature, and signature scheme.
-2. Base64url encode the string.
-3. Add the string to your request as a `X-Stamp` header.
-
-### If using a WebAuthn credential
-1. Create a JSON-encoded string with the authenticator data, client data, credential ID, and signature.
-2. Add the string to your request as a `X-Stamp-Webauthn` header
-
-In practice you should not have to worry about this step: our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) will take care of it for you. However, if you write an independent client, you will need to implement this yourself.
-
-For reference, check out our implementations:
-
-- [JS SDK's API Key stamper](https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper)
-- [JS SDK's WebAuthn stamper](https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper)
-- [CLI](https://github.com/tkhq/tkcli/blob/main/src/cmd/turnkey/pkg/request.go)
-
-## Queries and Submissions
-Our API endpoints are divided into 2 broad categories: queries and submissions.
-
-- Queries are read requests (for example: "get users")
-- Submissions are requests to execute an activity on Turnkey (for example: "create policy")
-
-We've separated these 2 categories because all submissions return an Activity and can be subject to consensus if your organization has consensus-based policies. It's best to think of a call to "/submit/..." as a request to start an asynchronous process. The response to a submit request will contain new activity, with an ID you can use to poll until activity completion if needed.
-
-Our API is idempotent: for each activity submission, the whole request body is hashed into a fingerprint. If you resubmit the same payload, you'll get the same activity instead of a new one. This helps with idempotency, and helps with security too. Because each activity request must contain a recent timestamp (in the `timestampMs` field), this avoids replay attacks: a third party can't generate new activities by re-POSTing previous activity requests.
-
-Queries return data synchronously, do not generate activities, and are not subject to consensus.
-
+## Dive Deeper
+- Creating your first [Stamp](./stamps.md)
+- Fetching data with [Queries](./queries.md)
+- Executing workloads with [Submissions](./submissions.md)
