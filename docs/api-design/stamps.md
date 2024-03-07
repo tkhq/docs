@@ -6,7 +6,7 @@ slug: /api-design/stamps
 
 # Stamps
 
-Every request made to Turnkey must include a signature over the POST body attached as a HTTP header (`Stamp`). Our secure enclave applications use this signature to verify the integrity and authenticity of the request.
+Every request made to Turnkey must include a signature over the POST body attached as a HTTP header. Our secure enclave applications use this signature to verify the integrity and authenticity of the request.
 
 ### API Keys
 To create a valid, API key stamped request follow these steps:
