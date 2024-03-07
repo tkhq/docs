@@ -6,7 +6,7 @@ slug: /api-design/stamps
 
 # Stamps
 
-Every request made to Turnkey must include a signature inside a stamp header. Our secure enclave applications use this signature to verify the integrity and authenticity of the request.
+Every request made to Turnkey must include a signature over the POST body attached as a HTTP header (`Stamp`). Our secure enclave applications use this signature to verify the integrity and authenticity of the request.
 
 ### API Keys
 To create a valid, API key stamped request follow these steps:
@@ -17,7 +17,8 @@ To create a valid, API key stamped request follow these steps:
     - `signature`: the signature produced by the API key
     - `scheme`: `SIGNATURE_SCHEME_TK_API_P256`
 4. Base64URL encode the stamp
-5. Add the encoded string to your request as a `X-Stamp` header
+5. Attach the encoded string to your request as a `X-Stamp` header
+6. Submit the stamped request to Turnkey's API
 
 ### Webauthn
 To create a valid, Webauthn authenticator stamped request follow these steps:
@@ -29,11 +30,12 @@ To create a valid, Webauthn authenticator stamped request follow these steps:
     - `clientDataJson`: the client data produced by the Webauthn assertion
     - `signature`: the signature produced by the Webauthn assertion
 4. Base64URL encode the stamp
-5. Add the encoded string to your request as a `X-Stamp-Webauthn` header
+5. Attach the encoded string to your request as a `X-Stamp-Webauthn` header
+6. Submit the stamped request to Turnkey's API
 
 ### Stampers
 
-In practice, you should not have to worry about this step. Our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) take care of stamping for you. However, if you choose to use an independent client, you will need to implement this yourself. For reference, check out our implementations:
+Our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) abstract request stamping for you. If you choose to use an independent client, you will need to implement this yourself. For reference, check out our implementations:
 - [API Key Stamper](https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper)
 - [WebAuthn Stamper](https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper)
 - [React Native Stamper](https://github.com/tkhq/sdk/tree/main/packages/react-native-passkey-stamper)
