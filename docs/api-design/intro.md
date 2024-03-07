@@ -14,7 +14,7 @@ Many client libraries are available to make requests to a RPC/HTTP API, across m
 
 ## POST-only
 
-If you look at the [API reference](./api) you'll notice that all API calls to Turnkey are HTTP POST requests. Requests contain a POST body and a header with a digital signature over the POST body. We call this digitial signature a [Stamp](/api-design/stamps).
+If you look at the [API reference](./api) you'll notice that all API calls to Turnkey are HTTP POST requests. Requests contain a POST body and a header with a digital signature over the POST body. We call this digitial signature a [Stamp](./stamps.md).
 
 Requests must be stamped by registered user credentials and verified by Turnkey's secure enclaves before they are processed. This ensures cryptographic integrity end-to-end which eliminates the ability for any party to modify a user's request.
 
@@ -24,6 +24,6 @@ Turnkey's API is divided into 2 broad categories: queries and submissions.
 - Submissions are requests to execute a workload (e.g. `create_policy`, `sign_transaction`, `delete_user`)
 
 ## Dive Deeper
-- Creating your first [Stamp](/api-design/stamps)
-- Fetching data with [Queries](/api-design/queries)
-- Executing workloads with [Submissions](/api-design/submissions)
+- Creating your first [Stamp](./stamps.md)
+- Fetching data with [Queries](./queries.md)
+- Executing workloads with [Submissions](./submissions.md)
