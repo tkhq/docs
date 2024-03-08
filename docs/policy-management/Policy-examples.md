@@ -1,4 +1,5 @@
 ---
+position: 100
 description: Check out some example policies to help write your own
 slug: /managing-policies/examples
 ---

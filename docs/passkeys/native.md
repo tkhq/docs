@@ -4,7 +4,7 @@ slug: /passkeys/native
 sidebar_position: 4
 ---
 
-# Native Passkeys
+# Native passkeys
 
 If you're unfamiliar with passkeys broadly, head to [this introduction](./introduction.md) for an overview. TL;DR: passkeys are cryptographic key pairs generated and stored on secure hardware. Typically this is your Mac's or iPhone's [secure enclave](https://support.apple.com/guide/security/secure-enclave-sec59b0b31ff/web), your Android's [Titan M2 chip](https://security.googleblog.com/2021/10/pixel-6-setting-new-standard-for-mobile.html), or an external security key plugged in via USB.
 
