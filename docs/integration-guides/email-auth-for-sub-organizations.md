@@ -8,8 +8,7 @@ slug: /integration-guides/sub-organization-auth
 
 Email auth is a powerful feature to couple with [sub-organizations](../getting-started/Sub-Organizations.md) for your users. This approach empowers your users to authenticate their Turnkey in a simple way (via email!), while minimizing your involvement: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
-<!-- TODO
-Our Demo Passkey Wallet application (https://wallet.tx.xyz) will soon have email auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation. -->
+Our [Demo Passkey Wallet](https://wallet.tx.xyz) application serves an example of how email auth functionality might be integrated. We encourage you to try it (and check out the [code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 
 ## Pre-requisites
 
@@ -42,17 +41,15 @@ Let's review these steps in detail:
 
 ```js
 const iframeStamper = new IframeStamper({
-  iframeUrl: 'https://auth.turnkey.com',
+  iframeUrl: "https://auth.turnkey.com",
   // Configure how the iframe element is inserted on the page
-  iframeContainerId: 'your-container',
-  iframeElementId: 'turnkey-iframe',
+  iframeContainerId: "your-container",
+  iframeElementId: "turnkey-iframe",
 });
 
 // Inserts the iframe in the DOM. This creates the new encryption target key
 const publicKey = await iframeStamper.init();
 ```
-
-<!-- TODO: describe customization as well -->
 
 2.  Your code receives the iframe public key and shows the auth form, and the user enters their email address.
 3.  Your app can now create and sign a new `EMAIL_AUTH` activity with the user email and the iframe public key in the parameters. Optional arguments include a custom name for the API key, and a specific duration (denoted in seconds) for it. Note: you'll need to retrieve the sub-organization ID based on the user email.
@@ -67,23 +64,23 @@ const publicKey = await iframeStamper.init();
     ```js
     // New client instantiated with our iframe stamper
     const client = new TurnkeyClient(
-      { baseUrl: 'https://api.turnkey.com' },
+      { baseUrl: "https://api.turnkey.com" },
       iframeStamper
     );
 
     // Sign and submits the CREATE_WALLET activity
     const response = await client.createWallet({
-      type: 'ACTIVITY_TYPE_CREATE_WALLET',
+      type: "ACTIVITY_TYPE_CREATE_WALLET",
       timestampMs: String(Date.now()),
       organizationId: authResponse.organizationId,
       parameters: {
-        walletName: 'Default Wallet',
+        walletName: "Default Wallet",
         accounts: [
           {
-            curve: 'CURVE_SECP256K1',
-            pathFormat: 'PATH_FORMAT_BIP32',
+            curve: "CURVE_SECP256K1",
+            pathFormat: "PATH_FORMAT_BIP32",
             path: "m/44'/60'/0'/0/0",
-            addressFormat: 'ADDRESS_FORMAT_ETHEREUM',
+            addressFormat: "ADDRESS_FORMAT_ETHEREUM",
           },
         ],
       },
@@ -103,3 +100,93 @@ const whoamiResponse = await client.getWhoami({
 ```
 
 A valid response indicates the credential is still live; otherwise, an error including `unable to authenticate: api key expired` will be thrown.
+
+## Email customization
+
+We offer customization for the following:
+
+- `appName`: the name of the application. This will be used in the email's subject, e.g. `Sign in to ${appName}`
+- `logoUrl`: a link to a PNG with a max width of 340px and max height of 124px
+- `magicLinkTemplate`: a template for the URL to be used in the magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`
+
+```js
+// Sign and submits the EMAIL_AUTH activity
+const response = await client.emailAuth({
+  type: "ACTIVITY_TYPE_EMAIL_AUTH",
+  timestampMs: String(Date.now()),
+  organizationId: <sub-organization-id>,
+  parameters: {
+    email: <user-email>,
+    targetPublicKey: <iframe-public-key>,
+    apiKeyName: <optional-api-key-name>,
+    expirationSeconds: <optional-api-key-expiration-in-seconds>,
+    emailCustomization: {
+      appName: <optional-your-app-name>,
+      logoUrl: <optional-your-logo-png>,
+      magicLinkTemplate: <optional-magic-link>
+    }
+  },
+});
+```
+
+### Bespoke templates
+
+We also support custom HTML email templates that can inject arbitrary data from a JSON string containing key-value pairs. In this case, the `emailCustomization` variable may look like:
+
+```js
+...
+emailCustomization: {
+  templateId: <HTML-template-stored-in-turnkey>,
+  templateVariables: "{\"username\": \"alice and bob\"}"
+}
+...
+```
+
+In this specific example, the value `alice and bob` can be interpolated into the email template using the key `username`. The use of such template variables is purely optional.
+
+Here's an example of a custom HTML email containing an email auth bundle:
+
+<p style={{ textAlign: "center" }}>
+  <img src="/img/email-auth-example-dynamic.png" alt="dynamic" style={{ width: 540 }} />  
+</p>
+
+If you are interested in implementing bespoke, fully-customized email templates, please reach out to <hello@turnkey.com>.
+
+## Case study: Alchemy
+
+Now that you've learned about email auth and its implementation details, let's dive into an example case study integration: Alchemy.
+
+### Persistent sessions
+
+By default, Turnkey's email auth architecture aims to isolate credentials in order to prevent an attacker being able to access credentials and have unfettered access to an organization. This is achieved by the separation of the `iframe credential` and the `Turnkey credential`. Before we dive in further, here are some relevant definitions:
+
+- the `iframe credential` (also referred to as the embedded key) is a P-256 keypair. It is stored in [local storage](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L123-L134).
+- the `email auth bundle` is an encrypted payload that Turnkey sends to an end-user via email. By itself, it is meaningless. However, upon *decryption*, this is a Turnkey API keypair that can readily sign Turnkey requests.
+- the `Turnkey credential` refers to a keypair that can be used to access Turnkey's API. This credential is safely sent from Turnkey to the iframe via the aforementioned auth bundle, which is then decrypted by the `iframe credential` mentioned above. Once the credential is decrypted, it is stored [in-memory](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L853-L854). This is in order to reduce the risk that a webpage or Chrome extension could read them, at which point an attacker would be able to make authenticated requests to Turnkey.
+
+Because these credentials (`iframe credential` and `Turnkey credential`) are kept separate, this means that an attacker *could not* unilaterally access a decrypted Turnkey credential — they would need access to both the iframe credential *and* the email auth bundle. However, this means that by default, because the Turnkey credential is stored in memory, it is *not* automatically persisted across browser sessions (e.g. tabs).
+
+### Alchemy's approach
+
+Once an end-user shares their encrypted email auth bundle (either by copying/pasting the OTP itself, or by navigating to a magic link containing it), Alchemy stores the encrypted bundle in the browser's local storage. Upon interactions like a page refresh, in order to "regain" an existing session, Alchemy inserts the iframe into the DOM, retrieves the email auth bundle from local storage, and injects that bundle. The result: the email auth bundle is now decrypted, and the iframe now has a Turnkey API key. At this point, that iframe can be used to authenticate requests to Turnkey.
+
+There are security implications with this approach: because the `iframe credential` and `email auth bundle` are both stored in local storage, an attacker with access to both would be able to decrypt a `Turnkey credential` and use it to access funds. One factor to note is that this vector is only open while the email auth credential is valid: by default, this duration is 15 minutes, but can be configured as mentioned in the [email customization](#email-customization) section above.
+
+### Custom email template
+
+Alchemy has elected to use our custom email templates, powered by template parameters like the following:
+
+```js
+...
+emailCustomization: {
+  templateId: <alchemy-template-id>,
+  templateVariables: "{\"LogoUrl\":\"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/InNOut_2021_logo.svg/440px-InNOut_2021_logo.svg.png\",\"ProjectName\":\"Alchemy Test\",\"ProjectColor\":\"#000\",\"ProjectAccent\":\"#fff\",\"SupportAccent\":\"#000\",\"PromptText\":\"Let us know that its really you by clicking the button below.\",\"ActionPrompt\":\"Sign In\",\"RedirectUrl\":\"https://alchemy.com\",\"RedirectQueryParams\":\"callback=/auth/callback\",\"AttributionLink\":\"https://www.alchemy.com/\",\"TermsUrl\":\"https://www.alchemy.com/terms\",\"TermsTitle\":\"End User Terms\"}"
+}
+...
+```
+
+And the end result is as follows 🎉:
+
+<p style={{ textAlign: "center" }}>
+  <img src="/img/email-auth-example-alchemy.png" alt="alchemy" style={{ width: 540 }} />
+</p>
