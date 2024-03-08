@@ -56,7 +56,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | Type         | Example       | Notes                                          |
 | ------------ | ------------- | ---------------------------------------------- |
 | **bool**     | true          |                                                |
-| **int**      | 256           | i64                                            |
+| **int**      | 256           | i128                                           |
 | **string**   | 'a'           | only single quotes are supported               |
 | **list<T\>** | [1, 2, 3]     | a list of type T                               |
 | **struct**   | { id: 'abc' } | a key-value map of { field:T } (defined below) |
@@ -82,6 +82,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                         | gas       | int           | The maximum allowed gas for the transaction                                  |
 |                         | gas_price | int           | The price of gas for the transaction                                         |
 |                         | chain_id  | int           | The chain identifier for the transaction                                     |
+|                         | nonce     | int           | The nonce for the transaction                                                |
 
 ## Activity Breakdown
 
