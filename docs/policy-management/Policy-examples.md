@@ -127,3 +127,13 @@ slug: /managing-policies/examples
   "condition": "eth.tx.chain_id == 11155111"
 }
 ```
+
+#### Allow ETH transactions with a specific nonce range
+
+```json JSON
+{
+  "policyName": "Allow signing Ethereum transactions with an early nonce",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.nonce <= 3"
+}
+```
