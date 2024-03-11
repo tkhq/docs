@@ -6,7 +6,7 @@ slug: /getting-started/email-auth
 
 # Email Auth
 
-Email Auth enables a user to authenticate their Turnkey account via email. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth).
+Email Auth enables a user to authenticate their Turnkey account with email via either a one time code, or a magic link. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth), and within our [Demo Passkey Wallet](https://wallet.tx.xyz) (code [here](https://github.com/tkhq/demo-passkey-wallet/blob/main/frontend/app/email-auth/page.tsx)).
 
 #### Mechanism
 

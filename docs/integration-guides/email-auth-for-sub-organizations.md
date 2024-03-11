@@ -10,7 +10,7 @@ Email auth is a powerful feature to couple with [sub-organizations](../getting-s
 
 Our [Demo Passkey Wallet](https://wallet.tx.xyz) application serves an example of how email auth functionality might be integrated. We encourage you to try it (and check out the [code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 
-## Pre-requisites
+## Prerequisites
 
 Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email auth. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
 
@@ -87,21 +87,29 @@ const publicKey = await iframeStamper.init();
     });
     ```
 
-Congrats! You've succcessfully performed Email Auth! 🥳
+Congrats! You've succcessfully performed Email Auth! 🥳 If you'd like to explore persisting sessions across tabs/windows, read on below.
+
+### Persistent sessions
+
+#### Security preface
+
+By default, Turnkey's email auth architecture aims to isolate credentials in order to prevent an attacker being able to access credentials and have unfettered access to an organization. This is achieved by the separation of the `iframe credential` and the `Turnkey credential`. Before we dive in further, here are some relevant definitions:
+
+- the `iframe credential` (also referred to as the embedded key) is a P-256 keypair. It is stored in [local storage](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L123-L134).
+- the `email auth bundle` is an encrypted payload that Turnkey sends to an end-user via email. By itself, it is meaningless. However, upon *decryption*, this is a Turnkey API keypair that can readily sign Turnkey requests.
+- the `Turnkey credential` refers to a keypair that can be used to access Turnkey's API. This credential is safely sent from Turnkey to the iframe via the aforementioned `auth bundle`, which is then decrypted by the `iframe credential`. Once the credential is decrypted, it is stored [in-memory](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L853-L854). This is in order to reduce the risk that a webpage or Chrome extension could read them *both*, at which point an attacker would be able to make authenticated requests to Turnkey.
+
+Because these credentials (`iframe credential` and `Turnkey credential`) are kept separate, this means that an attacker *could not* unilaterally access a decrypted Turnkey credential — they would need access to both the iframe credential *and* the email auth bundle. However, this means that by default, because the Turnkey credential is stored in memory, it is *not* automatically persisted across browser sessions (e.g. tabs).
+
+#### Implementing sessions
+
+Once an end-user shares their encrypted email auth bundle (either by copying/pasting the OTP itself, or by navigating to a magic link containing it), you can store it in the browser's local storage. Upon interactions like a page refresh, in order to "regain" an existing session, you would then insert the iframe into the DOM, retrieve the email auth bundle from local storage, and inject the bundle (i.e. `await iframeStamper.injectCredentialBundle(bundle)`). The result: the email auth bundle is now decrypted, and the iframe now has a Turnkey API key. At this point, the iframe can be used to authenticate requests to Turnkey.
+
+Echoing the security preface above, there are security implications with this approach: because the `iframe credential` and `email auth bundle` would now be stored in local storage, an attacker with access to both would be able to decrypt a `Turnkey credential` and use it to access funds. Note that this vector is only open while the email auth credential is valid: by default, this duration is 15 minutes, but can be configured as detailed in the [email customization](#email-customization) section below.
 
 ## Integration notes
 
-Before stamping an activity, if you'd like to validate whether or not an injected credential is still valid, you can use the `whoami` endpoint:
-
-```js
-const whoamiResponse = await client.getWhoami({
-  organizationId,
-});
-```
-
-A valid response indicates the credential is still live; otherwise, an error including `unable to authenticate: api key expired` will be thrown.
-
-## Email customization
+### Email customization
 
 We offer customization for the following:
 
@@ -129,9 +137,9 @@ const response = await client.emailAuth({
 });
 ```
 
-### Bespoke templates
+### Bespoke email templates
 
-We also support custom HTML email templates that can inject arbitrary data from a JSON string containing key-value pairs. In this case, the `emailCustomization` variable may look like:
+We also support custom HTML email templates for [Enterprise](https://www.turnkey.com/pricing) clients. This allows you to inject arbitrary data from a JSON string containing key-value pairs. In this case, the `emailCustomization` variable may look like:
 
 ```js
 ...
@@ -152,41 +160,14 @@ Here's an example of a custom HTML email containing an email auth bundle:
 
 If you are interested in implementing bespoke, fully-customized email templates, please reach out to <hello@turnkey.com>.
 
-## Case study: Alchemy
+### Credential validity checks
 
-Now that you've learned about email auth and its implementation details, let's dive into an example case study integration: Alchemy.
-
-### Persistent sessions
-
-By default, Turnkey's email auth architecture aims to isolate credentials in order to prevent an attacker being able to access credentials and have unfettered access to an organization. This is achieved by the separation of the `iframe credential` and the `Turnkey credential`. Before we dive in further, here are some relevant definitions:
-
-- the `iframe credential` (also referred to as the embedded key) is a P-256 keypair. It is stored in [local storage](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L123-L134).
-- the `email auth bundle` is an encrypted payload that Turnkey sends to an end-user via email. By itself, it is meaningless. However, upon *decryption*, this is a Turnkey API keypair that can readily sign Turnkey requests.
-- the `Turnkey credential` refers to a keypair that can be used to access Turnkey's API. This credential is safely sent from Turnkey to the iframe via the aforementioned auth bundle, which is then decrypted by the `iframe credential` mentioned above. Once the credential is decrypted, it is stored [in-memory](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L853-L854). This is in order to reduce the risk that a webpage or Chrome extension could read them, at which point an attacker would be able to make authenticated requests to Turnkey.
-
-Because these credentials (`iframe credential` and `Turnkey credential`) are kept separate, this means that an attacker *could not* unilaterally access a decrypted Turnkey credential — they would need access to both the iframe credential *and* the email auth bundle. However, this means that by default, because the Turnkey credential is stored in memory, it is *not* automatically persisted across browser sessions (e.g. tabs).
-
-### Alchemy's approach
-
-Once an end-user shares their encrypted email auth bundle (either by copying/pasting the OTP itself, or by navigating to a magic link containing it), Alchemy stores the encrypted bundle in the browser's local storage. Upon interactions like a page refresh, in order to "regain" an existing session, Alchemy inserts the iframe into the DOM, retrieves the email auth bundle from local storage, and injects that bundle. The result: the email auth bundle is now decrypted, and the iframe now has a Turnkey API key. At this point, that iframe can be used to authenticate requests to Turnkey.
-
-There are security implications with this approach: because the `iframe credential` and `email auth bundle` are both stored in local storage, an attacker with access to both would be able to decrypt a `Turnkey credential` and use it to access funds. One factor to note is that this vector is only open while the email auth credential is valid: by default, this duration is 15 minutes, but can be configured as mentioned in the [email customization](#email-customization) section above.
-
-### Custom email template
-
-Alchemy has elected to use our custom email templates, powered by template parameters like the following:
+By default, if a Turnkey request is signed with an expired credential, the API will return a 401 error. If you'd like to validate whether or not an injected credential is still valid, you can specifically use the `whoami` endpoint:
 
 ```js
-...
-emailCustomization: {
-  templateId: <alchemy-template-id>,
-  templateVariables: "{\"LogoUrl\":\"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/InNOut_2021_logo.svg/440px-InNOut_2021_logo.svg.png\",\"ProjectName\":\"Alchemy Test\",\"ProjectColor\":\"#000\",\"ProjectAccent\":\"#fff\",\"SupportAccent\":\"#000\",\"PromptText\":\"Let us know that its really you by clicking the button below.\",\"ActionPrompt\":\"Sign In\",\"RedirectUrl\":\"https://alchemy.com\",\"RedirectQueryParams\":\"callback=/auth/callback\",\"AttributionLink\":\"https://www.alchemy.com/\",\"TermsUrl\":\"https://www.alchemy.com/terms\",\"TermsTitle\":\"End User Terms\"}"
-}
-...
+const whoamiResponse = await client.getWhoami({
+  organizationId,
+});
 ```
 
-And the end result is as follows 🎉:
-
-<p style={{ textAlign: "center" }}>
-  <img src="/img/email-auth-example-alchemy.png" alt="alchemy" style={{ width: 540 }} />
-</p>
+A valid response indicates the credential is still live; otherwise, an error including `unable to authenticate: api key expired` will be thrown.

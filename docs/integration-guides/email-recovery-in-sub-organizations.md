@@ -10,7 +10,7 @@ Email recovery shines if you are leveraging [sub-organizations](../getting-start
 
 Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 
-## Pre-requisites
+## Prerequisites
 
 Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email recovery. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. To allow an API user to initiate email recovery, you'll need the following policy in your main organization:
 
