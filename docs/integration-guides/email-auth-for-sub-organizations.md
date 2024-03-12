@@ -24,7 +24,7 @@ Make sure you have set up your primary Turnkey organization with at least one AP
 
 ## Helper packages
 
-- We have released open-source code to create target encryption keys, decrypt auth credentials, and sign Turnkey activities. We've deployed this a static HTML page hosted on `auth.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the auth credentials are encrypted to keys that your organization doesn't have access to (because they live in the iframe, on a separate domain)
+- We have released open-source code to create target encryption keys, decrypt auth credentials, and sign Turnkey activities. We've deployed this as a static HTML page hosted on `auth.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the auth credentials are encrypted to keys that your organization doesn't have access to (because they live in the iframe, on a separate domain)
 - We have also built a package to help you insert this iframe and interact with it in the context of email auth: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
 
 In the rest of this guide we'll assume you are using these helpers.
@@ -39,27 +39,38 @@ Let's review these steps in detail:
 
 1.  User on `yoursite.xyz` clicks "auth", and a new auth UI is shown. We recommend this auth UI be a new hosted page of your site or application, which contains language explaining to the user what steps they will need to take next to successfully authenticate. While the UI is in a loading state your frontend uses [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to insert a new iframe element:
 
-```js
-const iframeStamper = new IframeStamper({
-  iframeUrl: "https://auth.turnkey.com",
-  // Configure how the iframe element is inserted on the page
-  iframeContainerId: "your-container",
-  iframeElementId: "turnkey-iframe",
-});
+    ```js
+    const iframeStamper = new IframeStamper({
+      iframeUrl: "https://auth.turnkey.com",
+      // Configure how the iframe element is inserted on the page
+      iframeContainerId: "your-container",
+      iframeElementId: "turnkey-iframe",
+    });
 
-// Inserts the iframe in the DOM. This creates the new encryption target key
-const publicKey = await iframeStamper.init();
-```
+    // Inserts the iframe in the DOM. This creates the new encryption target key
+    const publicKey = await iframeStamper.init();
+    ```
 
 2.  Your code receives the iframe public key and shows the auth form, and the user enters their email address.
 3.  Your app can now create and sign a new `EMAIL_AUTH` activity with the user email and the iframe public key in the parameters. Optional arguments include a custom name for the API key, and a specific duration (denoted in seconds) for it. Note: you'll need to retrieve the sub-organization ID based on the user email.
 4.  Email is received by the user.
-5.  User copies and pastes their auth code into your app. Remember: this code is an encrypted credential which can only be decrypted within the iframe.
+5.  User copies and pastes their auth code into your app. Remember: this code is an encrypted credential which can only be decrypted within the iframe. In order to enable persistent sessions, save the auth code in local storage:
+
+    ```js
+    window.localStorage.setItem("BUNDLE", bundle);
+    ```
+
+    See [Email Customization](#email-customization) below to use a magic link instead of a one time code.
+
 6.  Your app injects the auth code into the iframe for decryption:
+
     ```js
     await iframeStamper.injectCredentialBundle(code);
     ```
-7.  At this point, the user is authenticated! Your app should use [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to sign a new activity, e.g. `CREATE_WALLET`:
+
+7.  At this point, the user is authenticated!
+
+8.  Your app should use [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to sign a new activity, e.g. `CREATE_WALLET`:
 
     ```js
     // New client instantiated with our iframe stamper
@@ -87,27 +98,51 @@ const publicKey = await iframeStamper.init();
     });
     ```
 
-Congrats! You've succcessfully performed Email Auth! 🥳 If you'd like to explore persisting sessions across tabs/windows, read on below.
+9.  User navigates to a new tab.
 
-### Persistent sessions
+10. Because the code was also saved in local storage (step 6), it can be injected into the iframe across different tabs, resulting in a persistent session. See our [Demo Passkey Wallet](https://wallet.tx.xyz) for a [sample implementation](https://github.com/tkhq/demo-passkey-wallet/blob/2182c36583fbda79f762ce5d0c70db4926feb547/frontend/app/email-auth/page.tsx#L112-L117), specifically dealing with sharing the iframeStamper across components.
 
-#### Security preface
+    ```js
+    const code = window.localStorage.getItem("BUNDLE");
+    await iframeStamper.injectCredentialBundle(code);
+    ```
+
+11. Again, the user is authenticated, and able to initiate activities!
+
+12. Just like step 8, the iframeStamper can be used to sign another activity.
+
+    ```js
+    const client = new TurnkeyClient(
+      { baseUrl: "https://api.turnkey.com" },
+      iframeStamper
+    );
+
+    // Sign and submits a SIGN_TRANSACTION activity
+    const response = await client.signTransaction({
+      type: "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+      timestampMs: String(Date.now()),
+      organizationId: authResponse.organizationId,
+      parameters: {
+        signWith: "0x...",
+        type: "TRANSACTION_TYPE_ETHEREUM",
+        unsignedTransaction: "unsigned-tx",
+      },
+    });
+    ```
+
+Congrats! You've succcessfully implemented Email Auth! 🥳
+
+## Integration notes
+
+### Security considerations
 
 By default, Turnkey's email auth architecture aims to isolate credentials in order to prevent an attacker being able to access credentials and have unfettered access to an organization. This is achieved by the separation of the `iframe credential` and the `Turnkey credential`. Before we dive in further, here are some relevant definitions:
 
 - the `iframe credential` (also referred to as the embedded key) is a P-256 keypair. It is stored in [local storage](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L123-L134).
-- the `email auth bundle` is an encrypted payload that Turnkey sends to an end-user via email. By itself, it is meaningless. However, upon *decryption*, this is a Turnkey API keypair that can readily sign Turnkey requests.
-- the `Turnkey credential` refers to a keypair that can be used to access Turnkey's API. This credential is safely sent from Turnkey to the iframe via the aforementioned `auth bundle`, which is then decrypted by the `iframe credential`. Once the credential is decrypted, it is stored [in-memory](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L853-L854). This is in order to reduce the risk that a webpage or Chrome extension could read them *both*, at which point an attacker would be able to make authenticated requests to Turnkey.
+- the `email auth bundle` is an encrypted payload that Turnkey sends to an end-user via email. By itself, it is meaningless. However, upon _decryption_, this is a Turnkey API keypair that can readily sign Turnkey requests.
+- the `Turnkey credential` refers to a keypair that can be used to access Turnkey's API. This credential is safely sent from Turnkey to the iframe via the aforementioned `auth bundle`, which is then decrypted by the `iframe credential`. Once the credential is decrypted, it is stored [in-memory](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L853-L854). This is in order to reduce the risk that a webpage or Chrome extension could read them _both_, at which point an attacker would be able to make authenticated requests to Turnkey.
 
-Because these credentials (`iframe credential` and `Turnkey credential`) are kept separate, this means that an attacker *could not* unilaterally access a decrypted Turnkey credential — they would need access to both the iframe credential *and* the email auth bundle. However, this means that by default, because the Turnkey credential is stored in memory, it is *not* automatically persisted across browser sessions (e.g. tabs).
-
-#### Implementing sessions
-
-Once an end-user shares their encrypted email auth bundle (either by copying/pasting the OTP itself, or by navigating to a magic link containing it), you can store it in the browser's local storage. Upon interactions like a page refresh, in order to "regain" an existing session, you would then insert the iframe into the DOM, retrieve the email auth bundle from local storage, and inject the bundle (i.e. `await iframeStamper.injectCredentialBundle(bundle)`). The result: the email auth bundle is now decrypted, and the iframe now has a Turnkey API key. At this point, the iframe can be used to authenticate requests to Turnkey.
-
-Echoing the security preface above, there are security implications with this approach: because the `iframe credential` and `email auth bundle` would now be stored in local storage, an attacker with access to both would be able to decrypt a `Turnkey credential` and use it to access funds. Note that this vector is only open while the email auth credential is valid: by default, this duration is 15 minutes, but can be configured as detailed in the [email customization](#email-customization) section below.
-
-## Integration notes
+With persistent sessions, there are security implications to consider: because the `iframe credential` and `email auth bundle` are both stored in local storage, an attacker with access to both would be able to decrypt a `Turnkey credential` and use it to sign requests. Note that this vector is only open while the email auth credential is valid: by default, this duration is 15 minutes, but can be configured as detailed in the [Email Customization](#email-customization) section below.
 
 ### Email customization
 
@@ -162,7 +197,7 @@ If you are interested in implementing bespoke, fully-customized email templates,
 
 ### Credential validity checks
 
-By default, if a Turnkey request is signed with an expired credential, the API will return a 401 error. If you'd like to validate whether or not an injected credential is still valid, you can specifically use the `whoami` endpoint:
+By default, if a Turnkey request is signed with an expired credential, the API will return a 401 error. If you'd like to validate an injected credential, you can specifically use the `whoami` endpoint:
 
 ```js
 const whoamiResponse = await client.getWhoami({
