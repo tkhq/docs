@@ -71,7 +71,7 @@ Regardless of whether you use our helpers and abstractions, take a look at [our 
 If you have questions, feedback, or find yourself in need of an abstraction or integration that doesn't exist yet, please get in touch with us! You can
 - Create an [issue on our SDK repo](https://github.com/tkhq/sdk/issues)
 - Start a discussion in our [community repo](https://github.com/orgs/tkhq/discussions)
-- Contact us at <hello@turnkey.com>
+- Contact us at hello@turnkey.com
 
 We're here to make this as easy as possible for you and your team!
 

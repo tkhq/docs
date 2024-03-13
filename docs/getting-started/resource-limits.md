@@ -24,4 +24,4 @@ Currently, the resource limits within a single organization are as follows:
 | API keys per user (expiring)   | 10                     |
 | Sub-Organizations              | unlimited              |
 
-If you are approaching any of these limits in your implementation and require support, reach out to the Turnkey team (<help@turnkey.com>).
+If you are approaching any of these limits in your implementation and require support, reach out to the Turnkey team (help@turnkey.com).

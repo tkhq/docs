@@ -46,7 +46,7 @@ Losing your Turnkey API key doesn't mean you'll lose your crypto:
 - By default, your API key is not able to move funds
 - If you've changed policies so that your API key is allowed to unilaterally move funds, you may be at risk. Leverage the Turnkey UI to revoke your API key as soon as possible.
 
-Talk to our team (<hello@turnkey.com>) if you want to get in touch and talk more in-depth.
+Talk to our team (hello@turnkey.com) if you want to get in touch and talk more in-depth.
 
 ### How long is a signed activity request valid for?
 
@@ -65,7 +65,7 @@ While we don't have an off the shelf recipe, one potential approach is:
 - At sub-org creation, create your root user with 2+ API keys. One for day-to-day signing, and the other(s) securely stored.
 - If the day-to-day key is leaked, then you can use one of the secure, additional keys to remove it from all impacted sub-orgs via `ACTIVITY_TYPE_DELETE_API_KEYS`.
 
-Reach out to our team (<hello@turnkey.com>) for additional guidance.
+Reach out to our team (hello@turnkey.com) for additional guidance.
 
 ## Limits
 
@@ -85,7 +85,7 @@ When rate limits are exceeded, an error with HTTP 429 is returned with the follo
 
 This limit is on a **per IP address** basis: if you have multiple servers making requests to the turnkey API under a different IP address, each server is subject to the 60 RPS limit individually.
 
-Please get in touch with us (<help@turnkey.com>) if you need this limit adjusted for your use-case.
+Please get in touch with us (help@turnkey.com) if you need this limit adjusted for your use-case.
 
 ## Supported functionality
 
@@ -99,7 +99,7 @@ Turnkey's primitive for private keys is cryptographic curves, not specific crypt
 
 We have deeper support for common Ethereum use cases in our API and SDKs, including address derivation and scripts to help you construct simple transactions.
 
-If there are specific cryptocurrencies you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.com>.
+If there are specific cryptocurrencies you'd like to see us offer deeper support for, please let us know by contacting us at hello@turnkey.com.
 
 ### Do you support transaction construction and broadcast?
 
