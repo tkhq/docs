@@ -134,16 +134,6 @@ Congrats! You've succcessfully implemented Email Auth! 🥳
 
 ## Integration notes
 
-### Security considerations
-
-By default, Turnkey's email auth architecture aims to isolate credentials in order to prevent an attacker being able to access credentials and have unfettered access to an organization. This is achieved by the separation of the `iframe credential` and the `Turnkey credential`. Before we dive in further, here are some relevant definitions:
-
-- the `iframe credential` (also referred to as the embedded key) is a P-256 keypair. It is stored in [local storage](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L123-L134).
-- the `email auth bundle` is an encrypted payload that Turnkey sends to an end-user via email. By itself, it is meaningless. However, upon _decryption_, this is a Turnkey API keypair that can readily sign Turnkey requests.
-- the `Turnkey credential` refers to a keypair that can be used to access Turnkey's API. This credential is safely sent from Turnkey to the iframe via the aforementioned `auth bundle`, which is then decrypted by the `iframe credential`. Once the credential is decrypted, it is stored [in-memory](https://github.com/tkhq/frames/blob/82ee1cb3797c1c785226a130a7e06f991246877f/auth/index.html#L853-L854). This is in order to reduce the risk that a webpage or Chrome extension could read them _both_, at which point an attacker would be able to make authenticated requests to Turnkey.
-
-With persistent sessions, there are security implications to consider: because the `iframe credential` and `email auth bundle` are both stored in local storage, an attacker with access to both would be able to decrypt a `Turnkey credential` and use it to sign requests. Note that this vector is only open while the email auth credential is valid: by default, this duration is 15 minutes, but can be configured as detailed in the [Email Customization](#email-customization) section below.
-
 ### Email customization
 
 We offer customization for the following:
