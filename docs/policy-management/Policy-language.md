@@ -11,22 +11,22 @@ This page provides an overview of how to author policies using our policy langua
 
 The grammar has been designed for flexibility and expressiveness. We currently support the following operations:
 
-| Operation  | Operators                                    | Example                     | Types                            |
-| ---------- | -------------------------------------------- | --------------------------- | -------------------------------- |
-| logical    | &&, \|\|                                     | "true && false"             | (bool, bool) -> bool             |
-| comparison | {'=='}, {'!='}, {'<'}, {'>'}, {'<='}, {'>='} | "1 < 2"                     | (int, int) -> bool               |
-| comparison | ==, !=                                       | "'a' != 'b'"                | (string, string) -> bool         |
-| comparison | in                                           | "1 in [1, 2, 3]"            | (T, list{'<T\>'}) -> bool        |
-| access     | {'x[<index\>]'}                              | \[1,2,3\]\[0\]              | (list{'<T\>'}) -> T              |
-| access     | {'x[<index\>]'}                              | "'abc'[0]"                  | (string) -> string               |
-| access     | {'x[<start\>..<end\>]'}                      | \[1,2,3\]\[0..2\]           | (list{'<T\>'}) -> (list{'<T\>'}) |
-| access     | {'x[<start\>..<end\>]'}                      | "'abc'[0..2]"               | (string) -> string               |
-| access     | {'x.<field\>'}                               | "user.tags"                 | (struct) -> T                    |
-| function   | {'x.all(item, <predicate\>)'}                | "[1,1,1].all(x, x == 1)"    | (list{'<T\>'}) -> bool           |
-| function   | {'x.any(item, <predicate\>)'}                | "[1,2,3].any(x, x == 1)"    | (list{'<T\>'}) -> bool           |
-| function   | {'x.contains(<value\>)'}                     | "[1,2,3].contains(1)"       | (list{'<T\>'}) -> bool           |
-| function   | x.count()                                    | "[1,2,3].count()"           | (list{'<T\>'}) -> int            |
-| function   | {'x.filter(item, <predicate\>)'}             | "[1,2,3].filter(x, x == 1)" | (list{'<T\>'}) -> (list{'<T\>'}) |
+| Operation  | Operators                        | Example                     | Types                            |
+| ---------- | -------------------------------- | --------------------------- | -------------------------------- |
+| logical    | &&, \|\|                         | "true && false"             | (bool, bool) -> bool             |
+| comparison | {'==, !=, <, >, <=, >='}         | "1 < 2"                     | (int, int) -> bool               |
+| comparison | ==, !=                           | "'a' != 'b'"                | (string, string) -> bool         |
+| comparison | in                               | "1 in [1, 2, 3]"            | (T, list{'<T\>'}) -> bool        |
+| access     | {'x[<index\>]'}                  | \[1,2,3\]\[0\]              | (list{'<T\>'}) -> T              |
+| access     | {'x[<index\>]'}                  | "'abc'[0]"                  | (string) -> string               |
+| access     | {'x[<start\>..<end\>]'}          | \[1,2,3\]\[0..2\]           | (list{'<T\>'}) -> (list{'<T\>'}) |
+| access     | {'x[<start\>..<end\>]'}          | "'abc'[0..2]"               | (string) -> string               |
+| access     | {'x.<field\>'}                   | "user.tags"                 | (struct) -> T                    |
+| function   | {'x.all(item, <predicate\>)'}    | "[1,1,1].all(x, x == 1)"    | (list{'<T\>'}) -> bool           |
+| function   | {'x.any(item, <predicate\>)'}    | "[1,2,3].any(x, x == 1)"    | (list{'<T\>'}) -> bool           |
+| function   | {'x.contains(<value\>)'}         | "[1,2,3].contains(1)"       | (list{'<T\>'}) -> bool           |
+| function   | x.count()                        | "[1,2,3].count()"           | (list{'<T\>'}) -> int            |
+| function   | {'x.filter(item, <predicate\>)'} | "[1,2,3].filter(x, x == 1)" | (list{'<T\>'}) -> (list{'<T\>'}) |
 
 ## Keywords
 
