@@ -45,7 +45,7 @@ We are employing [Homebrew](https://brew.sh/) in this guide as a quick and easy 
 #### Generate an API key
 
 ```sh
-turnkey generate-api-key --organization $ORGANIZATION_ID --key-name quickstart
+turnkey generate api-key --organization $ORGANIZATION_ID --key-name quickstart
 ```
 
 When you run this command, Turnkey’s CLI generates an API key pair and **stores the API private key locally**. Copy the `publicKey` field in the output. In the next step, we'll add this to our User.

@@ -26,7 +26,7 @@ In the create user flow, you have the option to grant API key or web access to y
 Under access types, select "API key". Enter the user name "Policy Test". This will be an API-only user, and therefore an email is not required.  Click continue and create a new API key to associate with the user using the following command:
 
 ```shell
-turnkey generate-api-key --organization $ORGANIZATION_ID --key-name policy_test
+turnkey generate api-key --organization $ORGANIZATION_ID --key-name policy_test
 ```
 
 This will create 2 files, "policy_test.public" and "policy_test.private". Copy the contents of the ".public" file and paste it into "API public key". Finish the create user flow and authenticate. Your new user will appear in the Users table. Note down the user ID as you will use it in the next step.
