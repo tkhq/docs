@@ -10,8 +10,8 @@ Every request made to Turnkey must include a signature over the POST body attach
 
 ### API Keys
 To create a valid, API key stamped request follow these steps:
-1. SHA256 hash the JSON-encoded POST body
-2. Sign the hash with your API key to produce a `signature`
+1. Sign the JSON-encoded POST body with your API key to produce a `signature` (DER-encoded)
+2. Hex encode the `signature`
 3. Create a JSON-encoded stamp:
     - `publicKey`: the public key of API key
     - `signature`: the signature produced by the API key
