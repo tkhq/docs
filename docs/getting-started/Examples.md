@@ -51,7 +51,7 @@ See https://github.com/tkhq/demo-consumer-wallet for the code.
 ### Demo Passkey Wallet ([code](https://github.com/tkhq/demo-passkey-wallet), [live link](https://wallet.tx.xyz))
 
 A wallet application showing how users can register and authenticate using passkeys.
-This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](../concepts/Sub-Organizations.md) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
+This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](/concepts/sub-organizations) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
 
 <p style={{ textAlign: "center" }}>
   <img

@@ -12,7 +12,7 @@ This guide is designed to walk you through the process of setting up webhooks, f
 
 ## Prerequisites
 
-Before diving into webhook configuration, ensure you have completed the necessary preliminary steps outlined in our [Quickstart Guide](quickstart#create-your-turnkey-organization). This guide will assist you in setting up a new organization and installing the Turnkey CLI. Note: We'll create a new API Key for testing webhooks below.
+Before diving into webhook configuration, ensure you have completed the necessary preliminary steps outlined in our [Quickstart Guide](/getting-started/quickstart#create-your-turnkey-organization). This guide will assist you in setting up a new organization and installing the Turnkey CLI. Note: We'll create a new API Key for testing webhooks below.
 
 ## Environment Setup
 

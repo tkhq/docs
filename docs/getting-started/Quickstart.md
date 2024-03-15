@@ -109,5 +109,5 @@ If you'd like to broadcast your transaction, you can easily do so via [Etherscan
 ## Next Steps
 
 - Check out our [examples](/getting-started/examples) to see what can be built
-- Learn more about [Organizations](/getting-started/organizations) and [Wallets](/getting-started/wallets)
+- Learn more about [Organizations](/concepts/organizations) and [Wallets](/concepts/wallets)
 - See our [API design](/api-introduction) or dive into our [API reference](/api)
