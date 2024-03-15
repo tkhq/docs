@@ -6,7 +6,7 @@ slug: /integration-guides/sub-organization-recovery
 
 # Sub-Organization Recovery
 
-Email recovery shines if you are leveraging [sub-organizations](../getting-started/Sub-Organizations.md) for each of your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
+Email recovery shines if you are leveraging [sub-organizations](/concepts/Sub-Organizations) for each of your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
 Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 

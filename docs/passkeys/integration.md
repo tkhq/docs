@@ -77,7 +77,7 @@ We're here to make this as easy as possible for you and your team!
 
 ## Passkey wallets with sub-organizations
 
-If you're wondering how to create independent, non-custodial wallets for your end-users, head to [Sub-Organizations](/getting-started/sub-organizations). In short: you'll be able to pass the registered passkeys as part of a "create sub-organization" activity, making your end-users the sole owners of any resource created within the sub-organization (including private keys). Your organization will only have read permissions.
+If you're wondering how to create independent, non-custodial wallets for your end-users, head to [Sub-Organizations](/concepts/sub-organizations). In short: you'll be able to pass the registered passkeys as part of a "create sub-organization" activity, making your end-users the sole owners of any resource created within the sub-organization (including private keys). Your organization will only have read permissions.
 
 ## Proxying signed requests
 

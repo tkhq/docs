@@ -1,14 +1,14 @@
 ---
+title: Overview
 sidebar_position: 1
 slug: /
 ---
 
-<img src="/img/diagrams/welcome_image.png" alt="welcome" />  
+<img src="/img/diagrams/welcome_image.png" alt="welcome" />
 
+### Welcome to the Turnkey docs!
 
-### Welcome to the Turnkey docs!  
-
-Start here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](./getting-started/Quickstart.md). Or, join our Slack group [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw) to get support with your integration, share product feedback, and connect with other crypto builders. 
+Start here for a quick primer on our high-level product structure to orient you to the rest of the documentation. If you’d rather jump straight into the quickstart, head [here](./getting-started/Quickstart.md). Or, join our Slack group [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw) to get support with your integration, share product feedback, and connect with other crypto builders.
 
 ### About Turnkey
 
@@ -24,7 +24,6 @@ At a structural level, a Turnkey Organization is comprised of a few core resourc
 - <b>Wallets:</b> A collection of crypto private keys that share a common seed
 - <b>Credentials:</b> Used to verify Users - WebAuthn authenticators for human Users and API keys for API Users
 
-
 <p style={{textAlign: 'center'}}>
   <img
     src="/img/diagrams/resources.png"
@@ -33,7 +32,6 @@ At a structural level, a Turnkey Organization is comprised of a few core resourc
   />
 </p>
 
-    
 Turnkey enables two main types of actions via our REST API:
 
 - Change or retrieve Organization data

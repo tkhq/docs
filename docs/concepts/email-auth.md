@@ -1,7 +1,6 @@
 ---
 sidebar_position: 8
 description: Learn about Email Auth on Turnkey
-slug: /getting-started/email-auth
 ---
 
 # Email Auth
@@ -46,7 +45,7 @@ Authorization for email auth is based on our usual activity authorization: our [
 
 ## Email auth in your sub-organizations
 
-Email auth works well with [sub-organizations](./Sub-Organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
+Email auth works well with [sub-organizations](/concepts/sub-organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
 
 If you're looking for a more concrete guide, head to our [Sub-Organization Email Auth implementation guide](../integration-guides/email-auth-for-sub-organizations.md) for more details.
 

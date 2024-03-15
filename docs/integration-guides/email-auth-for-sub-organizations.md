@@ -6,7 +6,7 @@ slug: /integration-guides/sub-organization-auth
 
 # Sub-Organization Email Auth
 
-Email auth is a powerful feature to couple with [sub-organizations](../getting-started/Sub-Organizations.md) for your users. This approach empowers your users to authenticate their Turnkey in a simple way (via email!), while minimizing your involvement: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
+Email auth is a powerful feature to couple with [sub-organizations](/concepts/Sub-Organizations) for your users. This approach empowers your users to authenticate their Turnkey in a simple way (via email!), while minimizing your involvement: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
 Our [Demo Passkey Wallet](https://wallet.tx.xyz) application serves an example of how email auth functionality might be integrated. We encourage you to try it (and check out the [code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 
