@@ -9,7 +9,7 @@ An organization is a logical grouping of resources (e.g. users, policies, wallet
 
 ## Root Quorum
 
-All organizations are controlled by a [Root Quorum](../user-management/Root-quorum.md) which contains the root users and the required threshold of approvals to take any action. Only the root quorum can update the root quorum or feature set.
+All organizations are controlled by a [Root Quorum](/concepts/user-management/Root-quorum.md) which contains the root users and the required threshold of approvals to take any action. Only the root quorum can update the root quorum or feature set.
 
 ## Features
 

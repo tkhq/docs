@@ -16,7 +16,7 @@ Before deploying your Turnkey integration in production, take a look at our reco
 
 ## Security
 
-- [ ] Lock down your [root quorum](../user-management/Root-quorum.md). We recommend a quorum of at least 3 with a threshold of at least 2.
+- [ ] Lock down your [root quorum](/concepts/user-management/Root-quorum.md). We recommend a quorum of at least 3 with a threshold of at least 2.
 - [ ] Ensure any team members with critical permissions, especially root quorum members, have set up at least two authenticators for their account (e.g., touchID plus a hardware authenticator like a Yubikey).
 - [ ] Avoid using root user permissions for routine operations and instead use standard users with permissions explicitly granted via policies to limit the surface area of a compromised user.
 - [ ] Confirm that all API keys are stored securely and not embedded in exposed or vulnerable parts of the codebase. API keys should be stored in a secure, encrypted environment and should never be hard-coded in publicly accessible repositories or client-side code.
