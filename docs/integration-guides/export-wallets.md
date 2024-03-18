@@ -5,7 +5,7 @@ slug: /integration-guides/export-wallets
 ---
 # Export Wallet
 
-Turnkey's export functionality allows your end users to backup or transfer a [Wallet](../getting-started/Wallets.md) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
+Turnkey's export functionality allows your end users to backup or transfer a [Wallet](/concepts/wallets) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
 
 Follow along with the guide below to set up Wallet Export for your end users.
 
@@ -14,7 +14,7 @@ Follow along with the guide below to set up Wallet Export for your end users.
 Make sure you have created a wallet for your user. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started.  
 
  
-If you'd like to use a sub-organization as an end-user controlled wallet, follow our [Wallet integration guide](./sub-organizations-as-wallets.md).
+If you'd like to use a sub-organization as an end-user controlled wallet, follow our [Wallet integration guide](../integration-guides/sub-organizations-as-wallets.md).
 
 
 ## Helper packages

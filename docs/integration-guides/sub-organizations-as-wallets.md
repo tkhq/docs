@@ -3,15 +3,16 @@ sidebar_position: 1
 description: Use sub-organizations as end-user wallets
 slug: /integration-guides/sub-organizations-as-wallets
 ---
+
 # Sub-Organizations as Wallets
 
 Turnkey has built a new model for private key management that utilizes secure enclaves. All transactions are signed within an enclave and private keys are never exposed to Turnkey, your software, or your team. Turnkey’s role is similar to that of a safety deposit box operator — Turnkey secures and provides access to the safety deposit boxes, but our system requires cryptographic proof of ownership to take any action with the keys held within.
 
-We've seen in [Sub-Organizations](../getting-started/Sub-Organizations.md) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
+We've seen in [Sub-Organizations](/concepts/Sub-Organizations) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
 
-## Sub-Organizations as end-user controlled wallets  
+## Sub-Organizations as end-user controlled wallets
 
-In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](../passkeys/introduction.md) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing. Your application will construct transactions on behalf of the end-user, and then surface the relevant Turnkey activity request client-side for end-user approval.
+In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](/passkeys/introduction) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing. Your application will construct transactions on behalf of the end-user, and then surface the relevant Turnkey activity request client-side for end-user approval.
 
 Note that Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
 
@@ -34,21 +35,25 @@ Your application then uses an API-only user to create a new sub-organization on 
   "organizationId": "<your-organization-id>",
   "parameters": {
     "subOrganizationName": "<sub-org-name>",
-    "rootUsers": [{
-      "userName": "<end-user-name>",
-      "userEmail": "<email>(optional)",
-      "authenticators": [{
-        "authenticatorName": "<passkey-name>",
-        "challenge": "<webauthn-challenge>",
-        "attestation": {
-          "credentialId": "<credential-id>",
-          "clientDataJson": "<client-data-json>",
-          "attestationObject": "<attestation-object>",
-          "transports": ["AUTHENTICATOR_TRANSPORT_HYBRID"]
-        }
-      }],
-      "apiKeys": [],
-    }],
+    "rootUsers": [
+      {
+        "userName": "<end-user-name>",
+        "userEmail": "<email>(optional)",
+        "authenticators": [
+          {
+            "authenticatorName": "<passkey-name>",
+            "challenge": "<webauthn-challenge>",
+            "attestation": {
+              "credentialId": "<credential-id>",
+              "clientDataJson": "<client-data-json>",
+              "attestationObject": "<attestation-object>",
+              "transports": ["AUTHENTICATOR_TRANSPORT_HYBRID"]
+            }
+          }
+        ],
+        "apiKeys": []
+      }
+    ],
     "rootQuorumThreshold": 1,
     "wallet": {
       "walletName": "Default Wallet",
@@ -57,10 +62,10 @@ Your application then uses an API-only user to create a new sub-organization on 
           "curve": "CURVE_SECP256K1",
           "pathFormat": "PATH_FORMAT_BIP32",
           "path": "m/44'/60'/0'/0/0",
-          "addressFormat": "ADDRESS_FORMAT_ETHEREUM",
-        },
-      ],
-    },
+          "addressFormat": "ADDRESS_FORMAT_ETHEREUM"
+        }
+      ]
+    }
   }
 }
 ```
@@ -140,8 +145,8 @@ Next, we can derive additional accounts (addresses) given a single HD wallet. Th
         "curve": "CURVE_SECP256K1",
         "pathFormat": "PATH_FORMAT_BIP32",
         "path": "m/44'/60'/0'/0/0",
-        "addressFormat": "ADDRESS_FORMAT_ETHEREUM",
-      },
+        "addressFormat": "ADDRESS_FORMAT_ETHEREUM"
+      }
     ]
   }
 }
@@ -159,14 +164,14 @@ The end-user must provide a signature over each `SIGN_TRANSACTION` activity with
   "parameters": {
     "signWith": "<wallet account address, private key id, or private key address>",
     "type": "TRANSACTION_TYPE_ETHEREUM",
-    "unsignedTransaction": "<unsigned-transaction>",
+    "unsignedTransaction": "<unsigned-transaction>"
   }
 }
 ```
 
 Turnkey returns a signed transaction in the activity result which your application can broadcast using any provider you'd like.
 
-## Sub-Organizations as custodial wallets 
+## Sub-Organizations as custodial wallets
 
 Most of the steps outlined in the previous section remain unchanged: applications creating custodial wallets should still create segregated sub-organizations for their end-users to avoid limits (we currently have a maximum of 100 users per organization, whereas an organization can have unlimited sub-organizations).
 
