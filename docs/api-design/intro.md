@@ -19,11 +19,14 @@ If you look at the [API reference](./api) you'll notice that all API calls to Tu
 Requests must be stamped by registered user credentials and verified by Turnkey's secure enclaves before they are processed. This ensures cryptographic integrity end-to-end which eliminates the ability for any party to modify a user's request.
 
 ### Queries and Submissions
+
 Turnkey's API is divided into 2 broad categories: queries and submissions.
+
 - Queries are read requests (e.g. `get_users`, `list_users`)
 - Submissions are requests to execute a workload (e.g. `create_policy`, `sign_transaction`, `delete_user`)
 
 ## Dive Deeper
+
 - Creating your first [Stamp](./stamps.md)
 - Fetching data with [Queries](./queries.md)
 - Executing workloads with [Submissions](./submissions.md)

@@ -72,7 +72,7 @@ Let's review these steps in detail:
    // New client instantiated with our iframe stamper
    const client = new TurnkeyClient(
      { baseUrl: "https://api.turnkey.com" },
-     iframeStamper
+     iframeStamper,
    );
 
    // Sign and submits the RECOVER_USER activity

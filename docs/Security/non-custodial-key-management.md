@@ -3,20 +3,20 @@ sidebar_position: 2
 description: Learn how Turnkey handles private keys
 slug: /security/non-custodial-key-mgmt
 ---
+
 # Non-custodial key management
 
 ## Turnkey's non-custodial infrastructure
 
-Turnkey has built a new model for private key management that utilizes secure enclaves — highly constrained compute environments that can cryptographically attest to the code running inside. All private key material is only decrypted within an enclave, and transaction signing happens according to customer-defined policies. 
+Turnkey has built a new model for private key management that utilizes secure enclaves — highly constrained compute environments that can cryptographically attest to the code running inside. All private key material is only decrypted within an enclave, and transaction signing happens according to customer-defined policies.
 
 This novel security architecture means raw private keys themselves are never exposed to Turnkey, your software, or your team. Specifically, Turnkey stores encrypted private keys that are only decrypted when you authenticate to an auditable, tamper-proof secure enclave with your secret (e.g., API key or Passkey credentials). You (and/or your end users, depending on your implementation) remain the owner of your private keys and the funds controlled by those private keys at all times. See [quorum deployments](./Quorum-deployment.md) for more details on how we provision secure enclaves to ensure you’re always in control of your private keys.
 
 Although we’re not a bank, by analogy to physical security, Turnkey’s role is similar to that of a safety deposit box operator. Turnkey secures, and facilitates access to, the safety deposit boxes (wallets), but only the customer can unlock the safety deposit box and access the contents (digital assets) inside.
 
-
 ## Private key storage
 
-Turnkey does not store unencrypted private keys, but rather persists encrypted private key ciphertext inside of our primary and disaster recovery databases. This ciphertext is only to be decrypted from within the bounds of a secure enclave running verified Turnkey applications. Our [security overview](./our-approach.md) goes over the process in depth. 
+Turnkey does not store unencrypted private keys, but rather persists encrypted private key ciphertext inside of our primary and disaster recovery databases. This ciphertext is only to be decrypted from within the bounds of a secure enclave running verified Turnkey applications. Our [security overview](./our-approach.md) goes over the process in depth.
 
 ## Non-custodial wallets for end users
 

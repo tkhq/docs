@@ -60,6 +60,7 @@ The integers `-7` and `-257` are algorithm identifiers for ES256 (aka P256) and 
 ### `user`
 
 The `user` field has three sub-fields:
+
 - `id`: also known as "user handle", isn't visible to the end-user. We **strongly recommend setting this to a random value** (e.g. `const id = new Uint8Array(32); crypto.getRandomValues(id)`) to make sure a new passkey is created. Be aware: **if you accidentally set this value to an existing user handle, the corresponding passkey will be overridden!**. [This section of spec](https://www.w3.org/TR/webauthn-2/#dictionary-user-credential-params) is clear on the matter: "the user handle ought not be a constant value across different accounts, even for non-discoverable credentials".
 - `name`: this will show up in the passkey list modal (see screenshot below). We recommend setting this to something the user will recognize: their email, the name of your app, or potentially leave this up to the user:
   <p style={{ textAlign: "center" }}>
@@ -72,12 +73,13 @@ The `user` field has three sub-fields:
 This option has lots of consequences for UX, and it has many sub-options, outlined below.
 
 #### `authenticatorAttachment`
+
 This option, if set, restricts the type of authenticators that can be registered. See the table below for the values this option can take and their effect on registration prompts (captured via Chrome on a MacBook Pro).
 
-| Empty (default) | `platform` | `cross-platform` |
-|-----------------|------------|------------------|
-| If you want broad compatibility, leave this option empty, and the browser UI will allow for both internal and external passkeys. | If set to `platform`, only internal authenticators (face ID, touch ID, and so on) can be registered. | If set to `cross-platform`, only passkeys from other devices or attached via USB are allowed. |
-| <img src="/img/passkeys/attachment_unspecified.png" alt="authenticatorAttachment unspecified"/> | <img src="/img/passkeys/attachment_platform.png" alt="authenticatorAttachment set to platform"/> | <img src="/img/passkeys/attachment_cross_platform.png" alt="authenticatorAttachment set to cross-platform"/> |
+| Empty (default)                                                                                                                  | `platform`                                                                                           | `cross-platform`                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| If you want broad compatibility, leave this option empty, and the browser UI will allow for both internal and external passkeys. | If set to `platform`, only internal authenticators (face ID, touch ID, and so on) can be registered. | If set to `cross-platform`, only passkeys from other devices or attached via USB are allowed.                |
+| <img src="/img/passkeys/attachment_unspecified.png" alt="authenticatorAttachment unspecified"/>                                  | <img src="/img/passkeys/attachment_platform.png" alt="authenticatorAttachment set to platform"/>     | <img src="/img/passkeys/attachment_cross_platform.png" alt="authenticatorAttachment set to cross-platform"/> |
 
 #### `requireResidentKey` and `residentKey`
 
@@ -88,6 +90,7 @@ Important note: the default for `requireResidentKey` (`discouraged`) results in 
 #### `userVerification`
 
 "User verification" refers to mechanisms on the authenticators themselves such as PIN codes or biometric/fingerprint readers. This flag can be set to:
+
 - `discouraged`: yubikey PINs won't be required even if the device technically supports it. We've found that for TouchID/FaceID, authentication will still be required however.
 - `preferred`: yubikey PINs and other authentication mechanisms will be required if supported, but devices without them will be accepted.
 - `required`: authenticators without user verification support won't be accepted.
@@ -116,9 +119,9 @@ List of objects restricting which credentials can be used during authentication.
 
 Each object in this list has an ID (the credential ID) and a list of transports (e.g. "hybrid", "internal", "usb", etc). The `transports` list is **optional** but results in better, more targeted prompts. For example, here are screenshot of targeted prompts captured on Chrome, on a MacBook laptop:
 
-| `transports: ["internal"]` | `transports: ["usb"]` | `transports: ["hybrid"]` |
-|----------------------------|-----------------------|--------------------------|
-| <img src="/img/passkeys/transport_internal.png" alt="authentication prompt with transports: internal"/> | <img src="/img/passkeys/transport_usb.png" alt="authentication prompt with transports: usb"/> | <img src="/img/passkeys/transport_hybrid.png" alt="authentication prompt with transport: hybrid"/>
+| `transports: ["internal"]`                                                                              | `transports: ["usb"]`                                                                         | `transports: ["hybrid"]`                                                                           |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| <img src="/img/passkeys/transport_internal.png" alt="authentication prompt with transports: internal"/> | <img src="/img/passkeys/transport_usb.png" alt="authentication prompt with transports: usb"/> | <img src="/img/passkeys/transport_hybrid.png" alt="authentication prompt with transport: hybrid"/> |
 
 The credential ID needs to be passed as a buffer but is returned from registration as a base64-encoded value: make sure to decode it (in JavaScript: `Buffer.from(storedCredentialId, "base64")`) to avoid issues.
 
