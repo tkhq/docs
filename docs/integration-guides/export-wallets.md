@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 description: Learn about Wallet Export on Turnkey
 slug: /integration-guides/export-wallets
 ---

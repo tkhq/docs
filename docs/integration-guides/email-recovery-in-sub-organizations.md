@@ -10,7 +10,7 @@ Email recovery shines if you are leveraging [sub-organizations](../getting-start
 
 Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
 
-## Pre-requisites
+## Prerequisites
 
 Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email recovery. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started. To allow an API user to initiate email recovery, you'll need the following policy in your main organization:
 
@@ -43,10 +43,10 @@ Let's review these steps in detail:
 
    ```js
    const iframeStamper = new IframeStamper({
-     iframeUrl: 'https://recovery.turnkey.com',
+     iframeUrl: "https://recovery.turnkey.com",
      // Configure how the iframe element is inserted on the page
-     iframeContainerId: 'your-container',
-     iframeElementId: 'turnkey-iframe',
+     iframeContainerId: "your-container",
+     iframeElementId: "turnkey-iframe",
    });
 
    // Inserts the iframe in the DOM. This creates the new encryption target key
@@ -71,13 +71,13 @@ Let's review these steps in detail:
    ```js
    // New client instantiated with our iframe stamper
    const client = new TurnkeyClient(
-     { baseUrl: 'https://api.turnkey.com' },
+     { baseUrl: "https://api.turnkey.com" },
      iframeStamper
    );
 
    // Sign and submits the RECOVER_USER activity
    const response = await client.recoverUser({
-     type: 'ACTIVITY_TYPE_RECOVER_USER',
+     type: "ACTIVITY_TYPE_RECOVER_USER",
      timestampMs: String(Date.now()),
      organizationId: initRecoveryResponse.organizationId,
      parameters: {

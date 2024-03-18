@@ -20,3 +20,7 @@ dev-image: Dockerfile
 .PHONY: run-dev
 run-dev: dev-image
 	docker run -p 3000:3000 -v $(PWD):/home/node/app/ tkhq/docs:dev
+
+.PHONY: stop-dev
+stop-dev: 
+	docker stop $(shell docker ps -a -q  --filter ancestor=tkhq/docs:dev)

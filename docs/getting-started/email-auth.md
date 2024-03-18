@@ -6,7 +6,7 @@ slug: /getting-started/email-auth
 
 # Email Auth
 
-Email Auth enables a user to authenticate their Turnkey account via email. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth).
+Email Auth enables a user to authenticate their Turnkey account with email via either a one time code, or a magic link. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth), and within our [Demo Passkey Wallet](https://wallet.tx.xyz) (code [here](https://github.com/tkhq/demo-passkey-wallet/blob/main/frontend/app/email-auth/page.tsx)).
 
 #### Mechanism
 
@@ -20,7 +20,7 @@ Email Auth starts with a new activity posted to Turnkey. This activity has the t
 - `targetPublicKey`: the public key to which the auth credential is encrypted (more on this later)
 - `apiKeyName`: an optional name for the API Key. If none is provided, we will default to `Email Auth - <Timestamp>`
 - `expirationSeconds`: an optional window (in seconds) indicating how long the API Key should last. Default to 15 minutes.
-- `emailCustomization`: optional parameters for customizing emails. If not provided, use defaults. This is currently a WIP. 🚧
+- `emailCustomization`: optional parameters for customizing emails. If not provided, the default email will be used. For more info, see the [integration guide](../integration-guides/email-auth-for-sub-organizations.md#email-customization).
 
 This activity generates a new API key pair (an "auth credential"), saves the public key in organization data under the target user, and sends an email with the encrypted auth credential:
 
@@ -46,9 +46,7 @@ Authorization for email auth is based on our usual activity authorization: our [
 
 ## Email auth in your sub-organizations
 
-Email auth works well with [sub-organizations](./Sub-Organizations.md).
-
-<!-- TODO: Our Demo Passkey Wallet application (https://wallet.tx.xyz) has auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!). -->
+Email auth works well with [sub-organizations](./Sub-Organizations.md). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
 
 If you're looking for a more concrete guide, head to our [Sub-Organization Email Auth implementation guide](../integration-guides/email-auth-for-sub-organizations.md) for more details.
 
@@ -84,7 +82,7 @@ Users currently have a limit of 10 long-lived API keys, and 10 expiring API keys
 
 NOTE: feature must be enabled. For top-level orgs, by default, Email Auth is not enabled. It must be enabled via the `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activity. Here's an example, using our CLI:
 
-```
+```sh
 turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization_feature --body '{
         "timestampMs": "'"$(date +%s)"'000",
         "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
