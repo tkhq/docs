@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2
 description: Learn about sub-orgs and how you can use them
 ---
 
