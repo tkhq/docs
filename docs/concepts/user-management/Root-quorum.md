@@ -3,9 +3,10 @@ sidebar_position: 4
 description: Learn about the root quorum and how to manage it
 slug: /users/root-quorum
 ---
+
 # Root quorum
 
-When you create a Turnkey organization, your user is created and will default to being the sole member of the root quorum. Because of the wide scope of permissions, it is important to take care when using any users in the root quorum. The following offers a technical overview and some best practices. 
+When you create a Turnkey organization, your user is created and will default to being the sole member of the root quorum. Because of the wide scope of permissions, it is important to take care when using any users in the root quorum. The following offers a technical overview and some best practices.
 
 ## Technical overview
 
@@ -58,7 +59,7 @@ There are primarily two factors to consider when setting the root quorum
 - how hard is to get locked out of root? I.E. how many authenticators need to be lost/destroyed so the threshold cannot be met.
 - how many authenticators need to be compromised for an attacker to take root actions?
 
- For example, if a quorum is configured as 2/5, then
+For example, if a quorum is configured as 2/5, then
 
 - if 4 users lost all their authenticators, no root actions could be taken (including updating the quorum itself).
 - if 2 different users authenticators are compromised, an attacker could steal all the organizations funds.
@@ -69,7 +70,7 @@ The below examples are provided as a convenience only. It is up to you to ensure
 
 _High Value Organization_
 
-Special users should be created that are only used for root actions. Those users' authenticators should be stored in geographically distributed locations that have personal access controls,  are natural disaster resistant, and have redundancy in case of hardware failure. These would only be used in the case of a disaster.
+Special users should be created that are only used for root actions. Those users' authenticators should be stored in geographically distributed locations that have personal access controls, are natural disaster resistant, and have redundancy in case of hardware failure. These would only be used in the case of a disaster.
 
 For day to day admin operations, admin policies that use consensus can be put in place. These can be a set of finely scoped policies.
 

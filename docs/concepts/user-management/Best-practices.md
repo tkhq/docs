@@ -3,6 +3,7 @@ sidebar_position: 5
 description: Best practices as you set up users and policies
 slug: /users/best-practices
 ---
+
 # Best practices
 
 This page describes some best practices to consider as you set up users and policies while getting ready for production.
@@ -46,7 +47,7 @@ This reduces the chance that an old key can be used to access your Turnkey organ
 Turnkey's policy engine allows you to enforce permissions at a fine-grained level. When setting up your account, we suggest you use the principle of least privilege, meaning that a user only has the minimum permissions that are necessary to perform their job. Create policies that ensure that users have least-privilege permissions.
 
 **Apply consensus to sensitive actions**  
-Sensitive actions like changing policies or signing transactions should be carefully controlled as they can lead to funds being moved off of the platform. You can apply consensus to actions like this to ensure that multiple approvals are required. For example, the policy below specifies that 2 total approvals, including the initiating approval, are required to create a new policy.  
+Sensitive actions like changing policies or signing transactions should be carefully controlled as they can lead to funds being moved off of the platform. You can apply consensus to actions like this to ensure that multiple approvals are required. For example, the policy below specifies that 2 total approvals, including the initiating approval, are required to create a new policy.
 
 ```json
 {

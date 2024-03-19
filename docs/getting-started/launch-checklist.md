@@ -3,6 +3,7 @@ sidebar_position: 100
 description: A checklist to help you get your app to production!
 slug: /getting-started/launch-checklist
 ---
+
 # Launch Checklist
 
 Before deploying your Turnkey integration in production, take a look at our recommendations below. This checklist will guide you through a few important steps and considerations to help ensure your setup is secure, efficient and ready for prime time.

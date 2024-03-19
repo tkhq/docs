@@ -24,6 +24,7 @@ A typical passkey flow is composed of 4 main steps, depicted below:
 4. The signed request is verified within a Turnkey secure enclave.
 
 This flow happens once for **registration** and for each subsequent **authentication** or signature request. The main difference is the browser APIs used to trigger the passkey prompt in step (1):
+
 - **Passkey registration** uses `navigator.credentials.create`(as described in [this guide](https://web.dev/passkey-registration/)). `navigator.credentials.create` triggers the creation of a **new** passkey.
 - **Passkey authentication** uses `navigator.credentials.get`. See [this guide](https://web.dev/passkey-form-autofill/) for more information. `navigator.credentials.get` triggers a signature prompt for an **existing** passkey.
 
@@ -33,6 +34,7 @@ Our SDK has integrated passkey functionality, and we've built examples to help y
 
 - [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http) has a helper to trigger passkey registration (`getWebAuthnAttestation`). You can see it in action in our [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys) example: [direct code link](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88)
 - [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper) is a passkey-compatible stamper which integrates seamlessly with `TurnkeyClient`:
+
   ```js
   import { WebauthnStamper } from "@turnkey/webauthn-stamper";
   import { TurnkeyClient, createActivityPoller } from "@turnkey/http";
@@ -64,11 +66,13 @@ Our SDK has integrated passkey functionality, and we've built examples to help y
     // (omitting the rest of this for brevity)
   })
   ```
+
 - [`@turnkey/viem`](https://www.npmjs.com/package/@turnkey/viem) is a package wrapping all of the above so that you work directly with Viem without worrying about passkeys. See [this demo](https://github.com/tkhq/sdk/tree/main/examples/with-viem-and-passkeys).
 
 Regardless of whether you use our helpers and abstractions, take a look at [our registration and authentication options guide](/passkeys/options). This will help you choose the right options for your passkey flow.
 
 If you have questions, feedback, or find yourself in need of an abstraction or integration that doesn't exist yet, please get in touch with us! You can
+
 - Create an [issue on our SDK repo](https://github.com/tkhq/sdk/issues)
 - Start a discussion in our [community repo](https://github.com/orgs/tkhq/discussions)
 - Contact us at <hello@turnkey.com>

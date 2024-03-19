@@ -18,8 +18,9 @@ Activities typically create, modify, or utilize a resource within Turnkey and ar
 - If `activity.state == ACTIVITY_STATUS_PENDING`, the request is processing asynchronously.
 
 You can get activity status updates by:
-  - Re-submitting the request. See the notes on idempotency below.
-  - Polling `get_activity` with the `activity.id`
+
+- Re-submitting the request. See the notes on idempotency below.
+- Polling `get_activity` with the `activity.id`
 
 ### Idempotency
 

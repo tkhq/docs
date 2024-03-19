@@ -3,11 +3,12 @@ sidebar_position: 1
 description: Add a new user to your Org and try out the policy engine
 slug: /managing-policies/quickstart
 ---
+
 # Policy quickstart
 
 This guide will help you add an additional user to your Turnkey organization and set permissions for that user through Policies. Specifically, we will create an API-only user with permissions to sign transactions to an allowlisted address.
 
-This assumes that you previously completed the [Sign a transaction](/getting-started/quickstart) guide, and thus have already set up: 
+This assumes that you previously completed the [Sign a transaction](/getting-started/quickstart) guide, and thus have already set up:
 
 - Your Turnkey organization
 - An API key for the Root User
@@ -23,7 +24,7 @@ In the create user flow, you have the option to grant API key or web access to y
 
 ![](https://files.readme.io/71a66d5-Screen_Shot_2023-02-21_at_6.17.11_PM.png "Screen Shot 2023-02-21 at 6.17.11 PM.png")
 
-Under access types, select "API key". Enter the user name "Policy Test". This will be an API-only user, and therefore an email is not required.  Click continue and create a new API key to associate with the user using the following command:
+Under access types, select "API key". Enter the user name "Policy Test". This will be an API-only user, and therefore an email is not required. Click continue and create a new API key to associate with the user using the following command:
 
 ```shell
 turnkey generate api-key --organization $ORGANIZATION_ID --key-name policy_test
@@ -37,7 +38,7 @@ Next we will create a policy to grant permissions to the new user. Navigate to t
 
 ![](https://files.readme.io/e5cba15-small-Screen_Shot_2023-05-10_at_1.29.00_PM.png)
 
-Choose a name and note to describe your new policy. Next, enter the following policy, making sure to replace `<ALLOWED_ADDRESS>` with an Ethereum address of your choosing and `<USER_ID>` with the user ID of your recently created API user. 
+Choose a name and note to describe your new policy. Next, enter the following policy, making sure to replace `<ALLOWED_ADDRESS>` with an Ethereum address of your choosing and `<USER_ID>` with the user ID of your recently created API user.
 
 ```json JSON
 {
@@ -73,4 +74,3 @@ You'll see that the activity to allowlisted address comes back as `COMPLETED`, w
 - Try out some of our [policy examples](/managing-policies/examples)
 - Check out the [policy overview](/managing-policies/overview)
 - Learn how to author policies with our [policy language](/managing-policies/overview)
-

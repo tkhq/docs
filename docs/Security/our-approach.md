@@ -3,6 +3,7 @@ sidebar_position: 1
 description: Learn about Turnkey's unique security framework
 slug: /security/our-approach
 ---
+
 # Our approach
 
 At Turnkey we’ve developed a security framework that allows, us and eventually our users to prove that all systems with security critical workloads are running exactly the software we expect at any given time, no single engineer can access any enclave or reconstruct a secret, and the system is always safe as long as enclaves are not compromised

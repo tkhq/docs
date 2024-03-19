@@ -113,11 +113,11 @@ You can use any blockchain node provider, like Infura or Alchemy, to broadcast y
 
 In the ECDSA context, messages are hashed before signing. Turnkey can perform this hashing for you, as we support two hash functions: `HASH_FUNCTION_KECCAK256` and `HASH_FUNCTION_SHA256` (for Ethereum and Bitcoin ecosystems respectively). If your message had already been hashed, you should use the `HASH_FUNCTION_NO_OP` option to sign the raw hash, in which case Turnkey will sign the payload as is. `HASH_FUNCTION_NO_OP` also has privacy implications: if a raw hashed message is passed in, Turnkey has no knowledge of the underlying pre-image.
 
-As an example, in our Viem package, the message is [hashed](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L201) before [signing](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L348). 
+As an example, in our Viem package, the message is [hashed](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L201) before [signing](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L348).
 
 ### What is `HASH_FUNCTION_NOT_APPLICABLE` and how does it differ from `HASH_FUNCTION_NO_OP`?
 
-Unlike ECDSA, in which a message is hashed as a separate step *before* signing, when using Ed25519, hashing is performed *during* signature computation, and thus cannot be skipped (for more details on the standard, see [RFC 8032](https://datatracker.ietf.org/doc/html/rfc8032#section-5.1): `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
+Unlike ECDSA, in which a message is hashed as a separate step _before_ signing, when using Ed25519, hashing is performed _during_ signature computation, and thus cannot be skipped (for more details on the standard, see [RFC 8032](https://datatracker.ietf.org/doc/html/rfc8032#section-5.1): `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
 
 An example for this case can be found in our [Solana signer](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/solana/src/index.ts#L64).
 

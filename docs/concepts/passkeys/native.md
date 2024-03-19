@@ -8,15 +8,15 @@ sidebar_position: 4
 
 If you're unfamiliar with passkeys broadly, head to [this introduction](./introduction.md) for an overview. TL;DR: passkeys are cryptographic key pairs generated and stored on secure hardware. Typically this is your Mac's or iPhone's [secure enclave](https://support.apple.com/guide/security/secure-enclave-sec59b0b31ff/web), your Android's [Titan M2 chip](https://security.googleblog.com/2021/10/pixel-6-setting-new-standard-for-mobile.html), or an external security key plugged in via USB.
 
-* Registration ("sign up") creates a new key pair: this is your passkey
-* Authentication ("sign in") uses an existing passkey to sign a message, proving ownership of the associated private key stored on your device.
+- Registration ("sign up") creates a new key pair: this is your passkey
+- Authentication ("sign in") uses an existing passkey to sign a message, proving ownership of the associated private key stored on your device.
 
 ## Passkeys on the Web
 
 Creating and using passkeys on the web is straightforward: browsers offer APIs to do it!
 
-* `navigator.credentials.create` creates a passkey
-* `navigator.credentials.get` prompts the user to select a passkey to sign a message
+- `navigator.credentials.create` creates a passkey
+- `navigator.credentials.get` prompts the user to select a passkey to sign a message
 
 And this doesn't require a backend. Here's a demo proving it: https://passkeyapp.tkhqlabs.xyz/
 
@@ -25,12 +25,15 @@ An important security feature of passkeys: they're **domain-bound** to prevent p
 ## Native Platform APIs
 
 ### Android
+
 In the Android ecosystem the `CredentialManager` supports creating and using passkeys with `CreatePublicKeyCredentialRequest` and `GetCredentialRequest`. See [the associated documentation](https://developer.android.com/training/sign-in/passkeys#sign-in) for more information.
 
 ### iOS
+
 iOS APIs to create and use passkeys are available as well:
-* `ASAuthorizationPlatformPublicKeyCredentialProvider(…).createCredentialRegistrationRequest` for passkey creation
-* `ASAuthorizationPlatformPublicKeyCredentialProvider(…).createCredentialAssertionRequest` for passkey usage
+
+- `ASAuthorizationPlatformPublicKeyCredentialProvider(…).createCredentialRegistrationRequest` for passkey creation
+- `ASAuthorizationPlatformPublicKeyCredentialProvider(…).createCredentialAssertionRequest` for passkey usage
 
 See [these docs](https://developer.apple.com/documentation/authenticationservices/asauthorizationplatformpublickeycredentialprovider) for more info. And [this app](https://github.com/r-n-o/shiny) for a mini demo.
 
@@ -55,9 +58,10 @@ If you're looking for a concrete example, head to [this repository](https://gith
 ## Linking apps and web domains
 
 Passkeys on native apps aren't app-bound, they're **domain** bound just like web passkeys. This may come as a surprise: you'll have to configure a web domain to use passkeys natively! Configuration is done separately per ecosystem, but the idea is the same:
-* iOS expects a JSON file at the domain root (`/.well-known
+
+- iOS expects a JSON file at the domain root (`/.well-known
 /apple-app-site-association`) : [example](https://github.com/r-n-o/passkeyapp/blob/main/http/.well-known/apple-app-site-association)
-* Android expects a JSON file at the domain root (`/.well-known/assetlinks.json`): [example](https://github.com/r-n-o/passkeyapp/blob/main/http/.well-known/assetlinks.json)
+- Android expects a JSON file at the domain root (`/.well-known/assetlinks.json`): [example](https://github.com/r-n-o/passkeyapp/blob/main/http/.well-known/assetlinks.json)
 
 This unlocks interesting flows where users use their web-created passkeys in a "companion" native app, or vice-versa. For example: a native app linked to the wallet.tx.xyz domain would allow users to log into their account from a native mobile app _using their web-created passkey_ as long as they're synced properly.
 

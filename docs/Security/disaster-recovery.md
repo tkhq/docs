@@ -7,9 +7,10 @@ slug: /security/disaster-recovery
 # Disaster recovery
 
 We have a comprehensive disaster recovery process in place for all critical Turnkey data. In particular, there are two main categories of data that we consider to be critical:
+
 - <b>Organization data:</b> Core data within your organization, including details for users, encrypted private key material, policies, tags, activity history, etc.
 - <b>Quorum Keys</b>: Keys used by members of the Quorum Set to boot secure applications, and perform sensitive actions within an enclave like decrypting private keys or making policy decisions.
 
 For organization data, because all enclave applications are stateless, our persistence strategy is very similar to a traditional web application. Data is encrypted, stored redundantly across geographies, and consistently backed up and exported to our disaster recovery accounts.
 
-For Quorum Keys, as described in [Quorum deployments](./Quorum-deployment.md), we split the key between members of the Quorum set and have a level of redundancy in those shards. In the unlikely event that all members of the Quorum Set were to lose their active shares, we have a set of offline backup shares securely stored across geographically distributed locations. 
+For Quorum Keys, as described in [Quorum deployments](./Quorum-deployment.md), we split the key between members of the Quorum set and have a level of redundancy in those shards. In the unlikely event that all members of the Quorum Set were to lose their active shares, we have a set of offline backup shares securely stored across geographically distributed locations.
