@@ -160,3 +160,9 @@ The public part of this key pair is passed as a parameter inside of a signed `EX
 Our enclave encrypts the wallet's mnemonic or raw private key to the user's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/).
 
 Once the activity succeeds, the encrypted mnemonic or private key can be decrypted by the target public key offline or in an online script.
+
+### Solana notes
+
+Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
+
+When importing into a multichain wallet such as Phantom, see [this guide](https://help.phantom.app/hc/en-us/articles/12988493966227-What-derivation-paths-does-Phantom-wallet-support#:~:text=The%20addresses%20are%20grouped%20into,'%2F0'%2F0%2F0.) on matching private keys across Solana, Ethereum, and Polygon.
