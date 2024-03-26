@@ -76,19 +76,19 @@ turnkey encrypt \
 
 ### Requirements
 
-- We have released open-source code to create target encryption keys and decrypt exported wallet mnemonics. We've deployed a static HTML page hosted on `import.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics and keys are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
-- We have also built a package to help you insert this iframe and interact with it in the context of export: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
+- We have released open-source code to create target encryption keys and encrypt wallet mnemonics for import. We've deployed a static HTML page hosted on `import.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics and keys are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
+- We have also built a package to help you insert this iframe and interact with it in the context of import: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
 
 In the rest of this guide we'll assume you are using these helpers.
 
 ### Steps
 
-Here's a diagram summarizing the wallet import flow step-by-step ([direct link](/img/wallet_export_steps.png)):
+Here's a diagram summarizing the wallet import flow step-by-step ([direct link](/img/wallet_import_steps.png)):
 
 <p style={{ textAlign: "center" }}>
     <img
-        src="/img/wallet_export_steps.png"
-        alt="wallet export steps"
+        src="/img/wallet_import_steps.png"
+        alt="wallet import steps"
         style={{ width: 600 }}
     />
 </p>
@@ -118,14 +118,6 @@ Let's review these steps in detail:
      <div style={{ display: displayIframe }} />
    );
    ```
-
-<p style={{ textAlign: "center" }}>
-    <img
-        src="/img/wallet_export_mnemonic.png"
-        alt="wallet mnemonic"
-        style={{ width: 420 }}
-    />
-</p>
 
 2. Your application prompts the user to sign a new `INIT_IMPORT_WALLET` activity with the ID of the user importing the wallet.
 3. Your application polls for the activity response, which contains an import bundle.
@@ -192,14 +184,14 @@ Turnkey also supports importing Private Keys. Follow the same steps above for im
 
 Turnkey's import functionality ensures that neither your application nor Turnkey can view the wallet mnemonic or private key.
 
-It works by anchoring export in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and is generated in the Turnkey secure enclave via a `INIT_IMPORT_WALLET` or `INIT_IMPORT_PRIVATE_KEY` activity. This TEK is encrypted to the enclave's quorum key and the TEK public key is returned in the activity response.
+It works by anchoring import in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and is generated in the Turnkey secure enclave via a `INIT_IMPORT_WALLET` or `INIT_IMPORT_PRIVATE_KEY` activity. This TEK is encrypted to the enclave's quorum key and the TEK public key is returned in the activity response.
 
 The following diagram summarizes the flow:
 
 <p style={{ textAlign: "center" }}>
     <img
-        src="/img/wallet_export_cryptography.png"
-        alt="export cryptography"
+        src="/img/wallet_import_cryptography.png"
+        alt="import cryptography"
         style={{ height: 280 }}
     />
 </p>
