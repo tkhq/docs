@@ -121,7 +121,7 @@ Follow the same steps above for exporting Wallets as mnemonics, but instead use 
 
 ### Private Keys
 
-Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper).
+Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). You can pass an optional `keyFormat` to `injectKeyExportBundle(keyFormat)` that will apply either `hexadecimal` or `solana` formatting to the private key that is exported in the iframe. The default key format is `hexadecimal`, which is used by MetaMask, MyEtherWallet, Phantom, Ledger, and Trezor for Ethereum keys. For Solana keys, you will need to pass the `solana` key format.
 
 <p style={{ textAlign: "center" }}>
     <img
