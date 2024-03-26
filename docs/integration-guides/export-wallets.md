@@ -8,9 +8,9 @@ slug: /integration-guides/export-wallets
 
 Turnkey's export functionality allows your end users to backup or transfer a [Wallet](/concepts/Wallets) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
 
-Follow along with the guide below to set up Wallet Export for your end users.
+Follow along with the Embedded iframe guide.
 
-## Requirements
+## Embedded iframe
 
 - We have released open-source code to create target encryption keys and decrypt exported wallet mnemonics. We've deployed a static HTML page hosted on `export.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
 - We have also built a package to help you insert this iframe and interact with it in the context of export: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)

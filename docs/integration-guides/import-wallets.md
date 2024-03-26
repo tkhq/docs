@@ -12,8 +12,6 @@ Follow along with the CLI or Embedded iframe guides.
 
 ## CLI
 
-### Requirements
-
 Install the latest version of Turnkey CLI to access the new import functionality. You can find detailed instructions for installation [here](https://github.com/tkhq/tkcli).
 
 ### Steps
@@ -66,8 +64,6 @@ turnkey encrypt \
 ```
 
 ## Embedded iframe
-
-### Requirements
 
 - We have released open-source code to create target encryption keys and encrypt wallet mnemonics for import. We've deployed a static HTML page hosted on `import.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics and keys are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
 - We have also built a package to help you insert this iframe and interact with it in the context of import: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
