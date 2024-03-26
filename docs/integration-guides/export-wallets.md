@@ -17,7 +17,7 @@ Follow along with the Embedded iframe guide.
 
 In the rest of this guide we'll assume you are using these helpers.
 
-## Steps
+### Steps
 
 Here's a diagram summarizing the wallet export flow step-by-step ([direct link](/img/wallet_export_steps.png)):
 
@@ -86,7 +86,7 @@ Export is complete! The iframe now displays a sentence of words separated by spa
 
 The exported wallet will remain stored within Turnkey’s infrastructure. In your Turnkey dashboard, the exported user Wallet will be flagged as “Exported”.
 
-## UI customization
+### UI customization
 
 Everything is customizable in the export iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
 
@@ -111,15 +111,15 @@ return (
 );
 ```
 
-## Export as Private Keys
+### Export as Private Keys
 
 Turnkey also supports exporting Wallet Accounts and Private Keys as private keys.
 
-### Wallet Accounts
+#### Wallet Accounts
 
 Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_WALLET_ACCOUNT` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper).
 
-### Private Keys
+#### Private Keys
 
 Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). You can pass an optional `keyFormat` to `injectKeyExportBundle(keyFormat)` that will apply either `hexadecimal` or `solana` formatting to the private key that is exported in the iframe. The default key format is `hexadecimal`, which is used by MetaMask, MyEtherWallet, Phantom, Ledger, and Trezor for Ethereum keys. For Solana keys, you will need to pass the `solana` key format.
 
