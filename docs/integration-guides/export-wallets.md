@@ -1,29 +1,23 @@
 ---
 sidebar_position: 5
-description: Learn about Wallet Export on Turnkey
+description: Learn about Wallet and Key Export on Turnkey
 slug: /integration-guides/export-wallets
 ---
 
-# Export Wallet
+# Export Wallets and Keys
 
-Turnkey's export functionality allows your end users to backup or transfer a [Wallet](/concepts/wallets) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
+Turnkey's export functionality allows your end users to backup or transfer a [Wallet](/concepts/Wallets) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
 
 Follow along with the guide below to set up Wallet Export for your end users.
 
-## Before you start
-
-Make sure you have created a wallet for your user. Check out our [Quickstart guide](../getting-started/Quickstart.md) if you need help getting started.
-
-If you'd like to use a sub-organization as an end-user controlled wallet, follow our [Wallet integration guide](../integration-guides/sub-organizations-as-wallets.md).
-
-## Helper packages
+## Requirements
 
 - We have released open-source code to create target encryption keys and decrypt exported wallet mnemonics. We've deployed a static HTML page hosted on `export.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
 - We have also built a package to help you insert this iframe and interact with it in the context of export: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
 
 In the rest of this guide we'll assume you are using these helpers.
 
-## Export step-by-step
+## Steps
 
 Here's a diagram summarizing the wallet export flow step-by-step ([direct link](/img/wallet_export_steps.png)):
 
@@ -119,7 +113,7 @@ return (
 
 ## Export as Private Keys
 
-Turnkey also supports exporting Wallet Accounts and Private Keys as raw private keys.
+Turnkey also supports exporting Wallet Accounts and Private Keys as private keys.
 
 ### Wallet Accounts
 
@@ -137,7 +131,7 @@ Follow the same steps above for exporting Wallets as mnemonics, but instead use 
     />
 </p>
 
-At the end of a successful private key export, the iframe displays a hexadecimal-encoded raw private key.
+At the end of a successful private key export, the iframe displays a private key.
 
 ## Cryptographic details
 
@@ -157,7 +151,7 @@ The following diagram summarizes the flow:
 
 The public part of this key pair is passed as a parameter inside of a signed `EXPORT_WALLET`, `EXPORT_PRIVATE_KEY`, or `EXPORT_WALLET_ACCOUNT` activity.
 
-Our enclave encrypts the wallet's mnemonic or raw private key to the user's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/).
+Our enclave encrypts the wallet's mnemonic or private key to the user's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/).
 
 Once the activity succeeds, the encrypted mnemonic or private key can be decrypted by the target public key offline or in an online script.
 

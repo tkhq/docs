@@ -74,3 +74,7 @@ Turnkey also supports raw private keys, but we recommend using Wallets since the
 ## Export keys
 
 Exporting on Turnkey enables you or your end users to export a copy of a Wallet or Private Key from our system at any time. While most Turnkey users opt to keep Wallets within Turnkey's secure infrastructure, the export functionality means you are never locked into Turnkey, and gives you the freedom to design your own backup processes as you see fit. Check out our [Export Wallet guide](../integration-guides/export-wallets.md) to allow your users to securely export their wallets.
+
+## Import keys
+
+Importing on Turnkey enables you or your end users to import a Wallet or Private Key to our system. Check out our [Import Wallet guide](../integration-guides/import-wallets.md) to allow your users to securely import their wallets.
