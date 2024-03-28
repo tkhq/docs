@@ -78,15 +78,16 @@ const config = {
         },
         items: [
           {
-            type: "docSidebar",
-            sidebarId: "tutorialSidebar",
+            type: "doc",
+            docId: "documentation/getting-started/overview",
             position: "left",
-            label: "Guides",
+            label: "Documentation",
           },
           {
+            type: "doc",
+            docId: "guides/wallets-for-your-users/sub-organizations-as-wallets",
             position: "left",
-            label: "Quickstart",
-            to: "/getting-started/quickstart",
+            label: "Guides",
           },
           {
             position: "left",
