@@ -39,18 +39,9 @@ Both the website and public APIs expose the ability to update the root quorum.
 
 The root quorum should only be used in cases where it is absolutely necessary. In particular, the root quorum should primarily be used to unblock an organization in the event of incorrect policies or lockout. For example, if you accidentally set overly-restrictive policies that prevent users from taking any action, the root quorum can be used to delete the relevant policies.
 
-## Create admin users as quickly as possible
+### Create scoped users for day-to-day actions
 
-The best first action with a root quorum, apart from adding additional quorum members, is to create an Admin user tag and an associated policy allowing for any action, like the policy below:
-
-```
-{
-  "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.filter(user, '<TAG_ID>' in user.tags).count() >= 1"
-}
-```
-
-You can then apply this user tag to a new user, use that user for any required actions, and lock down your root user(s).
+Ensure that you have scoped policies for day-to-day actions that you expect to complete. For example, you may have an API user with permissions to only create sub-organizations. You can read more about creating policies in our [Policy Overview](/managing-policies/overview). 
 
 ### Configuration considerations
 
