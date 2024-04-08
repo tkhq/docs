@@ -55,3 +55,9 @@ const selfAddress = account.address;
 ## @solana/web3
 
 We have released a package that you can use to sign transactions and messages: [`@turnkey/solana`](https://www.npmjs.com/package/@turnkey/solana). See [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana) for an example.
+
+## EIP-1193 
+
+[`@turnkey/eip-1193-provider`](https://www.npmjs.com/package/@turnkey/eip-1193-provider) provides a Turnkey-compatible Ethereum provider that adheres to the EIP-1193 standards. It's build to seamlessly integrate with a broad spectrum of EVM-compatible chains, offering capabilities like account management, transaction signin, and blockchain interaction. 
+
+See [`with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider) for an example.
