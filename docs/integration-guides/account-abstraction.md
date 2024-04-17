@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 4
 description: Use Turnkey to power Account Abstraction wallets
 slug: /integration-guides/aa-wallets
 ---

@@ -75,37 +75,6 @@ Turnkey also supports raw private keys, but we recommend using Wallets since the
 
 Exporting on Turnkey enables you or your end users to export a copy of a Wallet or Private Key from our system at any time. While most Turnkey users opt to keep Wallets within Turnkey's secure infrastructure, the export functionality means you are never locked into Turnkey, and gives you the freedom to design your own backup processes as you see fit. Check out our [Export Wallet guide](../integration-guides/export-wallets.md) to allow your users to securely export their wallets.
 
-#### Solana Notes
+## Import keys
 
-Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
-
-When importing into a multichain wallet such as Phantom, see [this guide](https://help.phantom.app/hc/en-us/articles/12988493966227-What-derivation-paths-does-Phantom-wallet-support#:~:text=The%20addresses%20are%20grouped%20into,'%2F0'%2F0%2F0.) on matching private keys across Solana, Ethereum, and Polygon.
-
-Lastly, Turnkey will currently export Solana wallet accounts (private keys) as a 128-byte hex string. See the below on how to convert this to a base58-encoded payload that can be imported into a wallet like Phantom:
-
-```js
-var web3 = require("@solana/web3.js");
-var bs58 = require("bs58");
-
-const uint8arrayToHexString = (buffer) => {
-  return [...buffer].map((x) => x.toString(16).padStart(2, "0")).join("");
-};
-
-const uint8arrayFromHexString = (hexString) =>
-  new Uint8Array(hexString.match(/../g).map((h) => parseInt(h, 16)));
-
-const privateKey = "<your turnkey-provided exported private key (without 0x)>";
-const address = "<your solana address>";
-
-const base58DecodedAddress = bs58.decode(address);
-const base58DecodedAddressHex = uint8arrayToHexString(base58decodedAddress);
-const uintarr = uint8arrayFromHexString(
-  `${privateKey}${base58decodedAddressHex}`,
-);
-
-const imported = web3.Keypair.fromSecretKey(uintarr);
-console.log("imported wallet", imported); // verify import
-
-const privateKeyString = bs58.encode(uintarr);
-console.log("phantom-importable private key string", privateKeyString);
-```
+Importing on Turnkey enables you or your end users to import a Wallet or Private Key to our system. Check out our [Import Wallet guide](../integration-guides/import-wallets.md) to allow your users to securely import their wallets.
