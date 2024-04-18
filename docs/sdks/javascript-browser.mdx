@@ -10,7 +10,7 @@ import TabItem from "@theme/TabItem";
 import CodeBlock from "@theme/CodeBlock";
 import Parameter from "@site/src/components/parameter";
 
-## 1. Installation
+## Installation
 <Tabs>
   <TabItem value="yarn" label="Yarn" default>
     <CodeBlock language="bash">{`yarn add @turnkey/sdk-browser`}</CodeBlock>
@@ -20,11 +20,11 @@ import Parameter from "@site/src/components/parameter";
   </TabItem>
 </Tabs>
 
-## 2. Initializing
+## Initializing
 <CodeBlock language="typescript">
 {`import { TurnkeyBrowserSDK, TurnkeySDKBrowserConfig } from "@turnkey/sdk-browser";`}
-{`\n\nconst turnkeyConfig: TurnkeySDKBrowserConfig = {...};`}
-{`\n\nconst turnkeyClient = new TurnkeyBrowserSDK(turnkeyConfig);`}
+{`\nconst turnkeyConfig: TurnkeySDKBrowserConfig = {...};`}
+{`\nconst turnkeyClient = new TurnkeyBrowserSDK(turnkeyConfig);`}
 </CodeBlock>
 
 #### Parameters
@@ -97,7 +97,7 @@ Some text about iframeUrl (defaults to https://auth.turnkey.com)
   }}
 >
 
-Some text about rpId (will be inferred from `window.location.hostname` unless otherwise specified)
+Some text about rpId (will default to the value returned from `window.location.hostname` unless otherwise specified)
 
 </Parameter>
 
@@ -114,3 +114,73 @@ Some text about rpId (will be inferred from `window.location.hostname` unless ot
 Some text about serverSignUrl
 
 </Parameter>
+
+## Turnkey Signing Methods
+
+Calls to Turnkey's API must be signed by a credential that gives a user access to make that API call. This can take multiple different forms depending on the kind of authentication credential that is being used.
+In the Turnkey SDK these are called "signers", each signer can make authenticated requests to Turnkey's API, but will sign the request in a different way. Each example shows how to make a request to list all wallet's associated with a user.
+
+#### 1. Passkey Signer
+
+The passkey signer will prompt a user to sign with a passkey credential to authenticate the API call
+
+<CodeBlock language="typescript">
+{`const passkeySigner = await turnkeyClient.passkeySigner();`}
+{`\nconst walletsResponse = await passkeySigner.getWallets();`}
+</CodeBlock>
+
+#### 2. User Session Signer
+
+Generally speaking, you will not want a user have to authenticate every read request from Turnkey's API with a credential confirmation step. In order to make the UX more seamless, you can have a user `login()` to Turnkey with a credential and then make read-only requests to Turnkey's API from the userSessionSigner.
+
+<CodeBlock language="typescript">
+{`const passkeySigner = await turnkeyClient.passkeySigner();`}
+{`\nawait passkeySigner.login();`}
+{`\n\n// when a user logs in with the Turnkey SDK a read-only api credential is saved in localstorage and can be used to make API read requests on their behalf`}
+{`\n\nconst currentUserSession = await turnkeyClient.currentUserSession();`}
+{`\nconst walletsResponse = await currentUserSession.getWallets();`}
+</CodeBlock>
+
+#### 3. Iframe Signer
+
+The Iframe signer is used to allow users to sign requests with a text bundle, this is used in email authentication flows where a user is emailed a text bundle to paste into an iframe that can be used to send authenticated requests to Turnkey.
+
+<CodeBlock language="typescript">
+{`const iframeSigner = await turnkeyClient.iframeSigner(<Iframe Dom Element>);`}
+{`\nconst response = await iframeSigner.injectCredentialBundle(<Credential from Email>);`}
+{`\nif (response) { await iframeSigner.login(); }`}
+{`\n\n// when a user logs in with the Turnkey SDK a read-only api credential is saved in localstorage and can be used to make API read requests on their behalf`}
+{`\n\nconst currentUserSession = await turnkeyClient.currentUserSession();`}
+{`\nconst walletsResponse = await currentUserSession.getWallets();`}
+</CodeBlock>
+
+#### 4. Server Signer
+
+The ServerSign function is used to proxy requests from a root parent organization to a child organization. The API key cannot be stored client-side which is why the serverSign flow exists.
+
+<CodeBlock language="typescript">
+{`const subOrgIds: TurnkeySDKApiTypes.TGetSubOrgIdsResponse = await turnkeyClient?.serverSign(
+  "getSubOrgIds",
+    [{
+      filterType: "EMAIL",
+      filterValue: email
+    }]
+  )!
+`}
+{`\nif (subOrgIds.organizationIds?.length > 0) {
+  const emailAuthResponse = await turnkeyClient?.serverSign(
+    "emailAuth",
+    [{
+      email: email,
+      targetPublicKey: {iframeSigner.iframePublicKey},
+      organizationId: subOrgIds.organizationIds[0]
+    }]
+  )
+}`}
+</CodeBlock>
+
+
+## Examples
+
+#### 1. Implementing an embedded wallet authentication flow
+Check out the demo-embedded-wallet repository
