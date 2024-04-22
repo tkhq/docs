@@ -40,14 +40,14 @@ Turnkey is flexible, scalable, and secure wallet infrastructure. Create thousand
 You can keep reading for a broad understanding of Turnkey's infrastructure, or jump to a product guide below to get a sense for how you can use Turnkey in your product: 
 
 <div class="overview-buttons">
-  <a href="/getting-started/quickstart" class="overview-button">
+  <a href="/embedded-wallets/overview" class="overview-button">
     <img src="/img/icons/wallet-line.png" class="button-icon"/>
     <div class="button-text">
       <div class="button-header">Wallets for your users</div>
       <div class="button-description">Embed non-custodial user wallets directly in your product</div>
     </div>
   </a>
-  <a href="/api" class="overview-button">
+  <a href="/signing-automation/overview" class="overview-button">
     <img src="/img/icons/settings-3-line.png" class="button-icon"/>
     <div class="button-text">
       <div class="button-header">Signing automation</div>

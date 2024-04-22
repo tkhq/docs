@@ -123,6 +123,10 @@ An example for this case can be found in our [Solana signer](https://github.com/
 
 ## Guidance
 
+### Do you have a status page? 
+
+Yes, we report critical incidents at https://www.turnkey-status.com/. 
+
 ### How do you recommend testing the Turnkey API and functionality safely?
 
 Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.

@@ -1,6 +1,6 @@
 ---
 id: quickstart
-sidebar_position: 2
+sidebar_position: 1
 description: Onboard and sign your first Ethereum transaction
 slug: /getting-started/quickstart
 ---
