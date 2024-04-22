@@ -10,7 +10,7 @@ import TabItem from "@theme/TabItem";
 import CodeBlock from "@theme/CodeBlock";
 import Parameter from "@site/src/components/parameter";
 
-## 1. Installation
+## Installation
 <Tabs>
   <TabItem value="yarn" label="Yarn" default>
     <CodeBlock language="bash">{`yarn add @turnkey/sdk-server`}</CodeBlock>
@@ -19,3 +19,126 @@ import Parameter from "@site/src/components/parameter";
     <CodeBlock language="bash">{`npm install @turnkey/sdk-server`}</CodeBlock>
   </TabItem>
 </Tabs>
+
+## Initializing
+<CodeBlock language="typescript">
+{`import { Turnkey, TurnkeySDKServerConfig } from "@turnkey/sdk-server";`}
+{`\nconst turnkeyConfig: TurnkeySDKServerConfig = {...};`}
+{`\nconst turnkey = new Turnkey(turnkeyConfig);`}
+</CodeBlock>
+
+#### Parameters
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'config',
+    type: {
+      name: 'TurnkeySDKServerConfig',
+      link: 'https://github.com/tkhq/sdk/blob/main/packages/sdk-server/src/__types__/base.ts#L79'
+    }
+  }}
+  isRequired
+>
+
+An object containing configuration settings for the Server Client.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'defaultOrganizationId',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The root organization that requests will be made from unless otherwise specified
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'apiBaseUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+Some text about apiBaseUrl (defaults to https://api.turnkey.com)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'apiPrivateKey',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Some text about apiPrivateKey
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'apiPublicKey',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Some text about apiPublicKey
+
+</Parameter>
+
+## Turnkey Clients
+
+Calls to Turnkey's API must be signed with a valid credential from the user initiating the API call. This can take multiple different forms depending on the kind of authentication credential that is being used.
+
+#### 1. API Client
+
+The api client will sign requests with the injected `apiPrivateKey`, and `apiPublicKey` credentials.
+
+<CodeBlock language="typescript">
+{`const apiClient = turnkey.apiClient();`}
+{`\nconst walletsResponse = await apiClient.getWallets();`}
+{`\n\n// this will sign the request with the configured api credentials`}
+</CodeBlock>
+
+
+## API Proxies
+
+There are certain actions that are initiated by users, but require the activity to be signed by the root organization itself. Examples of this include the initial creation of the user `subOrganization`, sending an email to a user with a login credential as part of an `emailAuth` flow, and initializing an email recovery flow with the `initEmailRecovery` activity.
+
+These can be implemented in your backend by creating an `apiClient` and handling requests from your browser application at different routes, but we have also provided a conveneince method for doing this by having allowing a single `apiProxy` to handle requests at a single route and automatically sign specific user actions with the root organization's credentials.
+
+#### 1. Express Proxy Handler
+
+<CodeBlock language="typescript">
+{`const turnkeyProxyHandler = turnkey.expressProxyHandler({
+  allowedMethods: [
+    "createSubOrganization",
+    "emailAuth",
+    "initUserEmailRecovery",
+    "getSubOrgIds"
+  ]
+});`}
+{`\napp.post("/apiProxy", turnkeyProxyHandler)`}
+{`\n\n// this will sign requests made with the client-side \`serverSign\` function with the root organization's API key for the allowedMethods in the config`}
+</CodeBlock>
+
+#### 2. Next JS Proxy Handler
+
+
+## Examples
