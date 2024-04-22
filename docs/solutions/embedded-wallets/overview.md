@@ -2,7 +2,7 @@
 sidebar_position: 1
 description: Intro to embedded wallets on Turnkey
 slug: /embedded-wallets/overview
-sidebar_label: Intro to embedded wallets
+sidebar_label: Introduction
 ---
 # Embedded wallets
 ## Seamless, secure wallet infrastructure

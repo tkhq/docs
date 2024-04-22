@@ -2,7 +2,7 @@
 sidebar_position: 1
 description: Intro to signing automation on Turnkey
 slug: /signing-automation/overview
-sidebar_label: Intro to signing automation
+sidebar_label: Introduction
 ---
 # Signing automation
 ## Securely automate any signing workflow 

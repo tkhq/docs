@@ -43,8 +43,8 @@ You can keep reading for a broad understanding of Turnkey's infrastructure, or j
   <a href="/embedded-wallets/overview" class="overview-button">
     <img src="/img/icons/wallet-line.png" class="button-icon"/>
     <div class="button-text">
-      <div class="button-header">Wallets for your users</div>
-      <div class="button-description">Embed non-custodial user wallets directly in your product</div>
+      <div class="button-header">Embedded wallets</div>
+      <div class="button-description">Embed user wallets directly in your product</div>
     </div>
   </a>
   <a href="/signing-automation/overview" class="overview-button">

@@ -4,7 +4,7 @@ description: Learn about Email Auth on Turnkey
 slug: /embedded-wallets/sub-organization-auth
 ---
 
-# Sub-Organization Email Auth
+# Email Authentication
 
 Email auth is a powerful feature to couple with [sub-organizations](/concepts/Sub-Organizations) for your users. This approach empowers your users to authenticate their Turnkey in a simple way (via email!), while minimizing your involvement: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 

@@ -4,11 +4,11 @@ description: Use sub-organizations as end-user wallets
 slug: /embedded-wallets/sub-organizations-as-wallets
 ---
 
-# Sub-Organizations as Wallets
+# Integrating Embedded Wallets 
 
 Turnkey has built a new model for private key management that utilizes secure enclaves. All transactions are signed within an enclave and private keys are never exposed to Turnkey, your software, or your team. Turnkey’s role is similar to that of a safety deposit box operator — Turnkey secures and provides access to the safety deposit boxes, but our system requires cryptographic proof of ownership to take any action with the keys held within.
 
-We've seen in [Sub-Organizations](/concepts/Sub-Organizations) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
+We've seen in [Sub-Organizations](/concepts/Sub-Organizations) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as embedded wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
 
 ## Sub-Organizations as end-user controlled wallets
 
