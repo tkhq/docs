@@ -78,22 +78,15 @@ const config = {
         },
         items: [
           {
-            type: "doc",
-            docId: "overview",
+            type: "docSidebar",
+            sidebarId: "tutorialSidebar",
             position: "left",
-            label: "Documentation",
+            label: "Guides",
           },
           {
-            to: '/getting-started/quickstart', 
-            label: 'Quickstart',
-            position: 'left',
-            activeBaseRegex: '/docs/getting-started/quickstart/', // Regex to explicitly match only this path
-          },
-          {
-            type: "doc",
-            docId: "solutions/embedded-wallets/overview",
             position: "left",
-            label: "Solutions",
+            label: "Quickstart",
+            to: "/getting-started/quickstart",
           },
           {
             position: "left",
