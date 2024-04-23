@@ -125,7 +125,7 @@ An example for this case can be found in our [Solana signer](https://github.com/
 
 ### Do you have a status page? 
 
-Yes, we report critical incidents at https://www.turnkey-status.com/. 
+Yes, we report critical incidents at [turnkey-status.com](https://www.turnkey-status.com/). 
 
 ### How do you recommend testing the Turnkey API and functionality safely?
 

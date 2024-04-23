@@ -87,7 +87,7 @@ const config = {
             to: '/getting-started/quickstart', 
             label: 'Quickstart',
             position: 'left',
-            activeBaseRegex: '/docs/gettintg-started/quickstart/', // Regex to explicitly match only this path
+            activeBaseRegex: '/docs/getting-started/quickstart/', // Regex to explicitly match only this path
           },
           {
             type: "doc",
