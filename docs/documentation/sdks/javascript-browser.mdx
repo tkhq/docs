@@ -1,0 +1,192 @@
+---
+title: "Javascript Browser"
+sidebar_position: 1
+description: Javascript Browser SDK
+slug: /sdks/javascript-browser
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import CodeBlock from "@theme/CodeBlock";
+import Parameter from "@site/src/components/parameter";
+
+## Installation
+<Tabs>
+  <TabItem value="yarn" label="Yarn" default>
+    <CodeBlock language="bash">{`yarn add @turnkey/sdk-browser`}</CodeBlock>
+  </TabItem>
+  <TabItem value="npm" label="NPM">
+    <CodeBlock language="bash">{`npm install @turnkey/sdk-browser`}</CodeBlock>
+  </TabItem>
+</Tabs>
+
+## Initializing
+<CodeBlock language="typescript">
+{`import { Turnkey, TurnkeySDKBrowserConfig } from "@turnkey/sdk-browser";`}
+{`\nconst turnkeyConfig: TurnkeySDKBrowserConfig = {...};`}
+{`\nconst turnkey = new Turnkey(turnkeyConfig);`}
+</CodeBlock>
+
+#### Parameters
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'config',
+    type: {
+      name: 'TurnkeySDKBrowserConfig',
+      link: 'https://github.com/tkhq/sdk/blob/main/packages/sdk-browser/src/__types__/base.ts#L83'
+    }
+  }}
+  isRequired
+>
+
+An object containing configuration settings for the Browser Client.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'defaultOrganizationId',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The root organization that requests will be made from unless otherwise specified
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'apiBaseUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+Some text about apiBaseUrl (defaults to https://api.turnkey.com)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'iframeUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Some text about iframeUrl (defaults to https://auth.turnkey.com)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'rpId',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Some text about rpId (will default to the value returned from `window.location.hostname` unless otherwise specified)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'serverSignUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Some text about serverSignUrl
+
+</Parameter>
+
+## Turnkey Clients
+
+Calls to Turnkey's API must be signed with a valid credential from the user initiating the API call. This can take multiple different forms depending on the kind of authentication credential that is being used.
+
+#### 1. Passkey Client
+
+The passkey client will prompt a user to sign with a passkey credential to authenticate the API call.
+
+<CodeBlock language="typescript">
+{`const passkeyClient = turnkey.passkeyClient();`}
+{`\nconst walletsResponse = await passkeyClient.getWallets();`}
+{`\n\n// this requires the user to authenticate with a passkey credential in their browser`}
+</CodeBlock>
+
+#### 2. Iframe Client
+
+The Iframe client is used to allow users to sign requests with a text bundle that is injected into an Iframe served from turnkey's domain. This is used for flows like email recovery where a user is emailed a text bundle that can be used to send authenticated requests to Turnkey.
+
+<CodeBlock language="typescript">
+{`const iframeClient = await turnkey.iframeClient(<Iframe Dom Element>);`}
+{`\nconst response = await iframeClient.injectCredentialBundle(<Credential from Email>);`}
+{`\nif (response) { await iframeClient.getWallets(); }`}
+{`\n\n// this requires the developer to build a wrapper flow that can take user text input in their app and call the injectCredentialBundle function on the turnkey iframeClient`}
+</CodeBlock>
+
+#### 3. Read Only User Session Client
+
+Generally speaking, in order to ensure a seamless UX, you will not want a user have to authenticate every read request from Turnkey's API with a credential confirmation step. In order to make this more seamless, you can have a user `login()` to Turnkey with a credential and then make read-only requests to Turnkey's API from the `userSessionClient`.
+
+<CodeBlock language="typescript">
+{`const passkeyClient = await turnkey.passkeyClient();`}
+{`\nawait passkeySigner.login();`}
+{`\n\n// when a user logs in with the Turnkey SDK a read-only api credential is saved in localstorage and can be used to make API read requests on their behalf`}
+{`\n\nconst userSessionClient = await turnkey.currentUserSession();`}
+{`\nconst walletsResponse = await userSessionClient.getWallets();`}
+{`\n\n// this api call happens without any confirmation step because the user has already been authenticated`}
+</CodeBlock>
+
+#### 4. Server Signer
+
+The ServerSign function is used to proxy requests from a root parent organization to a child organization. The API key cannot be stored client-side which is why the serverSign flow exists.
+
+<CodeBlock language="typescript">
+{`const subOrgIds: TurnkeySDKApiTypes.TGetSubOrgIdsResponse = await turnkey?.serverSign(
+  "getSubOrgIds",
+    [{
+      filterType: "EMAIL",
+      filterValue: email
+    }]
+  )!
+`}
+{`\nif (subOrgIds.organizationIds?.length > 0) {
+  const emailAuthResponse = await turnkey?.serverSign(
+    "emailAuth",
+    [{
+      email: email,
+      targetPublicKey: {iframeClient.iframePublicKey},
+      organizationId: subOrgIds.organizationIds[0]
+    }]
+  )
+}`}
+</CodeBlock>
+
+
+## Examples
+
+#### 1. Implementing an embedded wallet authentication flow with passkeys
+Check out the demo-embedded-wallet repository
+
+#### 2. Implementing an embedded wallet authentication flow with email
+Check out the demo-embedded-wallet repository
+
+#### 3. Signing Transactions
+Check out the demo-embedded-wallet repository
