@@ -1,0 +1,149 @@
+---
+title: "React"
+sidebar_position: 4
+description: React SDK
+slug: /sdks/react
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import CodeBlock from "@theme/CodeBlock";
+import Parameter from "@site/src/components/parameter";
+
+## Installation
+<Tabs>
+  <TabItem value="yarn" label="Yarn" default>
+    <CodeBlock language="bash">{`yarn add @turnkey/sdk-react`}</CodeBlock>
+  </TabItem>
+  <TabItem value="npm" label="NPM">
+    <CodeBlock language="bash">{`npm install @turnkey/sdk-react`}</CodeBlock>
+  </TabItem>
+</Tabs>
+
+## Initializing
+
+In `App.tsx` (or equivalent file)
+<CodeBlock language="typescript">
+{`import { TurnkeyProvider } from "@turnkey/sdk-react";`}
+{`\nimport turnkeyConfig from "./turnkey.json";`}
+{`\n\n<div className="App">
+  <TurnkeyProvider config={turnkeyConfig}>
+    // Rest of app ...
+  </TurnkeyProvider>
+</div>`}
+</CodeBlock>
+
+#### Parameters
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'config',
+    type: {
+      name: 'TurnkeySDKBrowserConfig',
+      link: 'https://github.com/tkhq/sdk/blob/main/packages/sdk-browser/src/__types__/base.ts#L83'
+    }
+  }}
+  isRequired
+>
+
+An object containing configuration settings for the Browser Client.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'defaultOrganizationId',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The root organization that requests will be made from unless otherwise specified
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'apiBaseUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The base url that api requests will be sent to (use https://api.turnkey.com when making requests to Turnkey's production API)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'iframeUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+The source url of the iframe created by the iframeClient (use https://auth.turnkey.com when using email authentication flows)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'rpId',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+the relying party id used for webauthn flows (will default to the value returned from `window.location.hostname` unless otherwise specified)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingLeft: "12px"}}
+  param={{
+    name: 'serverSignUrl',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+The url to send requests that need to be signed from a backend codebase by the root organization's API key if using the serverSign flow.
+
+</Parameter>
+
+## Using Turnkey
+
+In any react component nested under the `TurnkeyProvider`
+
+<CodeBlock language="typescript">
+{`import { useTurnkey } from "@turnkey/sdk-react";`}
+{`\nconst { turnkey, passkeyClient, iframeClient } = useTurnkey();`}
+{`\n\nconst loginWithPasskey = async () => {
+  await passkeyClient?.login();
+}`}
+{`\n\nconst initEmailAuth = async () => {
+  await turnkey?.serverSign(
+    "emailAuth",
+    [{
+      email: "<target user email>",
+      targetPublicKey: \`\${iframeClient.iframePublicKey}\`,
+      organizationId: "<target user suborg-id>"
+    }]
+  )
+}`}
+{`\n\nconst loginWithIframe = async (credentialBundle: string) => {
+  await iframeClient?.injectCredentialBundle(credentialBundle);
+  await iframeClient?.login();
+}`}
+</CodeBlock>
