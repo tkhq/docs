@@ -97,7 +97,7 @@ const config = {
           },
           {
             type: "doc",
-            docId: "sdks/javascript-browser",
+            docId: "sdks/introduction",
             position: "left",
             label: "SDK Reference"
           },
