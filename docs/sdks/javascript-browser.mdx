@@ -70,7 +70,7 @@ The root organization that requests will be made from unless otherwise specified
   isRequired
 >
 
-The base url that API requests will be sent to (use https://api.turnkey.com when making requests to Turnkey's production API)
+The base URL that API requests will be sent to (use https://api.turnkey.com when making requests to Turnkey's API)
 
 </Parameter>
 
@@ -82,9 +82,10 @@ The base url that API requests will be sent to (use https://api.turnkey.com when
       name: 'string',
     }
   }}
+  isRequired
 >
 
-The source url of the iframe created by the iframeClient (use https://auth.turnkey.com when using email authentication flows)
+The source URL of the iframe created by the `iframeClient` (use https://auth.turnkey.com when using email authentication flows)
 
 </Parameter>
 
@@ -98,7 +99,7 @@ The source url of the iframe created by the iframeClient (use https://auth.turnk
   }}
 >
 
-the relying party id used for webauthn flows (will default to the value returned from `window.location.hostname` unless otherwise specified)
+The Relying Party ID used for WebAuthn flows (will default to the value returned from `window.location.hostname` unless otherwise specified)
 
 </Parameter>
 
@@ -112,7 +113,7 @@ the relying party id used for webauthn flows (will default to the value returned
   }}
 >
 
-The url to send requests that need to be signed from a backend codebase by the root organization's API key if using the serverSign flow.
+The URL to send requests that need to be signed from a backend codebase by the root organization's API key if using the serverSign flow.
 
 </Parameter>
 
@@ -132,34 +133,34 @@ The passkey client will prompt a user to sign with a passkey credential to authe
 
 #### 2. Iframe Client
 
-The Iframe client is used to allow users to sign requests with a text bundle that is injected into an Iframe served from turnkey's domain. This is used for flows like email recovery where a user is emailed a text bundle that can be used to send authenticated requests to Turnkey.
+The Iframe client is used to interact with a series of iframes hosted by Turnkey, designed for sensitive operations such as storing an expiring credential within the [Email Recovery](/features/email-recovery) and [Email Auth](/features/email-auth) flows, and facilitating Wallet [Import](/features/wallet-import) and [Export](/features/wallet-export). The code powering these iframes can be found at https://github.com/tkhq/frames.
 
 <CodeBlock language="typescript">
-{`const iframeClient = await turnkey.iframeClient(<Iframe Dom Element>);`}
+{`const iframeClient = await turnkey.iframeClient(<Iframe DOM Element>);`}
 {`\nconst response = await iframeClient.injectCredentialBundle(<Credential from Email>);`}
 {`\nif (response) { await iframeClient.getWallets(); }`}
 {`\n\n// this requires the developer to build a wrapper flow that can take user text input in their app and call the injectCredentialBundle function on the turnkey iframeClient`}
 </CodeBlock>
 
-#### 3. Read Only User Session Client
+#### 3. Read-only User Session Client
 
-Generally speaking, in order to ensure a seamless UX, you will not want a user have to authenticate every read request from Turnkey's API with a credential confirmation step. In order to make this more seamless, you can have a user `login()` to Turnkey with a credential and then make read-only requests to Turnkey's API from the `userSessionClient`.
+Generally speaking, in order to ensure a seamless UX, you might not want a passkey user have to manually authenticate every _read_ request from Turnkey's API with a credential (e.g. via FaceID or TouchID). In order to reduce friction, you can have a user `login()` to Turnkey with a credential once, resulting in a session that allows multiple read-only requests to Turnkey's API via `userSessionClient`.
 
 <CodeBlock language="typescript">
 {`const passkeyClient = turnkey.passkeyClient();`}
 {`\nawait passkeySigner.login();`}
-{`\n\n// when a user logs in with the Turnkey SDK a read-only api credential is saved in localstorage and can be used to make API read requests on their behalf`}
+{`\n\n// when a user logs in with the Turnkey SDK, a read-only API credential is saved in localStorage and can be used to make API read requests on their behalf`}
 {`\n\nconst userSessionClient = await turnkey.currentUserSession();`}
 {`\nconst walletsResponse = await userSessionClient.getWallets();`}
-{`\n\n// this api call happens without any confirmation step because the user has already been authenticated`}
+{`\n\n// this API call happens without any confirmation step because the user now has an active read-only session`}
 </CodeBlock>
 
 #### 4. Server Signer
 
-The ServerSign function is used to proxy requests from a root parent organization to a child organization. The API key cannot be stored client-side which is why the serverSign flow exists.
+The `serverSign` function is used to proxy requests from a root parent organization to a child organization. The API key cannot be stored client-side, which is why the `serverSign` flow exists: to forward authenticated client-side requests to Turnkey via proxy backend.
 
 <CodeBlock language="typescript">
-{`const subOrgIds = await turnkey.serverSign(
+{`const subOrgIdsResponse = await turnkey.serverSign(
   "getSubOrgIds",
     [{
       filterType: "EMAIL",
@@ -167,13 +168,13 @@ The ServerSign function is used to proxy requests from a root parent organizatio
     }]
   )!
 `}
-{`\nif (subOrgIds.organizationIds?.length > 0) {
+{`\nif (subOrgIdsResponse.organizationIds?.length > 0) {
   const emailAuthResponse = await turnkey.serverSign(
     "emailAuth",
     [{
       email: email,
-      targetPublicKey: {iframeClient.iframePublicKey},
-      organizationId: subOrgIds.organizationIds[0]
+      targetPublicKey: <iframeClient.iframePublicKey>,
+      organizationId: subOrgIdsResponse.organizationIds[0]
     }]
   )
 }`}
