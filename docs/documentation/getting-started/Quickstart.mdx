@@ -1,0 +1,269 @@
+---
+id: quickstart
+title: "Quickstart"
+sidebar_position: 1
+description: Onboard and sign your first Ethereum transaction
+slug: /getting-started/quickstart
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import CodeBlock from "@theme/CodeBlock";
+import Parameter from "@site/src/components/parameter";
+
+# Quickstart
+
+Turnkey is a secure, powerful, and flexible piece of crypto infrastructure that allows for programmatic management of cryptographic keypairs and signing of crypto transactions. The guide below will walk you through Turnkey's onboarding, and using Turnkey's SDK to programmatically create a wallet and sign your first Ethereum transaction. It will also walk you through a common flow for creating a non-custodial wallet on behalf of another user, and having that user sign their first Ethereum transaction using a passkey authenticator.
+
+### Create your Turnkey Organization
+
+- Visit [app.turnkey.com/dashboard/auth/initial](https://app.turnkey.com/dashboard/auth/initial) and enter your email address
+- Confirm your email by clicking on the link inside of the confirmation email
+- Follow the prompts to add your first authenticator and create your organization
+
+You can find your newly created organization ID in the user dropdown menu at the top right corner of the dashboard.
+
+<img
+  src="/img/quickstart/find_organization_id.png"
+  alt="Find organization ID"
+  style={{ width: 940 }}
+/>
+
+You'll want to reference this in your code or as an environment variable, as you'll need it to make requests to the Turnkey API.
+
+### Create an API Keypair
+
+Turnkey API Keypairs are p256 public / private keypairs that allow you to make authenticated requests to Turnkey's API. You can create an API Keypair from your user page of the dashboard. Navigate to your user page by clicking on "User Details" in the user dropdown menu, and then click "Create an API key".
+
+<img
+  src="/img/quickstart/find_user_details.png"
+  alt="Find user details"
+  style={{ width: 940 }}
+/>
+
+<img
+  src="/img/quickstart/create_api_key.png"
+  alt="Find user details"
+  style={{ width: 940 }}
+/>
+
+- Select "Generate API keys in-browser" and click continue.
+- Give your API keypair a name and click continue.
+- Save your Public and Private Key locally.
+- Make sure to click "Approve" to sign the API Creation activity with your authenticator device.
+
+A couple of notes on the action you just took:
+- Every action on Turnkey returns an `activity`, including creating the API keypair in the previous step. You can read more about the full [Turnkey Activity Model here](/concepts/policies/language#activity-breakdown).
+- The keypair you just created is for your root Turnkey organization. **Any code using an API private key for the root organization should only ever be run server-side and never exposed to end-users**.
+- You will need both the public and private key to sign requests to the Turnkey API.
+
+### Instantiate Turnkey with an SDK Library
+
+The simplest way to use Turnkey's API is through one of our SDK libraries. This example will make requests to the API using our server-side node.js library. You can see the full list of client libraries supported on our [SDK Reference page.](/sdks/introduction)
+
+#### Installation
+<Tabs>
+  <TabItem value="yarn" label="Yarn" default>
+    <CodeBlock language="bash">{`yarn add @turnkey/sdk-server`}</CodeBlock>
+  </TabItem>
+  <TabItem value="npm" label="NPM">
+    <CodeBlock language="bash">{`npm install @turnkey/sdk-server`}</CodeBlock>
+  </TabItem>
+</Tabs>
+
+#### Initialize an `apiClient`
+There are multiple ways to authenticate a request to Turnkey's API. The `apiClient` is how you make requests using a public/private keypair (like the one you created above). The `apiClient` needs two additional parameters as well as the private and public key:
+1. the `apiBaseUrl` that you are making requests to (you will use https://api.turnkey.com when making requests to Turnkey's production API)
+2. the `defaultOrganizationId` to make requests on behalf of (you can use the organization ID you saved above).
+
+<CodeBlock language="typescript">
+{`import { Turnkey } from "@turnkey/sdk-server";`}
+{`\n\nconst turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID
+});`}
+{`\n\nconst apiClient = turnkey.apiClient();`}
+</CodeBlock>
+
+### Create a Wallet
+
+A [hierarchical deterministic (HD) Wallet](https://learnmeabitcoin.com/technical/hd-wallets) is a collection of cryptographic private/public keypairs that share a common seed.
+
+The construct that most people are familiar with is what is called an `address`. This is the string that looks like `0x7aAE6F67798D1Ea0b8bFB5b64231B2f12049DB5e` that you use when you want to transfer funds to someone. For simplicity, you can think of a `wallet` as a collection of `accounts` where each `account` has a single `address` associated with it. A `wallet` is used to generate `accounts`.
+
+You can read more about how Turnkey implements wallets in our [Wallet guide.](/concepts/wallets)
+
+In order to create a wallet we can call `createWallet` and pass in the name of the wallet, as well as any accounts that we want to derive when creating the wallet. In this example, we will create a new wallet and create a single Ethereum account with it.
+
+Note: You can always add new accounts to a wallet later using the `createWalletAccounts` method.
+
+<CodeBlock language="typescript">
+{`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";`}
+{`\n\nconst walletResponse = await apiClient.createWallet({
+  walletName: "Example Wallet 1",
+  accounts: DEFAULT_ETHEREUM_ACCOUNTS
+})`}
+{`\n\nconst walletId = walletResponse.walletId;`}
+{`\nconst accountAddress = walletResponse.addresses[0];`}
+</CodeBlock>
+
+You should now be able to see your newly created wallet on your Turnkey dashboard in the Wallets section.
+
+### Sign a Transaction
+
+A Turnkey client can be used as a signer alongside many popular web3 libraries. You can see the full list of supported web3 integrations [here.](/category/web3-libraries) In this example, we will use Turnkey's ethers.js wrapper to sign and broadcast a transaction.
+
+<Tabs>
+  <TabItem value="yarn" label="Yarn" default>
+    <CodeBlock language="bash">
+      {`yarn add @ethers`}
+      {`\nyarn add @turnkey/ethers`}
+    </CodeBlock>
+  </TabItem>
+  <TabItem value="npm" label="NPM">
+    <CodeBlock language="bash">
+      {`npm install @ethers`}
+      {`\nnpm install @turnkey/ethers`}
+    </CodeBlock>
+  </TabItem>
+</Tabs>
+
+<CodeBlock language="typescript">
+{`import { ethers } from "ethers";`}
+{`\nimport { TurnkeySigner } from "@turnkey/ethers";`}
+{`\n\nconst turnkeySigner = new TurnkeySigner({
+  client: apiClient,
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID,
+  signWith: accountAddress
+})`}
+{`\n\n// if you also want to broadcast the transaction`}
+{`\nconst provider = new ethers.JsonRpcProvider(<provider api url>);`}
+{`\nconst connectedSigner = turnkeySigner.connect(provider);`}
+{`\n\nconst transactionRequest = {
+  to: <destination address>,
+  value: ethers.parseEther(<amount to send>),
+  type: 2
+}`}
+{`\nconst transactionResult = await connectedSigner.sendTransaction(transactionRequest);`}
+</CodeBlock>
+
+And that's it, you have sent your first Ethereum transaction without ever having to manage private key material on your own server!
+
+Sending transactions this way provides a **much stronger security model** than managing key material directly on your own servers, but the real power of Turnkey comes from it's extensibility. In the next section we will show you how to create fully non-custodial wallets on behalf of your users, where users can sign transactions themselves using passkeys.
+
+---
+
+## Creating a Non-Custodial Wallet for a User
+
+### Instantiate Turnkey using the Browser SDK
+In addition to making calls to the Turnkey API, The browser SDK provides utilities for interacting with native browser APIs such as creating and managing user passkeys and storing user login sessions.
+
+#### Installation
+<Tabs>
+  <TabItem value="yarn" label="Yarn" default>
+    <CodeBlock language="bash">{`yarn add @turnkey/sdk-browser`}</CodeBlock>
+  </TabItem>
+  <TabItem value="npm" label="NPM">
+    <CodeBlock language="bash">{`npm install @turnkey/sdk-browser`}</CodeBlock>
+  </TabItem>
+</Tabs>
+
+#### Initialize a `passkeyClient`
+<CodeBlock language="typescript" title="Run in Browser">
+{`import { Turnkey } from "@turnkey/sdk-browser";`}
+{`\n\nconst turnkey = new Turnkey({
+  apiBaseUrl: "auth.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID
+})`}
+{`\n\nconst passkeyClient = turnkey.passkeyClient();`}
+</CodeBlock>
+
+### Create a wallet for a user
+The process is to create a `subOrganization` for each user. Each `subOrganization` can have their own policies associated with it. The `subOrganization` can be configured in any way, including shared custodial setups that require multisig schemes to execute.
+
+The guide below will walk you through an example flow for creating a non-custodial wallet on behalf of a user.
+
+#### Create a Local Passkey Credential
+This will prompt a user natively in their browser to create a passkey.
+
+<CodeBlock language="typescript" title="Run in Browser">
+{`const credential = await passkeyClient.createUserPasskey({
+  publicKey: {
+    user: {
+      name: <userName>,
+      displayName: <userDisplayName>
+    }
+  }
+})`}
+{`\n\n// post the credential to your server`}
+</CodeBlock>
+
+#### Configure the `subOrganization` for the User
+<CodeBlock language="typescript" title="Run on Server">
+{`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";`}
+{`\n\n// handle posted credential`}
+{`\n\nconst subOrganizationConfig = {
+  subOrganizationName: <subOrganizationName>,
+  rootUsers: [{
+    userName: <userName>,
+    userEmail: <userEmail>,
+    apiKeys: [],
+    authenticators: [
+      {
+        authenticatorName: <authenticatorName>,
+        challenge: credential.challenge,
+        attestation: credential.attestation
+      }
+    ]
+  }],
+  rootQuorumThreshold: 1,
+  wallet: {
+    walletName: <initialWalletName>,
+    accounts: DEFAULT_ETHEREUM_ACCOUNTS
+  }
+}`}
+</CodeBlock>
+
+#### Call `createSubOrganization` from your backend
+The root organization has the ability to `createSubOrganization` for a user. In this case what we are doing is creating a local passkey credential and then telling the server-side code to call `createSubOrganization` with that parameter.
+
+<CodeBlock language="typescript" title="Run on Server">
+{`const subOrganizationResponse = await apiClient.createSubOrganization(subOrganizationConfig);`}
+</CodeBlock>
+
+### Make requests on behalf of a user
+Once the `subOrganization` has been successfully created for a user, a user is then able to create a login session with Turnkey using the credential registered on their `subOrganization`. This login credential will provide you a read only session that you can use to make requests on behalf of the user.
+
+#### Login User
+<CodeBlock language="typescript" title="Run in Browser">
+{`const response = await passkeyClient.login();`}
+{`\nif (response.organizationId) {
+  // user is authenticated
+} else {
+  // user was not authenticated
+}`}
+</CodeBlock>
+
+#### Making requests on behalf of a user
+Once a user has been logged in, you will have access to the `currentUserSession` to call Turnkey's API. The following example will give you a list of wallets for the user.
+
+<CodeBlock language="typescript" title="Run in Browser">
+{`const currentUserSession = await turnkey.currentUserSession();`}
+
+{`\nif (response.organizationId) {
+  // user is authenticated
+} else {
+  // user was not authenticated
+}`}
+</CodeBlock>
+
+---
+
+## Next Steps
+In addition to programmatic transaction signing, and embedded wallet passkey flows, Turnkey also allows ways for users to authenticate with email and recover lost accounts, create specific policies around transaction execution, and much much more.
+
+- Check out our [examples](/getting-started/examples) to see what can be built.
+- Learn more about [Organizations](/getting-started/organizations) and [Wallets](/getting-started/wallets).
+- See our [API design](/api-introduction) or dive into our [API reference](/api).
