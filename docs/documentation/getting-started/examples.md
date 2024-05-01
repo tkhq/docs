@@ -92,16 +92,3 @@ A similar, simple application demonstrating how to create sub-organizations, cre
 
 See https://github.com/tkhq/demo-viem-passkeys for the code.
 
-### Automated ETH staking ([code](https://docs.figment.io/recipes/stake-eth-from-turnkey))
-
-A simple example using Turnkey and Figment to easily automate ETH staking.
-
-<p style={{ textAlign: "center" }}>
-  <img
-    src="/img/staking_example.png"
-    alt="turnkey figment integration"
-    style={{ width: 700 }}
-  />
-</p>
-
-See https://docs.figment.io/recipes/stake-eth-from-turnkey for the code.
