@@ -43,14 +43,14 @@ You can keep reading for a broad understanding of Turnkey's infrastructure, or j
   <a href="/embedded-wallets/overview" class="overview-button">
     <img src="/img/icons/wallet-line.png" class="button-icon"/>
     <div class="button-text">
-      <div class="button-header">Embedded wallets</div>
+      <div class="button-header">Embedded Wallets</div>
       <div class="button-description">Embed user wallets directly in your product</div>
     </div>
   </a>
   <a href="/signing-automation/overview" class="overview-button">
     <img src="/img/icons/settings-3-line.png" class="button-icon"/>
     <div class="button-text">
-      <div class="button-header">Signing automation</div>
+      <div class="button-header">Signing Automation</div>
       <div class="button-description">Securely automate any signing workflow</div>
     </div>
   </a>

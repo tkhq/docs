@@ -4,7 +4,7 @@ description: Intro to embedded wallets on Turnkey
 slug: /embedded-wallets/overview
 sidebar_label: Introduction
 ---
-# Embedded wallets
+# Embedded Wallets
 ## Seamless, secure wallet infrastructure
 
 With embedded wallets on Turnkey, you can create custom wallet experiences that are seamlessly integrated into your product, without compromising on security. Whether you need custodial or non-custodial wallets, our infrastructure provides the foundation for building innovative, user-friendly crypto products.

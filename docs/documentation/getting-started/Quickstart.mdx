@@ -31,9 +31,9 @@ You can find your newly created organization ID in the user dropdown menu at the
 
 You'll want to reference this in your code or as an environment variable, as you'll need it to make requests to the Turnkey API.
 
-### Create an API Keypair
+### Create an API Key
 
-Turnkey API Keypairs are p256 public / private keypairs that allow you to make authenticated requests to Turnkey's API. You can create an API Keypair from your user page of the dashboard. Navigate to your user page by clicking on "User Details" in the user dropdown menu, and then click "Create an API key".
+Turnkey API Keys consist of P-256 public / private keypairs that allow you to make authenticated requests to Turnkey's API. You can create an API Key from your user page of the dashboard. Navigate to your user page by clicking on "User Details" in the user dropdown menu, and then click "Create an API key".
 
 <img
   src="/img/quickstart/find_user_details.png"
@@ -54,10 +54,10 @@ Turnkey API Keypairs are p256 public / private keypairs that allow you to make a
 
 A couple of notes on the action you just took:
 - Every action on Turnkey returns an `activity`, including creating the API keypair in the previous step. You can read more about the full [Turnkey Activity Model here](/concepts/policies/language#activity-breakdown).
-- The keypair you just created is for your root Turnkey organization. **Any code using an API private key for the root organization should only ever be run server-side and never exposed to end-users**.
+- The keypair you just created is for your parent (root) Turnkey organization. **Any code using an API keypair for the parent organization should only ever be used and stored securely server-side, and never exposed to end-users**.
 - You will need both the public and private key to sign requests to the Turnkey API.
 
-### Instantiate Turnkey with an SDK Library
+### Instantiate Turnkey using the Server SDK
 
 The simplest way to use Turnkey's API is through one of our SDK libraries. This example will make requests to the API using our server-side node.js library. You can see the full list of client libraries supported on our [SDK Reference page.](/sdks/introduction)
 
@@ -136,8 +136,8 @@ A Turnkey client can be used as a signer alongside many popular web3 libraries. 
   organizationId: process.env.TURNKEY_ORGANIZATION_ID,
   signWith: accountAddress
 })`}
-{`\n\n// if you also want to broadcast the transaction`}
-{`\nconst provider = new ethers.JsonRpcProvider(<provider api url>);`}
+{`\n\n// a provider is required if you want to interact with the live network, i.e. broadcast transactions, fetch gas prices, etc.`}
+{`\nconst provider = new ethers.JsonRpcProvider(<provider API URL>);`}
 {`\nconst connectedSigner = turnkeySigner.connect(provider);`}
 {`\n\nconst transactionRequest = {
   to: <destination address>,
@@ -149,12 +149,12 @@ A Turnkey client can be used as a signer alongside many popular web3 libraries. 
 
 And that's it, you have sent your first Ethereum transaction without ever having to manage private key material on your own server!
 
-Sending transactions this way provides a **much stronger security model** than managing key material directly on your own servers, but the real power of Turnkey comes from it's extensibility. In the next section we will show you how to create fully non-custodial wallets on behalf of your users, where users can sign transactions themselves using passkeys.
+Sending transactions this way provides a **much stronger security model** than managing key material directly on your own servers, but the real power of Turnkey comes from its extensibility. In the next section we will show you how to create fully non-custodial wallets on behalf of your users, where users can sign transactions themselves using passkeys.
 
 ---
 
-## Creating a Non-Custodial Wallet for a User
-The following example will walk you through a simple flow for having a user create a wallet as a configurable `subOrganization` of your Turnkey root organization. This gives you full control of the policies and access controls associated with the wallet when it's created.
+## Create a Non-Custodial Wallet for a User
+The following example will walk you through a simple flow for having a user create a wallet as a configurable `subOrganization` of your parent Turnkey organization. This gives you full control of the policies and access controls associated with the wallet when it's created.
 
 For a more comprehensive breakdown of all our embedded wallet flows you can read our [Embedded Wallets Guide.](/embedded-wallets/overview)
 
@@ -193,7 +193,7 @@ This will prompt a user natively in their browser to create a passkey.
     }
   }
 })`}
-{`\n\n// post the credential to your server`}
+{`\n\n// now, you can specify this credential when you create a sub-organization below`}
 </CodeBlock>
 
 #### Configure the `subOrganization` for the User
@@ -225,14 +225,14 @@ In this example flow, you are creating a segregated `subOrganization` for each e
 </CodeBlock>
 
 #### Call `createSubOrganization` from your `apiClient`
-The call to `createSubOrganization` must ultimately be done from the root organization credentials, which is why we make the call from the server-side `apiClient`.
+The call to `createSubOrganization` must ultimately be done using the parent organization credentials, which is why we make the call from the server-side `apiClient`.
 
 <CodeBlock language="typescript" title="Run on Server">
 {`const subOrganizationResponse = await apiClient.createSubOrganization(subOrganizationConfig);`}
 </CodeBlock>
 
-### Make requests on behalf of a user
-Once the `subOrganization` has been created, all future activities on that `subOrganization` can be authenticated from the user's passkey credential, and performed directly from the `passkeyClient` in the browser sdk. A user could authenticate the call to create another wallet on their account with the following code.
+### Make user requests
+Once the `subOrganization` has been created, all future activities on that `subOrganization` can be authenticated from the end-user's passkey credential, and performed directly from the `passkeyClient` in the browser SDK. A user could authenticate the call to create another wallet on their account with the following code.
 
 <CodeBlock language="typescript" title="Run in Browser">
 {`const walletResponse = await passkeyClient.createWallet({
@@ -253,8 +253,8 @@ Once the `subOrganization` has been created, all future activities on that `subO
   organizationId: process.env.TURNKEY_ORGANIZATION_ID,
   signWith: accountAddress
 })`}
-{`\n\n// if you also want to broadcast the transaction`}
-{`\nconst provider = new ethers.JsonRpcProvider(<provider api url>);`}
+{`\n\n// a provider is required if you want to interact with the live network, i.e. broadcast transactions, fetch gas prices, etc.`}
+{`\nconst provider = new ethers.JsonRpcProvider(<provider API URL>);`}
 {`\nconst connectedSigner = turnkeySigner.connect(provider);`}
 {`\n\nconst transactionRequest = {
   to: <destination address>,
@@ -281,10 +281,10 @@ Once a user has been logged in, you will have access to the `currentUserSession`
 <CodeBlock language="typescript" title="Run in Browser">
 {`const currentUserSession = await turnkey.currentUserSession();`}
 {`\n\nif (currentUserSession) {
+  // this request will not require the user to tap a passkey
   const walletsResponse = await currentUserSession.getWallets();
   const allUserWallets = walletsResponse.wallets;
 }`}
-{`\n\n// this request will not require the user to tap a passkey`}
 </CodeBlock>
 
 ---
