@@ -21,8 +21,10 @@ Install the latest version of Turnkey CLI to access the new export functionality
 turnkey generate encryption-key \
 --user $USER_ID \
 --organization $ORGANIZATION_ID \
+--encryption-key-name "demo-enc"
 ```
 - The `--user` flag (required) is the id of the user exporting the private key; this is required because the underlying encryption keys used for import are scoped to each user.
+- The `--encryption-key-name` (optional) is the name of the encryption key that you will use in Step 2. By default, the encryption key's name is "default".
 
 2. Export private key:
 ```sh
@@ -30,9 +32,12 @@ turnkey wallets export \
 --user $USER_ID \
 --name "demo key"  \
 --export-bundle-output "./export_bundle.txt" \
---key-name demo 
+--encryption-key-name "demo-enc" \
+--key-name demo
 ```
 - The `--export-bundle-output` (required) flag is the desired output file path for the "export bundle” that will be sent from Turnkey.
+- The `--encryption-key--name` (optional) flag specifies the one-time encryption key that you will use to export the wallet or private key.
+- Reminder: The `--key-name` (optional) flag specifies the name of API key with which to interact with the Turnkey API service. This should be the name of a previously created key. If you do not have one, visit the quickstart guide for help creating one.
 
 3. Decrypt without saving plaintext to filesystem. This can be done offline:
 ```sh
