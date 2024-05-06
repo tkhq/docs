@@ -141,30 +141,37 @@ Import is complete!
 
 In your Turnkey dashboard, the imported user Wallet will be flagged as “Imported”.
 
-## UI customization
+### UI customization
 
-Everything is customizable in the import iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
-
+Use `iframeStamper.applySettings(settings)` where settings currently consists of the `styles` object with the following accepted CSS style properties in the example:
 ```js
-const iframeCss = `
-iframe {
-    box-sizing: border-box;
-    width: 400px;
-    height: 120px;
-    border-radius: 8px;
-    border-width: 1px;
-    border-style: solid;
-    border-color: rgba(216, 219, 227, 1);
-    padding: 20px;
+{
+  "styles": {
+    "padding": "10px",
+    "margin": "10px",
+    "borderWidth": "1px",
+    "borderStyle": "solid",
+    "borderColor": "transparent",
+    "borderRadius": "5px",
+    "fontSize": "16px",
+    "fontWeight": "bold",
+    "fontFamily": "SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    "color": "#000000",
+    "backgroundColor": "rgb(128, 0, 128)",
+    "width": "100%",
+    "height": "auto",
+    "maxWidth": "100%",
+    "maxHeight": "100%",
+    "lineHeight": "1.25rem",
+    "boxShadow": "0px 0px 10px #aaa",
+    "textAlign": "center",
+    "overflowWrap": "break-word",
+    "wordWrap": "break-word",
+    "resize": "none"
+  }
 }
-`;
-
-return (
-  <div style={{ display: iframeDisplay }} id="your-container">
-    <style>{iframeCss}</style>
-  </div>
-);
 ```
+Each accepted styles property is strictly validated and santizied before being applied to the textbox containing the plaintext.
 
 ### Private Key support
 
