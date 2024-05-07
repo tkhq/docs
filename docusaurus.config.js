@@ -84,7 +84,7 @@ const config = {
             label: "Documentation",
           },
           {
-            to: '/getting-started/quickstart', 
+            to: '/getting-started/quickstart',
             label: 'Quickstart',
             position: 'left',
             activeBaseRegex: '/docs/getting-started/quickstart/', // Regex to explicitly match only this path
@@ -94,6 +94,12 @@ const config = {
             docId: "solutions/embedded-wallets/overview",
             position: "left",
             label: "Solutions",
+          },
+          {
+            type: "doc",
+            docId: "sdks/introduction",
+            position: "left",
+            label: "SDK Reference"
           },
           {
             position: "left",

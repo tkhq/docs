@@ -4,7 +4,7 @@ description: Intro to signing automation on Turnkey
 slug: /signing-automation/overview
 sidebar_label: Introduction
 ---
-# Signing automation
+# Signing Automation
 ## Securely automate any signing workflow 
 
 Turnkey empowers teams to automate complex signing workflows at scale without compromising on security or flexibility. Our API and policy engine provide the building blocks for creating custom automation solutions that fit your specific needs, from smart contract interactions to staking management.
