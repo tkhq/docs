@@ -84,10 +84,10 @@ const config = {
             label: "Documentation",
           },
           {
-            to: '/getting-started/quickstart',
-            label: 'Quickstart',
-            position: 'left',
-            activeBaseRegex: '/docs/getting-started/quickstart/', // Regex to explicitly match only this path
+            to: "/getting-started/quickstart",
+            label: "Quickstart",
+            position: "left",
+            activeBaseRegex: "/docs/getting-started/quickstart/", // Regex to explicitly match only this path
           },
           {
             type: "doc",
@@ -99,7 +99,7 @@ const config = {
             type: "doc",
             docId: "sdks/introduction",
             position: "left",
-            label: "SDK Reference"
+            label: "SDK Reference",
           },
           {
             position: "left",

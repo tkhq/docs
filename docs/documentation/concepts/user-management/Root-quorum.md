@@ -41,7 +41,7 @@ The root quorum should only be used in cases where it is absolutely necessary. I
 
 ### Create scoped users for day-to-day actions
 
-Ensure that you have scoped policies for day-to-day actions that you expect to complete. For example, you may have an API user with permissions to only create sub-organizations. You can read more about creating policies in our [Policy Overview](/concepts/policies/overview). 
+Ensure that you have scoped policies for day-to-day actions that you expect to complete. For example, you may have an API user with permissions to only create sub-organizations. You can read more about creating policies in our [Policy Overview](/concepts/policies/overview).
 
 ### Configuration considerations
 

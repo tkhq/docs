@@ -4,7 +4,7 @@ description: Learn about Users on Turnkey
 slug: /concepts/users/introduction
 ---
 
-# Introduction to users 
+# Introduction to users
 
 Turnkey Users are resources within an Organization. Their attributes are:
 
