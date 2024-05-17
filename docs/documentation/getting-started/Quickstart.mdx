@@ -53,6 +53,7 @@ Turnkey API Keys consist of P-256 public / private keypairs that allow you to ma
 - Make sure to click "Approve" to sign the API Creation activity with your authenticator device.
 
 A couple of notes on the action you just took:
+
 - Every action on Turnkey returns an `activity`, including creating the API keypair in the previous step. You can read more about the full [Turnkey Activity Model here](/concepts/policies/language#activity-breakdown).
 - The keypair you just created is an authenticator for the root user of your Turnkey organization. **Any code using an API keypair for the parent organization should only ever be used and stored securely server-side, and never exposed to end-users**.
 - You will need both the public and private key to sign requests to the Turnkey API.
@@ -62,6 +63,7 @@ A couple of notes on the action you just took:
 The simplest way to use Turnkey's API is through one of our SDK libraries. This example will make requests to the API using our server-side node.js library. You can see the full list of client libraries supported on our [SDK Reference page.](/sdks/introduction). Additionally, if you're looking for an example to get started, here are some fullstack Next.js apps that use [Ethers](https://github.com/tkhq/demo-ethers-passkeys) and [Viem](https://github.com/tkhq/demo-viem-passkeys), respectively.
 
 #### Installation
+
 <Tabs>
   <TabItem value="yarn" label="Yarn" default>
     <CodeBlock language="bash">{`yarn add @turnkey/sdk-server`}</CodeBlock>
@@ -72,19 +74,21 @@ The simplest way to use Turnkey's API is through one of our SDK libraries. This 
 </Tabs>
 
 #### Initialize an `apiClient`
+
 There are multiple ways to authenticate a request to Turnkey's API. The `apiClient` is how you make requests using a public/private keypair (like the one you created above). The `apiClient` needs two additional parameters as well as the private and public key:
+
 1. the `apiBaseUrl` that you are making requests to (you will use https://api.turnkey.com when making requests to Turnkey's production API)
 2. the `defaultOrganizationId` to make requests on behalf of (you can use the organization ID you saved above).
 
 <CodeBlock language="typescript">
-{`import { Turnkey } from "@turnkey/sdk-server";`}
-{`\n\nconst turnkey = new Turnkey({
+  {`import { Turnkey } from "@turnkey/sdk-server";`}
+  {`\n\nconst turnkey = new Turnkey({
   apiBaseUrl: "https://api.turnkey.com",
   apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
   apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
   defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID
 });`}
-{`\n\nconst apiClient = turnkey.apiClient();`}
+  {`\n\nconst apiClient = turnkey.apiClient();`}
 </CodeBlock>
 
 ### Create a Wallet
@@ -98,13 +102,13 @@ In order to create a wallet you can call `createWallet` and pass in the name of 
 Note: You can always add new accounts to a wallet later using the `createWalletAccounts` method.
 
 <CodeBlock language="typescript">
-{`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";`}
-{`\n\nconst walletResponse = await apiClient.createWallet({
+  {`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";`}
+  {`\n\nconst walletResponse = await apiClient.createWallet({
   walletName: "Example Wallet 1",
   accounts: DEFAULT_ETHEREUM_ACCOUNTS
 })`}
-{`\n\nconst walletId = walletResponse.walletId;`}
-{`\nconst accountAddress = walletResponse.addresses[0];`}
+  {`\n\nconst walletId = walletResponse.walletId;`}
+  {`\nconst accountAddress = walletResponse.addresses[0];`}
 </CodeBlock>
 
 You should now be able to see your newly created wallet on your Turnkey dashboard in the Wallets section.
@@ -129,22 +133,22 @@ A Turnkey client can be used as a signer alongside many popular web3 libraries. 
 </Tabs>
 
 <CodeBlock language="typescript">
-{`import { ethers } from "ethers";`}
-{`\nimport { TurnkeySigner } from "@turnkey/ethers";`}
-{`\n\nconst turnkeySigner = new TurnkeySigner({
+  {`import { ethers } from "ethers";`}
+  {`\nimport { TurnkeySigner } from "@turnkey/ethers";`}
+  {`\n\nconst turnkeySigner = new TurnkeySigner({
   client: apiClient,
   organizationId: process.env.TURNKEY_ORGANIZATION_ID,
   signWith: accountAddress
 })`}
-{`\n\n// a provider is required if you want to interact with the live network, \n// i.e. broadcast transactions, fetch gas prices, etc.`}
-{`\nconst provider = new ethers.JsonRpcProvider(<provider API URL>);`}
-{`\nconst connectedSigner = turnkeySigner.connect(provider);`}
-{`\n\nconst transactionRequest = {
+  {`\n\n// a provider is required if you want to interact with the live network, \n// i.e. broadcast transactions, fetch gas prices, etc.`}
+  {`\nconst provider = new ethers.JsonRpcProvider(<provider API URL>);`}
+  {`\nconst connectedSigner = turnkeySigner.connect(provider);`}
+  {`\n\nconst transactionRequest = {
   to: <destination address>,
   value: ethers.parseEther(<amount to send>),
   type: 2
 }`}
-{`\nconst transactionResult = await connectedSigner.sendTransaction(transactionRequest);`}
+  {`\nconst transactionResult = await connectedSigner.sendTransaction(transactionRequest);`}
 </CodeBlock>
 
 And that's it, you have sent your first Ethereum transaction without ever having to manage private key material on your own server!
@@ -154,14 +158,17 @@ Sending transactions this way provides a **much stronger security model** than m
 ---
 
 ## Create a Non-Custodial Wallet for a User
+
 The following example will walk you through a simple flow for having a user create a wallet as a configurable `subOrganization` of your parent Turnkey organization. This gives you full control of the policies and access controls associated with the wallet when it's created.
 
 For a more comprehensive breakdown of all our embedded wallet flows you can read our [Embedded Wallets Guide.](/embedded-wallets/overview)
 
 ### Instantiate Turnkey using the Browser SDK
+
 Turnkey offers a browser SDK which includes utilities for leveraging native browser APIs in addition to facilitating calls to Turnkey's API. These utilities enable the creation and management of user passkeys and the storage of user login sessions among other things.
 
 #### Installation
+
 <Tabs>
   <TabItem value="yarn" label="Yarn" default>
     <CodeBlock language="bash">{`yarn add @turnkey/sdk-browser`}</CodeBlock>
@@ -172,20 +179,22 @@ Turnkey offers a browser SDK which includes utilities for leveraging native brow
 </Tabs>
 
 #### Initialize a `passkeyClient`
+
 <CodeBlock language="typescript" title="Run in Browser">
-{`import { Turnkey } from "@turnkey/sdk-browser";`}
-{`\n\nconst turnkey = new Turnkey({
+  {`import { Turnkey } from "@turnkey/sdk-browser";`}
+  {`\n\nconst turnkey = new Turnkey({
   apiBaseUrl: "https://api.turnkey.com",
   defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID
 })`}
-{`\n\nconst passkeyClient = turnkey.passkeyClient();`}
+  {`\n\nconst passkeyClient = turnkey.passkeyClient();`}
 </CodeBlock>
 
 #### Create a Local Passkey Credential
+
 This will prompt a user natively in their browser to create a passkey.
 
 <CodeBlock language="typescript" title="Run in Browser">
-{`const credential = await passkeyClient.createUserPasskey({
+  {`const credential = await passkeyClient.createUserPasskey({
   publicKey: {
     user: {
       name: <userName>,
@@ -193,16 +202,17 @@ This will prompt a user natively in their browser to create a passkey.
     }
   }
 })`}
-{`\n\n// now, you can specify this credential when you create a sub-organization below`}
+  {`\n\n// now, you can specify this credential when you create a sub-organization below`}
 </CodeBlock>
 
 #### Configure the `subOrganization` for the User
+
 In this example flow, you are creating a segregated `subOrganization` for each end-user. Each `subOrganization` can have it's own policies associated with it. The `subOrganization` can be configured in any way, including shared custodial setups that require multisig schemes to execute. In this example config, you are creating a wallet where only the end-user has the ability to approve signing, with the passkey credential they created above.
 
 <CodeBlock language="typescript" title="Run on Server">
-{`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";`}
-{`\n\n// receive posted credential`}
-{`\n\nconst subOrganizationConfig = {
+  {`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";`}
+  {`\n\n// receive posted credential`}
+  {`\n\nconst subOrganizationConfig = {
   subOrganizationName: <subOrganizationName>,
   rootUsers: [{
     userName: <userName>,
@@ -225,51 +235,54 @@ In this example flow, you are creating a segregated `subOrganization` for each e
 </CodeBlock>
 
 #### Call `createSubOrganization` from your `apiClient`
+
 The call to `createSubOrganization` must ultimately be done using the parent organization credentials, which is why we make the call from the server-side `apiClient`.
 
 <CodeBlock language="typescript" title="Run on Server">
-{`const subOrganizationResponse = await apiClient.createSubOrganization(subOrganizationConfig);`}
+  {`const subOrganizationResponse = await apiClient.createSubOrganization(subOrganizationConfig);`}
 </CodeBlock>
 
 ### Make user requests
+
 Once the `subOrganization` has been created, all future activities on that `subOrganization` can be authenticated from the end-user's passkey credential, and performed directly from the `passkeyClient` in the browser SDK. A user could authenticate the call to create another wallet on their account with the following code.
 
 <CodeBlock language="typescript" title="Run in Browser">
-{`const walletResponse = await passkeyClient.createWallet({
+  {`const walletResponse = await passkeyClient.createWallet({
   walletName: "Wallet Created with User Authentication",
   accounts: DEFAULT_ETHEREUM_ACCOUNTS
 });`}
-{`\n\nconst walletId = walletResponse.walletId;`}
-{`\nconst accountAddress = walletResponse.addresses[0];`}
+  {`\n\nconst walletId = walletResponse.walletId;`}
+  {`\nconst accountAddress = walletResponse.addresses[0];`}
 </CodeBlock>
 
 #### Sign a Transaction
 
 <CodeBlock language="typescript" title="Run in Browser">
-{`import { ethers } from "ethers";`}
-{`\nimport { TurnkeySigner } from "@turnkey/ethers";`}
-{`\n\nconst turnkeySigner = new TurnkeySigner({
+  {`import { ethers } from "ethers";`}
+  {`\nimport { TurnkeySigner } from "@turnkey/ethers";`}
+  {`\n\nconst turnkeySigner = new TurnkeySigner({
   client: passkeyClient,
   organizationId: process.env.TURNKEY_ORGANIZATION_ID,
   signWith: accountAddress
 })`}
-{`\n\n// a provider is required if you want to interact with the live network, \n// i.e. broadcast transactions, fetch gas prices, etc.`}
-{`\nconst provider = new ethers.JsonRpcProvider(<provider API URL>);`}
-{`\nconst connectedSigner = turnkeySigner.connect(provider);`}
-{`\n\nconst transactionRequest = {
+  {`\n\n// a provider is required if you want to interact with the live network, \n// i.e. broadcast transactions, fetch gas prices, etc.`}
+  {`\nconst provider = new ethers.JsonRpcProvider(<provider API URL>);`}
+  {`\nconst connectedSigner = turnkeySigner.connect(provider);`}
+  {`\n\nconst transactionRequest = {
   to: <destination address>,
   value: ethers.parseEther(<amount to send>),
   type: 2
 }`}
-{`\nconst transactionResult = await connectedSigner.sendTransaction(transactionRequest);`}
+  {`\nconst transactionResult = await connectedSigner.sendTransaction(transactionRequest);`}
 </CodeBlock>
 
 #### Login a User
+
 Whenever you call a method on `passkeySigner` the browser will prompt the end-user for a passkey signature to use as an authentication credential for the request to Turnkey's API. This is good when used for stateful write actions to their `subOrganization`, but a bit cumbersome when used for reading data from their account. In order to make this UX feel more streamlined, the browser SDK offers a way to `login` a user and then subsequently make read-only requests to Turnkey's API via a login session instead of needing an end-user to tap a passkey each time.
 
 <CodeBlock language="typescript" title="Run in Browser">
-{`const response = await passkeyClient.login();`}
-{`\nif (response.organizationId) {
+  {`const response = await passkeyClient.login();`}
+  {`\nif (response.organizationId) {
   // user is authenticated with Turnkey
 } else {
   // user was not authenticated with Turnkey
@@ -279,8 +292,8 @@ Whenever you call a method on `passkeySigner` the browser will prompt the end-us
 Once a user has been logged in, you will have access to the `currentUserSession` to call Turnkey's API. The following example will return a list of wallets for the logged-in user.
 
 <CodeBlock language="typescript" title="Run in Browser">
-{`const currentUserSession = await turnkey.currentUserSession();`}
-{`\n\nif (currentUserSession) {
+  {`const currentUserSession = await turnkey.currentUserSession();`}
+  {`\n\nif (currentUserSession) {
   // this request will not require the user to tap a passkey
   const walletsResponse = await currentUserSession.getWallets();
   const allUserWallets = walletsResponse.wallets;
@@ -290,9 +303,10 @@ Once a user has been logged in, you will have access to the `currentUserSession`
 ---
 
 ## Next Steps and Examples
+
 In addition to programmatic transaction signing, and embedded wallet passkey flows, Turnkey also allows ways for users to authenticate with email and recover lost accounts, create specific policies around transaction execution, and much much more.
 
-- Check out our [examples](/getting-started/examples) to see what can be built. 
+- Check out our [examples](/getting-started/examples) to see what can be built.
   - This includes some lightweight, fullstack Next.js apps that use [Ethers](https://github.com/tkhq/demo-ethers-passkeys) and [Viem](https://github.com/tkhq/demo-viem-passkeys).
 - Learn more about [Organizations](/concepts/organizations) and [Wallets](/concepts/wallets).
 - See our [API design](/category/api-overview) or dive into our [API reference](/api).

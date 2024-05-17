@@ -4,7 +4,7 @@ description: Use sub-organizations as end-user wallets
 slug: /embedded-wallets/sub-organizations-as-wallets
 ---
 
-# Integrating Embedded Wallets 
+# Integrating Embedded Wallets
 
 Turnkey has built a new model for private key management that utilizes secure enclaves. All transactions are signed within an enclave and private keys are never exposed to Turnkey, your software, or your team. Turnkey’s role is similar to that of a safety deposit box operator — Turnkey secures and provides access to the safety deposit boxes, but our system requires cryptographic proof of ownership to take any action with the keys held within.
 

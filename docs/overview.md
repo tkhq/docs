@@ -6,10 +6,9 @@ slug: /
 
 <img src="/img/diagrams/welcome_image.png" alt="welcome" />
 
-
 ### About Turnkey
 
-Turnkey is flexible, scalable, and secure wallet infrastructure. Create thousands of embedded wallets, eliminate manual transaction flows, and automate onchain actions - all without compromising on security. 
+Turnkey is flexible, scalable, and secure wallet infrastructure. Create thousands of embedded wallets, eliminate manual transaction flows, and automate onchain actions - all without compromising on security.
 
 <div class="overview-buttons">
   <a href="/getting-started/quickstart" class="overview-button">
@@ -35,9 +34,9 @@ Turnkey is flexible, scalable, and secure wallet infrastructure. Create thousand
   </a>
 </div>
 
-### Jump to product guides 
+### Jump to product guides
 
-You can keep reading for a broad understanding of Turnkey's infrastructure, or jump to a product guide below to get a sense for how you can use Turnkey in your product: 
+You can keep reading for a broad understanding of Turnkey's infrastructure, or jump to a product guide below to get a sense for how you can use Turnkey in your product:
 
 <div class="overview-buttons">
   <a href="/embedded-wallets/overview" class="overview-button">

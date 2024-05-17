@@ -18,6 +18,7 @@ That said, we have built out several example services and applications to help i
 | [`demo-passkey-wallet`](https://github.com/tkhq/demo-passkey-wallet)                                 | A minimal consumer wallet app powered by Turnkey and passkeys                                                               |
 | [`demo-ethers-passkeys`](https://github.com/tkhq/demo-ethers-passkeys)                               | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                          |
 | [`demo-viem-passkeys`](https://github.com/tkhq/demo-viem-passkeys)                                   | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                            |
+| [`passkeyapp`](https://github.com/tkhq/passkeyapp)                                                   | A React Native + Expo app powered by Turnkey and passkeys                                                                   |
 | [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                               | Compile and deploy a smart contract                                                                                         |
 | [`email-recovery`](https://github.com/tkhq/sdk/tree/main/examples/email-recovery/)                   | A NextJS app that demonstrates how to use `@turnkey/iframe-stamper` to perform email recovery                               |
 | [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer/)                           | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users             |
@@ -27,7 +28,7 @@ That said, we have built out several example services and applications to help i
 | [`with-ethers`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/)                         | Create a new Ethereum address, then sign and broadcast a transaction using the Ethers signer with Infura                    |
 | [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem/)                             | Sign and broadcast a transaction using the Turnkey Custom Account and Infura                                                |
 | [`with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs/)                         | Create a new Cosmos address, then sign and broadcast a transaction on Celestia testnet using the CosmJS signer              |
-| [`with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider/)   | Example using a Turnkey-compatible Ethereum provider that adheres to the EIP-1193 standards                                     |
+| [`with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider/)   | Example using a Turnkey-compatible Ethereum provider that adheres to the EIP-1193 standards                                 |
 | [`with-solana`](https://github.com/tkhq/sdk/tree/main/examples/with-solana/)                         | Create a new Solana address, then sign and broadcast a transaction on Solana's devnet                                       |
 | [`with-gnosis`](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis/)                         | Create new Ethereum addresses, configure a 3/3 Gnosis safe, and create + execute a transaction from it                      |
 | [`with-uniswap`](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap/)                       | Sign and broadcast a Uniswap v3 trade using the Ethers signer with Infura                                                   |
@@ -92,3 +93,14 @@ A similar, simple application demonstrating how to create sub-organizations, cre
 
 See https://github.com/tkhq/demo-viem-passkeys for the code.
 
+### React Native Passkey App ([code](https://github.com/tkhq/passkeyapp))
+
+A simple React Native app that demonstrates sign up and sign in with passkeys, as well as Email Auth support.
+
+<p style={{ textAlign: "center" }}>
+  <video controls width="800px">
+    <source src="https://github.com/r-n-o/passkeyapp/assets/104520680/9fabf71c-d88a-4631-8bfa-14b55c72967b"/>
+  </video>
+</p>
+
+See https://github.com/tkhq/passkeyapp for the code.
