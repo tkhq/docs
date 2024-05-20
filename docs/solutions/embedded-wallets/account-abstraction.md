@@ -19,3 +19,9 @@ Visit [the Alchemy Account Kit documentation](https://accountkit.alchemy.com/sma
 By combining Turnkey with ZeroDev you can create AA wallets with powerful functionalities such as sponsoring gas, batching transactions, and more.
 
 Visit [the ZeroDev documentation](https://docs-v4.zerodev.app/create-wallets/integrations/turnkey) for more information.
+
+## Biconomy Smart Accounts
+
+Create a Biconomy Smart Account and add a Turnkey signer to manage your private key and authentication methods by using Turnkey's API. 
+
+For detailed code snippets and an integration guide, refer to the [Biconomy documentation](https://docs.biconomy.io/Account/signers/turnkey).
