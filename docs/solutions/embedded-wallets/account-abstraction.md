@@ -22,6 +22,6 @@ Visit [the ZeroDev documentation](https://docs-v4.zerodev.app/create-wallets/int
 
 ## Biconomy Smart Accounts
 
-Create a Biconomy Smart Account and add a Turnkey signer to manage your private key and authentication methods by using Turnkey's API. 
+Create a Biconomy Smart Account and add a Turnkey signer to manage your private key and authentication methods by using Turnkey's API.
 
 For detailed code snippets and an integration guide, refer to the [Biconomy documentation](https://docs.biconomy.io/Account/signers/turnkey).
