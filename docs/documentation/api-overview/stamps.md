@@ -22,20 +22,21 @@ To create a valid, API key stamped request follow these steps:
 5. Attach the encoded string to your request as a `X-Stamp` header
 6. Submit the stamped request to Turnkey's API
 
-### Webauthn
+### WebAuthn
 
 To create a valid, Webauthn authenticator stamped request follow these steps:
 
-1. SHA256 hash the JSON-encoded POST body
-2. Sign the hash with WebAuthn credential.
+1. Base64-encode the SHA256 hash of the JSON-encoded POST body -- this is considered the **challenge**
+2. Include the challenge amongst WebAuthn signing options. Refer to the existing stamper implementations in the [following section](#stampers)) for examples
 3. Create a JSON-encoded stamp:
    - `credentialId`: the id of the webauthn authenticator
    - `authenticatorData`: the authenticator data produced by Webauthn assertion
    - `clientDataJson`: the client data produced by the Webauthn assertion
    - `signature`: the signature produced by the Webauthn assertion
-4. Base64URL encode the stamp
-5. Attach the encoded string to your request as a `X-Stamp-Webauthn` header
-6. Submit the stamped request to Turnkey's API
+4. Attach the JSON-encoded stamp to your request as a `X-Stamp-Webauthn` header
+   - Header names are case-insensitive (so `X-Stamp-Webauthn` and `X-Stamp-WebAuthn` are considered equivalent)
+   - Unlike API key stamps, the format is just JSON; no base64URL encoding necessary!
+5. Submit the stamped request to Turnkey's API. If you would like your client request to be proxied through a backend, refer to the patterns mentioned [here](../../documentation/features/passkeys/integration.md#proxying-signed-requests). An example application that uses this pattern can be found at wallet.tx.xyz (code [here](https://github.com/tkhq/demo-passkey-wallet/))
 
 ### Stampers
 
