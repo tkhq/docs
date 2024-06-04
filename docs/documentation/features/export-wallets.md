@@ -86,31 +86,6 @@ Export is complete! The iframe now displays a sentence of words separated by spa
 
 The exported wallet will remain stored within Turnkey’s infrastructure. In your Turnkey dashboard, the exported user Wallet will be flagged as “Exported”.
 
-### UI customization
-
-Everything is customizable in the export iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
-
-```js
-const iframeCss = `
-iframe {
-    box-sizing: border-box;
-    width: 400px;
-    height: 120px;
-    border-radius: 8px;
-    border-width: 1px;
-    border-style: solid;
-    border-color: rgba(216, 219, 227, 1);
-    padding: 20px;
-}
-`;
-
-return (
-  <div style={{ display: iframeDisplay }} id="your-container">
-    <style>{iframeCss}</style>
-  </div>
-);
-```
-
 ### Export as Private Keys
 
 Turnkey also supports exporting Wallet Accounts and Private Keys as private keys.
