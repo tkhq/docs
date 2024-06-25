@@ -64,58 +64,76 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 ### Struct
 
-| Struct                  | Field     | Type          | Description                                                                  |
-| ----------------------- | --------- | ------------- | ---------------------------------------------------------------------------- |
-| **User**                | id        | string        | The identifier of the user                                                   |
-|                         | tags      | list<string\> | The collection of tags for the user                                          |
-|                         | email     | string        | The email address of the user                                                |
-|                         | alias     | string        | The alias of the user                                                        |
-| **Activity**            | type      | string        | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)            |
-|                         | resource  | string        | The resource type the activity targets (e.g. USER, PRIVATE_KEY, POLICY, etc) |
-|                         | action    | string        | The action of the activity (e.g. CREATE, UPDATE, DELETE, SIGN, etc)          |
-| **Wallet**              | id        | string        | The identifier of the wallet                                                 |
-| **PrivateKey**          | id        | string        | The identifier of the private key                                            |
-|                         | tags      | list<string\> | The collection of tags for the private key                                   |
-| **EthereumTransaction** | from      | string        | The sender address of the transaction                                        |
-|                         | to        | string        | The receiver address of the transaction                                      |
-|                         | data      | string        | The arbitrary data of the transaction (hex-encoded)                          |
-|                         | value     | int           | The amount being sent (in wei)                                               |
-|                         | gas       | int           | The maximum allowed gas for the transaction                                  |
-|                         | gas_price | int           | The price of gas for the transaction                                         |
-|                         | chain_id  | int           | The chain identifier for the transaction                                     |
-|                         | nonce     | int           | The nonce for the transaction                                                |
+| Struct                  | Field     | Type          | Description                                                                                                                                                                                   |
+| ----------------------- | --------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User**                | id        | string        | The identifier of the user                                                                                                                                                                    |
+|                         | tags      | list<string\> | The collection of tags for the user                                                                                                                                                           |
+|                         | email     | string        | The email address of the user                                                                                                                                                                 |
+|                         | alias     | string        | The alias of the user                                                                                                                                                                         |
+| **Activity**            | type      | string        | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                             |
+|                         | resource  | string        | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `RECOVERY`, `AUTH`, `PAYMENT_ACTION`, `SUBSCRIPTION` |
+|                         | action    | string        | The action of the activity: `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT`, `IMPORT`                                                                                                          |
+| **Wallet**              | id        | string        | The identifier of the wallet                                                                                                                                                                  |
+| **PrivateKey**          | id        | string        | The identifier of the private key                                                                                                                                                             |
+|                         | tags      | list<string\> | The collection of tags for the private key                                                                                                                                                    |
+| **EthereumTransaction** | from      | string        | The sender address of the transaction                                                                                                                                                         |
+|                         | to        | string        | The receiver address of the transaction                                                                                                                                                       |
+|                         | data      | string        | The arbitrary data of the transaction (hex-encoded)                                                                                                                                           |
+|                         | value     | int           | The amount being sent (in wei)                                                                                                                                                                |
+|                         | gas       | int           | The maximum allowed gas for the transaction                                                                                                                                                   |
+|                         | gas_price | int           | The price of gas for the transaction                                                                                                                                                          |
+|                         | chain_id  | int           | The chain identifier for the transaction                                                                                                                                                      |
+|                         | nonce     | int           | The nonce for the transaction                                                                                                                                                                 |
 
 ## Activity Breakdown
 
-| Resource Type    | Action | Activity Type                            |
-| ---------------- | ------ | :--------------------------------------- |
-| **ORGANIZATION** | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V4 |
-| **INVITATION**   | CREATE | ACTIVITY_TYPE_CREATE_INVITATIONS         |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_INVITATION          |
-| **POLICY**       | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3           |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY              |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_POLICY              |
-| **WALLET**       | CREATE | ACTIVITY_TYPE_CREATE_WALLET              |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS     |
-|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET              |
-| **PRIVATE_KEY**  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2     |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG     |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG     |
-|                  | DELETE | ACTIVITY_TYPE_DISABLE_PRIVATE_KEY        |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS    |
-|                  | EXPORT | ACTIVITY_TYPE_EXPORT_PRIVATE_KEY         |
-|                  | SIGN   | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2        |
-|                  | SIGN   | ACTIVITY_TYPE_SIGN_TRANSACTION_V2        |
-| **USER**         | CREATE | ACTIVITY_TYPE_CREATE_USERS_V2            |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_USER_TAG            |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER                |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER_TAG            |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_USERS               |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_USER_TAG            |
-| **CREDENTIAL**   | CREATE | ACTIVITY_TYPE_CREATE_API_KEYS            |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2   |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_API_KEYS            |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_AUTHENTICATORS      |
-| **CONFIG**       | UPDATE | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS     |
-| **RECOVERY**     | CREATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY   |
-| **AUTH**         | CREATE | ACTIVITY_TYPE_EMAIL_AUTH                 |
+| Resource Type    | Action | Activity Type                             |
+| ---------------- | ------ | :---------------------------------------- |
+| **ORGANIZATION** | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V5  |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_ROOT_QUORUM          |
+|                  | UPDATE | ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE    |
+|                  | REMOVE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE |
+| **INVITATION**   | CREATE | ACTIVITY_TYPE_CREATE_INVITATIONS          |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_INVITATION           |
+|                  | ACCEPT | ACTIVITY_TYPE_ACCEPT_INVITATION_V2        |
+| **POLICY**       | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3            |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_POLICIES             |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY               |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_POLICY               |
+| **WALLET**       | CREATE | ACTIVITY_TYPE_CREATE_WALLET               |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS      |
+|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET               |
+|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT       |
+|                  | IMPORT | ACTIVITY_TYPE_INIT_IMPORT_WALLET          |
+|                  | IMPORT | ACTIVITY_TYPE_IMPORT_WALLET               |
+| **PRIVATE_KEY**  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2      |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG      |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG      |
+|                  | DELETE | ACTIVITY_TYPE_DISABLE_PRIVATE_KEY         |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS     |
+|                  | EXPORT | ACTIVITY_TYPE_EXPORT_PRIVATE_KEY          |
+|                  | IMPORT | ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY     |
+|                  | IMPORT | ACTIVITY_TYPE_IMPORT_PRIVATE_KEY          |
+|                  | SIGN   | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2         |
+|                  | SIGN   | ACTIVITY_TYPE_SIGN_TRANSACTION_V2         |
+| **USER**         | CREATE | ACTIVITY_TYPE_CREATE_USERS_V2             |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_USER_TAG             |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_API_ONLY_USERS       |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER                 |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER_TAG             |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_USERS                |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_USER_TAGS            |
+|                  | UPDATE | ACTIVITY_TYPE_RECOVER_USER                |
+| **CREDENTIAL**   | CREATE | ACTIVITY_TYPE_CREATE_API_KEYS             |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2    |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_API_KEYS             |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_AUTHENTICATORS       |
+| **PAYMENT**      | UPDATE | ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2       |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_PAYMENT_METHOD       |
+| **SUBSCRIPTION** | UPDATE | ACTIVITY_TYPE_ACTIVATE_BILLING_TIER       |
+| **CONFIG**       | UPDATE | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS      |
+| **RECOVERY**     | UPDATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY    |
+| **AUTH**         | CREATE | ACTIVITY_TYPE_EMAIL_AUTH                  |
+|                  | CREATE | ACTIVITY_TYPE_OAUTH                       |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS      |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS      |
