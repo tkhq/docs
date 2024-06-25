@@ -39,7 +39,7 @@ Synchronization and recovery are both supported natively by Apple and Google:
 
 ## OS and browser support
 
-Modern browsers have great support for passkeys with the exception of Firefox, which only supports security keys. See [caniuse](https://caniuse.com/passkeys) for detailed information.
+Modern browsers have great support for passkeys. See [caniuse](https://caniuse.com/passkeys) for detailed information.
 
 Support also varies by operating system: [this matrix](https://passkeys.dev/device-support/#matrix) has detailed information about OS-level support.
 
