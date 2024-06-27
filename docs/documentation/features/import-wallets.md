@@ -33,6 +33,7 @@ turnkey wallets init-import \
 
 ```sh
 turnkey encrypt \
+--user $USERID \
 --import-bundle-input "./import_bundle.txt" \
 --plaintext-input /dev/fd/3 3<<<"$MNEMONIC_1" \
 --encrypted-bundle-output "./encrypted_bundle.txt"
@@ -49,8 +50,6 @@ turnkey wallets import \
 --user $USER_ID \
 --name "demo key"  \
 --encrypted-bundle-input "./encrypted_bundle.txt" \
---address-format ADDRESS_FORMAT_ETHEREUM \
---curve CURVE_SECP256K1 \
 --key-name demo
 ```
 
