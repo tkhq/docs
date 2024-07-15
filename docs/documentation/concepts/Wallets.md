@@ -47,7 +47,7 @@ Certain address formats can only be used with particular curves. See the table b
 | Type           | Address Format              | Curve           | Path Format       | Standard Path     |
 | -------------- | --------------------------- | --------------- | ----------------- | ----------------- |
 | **Public Key** | ADDRESS_FORMAT_COMPRESSED   | all             | PATH_FORMAT_BIP32 | none              |
-|                | ADDRESS_FORMAT_UNCOMPRESSED | all             | PATH_FORMAT_BIP32 | none              |
+|                | ADDRESS_FORMAT_UNCOMPRESSED | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | none              |
 | **Ethereum**   | ADDRESS_FORMAT_ETHEREUM     | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/60'/0'/0/0  |
 | **Cosmos**     | ADDRESS_FORMAT_COSMOS       | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/118'/0'/0/0 |
 | **Solana**     | ADDRESS_FORMAT_SOLANA       | CURVE_ED25519   | PATH_FORMAT_BIP32 | m/44'/501'/0'/0'  |
