@@ -12,13 +12,13 @@ Turnkey offers flexible infrastructure to create and manage keys. These keys can
 
 You can use Turnkey with Alchemy's Account Kit via the [aa-signers](https://accountkit.alchemy.com/packages/aa-signers/turnkey/introduction.html) package to generate embedded wallets, and leverage [aa-alchemy](https://accountkit.alchemy.com/packages/aa-alchemy/index.html) to create smart accounts for your users.
 
-Visit [the Alchemy Account Kit documentation](https://accountkit.alchemy.com/smart-accounts/signers/guides/turnkey.html) for more information.
+Visit [the Alchemy Account Kit documentation](https://accountkit.alchemy.com/signers/guides/turnkey#turnkey-integration-guide) for more information.
 
 ## ZeroDev Wallets
 
 By combining Turnkey with ZeroDev you can create AA wallets with powerful functionalities such as sponsoring gas, batching transactions, and more.
 
-Visit [the ZeroDev documentation](https://docs-v4.zerodev.app/create-wallets/integrations/turnkey) for more information.
+Visit [the ZeroDev documentation](https://docs.zerodev.app/sdk/signers/turnkey) for more information.
 
 ## Biconomy Smart Accounts
 
