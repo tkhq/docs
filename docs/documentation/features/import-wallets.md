@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 8
 description: Learn about Wallet and Key Import on Turnkey
 slug: /features/import-wallets
 ---
