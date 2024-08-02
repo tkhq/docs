@@ -31,4 +31,4 @@ Before deploying your Turnkey integration in production, take a look at our reco
 
 - Activity submission is optimistically synchronous. In most cases activities will be completed and returned right away (synchronously), but if there is a lot of activity in a single organization, activities will be processed asynchronously. Make sure you handle PENDING activities by polling a few times until their completion. You can use [createActivityPoller](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/http/src/async.ts#L101) to do this if you're using our Typescript SDK.
 - Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. Incorporate [rate limiting](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) and exponential backoff in retry mechanisms.
-- Set up monitoring to detect and alert on patterns of failures
+- Set up monitoring to detect and alert on patterns of failures.
