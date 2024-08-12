@@ -82,10 +82,10 @@ For example, if the iframe public key is `04bb76f9a8aaafbb0722fa184f66642ae425e2
 
 ## OAuth vs. OIDC
 
-[OAuth2.0](https://datatracker.ietf.org/doc/html/rfc6749) is a separate protocol from ([OIDC](https://openid.net/specs/openid-connect-core-1_0.html)), with distinct goals:
+[OAuth2.0](https://datatracker.ietf.org/doc/html/rfc6749) is a separate protocol from [OIDC](https://openid.net/specs/openid-connect-core-1_0.html), with distinct goals:
 * "OAuth2.0" is an authorization framework
 * "OIDC" is an authentication framework
 
-We chose to name this feature "OAuth" because of the term familiarity: most Turnkey customers will have to setup an "OAuth" app with Google, and the user experience is often referred to as "OAuth" regardless of the protocol underneath.
+We chose to name this feature "OAuth" because of the term familiarity: most Turnkey customers will have to setup an "OAuth" app with Google, and the user experience is often referred to as "OAuth" flows regardless of the protocol underneath.
 
 From dev to dev: if want some kind of saving grace, think about Turnkey's OAuth as an abbreviation for "OIDC Auth".
