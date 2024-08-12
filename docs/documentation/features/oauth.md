@@ -8,7 +8,7 @@ slug: /features/oauth
 
 OAuth is a feature to authenticate users using OpenID Connect ([OIDC](https://openid.net/specs/openid-connect-core-1_0.html)) tokens. It is only available for sub-organization users.
 
-Similar to [email auth](./email-auth.md) and [email recovery](./email-recovery.md), OAuth authenticates users who do not wish to handle API keys or [passkeys](./passkeys/) directly. This makes it a great fit for onboarding users who have existing web2-style accounts (e.g. Google, Facebook) but do not know anything about cryptographic keys and credentials.
+Similar to [email auth](./email-auth.md) and [email recovery](./email-recovery.md), OAuth authenticates users who do not wish to handle API keys or [passkeys](./passkeys/introduction.md) directly. This makes it a great fit for onboarding users who have existing web2-style accounts (e.g. Google, Facebook) but do not know anything about cryptographic keys and credentials.
 
 ## Roles and responsibilities
 
