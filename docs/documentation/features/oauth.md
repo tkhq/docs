@@ -13,7 +13,7 @@ Similar to [email auth](./email-auth.md) and [email recovery](./email-recovery.m
 ## Roles and responsibilities
 
 * **Turnkey**: runs verifiable infrastructure to create credentials and verify OIDC tokens
-* **Parent**: that's you! **For the rest of this guide we'll assume you, the reader, are a Turnkey customer**. We assume that you have
+* **Parent**: that's you! **For the rest of this guide we'll assume you, the reader, are a Turnkey customer**. We assume that you have:
   * an existing Turnkey organization (we'll refer to this organization as "the parent organization")
   * a web application frontend (we'll refer to this as just "app" or "web app")
   * a backend able to sign and POST Turnkey activities ("backend" or "parent backend")
@@ -87,5 +87,3 @@ For example, if the iframe public key is `04bb76f9a8aaafbb0722fa184f66642ae425e2
 * "OIDC" is an authentication framework
 
 We chose to name this feature "OAuth" because of the term familiarity: most Turnkey customers will have to setup an "OAuth" app with Google, and the user experience is often referred to as "OAuth" flows regardless of the protocol underneath.
-
-From dev to dev: if want some kind of saving grace, think about Turnkey's OAuth as an abbreviation for "OIDC Auth".
