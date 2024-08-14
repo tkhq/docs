@@ -16,7 +16,7 @@ In order to manually trigger a new crawl, use the `Restart crawling` button:
 
 <img src="./static/algolia-crawler.png" />
 
-Our docs site is fairly smol, so each crawl should be fairly quick (~30-60s).
+Our docs site is small, so each crawl is quick (~30-60s).
 
 ## Development
 
