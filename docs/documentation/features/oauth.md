@@ -99,7 +99,9 @@ Below, some details and pointers about specific providers we've worked with befo
 ### Google
 
 This provider is extensively tested and supported. We've integrated it in our demo wallet (hosted at https://wallet.tx.xyz):
-![OAuth on our demo wallet](/img/oauth_demo_wallet.png)
+<p style={{textAlign: 'center'}}>
+    <img src="/img/oauth_demo_wallet.png" width="500"/>
+</p>
 
 The code is open-source, feel free to [check it out](https://github.com/tkhq/demo-embedded-wallet) for reference. The exact line where the OAuth component is loaded is here: [ui/src/screens/LandingScreen.tsx](https://github.com/tkhq/demo-embedded-wallet/blob/d4ec308e9ce0bf0da7b64da2b39e1a80c077eb82/ui/src/screens/LandingScreen.tsx#L384).
 
