@@ -80,6 +80,10 @@ In order to prevent OIDC tokens from being used against multiple public keys, ou
 
 For example, if the iframe public key is `04bb76f9a8aaafbb0722fa184f66642ae425e2a032bde8ffa0479ff5a93157b204c7848701cf246d81fd58f6c4c47a437d9f81e6a183042f2f1aa2f6aa28e4ab65`, our enclaves expect the OIDC token nonce to be `1f9570d976946c0cb72f0e853eea0fb648b5e9e9a2266d25f971817e187c9b18`.
 
+This restriction only applies during **authentication** (`OAUTH` activity). Registration via `CREATE_OAUTH_PROVIDER` and `CREATE_SUB_ORGANIZATION` activities is not affected since these activities do not accept a `targetPublicKey` and do not return encrypted credentials as a result.
+
+If your OAuth provider does not allow you to customize `nonce` claims, Turnkey also accepts and validates `tknonce` claims. This is an alternative claim that will be considered. Only one of (`nonce`, `tknonce`) needs to be set to `sha256(targetPublicKey)`; not both.
+
 ## OAuth vs. OIDC
 
 [OAuth2.0](https://datatracker.ietf.org/doc/html/rfc6749) is a separate protocol from [OIDC](https://openid.net/specs/openid-connect-core-1_0.html), with distinct goals:
@@ -87,3 +91,28 @@ For example, if the iframe public key is `04bb76f9a8aaafbb0722fa184f66642ae425e2
 * "OIDC" is an authentication framework
 
 We chose to name this feature "OAuth" because of the term familiarity: most Turnkey customers will have to setup an "OAuth" app with Google, and the user experience is often referred to as "OAuth" flows regardless of the protocol underneath.
+
+## Providers
+
+Below, some details and pointers about specific providers we've worked with before. If yours isn't listed below it does not mean it can't be supported: any OIDC provider should work with Turnkey's OAuth.
+
+### Google
+
+This provider is extensively tested and supported. We've integrated it in our demo wallet (hosted at https://wallet.tx.xyz):
+![OAuth on our demo wallet](oauth_demo_wallet.png)
+
+The code is open-source, feel free to [check it out](https://github.com/tkhq/demo-embedded-wallet) for reference. The exact line where the OAuth component is loaded is here: [ui/src/screens/LandingScreen.tsx](https://github.com/tkhq/demo-embedded-wallet/blob/d4ec308e9ce0bf0da7b64da2b39e1a80c077eb82/ui/src/screens/LandingScreen.tsx#L384).
+
+The main documentation for Google OIDC is available [here](https://developers.google.com/identity/openid-connect/openid-connect).
+
+### Auth0
+
+This provider was tested successfully and offers a wide range of authentication factors and integration. For example, Auth0 can wrap Twitter's auth or any other ["Social Connection"](https://marketplace.auth0.com/features/social-connections).
+
+In the testing process we discovered that Auth0 admins can manage users freely. Be careful about who can and can't access your Auth0 account: Auth0's management APIs allow for account merging. Specifically, anyone with a `users:update` scope token can call [this endpoint](https://auth0.com/docs/api/management/v2/users/post-identities) to arbitrarily link an identity.
+
+For example, if a Google-authenticated user (OIDC token `sub` claim: `google-oauth2|118121659617646047510`) gets merged into a Twitter-authenticated user (OIDC token `sub` claim: `twitter|47169608`), the OIDC token obtained by logging in through Google post-merge will be `twitter|47169608`. This can be surprising and lead to account takeover if an auth0 admin is malicious. This is documented in Auth0's own docs, [here](https://auth0.com/docs/manage-users/user-accounts/user-account-linking#precautions).
+
+### AWS Cognito
+
+The main thing to call out is the inability to pass custom `nonce` claims easily. To pass the hash of the end-user's iframe public key, use a custom `tknonce` claim instead.
