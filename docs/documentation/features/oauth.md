@@ -113,7 +113,7 @@ This provider was tested successfully and offers a wide range of authentication 
 
 In the testing process we discovered that Auth0 admins can manage users freely. Be careful about who can and can't access your Auth0 account: Auth0's management APIs allow for account merging. Specifically, anyone with a `users:update` scope token can call [this endpoint](https://auth0.com/docs/api/management/v2/users/post-identities) to arbitrarily link an identity.
 
-For example, if a Google-authenticated user (OIDC token `sub` claim: `google-oauth2|118121659617646047510`) gets merged into a Twitter-authenticated user (OIDC token `sub` claim: `twitter|47169608`), the OIDC token obtained by logging in through Google post-merge will be `twitter|47169608`. This can be surprising and lead to account takeover if an auth0 admin is malicious. This is documented in Auth0's own docs, [here](https://auth0.com/docs/manage-users/user-accounts/user-account-linking#precautions).
+For example, if a Google-authenticated user (OIDC token `sub` claim: `google-oauth2|118121659617646047510`) gets merged into a Twitter-authenticated user (OIDC token `sub` claim: `twitter|47169608`), the OIDC token obtained by logging in through Google post-merge will be `twitter|47169608`. This can be surprising and lead to account takeover if an Auth0 admin is malicious. This is documented in Auth0's own docs, [here](https://auth0.com/docs/manage-users/user-accounts/user-account-linking#precautions).
 
 ### AWS Cognito
 
