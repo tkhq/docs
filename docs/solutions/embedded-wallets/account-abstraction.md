@@ -26,8 +26,8 @@ Create a Biconomy Smart Account and add a Turnkey signer to manage your private 
 
 For detailed code snippets and an integration guide, refer to the [Biconomy documentation](https://docs.biconomy.io/Account/signers/turnkey).
 
-## permissionless.js Accounts 
+## permissionless.js Accounts
 
-permissionless.js is a TypeScript library built on viem for building with ERC-4337 smart accounts, bundlers, paymasters, and user operations. 
+permissionless.js is a TypeScript library built on viem for building with ERC-4337 smart accounts, bundlers, paymasters, and user operations.
 
 permissionless.js defines the `SmartAccountSigner` interface which supports Turnkey as a signer. You can find a detailed example for integrating a Turnkey signer with permissionless.js in the [Pimlico documentation](https://docs.pimlico.io/permissionless/how-to/signers/turnkey).
