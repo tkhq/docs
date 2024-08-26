@@ -10,6 +10,8 @@ import TabItem from "@theme/TabItem";
 import CodeBlock from "@theme/CodeBlock";
 import Parameter from "@site/src/components/parameter";
 
+This flow can both be used to login a user with only an email address, or to recover the account of a user that has lost their passkey credential with their email address. The end result is a valid `TurnkeyClient` which can also be used to add another authenbticator if needed.
+
 #### 1. Initialize Turnkey
 
 <CodeBlock language="typescript">
@@ -20,7 +22,7 @@ import Parameter from "@site/src/components/parameter";
 
 #### 2. Initialize the Iframe Client
 
-Note that the iframe client must be initialized with the dom element where the iframe will be injected. If you are using the [react-sdk](/sdks/react) you can import the `iframeClient` from the `useTurnkey()` hook without this step and the iframe dom element will be managed for you. Note that the `iframeClient` must be initialized before calling `emailAuth` because you need the `iframePublicKey` as a parameter to the `emailAuth` call.
+Note that the iframe client must be initialized with the dom element where the iframe will be injected. If you are using the [react-sdk](/sdks/react) you can import the `authIframeClient` from the `useTurnkey()` hook without this step and the iframe dom element will be managed for you. Note that the `iframeClient` must be initialized before calling `emailAuth` because you need the `iframePublicKey` as a parameter to the `emailAuth` call.
 
 <CodeBlock language="typescript">
   {`import { Turnkey, TurnkeySDKBrowserConfig } from "@turnkey/sdk-browser";`}
@@ -29,7 +31,7 @@ Note that the iframe client must be initialized with the dom element where the i
   {`\n\nconst iframeContainerId = "turnkey-auth-iframe-container-id";`}
   {`\n\n// ensure the HTML element exists somewhere in the rendered DOM`}
   {`\n<div id={iframeContainerId} />`}
-  {`\n\nconst iframeClient = await turnkey.iframeClient(document.getElementById(iframeContainerId))`}
+  {`\n\nconst authIframeClient = await turnkey.iframeClient(document.getElementById(iframeContainerId))`}
 </CodeBlock>
 
 #### 3. Call `emailAuth` from your backend
@@ -39,7 +41,7 @@ Note that the iframe client must be initialized with the dom element where the i
   "emailAuth",
   [{
     email: <userEmail>,
-    targetPublicKey: iframeClient.iframePublicKey,
+    targetPublicKey: authIframeClient.iframePublicKey,
     organizationId: <userSubOrganizationId>
   }]
 )`}
@@ -61,10 +63,10 @@ If you need to lookup the user `subOrganizationId` by email, you can call the `g
 #### 4. Inject the emailed `credentialBundle` into the iframe to authenticate the user
 
 <CodeBlock language="typescript">
-  {`const authenticationResponse = await iframeClient.injectCredentialBundle(credentialBundle);
+  {`const authenticationResponse = await authIframeClient.injectCredentialBundle(credentialBundle);
 if (authenticationResponse) {
   // user is authenticated and can perform actions from the \`iframeClient\`
-  await iframeClient.login();
+  await authIframeClient.login();
   navigate("/authenticated-route");
 } else {
   // credential bundle does not match emailed credential
@@ -85,7 +87,7 @@ if (authenticationResponse) {
 
 <CodeBlock language="typescript">
   {`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";`}
-  {`\nconst newWalletResponse = await iframeClient.createWallet({
+  {`\nconst newWalletResponse = await authIframeClient.createWallet({
   walletName: "New Wallet for User",
   accounts: DEFAULT_ETHEREUM_ACCOUNTS
 })`}
