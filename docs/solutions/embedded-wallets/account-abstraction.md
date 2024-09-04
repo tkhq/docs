@@ -24,7 +24,7 @@ Visit [the ZeroDev documentation](https://docs.zerodev.app/sdk/signers/turnkey) 
 
 Create a Biconomy Smart Account and add a Turnkey signer to manage your private key and authentication methods by using Turnkey's API.
 
-For detailed code snippets and an integration guide, refer to the [Biconomy documentation](https://docs.biconomy.io/Account/signers/turnkey).
+For detailed code snippets and an integration guide, refer to the [Biconomy documentation](https://docs.biconomy.io/account/signers/turnkey).
 
 ## permissionless.js Accounts
 
