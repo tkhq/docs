@@ -106,6 +106,11 @@ const config = {
             label: "API Reference",
             to: "/api",
           },
+          {
+            position: "left",
+            label: "Changelog",
+            to: "/api",
+          },
           // {to: '/blog', label: 'Blog', position: 'left'},
           {
             to: "https://github.com/tkhq",
