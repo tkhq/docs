@@ -35,6 +35,8 @@ The `rp` options is an object with 2 fields: `id` and `name`.
 
 `rp.id` should be your app domain. If your app is hosted on "your.app.xyz" the RPID can be "your.app.xyz" or "app.xyz". Be aware: if you create passkeys on "your.app.xyz", they won't be usable on other subdomains (e.g. "other.app.xyz"). So unless you have good reasons not to, use the top-level domain as the RPID.
 
+To be specific, passkeys created on "your.app.xyz" will be bound to that exact domain in your browser, even if your RPID is "app.xyz" (for security purposes). Thus, if a passkey is created on a subdomain like "your.app.xyz", it will _not_ work on "app.xyz", even if the RPID is "app.xyz". However, if a passkey is created on "app.xyz", it _will_ work on a subdomain like "your.app.xyz".
+
 `rp.id` will show up in the initial registration popup:
 
 <p style={{ textAlign: "center" }}>
