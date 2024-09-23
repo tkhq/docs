@@ -45,6 +45,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | --------------- | ------------------- | -------------------------------------------- |
 | **activity**    | Activity            | The activity metadata of the request         |
 | **eth.tx**      | EthereumTransaction | The parsed Ethereum transaction payload      |
+| **solana.tx**   | SolanaTransaction   | The parsed Solana transaction payload        |
 | **wallet**      | Wallet              | The target wallet used in sign requests      |
 | **private_key** | PrivateKey          | The target private key used in sign requests |
 
@@ -64,26 +65,49 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 ### Struct
 
-| Struct                  | Field     | Type          | Description                                                                                                                                                                                   |
-| ----------------------- | --------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **User**                | id        | string        | The identifier of the user                                                                                                                                                                    |
-|                         | tags      | list<string\> | The collection of tags for the user                                                                                                                                                           |
-|                         | email     | string        | The email address of the user                                                                                                                                                                 |
-|                         | alias     | string        | The alias of the user                                                                                                                                                                         |
-| **Activity**            | type      | string        | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                             |
-|                         | resource  | string        | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `RECOVERY`, `AUTH`, `PAYMENT_ACTION`, `SUBSCRIPTION` |
-|                         | action    | string        | The action of the activity: `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT`, `IMPORT`                                                                                                          |
-| **Wallet**              | id        | string        | The identifier of the wallet                                                                                                                                                                  |
-| **PrivateKey**          | id        | string        | The identifier of the private key                                                                                                                                                             |
-|                         | tags      | list<string\> | The collection of tags for the private key                                                                                                                                                    |
-| **EthereumTransaction** | from      | string        | The sender address of the transaction                                                                                                                                                         |
-|                         | to        | string        | The receiver address of the transaction                                                                                                                                                       |
-|                         | data      | string        | The arbitrary data of the transaction (hex-encoded)                                                                                                                                           |
-|                         | value     | int           | The amount being sent (in wei)                                                                                                                                                                |
-|                         | gas       | int           | The maximum allowed gas for the transaction                                                                                                                                                   |
-|                         | gas_price | int           | The price of gas for the transaction                                                                                                                                                          |
-|                         | chain_id  | int           | The chain identifier for the transaction                                                                                                                                                      |
-|                         | nonce     | int           | The nonce for the transaction                                                                                                                                                                 |
+| Struct                  | Field            | Type               | Description                                                                                                                                                                                   |
+| ----------------------- | ---------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User**                | id               | string             | The identifier of the user                                                                                                                                                                    |
+|                         | tags             | list<string\>      | The collection of tags for the user                                                                                                                                                           |
+|                         | email            | string             | The email address of the user                                                                                                                                                                 |
+|                         | alias            | string             | The alias of the user                                                                                                                                                                         |
+| **Activity**            | type             | string             | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                             |
+|                         | resource         | string             | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `RECOVERY`, `AUTH`, `PAYMENT_ACTION`, `SUBSCRIPTION` |
+|                         | action           | string             | The action of the activity: `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT`, `IMPORT`                                                                                                          |
+| **Wallet**              | id               | string             | The identifier of the wallet                                                                                                                                                                  |
+| **PrivateKey**          | id               | string             | The identifier of the private key                                                                                                                                                             |
+|                         | tags             | list<string\>      | The collection of tags for the private key                                                                                                                                                    |
+| **EthereumTransaction** | from             | string             | The sender address of the transaction                                                                                                                                                         |
+|                         | to               | string             | The receiver address of the transaction                                                                                                                                                       |
+|                         | data             | string             | The arbitrary data of the transaction (hex-encoded)                                                                                                                                           |
+|                         | value            | int                | The amount being sent (in wei)                                                                                                                                                                |
+|                         | gas              | int                | The maximum allowed gas for the transaction                                                                                                                                                   |
+|                         | gas_price        | int                | The price of gas for the transaction                                                                                                                                                          |
+|                         | chain_id         | int                | The chain identifier for the transaction                                                                                                                                                      |
+|                         | nonce            | int                | The nonce for the transaction                                                                                                                                                                 |
+| **SolanaTransaction**   | account_keys     | list<string\>      | The accounts (public keys) involved in the transaction                                                                                                                                        |
+|                         | program_keys     | list<string\>      | The programs (public keys) involved in the transaction                                                                                                                                        |
+|                         | instructions     | list<Instruction\> | A list of Instructions (see below)                                                                                                                                                            |
+|                         | transfers        | list<Transfer\>    | A list of Transfers (see below)                                                                                                                                                               |
+|                         | recent_blockhash | string             | The recent blockhash specified in a transaction                                                                                                                                               |
+
+### Nested Structs
+
+| Struct                 | Field                 | Type                      | Description                                                                                                              |
+| ---------------------- | --------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Instruction**        | program_key           | string                    | The program (public key) involved in the instruction                                                                     |
+|                        | accounts              | list<Account\>            | A list of Accounts involved in the instruction                                                                           |
+|                        | instruction_data_hex  | string                    | Raw hex bytes corresponding to instruction data                                                                          |
+|                        | address_table_lookups | list<AddressTableLookup\> | A list of AddressTableLookups used in the instruction. Learn more [here](https://solana.com/docs/advanced/lookup-tables) |
+| **Transfer**           | sender                | string                    | A Solana account (public key)                                                                                            |
+|                        | recipient             | string                    | A Solana account (public key)                                                                                            |
+|                        | amount                | string                    | The native SOL amount for the transfer (lamports)                                                                        |
+| **Account**            | account_key           | string                    | A Solana account (public key)                                                                                            |
+|                        | signer                | boolean                   | An indicator of whether or not the account is a signer                                                                   |
+|                        | writable              | boolean                   | An indicator of whether or not the account can perform a write operation                                                 |
+| **AddressTableLookup** | address_table_key     | string                    | A Solana address (public key) corresponding to the address table                                                         |
+|                        | writable_indexes      | list<int\>                 | Indexes corresponding to accounts that can perform writes                                                                |
+|                        | readonly_indexes      | list<int\>                 | Indexes corresponding to accounts that can only perform reads                                                            |
 
 ## Activity Breakdown
 

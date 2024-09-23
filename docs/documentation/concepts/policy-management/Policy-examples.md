@@ -139,3 +139,53 @@ sidebar_label: Examples
   "condition": "eth.tx.nonce <= 3"
 }
 ```
+
+#### Allow Solana transactions that include a transfer with a specific sender
+
+```json JSON
+{
+  "policyName": "Enable transactions with a transfer sent by <SENDER_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.any(transfer, transfer.from == '<SENDER_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions that include a transfer with a specific recipient
+
+```json JSON
+{
+  "policyName": "Enable transactions with a transfer sent to <RECIPIENT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.any(transfer, transfer.to == '<RECIPIENT_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions that only use the Solana System Program
+
+```json JSON
+{
+  "policyName": "Enable transactions that only use the system program",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.program_keys.all(p, p == '11111111111111111111111111111111')"
+}
+```
+
+#### Allow Solana transactions whose first instruction involves a specific address
+
+```json JSON
+{
+  "policyName": "Enable transactions with the first instruction involving <ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].accounts.any(a, a.account_key == '<ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions with specific expected instruction data
+
+```json JSON
+{
+  "policyName": "Enable transactions where the first instruction has precisely <HEX BYTES>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].instruction_data_hex == '<HEX BYTES>'"
+}
+```
