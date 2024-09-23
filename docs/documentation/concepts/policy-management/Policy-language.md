@@ -41,13 +41,13 @@ Keywords are reserved words that are dynamically interchanged for real values at
 
 ### Condition
 
-| Keyword         | Type                | Description                                  |
-| --------------- | ------------------- | -------------------------------------------- |
-| **activity**    | Activity            | The activity metadata of the request         |
-| **eth.tx**      | EthereumTransaction | The parsed Ethereum transaction payload      |
-| **solana.tx**   | SolanaTransaction   | The parsed Solana transaction payload        |
-| **wallet**      | Wallet              | The target wallet used in sign requests      |
-| **private_key** | PrivateKey          | The target private key used in sign requests |
+| Keyword         | Type                | Description                                                  |
+| --------------- | ------------------- | ------------------------------------------------------------ |
+| **activity**    | Activity            | The activity metadata of the request                         |
+| **eth.tx**      | EthereumTransaction | The parsed Ethereum transaction payload (see Appendix below) |
+| **solana.tx**   | SolanaTransaction   | The parsed Solana transaction payload (see Appendix below)   |
+| **wallet**      | Wallet              | The target wallet used in sign requests                      |
+| **private_key** | PrivateKey          | The target private key used in sign requests                 |
 
 ## Types
 
@@ -78,8 +78,8 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **PrivateKey**          | id               | string             | The identifier of the private key                                                                                                                                                             |
 |                         | tags             | list<string\>      | The collection of tags for the private key                                                                                                                                                    |
 | **EthereumTransaction** | from             | string             | The sender address of the transaction                                                                                                                                                         |
-|                         | to               | string             | The receiver address of the transaction                                                                                                                                                       |
-|                         | data             | string             | The arbitrary data of the transaction (hex-encoded)                                                                                                                                           |
+|                         | to               | string             | The receiver address of the transaction (can be an EOA or smart contract)                                                                                                                     |
+|                         | data             | string             | The arbitrary calldata of the transaction (hex-encoded)                                                                                                                                       |
 |                         | value            | int                | The amount being sent (in wei)                                                                                                                                                                |
 |                         | gas              | int                | The maximum allowed gas for the transaction                                                                                                                                                   |
 |                         | gas_price        | int                | The price of gas for the transaction                                                                                                                                                          |
@@ -91,7 +91,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                         | transfers        | list<Transfer\>    | A list of Transfers (see below)                                                                                                                                                               |
 |                         | recent_blockhash | string             | The recent blockhash specified in a transaction                                                                                                                                               |
 
-### Nested Structs
+#### Nested Structs
 
 | Struct                 | Field                 | Type                      | Description                                                                                                              |
 | ---------------------- | --------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -106,8 +106,8 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                        | signer                | boolean                   | An indicator of whether or not the account is a signer                                                                   |
 |                        | writable              | boolean                   | An indicator of whether or not the account can perform a write operation                                                 |
 | **AddressTableLookup** | address_table_key     | string                    | A Solana address (public key) corresponding to the address table                                                         |
-|                        | writable_indexes      | list<int\>                 | Indexes corresponding to accounts that can perform writes                                                                |
-|                        | readonly_indexes      | list<int\>                 | Indexes corresponding to accounts that can only perform reads                                                            |
+|                        | writable_indexes      | list<int\>                | Indexes corresponding to accounts that can perform writes                                                                |
+|                        | readonly_indexes      | list<int\>                | Indexes corresponding to accounts that can only perform reads                                                            |
 
 ## Activity Breakdown
 
@@ -161,3 +161,21 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                  | CREATE | ACTIVITY_TYPE_OAUTH                       |
 |                  | CREATE | ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS      |
 |                  | DELETE | ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS      |
+
+## Appendix
+
+### Ethereum
+
+Our Ethereum policy language (accessible via `eth.tx`) allows for the granular governance of signing Ethereum (EVM-compatible) transactions. Our policy engine exposes a [fairly standard set of properties](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope) belonging to a transaction.
+
+See the [Policy examples](./Policy-examples.md) for sample scenarios.
+
+### Solana
+
+Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure. Notably, within our policy engine, a Solana transaction contains a list of Transfers, currently corresponding to native SOL transfers. Each transfer within a transaction is considered a separate entity. Here are some approaches you might take to govern native SOL transfers:
+
+- _All_ transfers need to match the policy condition Useful for allowlists ([example](./Policy-examples.md#allow-solana-transactions-that-include-a-transfer-with-only-one-specific-recipient))
+- _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](./Policy-examples.md#deny-all-solana-transactions-transferring-to-an-undesired-address))
+- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](./Policy-examples.md#allow-solana-transactions-that-have-exactly-one-transfer-with-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
+
+See the [Policy examples](./Policy-examples.md) for sample scenarios.

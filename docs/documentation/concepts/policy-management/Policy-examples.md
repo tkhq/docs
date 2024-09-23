@@ -110,6 +110,10 @@ sidebar_label: Examples
 }
 ```
 
+### Ethereum (EVM)
+
+Note: see the [language section](Policy-language.md#appendix) for more details.
+
 #### Allow ERC-20 transfers for a specific token smart contract
 
 ```json JSON
@@ -140,7 +144,11 @@ sidebar_label: Examples
 }
 ```
 
-#### Allow Solana transactions that include a transfer with only one specific sender
+### Solana
+
+Note: see the [language section](Policy-language.md#appendix) for various approaches on writing Solana policies.
+
+#### Allow Solana transactions that include a transfer from one specific sender
 
 ```json JSON
 {
@@ -150,7 +158,17 @@ sidebar_label: Examples
 }
 ```
 
-#### Allow Solana transactions that include a transfer with only one specific recipient
+#### Allow Solana transactions that include a transfer to only one specific recipient
+
+```json JSON
+{
+  "policyName": "Enable transactions with a single transfer sent to <RECIPIENT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.count == 1 && solana.tx.transfers[0].to == '<RECIPIENT_ADDRESS>'"
+}
+```
+
+#### Allow Solana transactions that have exactly one transfer, to one specific recipient
 
 ```json JSON
 {
