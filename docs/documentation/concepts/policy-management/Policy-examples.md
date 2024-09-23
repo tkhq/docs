@@ -140,23 +140,23 @@ sidebar_label: Examples
 }
 ```
 
-#### Allow Solana transactions that include a transfer with a specific sender
+#### Allow Solana transactions that include a transfer with only one specific sender
 
 ```json JSON
 {
   "policyName": "Enable transactions with a transfer sent by <SENDER_ADDRESS>",
   "effect": "EFFECT_ALLOW",
-  "condition": "solana.tx.transfers.any(transfer, transfer.from == '<SENDER_ADDRESS>')"
+  "condition": "solana.tx.transfers.all(transfer, transfer.from == '<SENDER_ADDRESS>')"
 }
 ```
 
-#### Allow Solana transactions that include a transfer with a specific recipient
+#### Allow Solana transactions that include a transfer with only one specific recipient
 
 ```json JSON
 {
   "policyName": "Enable transactions with a transfer sent to <RECIPIENT_ADDRESS>",
   "effect": "EFFECT_ALLOW",
-  "condition": "solana.tx.transfers.any(transfer, transfer.to == '<RECIPIENT_ADDRESS>')"
+  "condition": "solana.tx.transfers.all(transfer, transfer.to == '<RECIPIENT_ADDRESS>')"
 }
 ```
 
@@ -170,13 +170,13 @@ sidebar_label: Examples
 }
 ```
 
-#### Allow Solana transactions whose first instruction involves a specific address
+#### Deny all Solana transactions transferring to an undesired address
 
 ```json JSON
 {
-  "policyName": "Enable transactions with the first instruction involving <ADDRESS>",
-  "effect": "EFFECT_ALLOW",
-  "condition": "solana.tx.instructions[0].accounts.any(a, a.account_key == '<ADDRESS>')"
+  "policyName": "Reject transactions with a transfer sent to <BAD_ADDRESS>",
+  "effect": "EFFECT_DENY",
+  "condition": "solana.tx.transfers.any(transfer, transfer.to == '<BAD_ADDRESS>')"
 }
 ```
 
@@ -187,5 +187,15 @@ sidebar_label: Examples
   "policyName": "Enable transactions where the first instruction has precisely <HEX BYTES>",
   "effect": "EFFECT_ALLOW",
   "condition": "solana.tx.instructions[0].instruction_data_hex == '<HEX BYTES>'"
+}
+```
+
+#### Allow Solana transactions whose first instruction involves a specific address
+
+```json JSON
+{
+  "policyName": "Enable transactions where the first instruction has a first account involving <ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].accounts[0].account_key == '<ADDRESS>'"
 }
 ```
