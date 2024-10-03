@@ -110,6 +110,10 @@ sidebar_label: Examples
 }
 ```
 
+### Ethereum (EVM)
+
+Note: see the [language section](Policy-language.md#appendix) for more details.
+
 #### Allow ERC-20 transfers for a specific token smart contract
 
 ```json JSON
@@ -137,5 +141,79 @@ sidebar_label: Examples
   "policyName": "Allow signing Ethereum transactions with an early nonce",
   "effect": "EFFECT_ALLOW",
   "condition": "eth.tx.nonce <= 3"
+}
+```
+
+### Solana
+
+Note: see the [language section](Policy-language.md#appendix) for various approaches on writing Solana policies.
+
+#### Allow Solana transactions that include a transfer from one specific sender
+
+```json JSON
+{
+  "policyName": "Enable transactions with a transfer sent by <SENDER_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.all(transfer, transfer.from == '<SENDER_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions that include a transfer to only one specific recipient
+
+```json JSON
+{
+  "policyName": "Enable transactions with a single transfer sent to <RECIPIENT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.count == 1 && solana.tx.transfers[0].to == '<RECIPIENT_ADDRESS>'"
+}
+```
+
+#### Allow Solana transactions that have exactly one transfer, to one specific recipient
+
+```json JSON
+{
+  "policyName": "Enable transactions with a transfer sent to <RECIPIENT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.all(transfer, transfer.to == '<RECIPIENT_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions that only use the Solana System Program
+
+```json JSON
+{
+  "policyName": "Enable transactions that only use the system program",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.program_keys.all(p, p == '11111111111111111111111111111111')"
+}
+```
+
+#### Deny all Solana transactions transferring to an undesired address
+
+```json JSON
+{
+  "policyName": "Reject transactions with a transfer sent to <BAD_ADDRESS>",
+  "effect": "EFFECT_DENY",
+  "condition": "solana.tx.transfers.any(transfer, transfer.to == '<BAD_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions with specific expected instruction data
+
+```json JSON
+{
+  "policyName": "Enable transactions where the first instruction has precisely <HEX BYTES>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].instruction_data_hex == '<HEX BYTES>'"
+}
+```
+
+#### Allow Solana transactions whose first instruction involves a specific address
+
+```json JSON
+{
+  "policyName": "Enable transactions where the first instruction has a first account involving <ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].accounts[0].account_key == '<ADDRESS>'"
 }
 ```
