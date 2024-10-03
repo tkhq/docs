@@ -39,6 +39,31 @@ That said, we have built out several example services and applications to help i
 
 ## Demos built with Turnkey
 
+### Demo Embedded Wallet ([code](https://github.com/tkhq/demo-embedded-wallet))
+
+A comprehensive demo showcasing how to build an embedded wallet using Turnkey. This demo uses the [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser), [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) and [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server) packages and includes features such as:
+
+- User authentication with passkeys, email auth, and oauth auth
+- Creating new wallets and wallet accounts
+- Sending a transaction
+- Importing/Exporting a wallet
+- Adding a credential to the wallet
+
+<p style={{ display: "flex",  alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+  <img
+    src="/demo-embedded-wallet.png"
+    alt="demo embedded wallet screenshot"
+    style={{ width: "50%", marginBottom: "10px" }}
+  />
+  <img
+    src="/demo-embedded-wallet-ui.png"
+    alt="another image description"
+    style={{ width: "50%" }}
+  />
+</p>
+
+See https://github.com/tkhq/demo-embedded-wallet for the code.
+
 ### Demo Consumer Wallet ([code](https://github.com/tkhq/demo-consumer-wallet))
 
 A minimal consumer wallet app powered by Turnkey. Behind the scenes, it uses [`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) for signing and WalletConnect (v1) for accessing dapps.

@@ -8,7 +8,7 @@ slug: /embedded-wallets/sub-organization-recovery
 
 Email recovery shines if you are leveraging [sub-organizations](/concepts/Sub-Organizations) to create embedded wallets for your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
-Our Demo Passkey Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
+Our Demo Embedded Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-embedded-wallet)) before diving into your own implementation.
 
 ## Prerequisites
 
@@ -72,7 +72,7 @@ Let's review these steps in detail:
    // New client instantiated with our iframe stamper
    const client = new TurnkeyClient(
      { baseUrl: "https://api.turnkey.com" },
-     iframeStamper,
+     iframeStamper
    );
 
    // Sign and submits the RECOVER_USER activity
