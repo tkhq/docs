@@ -109,7 +109,7 @@ const config = {
           {
             position: "left",
             label: "Changelog",
-            to: "/api",
+            to: "/changelog",
           },
           // {to: '/blog', label: 'Blog', position: 'left'},
           {
