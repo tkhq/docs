@@ -108,4 +108,3 @@ The below table enumerates all errors across different actions that can be taken
 | Create Sub Org     | InvalidArgument   | 400       | invalid curve                                                                                            |
 | Create Sub Org     | InvalidArgument   | 400       | curve required                                                                                           |
 | Approve Activity   | NotFound          | 404       | No activity found with fingerprint. Consensus activities must target an existing activity by fingerprint |
-Footer
