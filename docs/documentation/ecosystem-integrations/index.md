@@ -30,7 +30,7 @@ At our highest level of support, Turnkey offers the ability to parse transaction
 
 <!-- We insert &nbsp; characters to make the columns equal width -->
 | Tier        | Depth of support                 | EVM&nbsp;&nbsp; | SVM&nbsp;&nbsp; | BTC&nbsp;&nbsp; | ATOM | TRON | SUI&nbsp;&nbsp;&nbsp; | APT&nbsp;&nbsp; |
-|-------------|----------------------------------|------------|--------|---------|--------|------|-----|-------|
+|-------------|:----------------------------------|------------|--------|---------|--------|------|-----|-------|
 | Tier&nbsp;1 | Curve-level                      | ✅         | ✅      | ✅      | ✅     | ✅    | ✅  | ✅    |
 | Tier&nbsp;2 | Address derivation               | ✅         | ✅      | ✅      | ✅     | ✅    | ✅  | ✅    |
 | Tier&nbsp;3 | SDK construction and signing     | ✅         | ✅      |         |        |      |     |      |
