@@ -89,17 +89,29 @@ Please get in touch with us (<help@turnkey.com>) if you need this limit adjusted
 
 ## Supported functionality
 
+### Does Turnkey support Ethereum (EVM)?
+
+Yes! See [Ethereum (EVM) support on Turnkey](./ecosystem-integrations/ethereum.md) for more information and concrete examples.
+
+### Does Turnkey support Solana (SVM)?
+
+Yes! See [Solana (SVM) support on Turnkey](./ecosystem-integrations/solana.md) for more information and concrete examples.
+
+### Does Turnkey support Bitcoin?
+
+Yes! See [Bitcoin support on Turnkey](./ecosystem-integrations/bitcoin.md) for more information and concrete examples.
+
 ### Which cryptographic curves do you support?
 
-Turnkey currently supports secp256k1 and ed25519.
+Turnkey currently supports SECP256k1 and Ed25519.
 
-### Which cryptocurrencies do you support?
+### Which ecosystems and chains do you support?
 
-Turnkey's primitive for private keys is cryptographic curves, not specific cryptocurrencies. This means that if Turnkey supports the cryptographic curve used by a given cryptocurrency, you can use Turnkey private keys to store and sign for that asset.
+Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. Our approach to supporting assets is tiered, see [this page](./ecosystem-integrations/index.md) for more information.
 
-We have deeper support for common Ethereum use cases in our API and SDKs, including address derivation and scripts to help you construct simple transactions.
+We have deeper support for [Ethereum](./ecosystem-integrations/ethereum.md), [Solana](./ecosystem-integrations/solana.md), and [Bitcoin](./ecosystem-integrations/bitcoin.md).
 
-If there are specific cryptocurrencies you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.com>.
+If there are specific ecosystems or chains you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.com>, on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw).
 
 ### Do you support transaction construction and broadcast?
 
