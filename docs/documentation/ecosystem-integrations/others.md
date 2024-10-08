@@ -17,6 +17,6 @@ We support address derivation for these ecosystems. We also have two SDK example
 * [`examples/with-sui`](https://github.com/tkhq/sdk/tree/main/examples/with-sui) demonstrates transaction construction and broadcast on Sui.
 * [`examples/with-aptos`](https://github.com/tkhq/sdk/tree/main/examples/with-aptos) demonstrates transaction construction and broadcast on Aptos.
 
-## Ed25519 and Secp256k1 Signing
+## Ed25519 and SECP256k1 Signing
 
-Turnkey supports bare bare Ed25519 and Secp256k1 signing which covers most ecosystems and blockchains out there. If your ecosystem of choice isn't covered adequately we're open to feedback and feature requests. Give us a shout on [X](https://x.com/turnkeyhq/) or [Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw)!
+Turnkey supports bare bare Ed25519 and SECP256k1 signing which covers most ecosystems and blockchains out there. If your ecosystem of choice isn't covered adequately we're open to feedback and feature requests. Give us a shout on [X](https://x.com/turnkeyhq/) or [Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw)!

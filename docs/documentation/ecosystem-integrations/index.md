@@ -4,7 +4,7 @@ import DocCardList from '@theme/DocCardList';
 
 ## Introduction
 
-Turnkey operates at the **cryptographic curve** level rather that specific assets. As a result Turnkey is asset agnostic and can be used with any type of asset as long as we support the curve type (today: Ed25519, Secp256k1).
+Turnkey operates at the **cryptographic curve** level rather that specific assets. As a result Turnkey is asset agnostic and can be used with any type of asset as long as we support the underlying curve.
 
 We are continuously evaluating and adding support for emerging assets and protocols. If there are specific cryptocurrencies you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.com>, on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw).
 
@@ -28,7 +28,8 @@ Our SDK provides tools and scripts to help in constructing and signing basic tra
 
 At our highest level of support, Turnkey offers the ability to parse transactions and define custom policies based on transaction parameters.
 
-| Tier        | Depth of support                 | EVM chains | Solana | Bitcoin | Cosmos | Tron | Sui | Aptos |
+<!-- We insert &nbsp; characters to make the columns equal width -->
+| Tier        | Depth of support                 | EVM&nbsp;&nbsp; | SVM&nbsp;&nbsp; | BTC&nbsp;&nbsp; | ATOM | TRON | SUI&nbsp;&nbsp;&nbsp; | APT&nbsp;&nbsp; |
 |-------------|----------------------------------|------------|--------|---------|--------|------|-----|-------|
 | Tier&nbsp;1 | Curve-level                      | ✅         | ✅      | ✅      | ✅     | ✅    | ✅  | ✅    |
 | Tier&nbsp;2 | Address derivation               | ✅         | ✅      | ✅      | ✅     | ✅    | ✅  | ✅    |

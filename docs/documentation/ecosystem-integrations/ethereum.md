@@ -51,5 +51,36 @@ If you're looking for shorter, more focused examples, here are a few worth check
 * [`examples/with-uniswap`](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap): shows how to use Turnkey with Uniswap, using Ethers.
 * [`example/with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider): short example focused on EIP-1193 provider usage.
 
+## Which EVM chains does Turnkey support?
 
+Turnkey supports the EVM chains below for address derivation and signing arbitrary transactions:
+* Arbitrum
+* Aurora
+* Avalanche C chain
+* Avalanche Fuji
+* Base
+* Base
+* Berachain
+* BNB Smart Chain
+* Celo
+* Chiliz
+* Cronos
+* EON
+* Ethereum
+* Fantom
+* Gnosis
+* Holesky Redstone
+* Holesky Garnet
+* Lukso
+* Linea
+* Moonbeam
+* Optimism
+* Palm
+* Polygon
+* Redstone
+* Scroll
+* Zora
+* zkSync
+* Zora
 
+If you are using an EVM chain we do not support, feel free to contact us at <hello@turnkey.com>, on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw).

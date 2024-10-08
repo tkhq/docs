@@ -103,7 +103,7 @@ Yes! See [Bitcoin support on Turnkey](./ecosystem-integrations/bitcoin.md) for m
 
 ### Which cryptographic curves do you support?
 
-Turnkey currently supports Secp256k1 and Ed25519.
+Turnkey currently supports SECP256k1 and Ed25519.
 
 ### Which ecosystems and chains do you support?
 
