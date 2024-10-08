@@ -4,7 +4,7 @@ title: Bitcoin
 slug: /ecosystems/bitcoin
 ---
 
-# Integration with the Bitcoin ecosystem
+# Bitcoin support on Turnkey
 
 ## BIP32 and BIP44: the basis for Turnkey wallets
 

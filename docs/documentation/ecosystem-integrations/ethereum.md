@@ -4,7 +4,7 @@ title: Ethereum (EVM)
 slug: /ecosystems/ethereum
 ---
 
-# Integration with the Ethereum (EVM) ecosystem
+# Ethereum (EVM) support on Turnkey
 
 ## Address derivation
 
