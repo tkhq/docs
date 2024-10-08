@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1000
 title: Others
+description: "Specific support for other ecosystems on Turnkey"
 slug: /ecosystems/others
 ---
 

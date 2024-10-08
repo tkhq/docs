@@ -1,6 +1,7 @@
 ---
 sidebar_position: 30
 title: Bitcoin
+description: "Bitcoin support on Turnkey"
 slug: /ecosystems/bitcoin
 ---
 

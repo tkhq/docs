@@ -107,7 +107,7 @@ Turnkey currently supports Secp256k1 and Ed25519.
 
 ### Which ecosystems and chains do you support?
 
-Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. If Turnkey supports the cryptographic curve used by a given asset, you can use Turnkey to store and sign.
+Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. Our approach to supporting assets is tiered, see [this page](./ecosystem-integrations/index.md) for more information.
 
 We have deeper support for [Ethereum](./ecosystem-integrations/ethereum.md), [Solana](./ecosystem-integrations/solana.md), and [Bitcoin](./ecosystem-integrations/bitcoin.md).
 

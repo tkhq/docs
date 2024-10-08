@@ -1,6 +1,7 @@
 ---
 sidebar_position: 10
 title: Ethereum (EVM)
+description: "Ethereum (EVM) support on Turnkey"
 slug: /ecosystems/ethereum
 ---
 

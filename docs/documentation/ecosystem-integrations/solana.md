@@ -1,6 +1,7 @@
 ---
 sidebar_position: 20
 title: Solana (SVM)
+description: "Solana (SVM) support on Turnkey"
 slug: /ecosystems/solana
 ---
 # Solana (SVM) support on Turnkey
