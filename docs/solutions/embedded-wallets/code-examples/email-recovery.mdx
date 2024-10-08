@@ -1,8 +1,183 @@
 ---
-title: "Recovering a Wallet with Email"
+title: "Recovering a User with Email"
 sidebar_position: 5
 description: Recovering a Wallet with Email
 slug: /embedded-wallets/code-examples/email-recovery
 ---
 
-#### TODO: EMAIL RECOVERY
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import CodeBlock from "@theme/CodeBlock";
+import Parameter from "@site/src/components/parameter";
+
+## Overview
+
+In this guide, we'll walk through the process of recovering a user using their email. This process involves using two Turnkey SDK packages:
+
+1. [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser): Used on the client-side for initializing email recovery and completing the recovery process.
+2. [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server): Used on the server-side to leverage the parent organization's public/private key pair for initializing the email recovery.
+
+The email recovery process is split between client-side and server-side operations to ensure security and proper handling of sensitive information.
+
+#### Initialize the Turnkey SDK with your organization ID and API base URL
+
+Begin by initializing the Turnkey SDK with your organization ID and API base URL on the client-side.
+
+```typescript title="/src/turnkey.ts"
+import { Turnkey } from "@turnkey/sdk-browser";
+
+// Initialize the Turnkey SDK with your organization ID and API base URL
+const turnkeyBrowser = new Turnkey({
+  rpId: process.env.TURNKEY_RP_ID,
+  apiBaseUrl: process.env.TURNKEY_API_BASE_URL,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+```
+
+#### Server-side Initialization
+
+On the server-side, you'll need to initialize the Turnkey SDK using the `@turnkey/sdk-server` package. This will allow you to use the parent organization's public/private key pair to initialize the email recovery process securely.
+
+```typescript title="src/turnkey-server.ts"
+// Optional: Used for nextjs server actions
+"use server";
+
+import { Turnkey } from "@turnkey/sdk-server";
+
+// Initialize the Turnkey Server Client on the server-side
+const turnkeyServer = new Turnkey({
+  baseUrl: process.env.TURNKEY_API_BASE_URL,
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+
+// ... (server-side email recovery initialization code will go here)
+```
+
+:::note
+If you're implementing this function inside a Next.js app, you should add the "use server" directive at the top of the file where you're initializing the Turnkey server client.
+This will ensure that the function is executed on the server-side and will have access to the server-side environment variables e.g. your parent organization's public/private key pair.
+For more information on Next.js server actions, see the
+[Next.js documentation on Server Actions and Mutations](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+:::
+
+#### Initialize the Iframe Client
+
+To enable secure communication between your application and Turnkey's services, you need to initialize the iframe client. This client creates a secure iframe within your application, which handles sensitive operations without exposing them to the main application context.
+
+```typescript title="/src/turnkey.ts"
+const iframeContainerId = "turnkey-recovery-iframe-container-id";
+
+// ensure the HTML element exists somewhere in the rendered DOM
+// <div id={iframeContainerId} />
+
+const authIframeClient = await turnkey.iframeClient(
+  document.getElementById(iframeContainerId)
+);
+```
+
+:::note
+If you are using the [react-sdk](/sdks/react), you can import the `iframeClient` from the `useTurnkey()` hook without this step,
+and the iframe DOM element will be managed for you. The `iframeClient` must be initialized before calling `emailRecovery` because
+you need the `iframePublicKey` as a parameter for the `emailRecovery` call.
+:::
+
+#### Create recovery function
+
+Next we'll create a new function called `initEmailRecovery` that will be used to initialize the email recovery process on the server-side.
+This method will be called from the client-side with the user's email and the target public key from the iframe client. Calling the `initEmailRecovery`
+method will trigger an email sent to the user containing a credential bundle which will be used to authenticate the authIframeClient in the next step.
+
+```typescript title="/src/turnkey-server.ts"
+export const initEmailRecovery = async ({
+  email,
+  targetPublicKey,
+}: {
+  email: Email;
+  targetPublicKey: string;
+}) => {
+  const recoveryResponse = await turnkeyServer.initUserEmailRecovery({
+    email,
+    targetPublicKey,
+  });
+  return recoveryResponse;
+};
+```
+
+#### Initialize Email Recovery
+
+At this stage, we initialize the email recovery process using a server-side function we created in the previous step.
+The user will need to paste the credential bundle they receive in their email into your app, which is then used to
+authenticate the `authIframeClient` via the `injectCredentialBundle` method.
+
+```typescript title="/src/turnkey.ts"
+import { initEmailRecovery } from "./turnkey-server";
+
+// ... rest of the code
+// We'll use the authIframeClient initialized in the previous step
+
+const initRecoveryResponse = await initEmailRecovery({
+  email,
+  targetPublicKey: `${authIframeClient?.iframePublicKey}`,
+});
+
+// Inject the recovery bundle into the iframe client
+// The recovery bundle is the credential bundle that the user will receive in their email
+// The application will need to provide a way for the user to input this recovery bundle
+// by pasting it into the UI
+await authIframeClient!.injectCredentialBundle(credentialBundle);
+```
+
+#### Create User Passkey
+
+In this step, we create a new passkey for the user, associating it with the email that was used in the recovery process.
+Now that the user has successfully received and entered their credential bundle,
+we generate a passkey to be used for future authentications.
+
+```typescript title="/src/turnkey.ts"
+// ... rest of the code
+
+// Initialize the passkey client
+const passkeyClient = await turnkey.passkeyClient();
+
+const { encodedChallenge, attestation } =
+  (await passkeyClient?.createUserPasskey({
+    publicKey: {
+      user: {
+        name: email,
+        displayName: email,
+      },
+    },
+  })) || {};
+```
+
+#### Complete Email Recovery
+
+In this final step, we complete the email recovery process by passing the `encodedChallenge` and `attestation` from the passkey we
+created in the previous step to the `recoverUser` method.
+This method will complete the email recovery process and if successful,
+will return a response containing the authenticator ID of the new passkey authenticator.
+
+```typescript title="/src/turnkey.ts"
+// ... rest of the code
+
+const response = await authIframeClient!.recoverUser({
+  organizationId: initRecoveryResponse?.activity.organizationId,
+  userId: initRecoveryResponse.userId,
+  authenticator: {
+    // This should be set by the user to name their authenticator
+    authenticatorName: "User Passkey",
+    challenge: encodedChallenge,
+    attestation,
+  },
+});
+```
+
+## Conclusion
+
+In this guide, we've walked through the process of recovering a user using their email using the Turnkey SDKs.
+By following these steps, you can implement email recovery in your application,
+providing users with a reliable way to regain access to their accounts or to onboard new users using only their email address.
+
+For a complete example, check out our [email recovery app](https://github.com/tkhq/sdk/tree/main/examples/email-recovery).
