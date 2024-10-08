@@ -8,7 +8,7 @@ slug: /ecosystems/others
 
 ## Cosmos
 
-We support address derivation and have published a package on NPM to help with transaction construction: [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs). See it in action in [`examples/with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs)
+We support address derivation and have published a package on NPM to help with transaction construction: [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs). See it in action in [`examples/with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs).
 
 ## Tron, Sui, Aptos
 
