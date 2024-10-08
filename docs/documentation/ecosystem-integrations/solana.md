@@ -14,7 +14,7 @@ To construct and sign a Solana transaction we offer a `@turnkey/solana` NPM pack
 
 ## Transaction parsing, policies, and signing
 
-Turnkey has built a Solana parser which runs in a secure enclave, to parse unsigned transactions and extract metadata. Solana transactions are a list of instructions. We offer details about program keys, accounts, signers, and more. See the `SolanaTransaction` struct in our [policy langugage](../concepts/policy-management/Policy-language.md) page for a full list.
+Turnkey has built a Solana parser which runs in a secure enclave, to parse unsigned transactions and extract metadata. Solana transactions are a list of instructions. We offer details about program keys, accounts, signers, and more. See the `SolanaTransaction` struct in our [policy language](../concepts/policy-management/Policy-language.md) page for a full list.
 
 As a bonus, Turnkey also takes care of combining the signature with the original payload if you use the `SIGN_TRANSACTION` activity types: the input is the unsigned payload, and the output is the signed Solana transaction, ready to be broadcast onchain.
 

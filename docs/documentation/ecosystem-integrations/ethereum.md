@@ -18,7 +18,7 @@ To construct and sign an EVM transaction with Turnkey, we offer:
 
 ## Transaction parsing, policies, and signing
 
-Turnkey has built an EVM parser which runs in a secure enclave, to parse unsigned EVM transactions and extract useful metadata: transaction source, destination, amount, chain ID, and more. See the `EthereumTransaction` struct in our [policy langugage](../concepts/policy-management/Policy-language.md) page for a full list.
+Turnkey has built an EVM parser which runs in a secure enclave, to parse unsigned EVM transactions and extract useful metadata: transaction source, destination, amount, chain ID, and more. See the `EthereumTransaction` struct in our [policy language](../concepts/policy-management/Policy-language.md) page for a full list.
 
 As a bonus, Turnkey also takes care of combining the signature with the original payload if you use the `SIGN_TRANSACTION` activity types: the input is the unsigned payload (RLP encoded), and the output is the signed RLP encoded transaction, ready to be broadcast!
 
