@@ -66,7 +66,7 @@ Contact us at hello@turnkey.com.
 
 ## Delete wallets
 
-To delete wallets you can call the [delete wallets activity](https://docs.turnkey.com/api#tag/Wallets/operation/DeleteWallets). Before deleting a wallet it must have been exported to prevent loss of funds, or you can pass in the `deleteWithoutExport` parameter with the value true to override this. The `deleteWithoutExport` parameter, if not passed in, is default false. Note that this activity must be initiated by the wallet owner.
+To delete wallets you can call the [delete wallets activity](https://docs.turnkey.com/api#tag/Wallets/operation/DeleteWallets). Before deleting a wallet it must have been exported to prevent loss of funds, or you can pass in the `deleteWithoutExport` parameter with the value `true` to override this. The `deleteWithoutExport` parameter, if not passed in, is default `false`. Note that this activity must be initiated by the wallet owner.
 
 ## Private Keys
 
@@ -86,4 +86,4 @@ Importing on Turnkey enables you or your end users to import a Wallet or Private
 
 ## Delete keys
 
-To delete prviate keys you can call the [delete private keys activity](https://docs.turnkey.com/api#tag/Private-Keys/operation/DeletePrivateKeys). Before deleting a private key it must have been exported to prevent loss of funds, or you can pass in the `deleteWithoutExport` parameter with the value true to override this. The `deleteWithoutExport` parameter, if not passed in, is default false. Note that this activity must be initiated by the private key owner.
+To delete prviate keys you can call the [delete private keys activity](https://docs.turnkey.com/api#tag/Private-Keys/operation/DeletePrivateKeys). Before deleting a private key it must have been exported to prevent loss of funds, or you can pass in the `deleteWithoutExport` parameter with the value `true` to override this. The `deleteWithoutExport` parameter, if not passed in, is default `false`. Note that this activity must be initiated by the private key owner.
