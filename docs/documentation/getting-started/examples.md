@@ -58,13 +58,13 @@ A comprehensive demo showcasing how to build an embedded wallet using Turnkey. T
 }}>
   <img
     src="/demo-embedded-wallet.png"
-    alt="demo embedded wallet screenshot"
-    style={{ width: "100%", height: "auto", borderRadius: "4px", boxShadow: "var(--ifm-global-shadow-tl)" }}
+    alt="demo embedded wallet login view"
+    style={{ width: "100%", height: "auto", borderRadius: "4px",  boxShadow: "0 2px 5px 0 #0003"  }}
   />
   <img
     src="/demo-embedded-wallet-ui.png"
-    alt="another image description"
-    style={{ width: "100%", height: "auto", borderRadius: "4px", boxShadow: "var(--ifm-global-shadow-tl)" }}
+    alt="demo embedded wallet dashboard view"
+    style={{ width: "100%", height: "auto", borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
   />
 </p>
 
@@ -75,7 +75,7 @@ See https://github.com/tkhq/demo-embedded-wallet for the code.
 A minimal consumer wallet app powered by Turnkey. Behind the scenes, it uses [`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) for signing and WalletConnect (v1) for accessing dapps.
 
 <p style={{ textAlign: "center" }}>
-  <video controls width="800px">
+  <video controls width="800px" style={{ borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}>
     <source src="https://github.com/tkhq/demo-consumer-wallet/assets/127255904/2c3409df-2d7c-4ec3-9aa8-e2944a0b0e0a"/>
   </video>
 </p>
@@ -91,7 +91,7 @@ This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](/conce
   <img
     src="/demo-passkey-wallet.png"
     alt="demo passkey wallet screenshot"
-    style={{ width: 800 }}
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
   />
 </p>
 
@@ -105,7 +105,7 @@ A simple application demonstrating how to create sub-organizations, create priva
   <img
     src="/ethers-ui-screenshot.png"
     alt="ethers ui screenshot"
-    style={{ width: 800 }}
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
   />
 </p>
 
@@ -119,7 +119,7 @@ A similar, simple application demonstrating how to create sub-organizations, cre
   <img
     src="/viem-ui-screenshot.png"
     alt="viem ui screenshot"
-    style={{ width: 800 }}
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
   />
 </p>
 
@@ -130,7 +130,7 @@ See https://github.com/tkhq/demo-viem-passkeys for the code.
 A simple React Native app that demonstrates sign up and sign in with passkeys, as well as Email Auth support.
 
 <p style={{ textAlign: "center" }}>
-  <video controls width="800px">
+  <video controls width="800px" style={{ borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}>
     <source src="https://github.com/r-n-o/passkeyapp/assets/104520680/9fabf71c-d88a-4631-8bfa-14b55c72967b"/>
   </video>
 </p>
