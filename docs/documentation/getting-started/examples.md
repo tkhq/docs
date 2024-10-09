@@ -43,22 +43,28 @@ That said, we have built out several example services and applications to help i
 
 A comprehensive demo showcasing how to build an embedded wallet using Turnkey. This demo uses the [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser), [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) and [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server) packages and includes features such as:
 
-- User authentication with passkeys, email auth, and oauth auth
+- User authentication with passkeys, email auth, and OAuth
 - Creating new wallets and wallet accounts
-- Sending a transaction
+- Sending and receiving funds
 - Importing/Exporting a wallet
 - Adding a credential to the wallet
 
-<p style={{ display: "flex",  alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+<p style={{ 
+  display: "grid", 
+  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", 
+  gap: "12px", 
+  borderRadius: "6px",
+  padding: "12px" 
+}}>
   <img
     src="/demo-embedded-wallet.png"
     alt="demo embedded wallet screenshot"
-    style={{ width: "50%", marginBottom: "10px" }}
+    style={{ width: "100%", height: "auto", borderRadius: "4px", boxShadow: "var(--ifm-global-shadow-tl)" }}
   />
   <img
     src="/demo-embedded-wallet-ui.png"
     alt="another image description"
-    style={{ width: "50%" }}
+    style={{ width: "100%", height: "auto", borderRadius: "4px", boxShadow: "var(--ifm-global-shadow-tl)" }}
   />
 </p>
 
