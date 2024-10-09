@@ -24,3 +24,7 @@ Root users can be programmatic or human, with one or many credentials attached.
 ## Using Sub-Organizations
 
 [Sub-Organizations as Wallets](/embedded-wallets/sub-organizations-as-wallets) explains how you might want to use this primitive as a way to model end-user controlled wallets, or custodial wallets. If you have another use-case in mind, or questions/feedback on this page, reach out to [welcome@turnkey.com](mailto:welcome@turnkey.com)!
+
+## Deleting Sub-Organizations
+
+To delete sub-organizations you can call the [delete sub-organization activity](https://docs.turnkey.com/api#tag/Organizations/operation/DeleteSubOrganization). Before deleting a sub-organization all private keys and wallets within the sub-organization must have been exported to prevent loss of funds, or you can pass in the `deleteWithoutExport` parameter with the value true to override this. The `deleteWithoutExport` parameter, if not passed in, is default false. Note that this activity must be initiated by the sub-organization that is to be deleted.
