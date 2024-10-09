@@ -76,7 +76,7 @@ Let's review these steps in detail:
     // New client instantiated with our iframe stamper
     const client = new TurnkeyClient(
       { baseUrl: "https://api.turnkey.com" },
-      iframeStamper
+      iframeStamper,
     );
 
     // Sign and submits the CREATE_WALLET activity
@@ -114,7 +114,7 @@ Let's review these steps in detail:
     ```js
     const client = new TurnkeyClient(
       { baseUrl: "https://api.turnkey.com" },
-      iframeStamper
+      iframeStamper,
     );
 
     // Sign and submits a SIGN_TRANSACTION activity
