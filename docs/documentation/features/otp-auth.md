@@ -7,9 +7,10 @@ slug: /features/otp-auth
 # OTP Auth
 
 OTP (one-time password) Auth enables a user to authenticate their Turnkey account with an email or phone number via a 6 digit one time password. Similar to email auth, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key.
+
 #### Mechanism
 
-OTP Auth uses two activities: INIT_OTP_AUTH sends a 6-digit OTP code to a specified phone number or email, and OTP_AUTH to verify the code. Upon successful verification, OTP_AUTH returns the encrypted API key credential (The same one that would be delivered to an email directly in an EMAIL_AUTH activity) in the activity result. This credential is then available for stamping (authenticating) requests on the client side. 
+OTP Auth uses two activities: INIT_OTP_AUTH sends a 6-digit OTP code to a specified phone number or email, and OTP_AUTH to verify the code. Upon successful verification, OTP_AUTH returns the encrypted API key credential in the activity result. This credential is then available for stamping (authenticating) requests on the client side. 
 
 ## User Experience
 
@@ -51,11 +52,11 @@ Authorization for OTP auth is based on our usual activity authorization: our [po
 </p>
 
 
-## Opting out of otp auth
+## Opting out of OTP auth
 
 Similar to email recovery and email auth, depending on your threat model, it may be unacceptable to rely on an email or phone number as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable OTP auth with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP email and `FEATURE_NAME_SMS_AUTH` for OTP SMS.
 
-If you _never_ want to have email auth enabled for sub-organizations, our `CREATE_SUB_ORGANIZATION` activity takes `disableOtpEmailAuth` and `disableSmsAuth` booleans in its parameters. Set them to `true` and the sub-organization will be created without the organization feature.
+If you _never_ want to have OTP email/SMS auth enabled for sub-organizations, our `CREATE_SUB_ORGANIZATION` activity takes `disableOtpEmailAuth` and `disableSmsAuth` booleans in its parameters. Set them to `true` and the sub-organization will be created without the organization feature.
 
 ## Mechanism and cryptographic details
 
