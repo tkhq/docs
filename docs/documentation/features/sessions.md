@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 description: Learn about user sessions on Turnkey
 slug: /features/sessions
 ---

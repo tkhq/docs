@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 8
 description: Learn about pre-generating wallets for users on Turnkey.
 slug: /features/pregenerated-wallets
 ---

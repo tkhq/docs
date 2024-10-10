@@ -21,6 +21,7 @@ Email Auth starts with a new activity posted to Turnkey. This activity has the t
 - `apiKeyName`: an optional name for the API Key. If none is provided, we will default to `Email Auth - <Timestamp>`
 - `expirationSeconds`: an optional window (in seconds) indicating how long the API Key should last. Default to 15 minutes.
 - `emailCustomization`: optional parameters for customizing emails. If not provided, the default email will be used. For more info, see the [integration guide](/embedded-wallets/sub-organization-auth#email-customization).
+- `invalidateExisting`: an optional boolean used to invalidate all other previously generated Email Auth API keys
 
 This activity generates a new API key pair (an "auth credential"), saves the public key in organization data under the target user, and sends an email with the encrypted auth credential:
 
