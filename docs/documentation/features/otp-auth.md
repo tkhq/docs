@@ -6,7 +6,7 @@ slug: /features/otp-auth
 
 # OTP Auth
 
-OTP Auth enables a user to authenticate their Turnkey account with an emai or phone number via a 6 digit one time password. Similar to email auth, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing OTP Auth for an organization can be found in our SDK repo (TODO) [here](https://github.com/tkhq/sdk/tree/main/examples/otp-auth)
+OTP (one-time password) Auth enables a user to authenticate their Turnkey account with an email or phone number via a 6 digit one time password. Similar to email auth, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing OTP Auth for an organization can be found in our SDK repo (TODO) [here](https://github.com/tkhq/sdk/tree/main/examples/otp-auth)
 
 #### Mechanism
 
@@ -17,7 +17,7 @@ OTP Auth uses two activities: INIT_OTP_AUTH sends a 6-digit OTP code to a specif
 OTP Auth starts with a new activity posted to Turnkey. This activity has the type `ACTIVITY_TYPE_INIT_OTP_AUTH` and takes the following as parameters:
 
 - `otpType`: specifiy delivery mechanism `"OTP_TYPE_SMS"` or `"OTP_TYPE_EMAIL"`
-- `contact`: the email or phone number of the user who would like to authenticate. This contact must be already attached to the user in organization data (i.e., previously approved by the user). This prevents malicious account takeover. If you try to pass a different email address, the activity will fail.
+- `contact`: the email or phone number of the user who would like to authenticate. This contact must be already attached to the user in organization data (i.e., previously approved by the user). This prevents malicious account takeover. If you try to pass a different email address or phone number, the activity will fail.
 - `emailCustomization`: optional parameters for customizing emails. If not provided, the default email will be used. For more info, see the [integration guide](/embedded-wallets/sub-organization-auth#email-customization).
 
 This activity generates a 6 digit OTP, and sends it as an email or SMS
@@ -30,7 +30,7 @@ This activity generates a 6 digit OTP, and sends it as an email or SMS
     />
 </p>
 
-This activity returns an otpId in the result to be used in the following `ACTIVITY_TYPE_OTP_AUTH` to verify the 6 digit code which takes the following as parameters:
+This activity returns an `otpId` in the result to be used in the following `ACTIVITY_TYPE_OTP_AUTH` to verify the 6 digit code which takes the following as parameters:
 
 - `otpId`: ID representing the result of an `ACTIVITY_TYPE_INIT_OTP_AUTH`
 - `otpCode`: 6 digit OTP code sent out to a user's contact (email or SMS)
@@ -48,13 +48,13 @@ Authorization for OTP auth is based on our usual activity authorization: our [po
 - `ACTIVITY_TYPE_OTP_AUTH` can be performed by the root user or by any user in an organization if authorized by policy, but **only if the feature is enabled**. The activity can target **any user** in this organization **or any sub-organization user**. The activity will fail if a parent user tries to perform OTP auth for a sub-organization which has [opted out of this feature](#opting-out-of-otp-auth).
 
 <p style={{textAlign: 'center'}}>
-    <img src="/img/diagrams/email_auth_authorization.png" width="500" height="200"/>
+    <img src="/img/diagrams/otp_auth_authorization.png" width="500" height="200"/>
 </p>
 
 
 ## Opting out of otp auth
 
-Similar to email recovery and email auth, depending on your threat model, it may be unacceptable to rely on and email or phone number as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable OTP auth with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP email and `FEATURE_NAME_SMS_AUTH` for OTP SMS.
+Similar to email recovery and email auth, depending on your threat model, it may be unacceptable to rely on an email or phone number as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable OTP auth with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP email and `FEATURE_NAME_SMS_AUTH` for OTP SMS.
 
 If you _never_ want to have email auth enabled for sub-organizations, our `CREATE_SUB_ORGANIZATION` activity takes `disableOtpEmailAuth` and `disableSmsAuth` booleans in its parameters. Set them to `true` and the sub-organization will be created without the organization feature.
 
@@ -62,9 +62,9 @@ If you _never_ want to have email auth enabled for sub-organizations, our `CREAT
 
 Note: if the following section looks familiar, it is! It shares similar cryptographic innerworkings to Email Recovery and Email Auth.
 
-Turnkey's OTP auth doesn't send unencrypted tokens via the activity result. This ensures no man-in-the-middle attack can happen: even if the content of the activity result is leaked, an attacker wouldn't be able to decrypt the auth credential. The following diagram summarizes the flow:
+Turnkey's OTP auth doesn't send unencrypted tokens via the activity result. This ensures no man-in-the-middle attack can happen: even if the content of the activity result is leaked, an attacker wouldn't be able to decrypt the auth credential. The following diagram summarizes the flow (Same as Email auth):
 
-<img src="/img/email_auth_cryptography.png" />
+<img src="/img/otp_auth_cryptography.png" />
 
 Our OTP auth flow works by anchoring auth in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
 
