@@ -7,88 +7,93 @@ slug: /embedded-wallets/code-examples/authenticate-user-email
 
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
-import CodeBlock from "@theme/CodeBlock";
 import Parameter from "@site/src/components/parameter";
 
 #### 1. Initialize Turnkey
 
-<CodeBlock language="typescript">
-  {`import { Turnkey } from "@turnkey/sdk-browser";`}
-  {`\n\nconst turnkey = new Turnkey({
+```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const turnkey = new Turnkey({
   apiBaseUrl: "https://api.turnkey.com",
-  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID
-})`}
-</CodeBlock>
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+```
 
 #### 2. Initialize the Iframe Client
 
 Note that the iframe client must be initialized with the dom element where the iframe will be injected. If you are using the [react-sdk](/sdks/react) you can import the `iframeClient` from the `useTurnkey()` hook without this step and the iframe dom element will be managed for you. Note that the `iframeClient` must be initialized before calling `emailAuth` because you need the `iframePublicKey` as a parameter to the `emailAuth` call.
 
-<CodeBlock language="typescript">
-  {`import { Turnkey, TurnkeySDKBrowserConfig } from "@turnkey/sdk-browser";`}
-  {`\n\nconst turnkeyConfig: TurnkeySDKBrowserConfig = {...};`}
-  {`\nconst turnkey = new Turnkey(turnkeyConfig);`}
-  {`\n\nconst iframeContainerId = "turnkey-auth-iframe-container-id";`}
-  {`\n\n// ensure the HTML element exists somewhere in the rendered DOM`}
-  {`\n<div id={iframeContainerId} />`}
-  {`\n\nconst iframeClient = await turnkey.iframeClient(document.getElementById(iframeContainerId))`}
-</CodeBlock>
+```typescript
+import { Turnkey, TurnkeySDKBrowserConfig } from "@turnkey/sdk-browser";
+
+const turnkeyConfig: TurnkeySDKBrowserConfig = {...};
+const turnkey = new Turnkey(turnkeyConfig);
+
+const iframeContainerId = "turnkey-auth-iframe-container-id";
+
+// ensure the HTML element exists somewhere in the rendered DOM
+<div id={iframeContainerId} />
+
+const iframeClient = await turnkey.iframeClient(document.getElementById(iframeContainerId))
+```
 
 #### 3. Call `emailAuth` from your backend
 
-<CodeBlock language="typescript">
-  {`await turnkey.serverSign(
+```typescript
+await turnkey.serverSign(
   "emailAuth",
   [{
     email: <userEmail>,
     targetPublicKey: iframeClient.iframePublicKey,
     organizationId: <userSubOrganizationId>
   }]
-)`}
-</CodeBlock>
+)
+```
 
 If you need to lookup the user `subOrganizationId` by email, you can call the `getSubOrgIds` method with the `filterType` parameter set to `"EMAIL"`
 
-<CodeBlock language="typescript">
-  {`const subOrgIds = await turnkey.serverSign(
+```typescript
+const subOrgIds = await turnkey.serverSign(
   "getSubOrgIds",
   [{
     filterType: "EMAIL",
     filterValue: <userEmail>
   }]
-)`}
-  {`\n\nconst userSubOrganizationId = subOrgIds.organizationIds[0];`}
-</CodeBlock>
+)
+
+const userSubOrganizationId = subOrgIds.organizationIds[0];
+```
 
 #### 4. Inject the emailed `credentialBundle` into the iframe to authenticate the user
 
-<CodeBlock language="typescript">
-  {`const authenticationResponse = await iframeClient.injectCredentialBundle(credentialBundle);
+```typescript
+const authenticationResponse =
+  await iframeClient.injectCredentialBundle(credentialBundle);
 if (authenticationResponse) {
-  // user is authenticated and can perform actions from the \`iframeClient\`
+  // user is authenticated and can perform actions from the `iframeClient`
   await iframeClient.login();
   navigate("/authenticated-route");
 } else {
   // credential bundle does not match emailed credential
   navigate("/not-authenticated-route");
 }
-`}
-</CodeBlock>
+```
 
 #### 5. Make read requests on behalf of the authenticated user from the `currentUserSession`
 
-<CodeBlock language="typescript">
-  {`const currentUserSession = await turnkey.currentUserSession();`}
-  {`\nconst walletsResponse = await currentUserSession.getWallets()`}
-  {`\nconst walletName = walletsResponse.wallets[0].walletName`}
-</CodeBlock>
+```typescript
+const currentUserSession = await turnkey.currentUserSession();
+const walletsResponse = await currentUserSession.getWallets();
+const walletName = walletsResponse.wallets[0].walletName;
+```
 
 #### 6. Call the `iframeClient` directly for write requests
 
-<CodeBlock language="typescript">
-  {`import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";`}
-  {`\nconst newWalletResponse = await iframeClient.createWallet({
+```typescript
+import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+const newWalletResponse = await iframeClient.createWallet({
   walletName: "New Wallet for User",
-  accounts: DEFAULT_ETHEREUM_ACCOUNTS
-})`}
-</CodeBlock>
+  accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+});
+```
