@@ -18,21 +18,24 @@ Turnkey supports importing and exporting keys in mnemonics form, following [BIP3
 ## Address derivation
 
 You can derive Bitcoin addresses when creating a Turnkey wallet or private key. The address types we support currently:
-* P2PKH (Pay-To-Public-Key-Hash)
-* P2SH (Pay-To-Script-Hash)
-* P2WPKH (Pay-to-Witness-Public-Key-Hash) -- [segwit-enabled](https://learnmeabitcoin.com/technical/upgrades/segregated-witness/)
-* P2WSH (Pay-to-Witness-Script-Hash) -- [segwit-enabled](https://learnmeabitcoin.com/technical/upgrades/segregated-witness/)
-* P2TR (Pay-to-Taproot) -- [taproot-enabled](https://cointelegraph.com/learn/a-beginners-guide-to-the-bitcoin-taproot-upgrade)
+
+- P2PKH (Pay-To-Public-Key-Hash)
+- P2SH (Pay-To-Script-Hash)
+- P2WPKH (Pay-to-Witness-Public-Key-Hash) -- [segwit-enabled](https://learnmeabitcoin.com/technical/upgrades/segregated-witness/)
+- P2WSH (Pay-to-Witness-Script-Hash) -- [segwit-enabled](https://learnmeabitcoin.com/technical/upgrades/segregated-witness/)
+- P2TR (Pay-to-Taproot) -- [taproot-enabled](https://cointelegraph.com/learn/a-beginners-guide-to-the-bitcoin-taproot-upgrade)
 
 Bitcoin addresses change depending on the network you're using (more precisely, their prefix!). When you derive an address the network will be part of the address format. We support the following networks:
-* Mainnet (`MAINNET`)
-* Testnet (`TESTNET`)
-* Regtest (`REGTEST`)
-* Signet (`SIGNET`)
+
+- Mainnet (`MAINNET`)
+- Testnet (`TESTNET`)
+- Regtest (`REGTEST`)
+- Signet (`SIGNET`)
 
 For example:
-* To derive a P2TR address on testnet, use `ADDRESS_FORMAT_BITCOIN_TESTNET_P2TR`.
-* To derive a P2SH address on mainnet, use `ADDRESS_FORMAT_BITCOIN_MAINNET_P2SH`.
+
+- To derive a P2TR address on testnet, use `ADDRESS_FORMAT_BITCOIN_TESTNET_P2TR`.
+- To derive a P2SH address on mainnet, use `ADDRESS_FORMAT_BITCOIN_MAINNET_P2SH`.
 
 ## Schnorr signatures and tweaks
 
@@ -45,4 +48,3 @@ To sign with Schnorr, pass a taproot (P2TR) address inside of your activity's `s
 If you want to get started with Bitcoin we encourage you to look at the following SDK example: [`examples/with-bitcoin`](https://github.com/tkhq/sdk/tree/main/examples/with-bitcoin). It showcases transaction construction and signing with [`bitcoinjs-lib`](https://github.com/bitcoinjs/bitcoinjs-lib), a widely used JS library.
 
 This demo contains a client-side [signer](https://github.com/tkhq/sdk/blob/main/examples/with-bitcoin/src/signer.ts) which seamlessly integrates Turnkey signing with this library for both taproot and non-taproot output signatures. Let us know if you're interested in using it. We have not yet published it as a standalone NPM package, but could do it if we hear enough interest!
-

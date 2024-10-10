@@ -14,8 +14,9 @@ Turnkey supports EVM address derivation with `ADDRESS_TYPE_ETHEREUM`. This addre
 ## Transaction construction and signing
 
 To construct and sign an EVM transaction with Turnkey, we offer:
-* [`@turnkey/viem`](https://npmjs.com/package/@turnkey/viem): contains a `createAccount` method to create a Turnkey-powered [custom account](https://viem.sh/docs/accounts/local) which [Viem](https://viem.sh/) can use seamlessly.
-* [`@turnkey/ethers`](https://npmjs.com/package/@turnkey/ethers): contains a `TurnkeySigner` which implements Ethers' `AbstractSigner` interface. See [Ethers docs](https://docs.ethers.org/v6/api/providers/abstract-signer/#AbstractSigner).
+
+- [`@turnkey/viem`](https://npmjs.com/package/@turnkey/viem): contains a `createAccount` method to create a Turnkey-powered [custom account](https://viem.sh/docs/accounts/local) which [Viem](https://viem.sh/) can use seamlessly.
+- [`@turnkey/ethers`](https://npmjs.com/package/@turnkey/ethers): contains a `TurnkeySigner` which implements Ethers' `AbstractSigner` interface. See [Ethers docs](https://docs.ethers.org/v6/api/providers/abstract-signer/#AbstractSigner).
 
 ## Transaction parsing, policies, and signing
 
@@ -43,44 +44,46 @@ A lot of our demos use EVM chains and capabilities. The most complete demo is ou
 
 Try it out at [wallet.tx.xyz](https://wallet.tx.xyz)!
 
-The code behind this demo is open-source, available at https://github.com/tkhq/demo-embedded-wallet/ 
+The code behind this demo is open-source, available at https://github.com/tkhq/demo-embedded-wallet/
 
 If you're looking for shorter, more focused examples, here are a few worth checking out:
-* [`examples/with-eth-passkeys-galore`](https://github.com/tkhq/sdk/tree/main/examples/with-eth-passkeys-galore): shows both Ethers and Viem integrations.
-* [`examples/with-gnosis`](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis): shows how to use Turnkey with [Gnosis (Safe)](https://safe.global/).
-* [`examples/with-uniswap`](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap): shows how to use Turnkey with Uniswap, using Ethers.
-* [`example/with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider): short example focused on EIP-1193 provider usage.
+
+- [`examples/with-eth-passkeys-galore`](https://github.com/tkhq/sdk/tree/main/examples/with-eth-passkeys-galore): shows both Ethers and Viem integrations.
+- [`examples/with-gnosis`](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis): shows how to use Turnkey with [Gnosis (Safe)](https://safe.global/).
+- [`examples/with-uniswap`](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap): shows how to use Turnkey with Uniswap, using Ethers.
+- [`example/with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider): short example focused on EIP-1193 provider usage.
 
 ## Which EVM chains does Turnkey support?
 
 Turnkey supports the EVM chains below for address derivation and signing arbitrary transactions:
-* Arbitrum
-* Aurora
-* Avalanche C chain
-* Avalanche Fuji
-* Base
-* Base
-* Berachain
-* BNB Smart Chain
-* Celo
-* Chiliz
-* Cronos
-* EON
-* Ethereum
-* Fantom
-* Gnosis
-* Holesky Redstone
-* Holesky Garnet
-* Lukso
-* Linea
-* Moonbeam
-* Optimism
-* Palm
-* Polygon
-* Redstone
-* Scroll
-* Zora
-* zkSync
-* Zora
+
+- Arbitrum
+- Aurora
+- Avalanche C chain
+- Avalanche Fuji
+- Base
+- Base
+- Berachain
+- BNB Smart Chain
+- Celo
+- Chiliz
+- Cronos
+- EON
+- Ethereum
+- Fantom
+- Gnosis
+- Holesky Redstone
+- Holesky Garnet
+- Lukso
+- Linea
+- Moonbeam
+- Optimism
+- Palm
+- Polygon
+- Redstone
+- Scroll
+- Zora
+- zkSync
+- Zora
 
 If you are using an EVM chain we do not support, feel free to contact us at <hello@turnkey.com>, on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw).
