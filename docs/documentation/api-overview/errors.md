@@ -46,69 +46,69 @@ Source: https://grpc.io/docs/guides/status-codes/
 
 The below table enumerates all errors across different actions that can be taken using the API. It contains both the GRPC codes as well as the HTTP codes corresponding with each error as well as the displayed error message.
 
-| Action             | GRPC Code         | HTTP Code | Reason                                                                                                   |
-| ------------------ | ----------------- | --------- | -------------------------------------------------------------------------------------------------------- |
-| Authentication     | NotFound          | 404       | no organization found with the given ID                                                                  |
-| Authentication     | Internal          | 500       | internal error                                                                                           |
-| Authentication     | Internal          | 500       | failed to read organization parent ID                                                                    |
-| Authentication     | Internal          | 500       | failed to execute get sub-organization by credential ID query                                            |
-| Authentication     | Internal          | 500       | failed to execute get sub-organization by public key query                                               |
-| Authentication     | Internal          | 500       | cannot find user for public key                                                                          |
-| Authentication     | InvalidArgument   | 400       | malformed organization ID provided                                                                       |
-| Authentication     | InvalidArgument   | 400       | bad request body                                                                                         |
-| Authentication     | PermissionDenied  | 403       | api operations disabled                                                                                  |
-| Authentication     | ResourceExhausted | 403       | this organization cannot execute activities because it is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.                                                                                  |
-| Authentication     | ResourceExhausted | 403       | this sub-organization cannot execute activities because its parent is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.                                                                          |
-| Authentication     | PermissionDenied  | 403       | request not authorized                                                                                   |
-| Authentication     | Unauthenticated   | 401       | no valid authentication signature found for request                                                      |
-| Authentication     | Unauthenticated   | 401       | could not find public key in organization                                                                |
-| Authentication     | Unauthenticated   | 401       | failed while looking up public key in parent organization                                                |
-| Authentication     | Unauthenticated   | 401       | could not find public key in organization or its parent organization                                     |
-| Authentication     | Unauthenticated   | 401       | could not verify WebAuthN signature                                                                      |
-| Authentication     | Unauthenticated   | 401       | credential ID could not be found in organization or its parent organization                              |
-| Authentication     | Unauthenticated   | 401       | public key could not be found in organization or its parent organization                                 |
-| Authentication     | Unauthenticated   | 401       | more than one suborg associated with a credential ID                                                     |
-| Authentication     | Unauthenticated   | 401       | more than one suborg associated with a public key                                                        |
-| Authentication     | Unauthenticated   | 401       | cannot extract api key signature                                                                         |
-| Authentication     | Unauthenticated   | 401       | could not verify api key signature                                                                       |
-| Authentication     | Unauthenticated   | 401       | request does not have a valid authentication header                                                      |
-| Authentication     | Unauthenticated   | 401       | expired api key                                                                                          |
-| Authentication     | Unauthenticated   | 401       | malformed activity stamp                                                                                 |
-| Authentication     | Unauthenticated   | 401       | could not extract webauthn stamp                                                                         |
-| Authentication     | Unauthenticated   | 401       | could not extract api key stamp                                                                          |
-| Authentication     | Unauthenticated   | 401       | cannot authenticate public API activity request without a stamp (X-Stamp/X-Stamp-Webauthn header)        |
-| Authentication     | NotFound          | 404       | webauthn authenticator not found in organization                                                         |
-| Authentication     | NotFound          | 404       | webauthn authenticator not found in organization or parent organization                                  |
-| Authentication     | Internal          | 500       | failed to load webauthn authenticator                                                                    |
-| Signing            | InvalidArgument   | 400       | invalid payload encoding                                                                                 |
-| Signing            | InvalidArgument   | 400       | invalid hash function                                                                                    |
-| Signing            | Internal          | 500\*     | transaction type not implemented                                                                         |
-| Email Auth         | InvalidArgument   | 400       | invalid magic link template                                                                              |
-| Email Auth         | InvalidArgument   | 400       | failed to get email template contents                                                                    |
-| Email Auth         | InvalidArgument   | 400       | failed to unmarshal template variables                                                                   |
-| Email Auth         | Internal          | 500       | error while sending auth email                                                                           |
-| Email Auth         | Internal          | 500       | failed to find user by email                                                                             |
-| List Users         | PermissionDenied  | 403       | authentication failed                                                                                    |
-| List Users         | InvalidArgument   | 400\*     | failed to load organizations                                                                             |
-| List Users         | Internal          | 500       | failed users lookup                                                                                      |
-| Policies           | InvalidArgument   | 400       | policy label must be unique                                                                              |
-| Policies           | InvalidArgument   | 400       | invalid policy consensus                                                                                 |
-| Policies           | InvalidArgument   | 400       | invalid policy condition                                                                                 |
-| Update Root Quorum | InvalidArgument   | 400       | quorum threshold must be non-zero integer                                                                |
-| Update Root Quorum | InvalidArgument   | 400       | quorum threshold cannot be less than quorum user count                                                   |
-| Update Root Quorum | InvalidArgument   | 400       | quorum users missing                                                                                     |
-| Update Root Quorum | InvalidArgument   | 400       | quorum missing                                                                                           |
-| Create Sub Org     | InvalidArgument   | 400       | invalid api key expiration                                                                               |
-| Create Sub Org     | InvalidArgument   | 400       | missing parameter: user authenticator attestation                                                        |
-| Create Sub Org     | InvalidArgument   | 400       | invalid authenticator attestation                                                                        |
-| Create Sub Org     | InvalidArgument   | 400       | missing parameter: user authenticator attestation auth data                                              |
-| Create Sub Org     | ResourceExhausted | 429       | user has exceeded maximum authenticators                                                                 |
-| Create Sub Org     | ResourceExhausted | 429       | user has exceeded maximum long-lived api keys                                                            |
-| Create Sub Org     | ResourceExhausted | 429       | user has exceeded maximum short-lived api keys                                                           |
-| Create Sub Org     | InvalidArgument   | 400       | missing wallet params                                                                                    |
-| Create Sub Org     | InvalidArgument   | 400       | invalid path format                                                                                      |
-| Create Sub Org     | InvalidArgument   | 400       | invalid path                                                                                             |
-| Create Sub Org     | InvalidArgument   | 400       | invalid address format                                                                                   |
-| Create Sub Org     | InvalidArgument   | 400       | invalid curve                                                                                            |
-| Create Sub Org     | InvalidArgument   | 400       | curve required                                                                                           |
-| Approve Activity   | NotFound          | 404       | No activity found with fingerprint. Consensus activities must target an existing activity by fingerprint |
+| Action             | GRPC Code         | HTTP Code | Reason                                                                                                                                                                       |
+| ------------------ | ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication     | NotFound          | 404       | no organization found with the given ID                                                                                                                                      |
+| Authentication     | Internal          | 500       | internal error                                                                                                                                                               |
+| Authentication     | Internal          | 500       | failed to read organization parent ID                                                                                                                                        |
+| Authentication     | Internal          | 500       | failed to execute get sub-organization by credential ID query                                                                                                                |
+| Authentication     | Internal          | 500       | failed to execute get sub-organization by public key query                                                                                                                   |
+| Authentication     | Internal          | 500       | cannot find user for public key                                                                                                                                              |
+| Authentication     | InvalidArgument   | 400       | malformed organization ID provided                                                                                                                                           |
+| Authentication     | InvalidArgument   | 400       | bad request body                                                                                                                                                             |
+| Authentication     | PermissionDenied  | 403       | api operations disabled                                                                                                                                                      |
+| Authentication     | ResourceExhausted | 403       | this organization cannot execute activities because it is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.             |
+| Authentication     | ResourceExhausted | 403       | this sub-organization cannot execute activities because its parent is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information. |
+| Authentication     | PermissionDenied  | 403       | request not authorized                                                                                                                                                       |
+| Authentication     | Unauthenticated   | 401       | no valid authentication signature found for request                                                                                                                          |
+| Authentication     | Unauthenticated   | 401       | could not find public key in organization                                                                                                                                    |
+| Authentication     | Unauthenticated   | 401       | failed while looking up public key in parent organization                                                                                                                    |
+| Authentication     | Unauthenticated   | 401       | could not find public key in organization or its parent organization                                                                                                         |
+| Authentication     | Unauthenticated   | 401       | could not verify WebAuthN signature                                                                                                                                          |
+| Authentication     | Unauthenticated   | 401       | credential ID could not be found in organization or its parent organization                                                                                                  |
+| Authentication     | Unauthenticated   | 401       | public key could not be found in organization or its parent organization                                                                                                     |
+| Authentication     | Unauthenticated   | 401       | more than one suborg associated with a credential ID                                                                                                                         |
+| Authentication     | Unauthenticated   | 401       | more than one suborg associated with a public key                                                                                                                            |
+| Authentication     | Unauthenticated   | 401       | cannot extract api key signature                                                                                                                                             |
+| Authentication     | Unauthenticated   | 401       | could not verify api key signature                                                                                                                                           |
+| Authentication     | Unauthenticated   | 401       | request does not have a valid authentication header                                                                                                                          |
+| Authentication     | Unauthenticated   | 401       | expired api key                                                                                                                                                              |
+| Authentication     | Unauthenticated   | 401       | malformed activity stamp                                                                                                                                                     |
+| Authentication     | Unauthenticated   | 401       | could not extract webauthn stamp                                                                                                                                             |
+| Authentication     | Unauthenticated   | 401       | could not extract api key stamp                                                                                                                                              |
+| Authentication     | Unauthenticated   | 401       | cannot authenticate public API activity request without a stamp (X-Stamp/X-Stamp-Webauthn header)                                                                            |
+| Authentication     | NotFound          | 404       | webauthn authenticator not found in organization                                                                                                                             |
+| Authentication     | NotFound          | 404       | webauthn authenticator not found in organization or parent organization                                                                                                      |
+| Authentication     | Internal          | 500       | failed to load webauthn authenticator                                                                                                                                        |
+| Signing            | InvalidArgument   | 400       | invalid payload encoding                                                                                                                                                     |
+| Signing            | InvalidArgument   | 400       | invalid hash function                                                                                                                                                        |
+| Signing            | Internal          | 500\*     | transaction type not implemented                                                                                                                                             |
+| Email Auth         | InvalidArgument   | 400       | invalid magic link template                                                                                                                                                  |
+| Email Auth         | InvalidArgument   | 400       | failed to get email template contents                                                                                                                                        |
+| Email Auth         | InvalidArgument   | 400       | failed to unmarshal template variables                                                                                                                                       |
+| Email Auth         | Internal          | 500       | error while sending auth email                                                                                                                                               |
+| Email Auth         | Internal          | 500       | failed to find user by email                                                                                                                                                 |
+| List Users         | PermissionDenied  | 403       | authentication failed                                                                                                                                                        |
+| List Users         | InvalidArgument   | 400\*     | failed to load organizations                                                                                                                                                 |
+| List Users         | Internal          | 500       | failed users lookup                                                                                                                                                          |
+| Policies           | InvalidArgument   | 400       | policy label must be unique                                                                                                                                                  |
+| Policies           | InvalidArgument   | 400       | invalid policy consensus                                                                                                                                                     |
+| Policies           | InvalidArgument   | 400       | invalid policy condition                                                                                                                                                     |
+| Update Root Quorum | InvalidArgument   | 400       | quorum threshold must be non-zero integer                                                                                                                                    |
+| Update Root Quorum | InvalidArgument   | 400       | quorum threshold cannot be less than quorum user count                                                                                                                       |
+| Update Root Quorum | InvalidArgument   | 400       | quorum users missing                                                                                                                                                         |
+| Update Root Quorum | InvalidArgument   | 400       | quorum missing                                                                                                                                                               |
+| Create Sub Org     | InvalidArgument   | 400       | invalid api key expiration                                                                                                                                                   |
+| Create Sub Org     | InvalidArgument   | 400       | missing parameter: user authenticator attestation                                                                                                                            |
+| Create Sub Org     | InvalidArgument   | 400       | invalid authenticator attestation                                                                                                                                            |
+| Create Sub Org     | InvalidArgument   | 400       | missing parameter: user authenticator attestation auth data                                                                                                                  |
+| Create Sub Org     | ResourceExhausted | 429       | user has exceeded maximum authenticators                                                                                                                                     |
+| Create Sub Org     | ResourceExhausted | 429       | user has exceeded maximum long-lived api keys                                                                                                                                |
+| Create Sub Org     | ResourceExhausted | 429       | user has exceeded maximum short-lived api keys                                                                                                                               |
+| Create Sub Org     | InvalidArgument   | 400       | missing wallet params                                                                                                                                                        |
+| Create Sub Org     | InvalidArgument   | 400       | invalid path format                                                                                                                                                          |
+| Create Sub Org     | InvalidArgument   | 400       | invalid path                                                                                                                                                                 |
+| Create Sub Org     | InvalidArgument   | 400       | invalid address format                                                                                                                                                       |
+| Create Sub Org     | InvalidArgument   | 400       | invalid curve                                                                                                                                                                |
+| Create Sub Org     | InvalidArgument   | 400       | curve required                                                                                                                                                               |
+| Approve Activity   | NotFound          | 404       | No activity found with fingerprint. Consensus activities must target an existing activity by fingerprint                                                                     |
