@@ -157,6 +157,10 @@ For more information about pricing and billing, check out the [pricing page](htt
 
 Join our slack community [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw) to get support with your integration, share product feedback, and connect with other crypto builders. Or, reach out directly to help@turnkey.com. Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via hello@turnkey.com.
 
+### What is your data deletion policy?
+
+To request the deletion of your parent organization from our records, please email us at privacy@turnkey.com.
+
 ### Is my country supported?
 
 Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions.
