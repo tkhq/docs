@@ -10,7 +10,7 @@ OTP (one-time password) Auth enables a user to authenticate their Turnkey accoun
 
 #### Mechanism
 
-OTP Auth uses two activities: INIT_OTP_AUTH sends a 6-digit OTP code to a specified phone number or email, and OTP_AUTH to verify the code. Upon successful verification, OTP_AUTH returns the encrypted API key credential in the activity result. This credential is then available for stamping (authenticating) requests on the client side. 
+OTP Auth uses two activities: INIT_OTP_AUTH sends a 6-digit OTP code to a specified phone number or email, and OTP_AUTH to verify the code. Upon successful verification, OTP_AUTH returns the encrypted API key credential in the activity result. This credential is then available for stamping (authenticating) requests on the client side.
 
 ## User Experience
 
@@ -50,7 +50,6 @@ Authorization for OTP auth is based on our usual activity authorization: our [po
 <p style={{textAlign: 'center'}}>
     <img src="/img/diagrams/otp_auth_authorization.png" width="500" height="200"/>
 </p>
-
 
 ## Opting out of OTP auth
 
