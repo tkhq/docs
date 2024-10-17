@@ -8,7 +8,7 @@ slug: /embedded-wallets/sub-organization-auth
 
 Email auth is a powerful feature to couple with [sub-organizations](/concepts/Sub-Organizations) for your users. This approach empowers your users to authenticate their Turnkey in a simple way (via email!), while minimizing your involvement: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
-Our [Demo Passkey Wallet](https://wallet.tx.xyz) application serves an example of how email auth functionality might be integrated. We encourage you to try it (and check out the [code](https://github.com/tkhq/demo-passkey-wallet)) before diving into your own implementation.
+Our [Demo Embedded Wallet](https://wallet.tx.xyz) application serves an example of how email auth functionality might be integrated. We encourage you to try it (and check out the [code](https://github.com/tkhq/demo-embedded-wallet)) before diving into your own implementation.
 
 ## Prerequisites
 
@@ -100,7 +100,7 @@ Let's review these steps in detail:
 
 9.  User navigates to a new tab.
 
-10. Because the code was also saved in local storage (step 6), it can be injected into the iframe across different tabs, resulting in a persistent session. See our [Demo Passkey Wallet](https://wallet.tx.xyz) for a [sample implementation](https://github.com/tkhq/demo-passkey-wallet/blob/2182c36583fbda79f762ce5d0c70db4926feb547/frontend/app/email-auth/page.tsx#L112-L117), specifically dealing with sharing the iframeStamper across components.
+10. Because the code was also saved in local storage (step 6), it can be injected into the iframe across different tabs, resulting in a persistent session. See our [Demo Embedded Wallet](https://wallet.tx.xyz) for a [sample implementation](https://github.com/tkhq/demo-embedded-wallet/blob/942ccc97de7f9289892b1714b10f3a21afec71b3/src/providers/auth-provider.tsx#L150-L171), specifically dealing with sharing the iframeStamper across components.
 
     ```js
     const code = window.localStorage.getItem("BUNDLE");

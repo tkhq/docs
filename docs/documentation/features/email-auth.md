@@ -6,7 +6,7 @@ slug: /features/email-auth
 
 # Email Auth
 
-Email Auth enables a user to authenticate their Turnkey account with email via either a one time code, or a magic link. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth), and within our [Demo Passkey Wallet](https://wallet.tx.xyz) (code [here](https://github.com/tkhq/demo-passkey-wallet/blob/main/frontend/app/email-auth/page.tsx)).
+Email Auth enables a user to authenticate their Turnkey account with email via either a one time code, or a magic link. In this process, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing Email Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth), and within our [Demo Embedded Wallet](https://wallet.tx.xyz) (code [here](https://github.com/tkhq/demo-embedded-wallet/blob/942ccc97de7f9289892b1714b10f3a21afec71b3/src/providers/auth-provider.tsx#L119-L177)).
 
 #### Mechanism
 
@@ -47,7 +47,7 @@ Authorization for email auth is based on our usual activity authorization: our [
 
 ## Email auth in your sub-organizations
 
-Email auth works well with [sub-organizations](/concepts/sub-organizations). Our Demo Passkey Wallet application (https://wallet.tx.xyz) has auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-passkey-wallet) if you're curious!).
+Email auth works well with [sub-organizations](/concepts/sub-organizations). Our Demo Embedded Wallet application (https://wallet.tx.xyz) has auth functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-embedded-wallet) if you're curious!).
 
 If you're looking for a more concrete guide, head to our [Sub-Organization Email Auth implementation guide](/embedded-wallets/sub-organization-auth) for more details.
 

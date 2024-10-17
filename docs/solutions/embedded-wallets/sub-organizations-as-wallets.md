@@ -16,7 +16,7 @@ In this example wallet implementation, you will create a segregated sub-organiza
 
 Note that Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
 
-If you'd like to see a live example, head over to our [✨Demo Passkey Wallet✨](https://wallet.tx.xyz/), and follow along with the code [here](https://github.com/tkhq/demo-passkey-wallet).
+If you'd like to see a live example, head over to our [✨Demo Embedded Wallet✨](https://wallet.tx.xyz/), and follow along with the code [here](https://github.com/tkhq/demo-embedded-wallet).
 
 ### Before you start
 
