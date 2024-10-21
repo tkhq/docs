@@ -8,7 +8,9 @@ slug: /embedded-wallets/sub-organization-recovery
 
 Email recovery shines if you are leveraging [sub-organizations](/concepts/Sub-Organizations) to create embedded wallets for your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
-Our Demo Embedded Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-embedded-wallet)) before diving into your own implementation.
+A simple example demonstrating email recovery end-to-end can be found [here](https://github.com/tkhq/sdk/tree/main/examples/email-recovery).
+
+<!-- TODO: add email recovery in the context of demo embedded wallet, once it's implemented -->
 
 ## Prerequisites
 

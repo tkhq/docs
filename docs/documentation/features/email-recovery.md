@@ -54,9 +54,11 @@ Important note: recovery credentials automatically expire after **15 minutes** a
 
 ## Email recovery in your sub-organizations
 
-Email recovery works well with [sub-organizations](/concepts/sub-organizations). Our Demo Embedded Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-embedded-wallet) if you're curious!).
+Email recovery works well with [sub-organizations](/concepts/sub-organizations). A simple example demonstrating email recovery end-to-end can be found [here](https://github.com/tkhq/sdk/tree/main/examples/email-recovery).
 
 If you're looking for a more concrete guide, head to our [Sub-Organization Recovery implementation guide](/embedded-wallets/sub-organization-recovery) for more details.
+
+<!-- TODO: add email recovery in the context of demo embedded wallet, once it's implemented -->
 
 ## Email recovery in your organization
 
