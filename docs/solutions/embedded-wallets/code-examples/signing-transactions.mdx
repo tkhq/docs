@@ -9,6 +9,65 @@ import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 import Parameter from "@site/src/components/parameter";
 
+This is a guide to signing transactions in the browser context. While these snippets leverage Ethers, it can be swapped out for other signers in the Viem or Solana contexts. See [here](https://github.com/tkhq/sdk/tree/main/examples/with-eth-passkeys-galore) for an example with both Ethers and Viem in the passkey + browser context, and [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana-passkeys) for a similar example with Solana.
+
+## Steps using `@turnkey/sdk-react`
+
+This process is made the most seamless by leveraging our [React package](../../../sdks/react). Read on for a non-React implementation.
+
+#### 1. Initialize the React Provider
+
+```typescript
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+const turnkeyConfig = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID, // prefix with NEXT_PUBLIC for NextJS
+  rpId: process.env.RPID, // your application's domain
+  iframeUrl: "https://auth.turnkey.com"
+}
+
+...
+
+<div className="App">
+  <TurnkeyProvider config={turnkeyConfig}>
+  // Rest of app ...
+  </TurnkeyProvider>
+</div>
+```
+
+#### 2. Initialize an Ethers Provider and Turnkey Signer using the Passkey Client
+
+```typescript
+import { ethers } from "ethers";
+import { TurnkeySigner } from "@turnkey/ethers";
+
+import { useTurnkey } from "@turnkey/sdk-react";
+const { turnkey, passkeyClient } = useTurnkey();
+
+const provider = new ethers.JsonRpcProvider(<provider api url>);
+const currentUser = await turnkey.getCurrentUser();
+const turnkeySigner = new TurnkeySigner({
+  client: passkeyClient,
+  organizationId: currentUser.organization.organizationId,
+  signWith: "<wallet address to sign with>"
+})
+const connectedSigner = turnkeySigner.connect(provider);
+```
+
+#### 3. Call `sendTransaction` with the Turnkey Signer
+
+```typescript
+const transactionRequest = {
+  to: "<destination address>",
+  value: ethers.parseEther("<amount to send>"),
+  type: 2,
+};
+const sendTransaction =
+  await connectedSigner.sendTransaction(transactionRequest);
+```
+
+## Alternative Steps (non-React)
+
 #### 1. Initialize the Passkey Client
 
 ```typescript
@@ -28,7 +87,7 @@ import { ethers } from "ethers";
 import { TurnkeySigner } from "@turnkey/ethers";
 
 const provider = new ethers.JsonRpcProvider(<provider api url>);
-const currentUser = await turnkey.getCurrentUser();
+const currentUser = await turnkey.getCurrentUser(); // assumes user details have been stored in LocalStorage via `login()`
 const turnkeySigner = new TurnkeySigner({
   client: passkeyClient,
   organizationId: currentUser.organization.organizationId,
