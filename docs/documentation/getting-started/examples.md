@@ -15,7 +15,7 @@ That said, we have built out several example services and applications to help i
 | Example                                                                                              | Description                                                                                                                                           |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`demo-consumer-wallet`](https://github.com/tkhq/demo-consumer-wallet)                               | A minimal consumer wallet app powered by Turnkey and WalletConnect                                                                                    |
-| [`demo-passkey-wallet`](https://github.com/tkhq/demo-passkey-wallet)                                 | A minimal consumer wallet app powered by Turnkey and passkeys                                                                                         |
+| [`demo-embedded-wallet`](https://github.com/tkhq/demo-embedded-wallet)                               | A minimal consumer wallet app powered by Turnkey and passkeys                                                                                         |
 | [`demo-ethers-passkeys`](https://github.com/tkhq/demo-ethers-passkeys)                               | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                                                    |
 | [`demo-viem-passkeys`](https://github.com/tkhq/demo-viem-passkeys)                                   | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                                                      |
 | [`passkeyapp`](https://github.com/tkhq/passkeyapp)                                                   | A React Native + Expo app powered by Turnkey and passkeys                                                                                             |
@@ -82,20 +82,20 @@ A minimal consumer wallet app powered by Turnkey. Behind the scenes, it uses [`@
 
 See https://github.com/tkhq/demo-consumer-wallet for the code.
 
-### Demo Passkey Wallet ([code](https://github.com/tkhq/demo-passkey-wallet), [live link](https://wallet.tx.xyz))
+### Demo Embedded Wallet ([code](https://github.com/tkhq/demo-embedded-wallet), [live link](https://wallet.tx.xyz))
 
 A wallet application showing how users can register and authenticate using passkeys.
 This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](/concepts/sub-organizations) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
 
 <p style={{ textAlign: "center" }}>
   <img
-    src="/demo-passkey-wallet.png"
-    alt="demo passkey wallet screenshot"
+    src="/demo-embedded-wallet.png"
+    alt="demo embedded wallet screenshot"
     style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
   />
 </p>
 
-See https://wallet.tx.xyz (and https://github.com/tkhq/demo-passkey-wallet for the code).
+See https://wallet.tx.xyz (and https://github.com/tkhq/demo-embedded-wallet for the code).
 
 ### Demo Ethers Passkeys ([code](https://github.com/tkhq/demo-ethers-passkeys))
 

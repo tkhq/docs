@@ -18,12 +18,12 @@ Turnkey's secure, flexible, and scalable private key infrastructure is built on 
 - Automate millions of signatures with customizable security controls
 - Implement role-based access controls and multi-party approvals
 - Support any blockchain or asset type with our chain-agnostic, arbitrary signing capabilities
-- Easily migrate existing wallets and keys in and out of Turnkey
 - Minimize attack surface area with our paranoid security model
+- Easily migrate existing wallets and keys in and out of Turnkey
 
 ### Code examples
 
-Explore our code examples to see Turnkey's signing automation in action:
+Explore the following code examples to see Turnkey's server-side signing automation in action, where requests and transactions are signed in a server context using API keys:
 
 | Example                                                                            | Description                                                                                                                 |
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |

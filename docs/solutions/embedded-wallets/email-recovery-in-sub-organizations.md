@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 description: Learn about Email Recovery on Turnkey
 slug: /embedded-wallets/sub-organization-recovery
 ---
@@ -8,11 +8,13 @@ slug: /embedded-wallets/sub-organization-recovery
 
 Email recovery shines if you are leveraging [sub-organizations](/concepts/Sub-Organizations) to create embedded wallets for your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
-Our Demo Embedded Wallet application (https://wallet.tx.xyz) has recovery functionality integrated. We encourage you to try it (and look at [the code](https://github.com/tkhq/demo-embedded-wallet)) before diving into your own implementation.
+A simple example demonstrating email recovery end-to-end can be found [here](https://github.com/tkhq/sdk/tree/main/examples/email-recovery).
+
+<!-- TODO: add email recovery in the context of demo embedded wallet, once it's implemented -->
 
 ## Prerequisites
 
-Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email recovery. Check out our [Quickstart guide](/getting-started/quickstart) if you need help getting started. To allow an API user to initiate email recovery, you'll need the following policy in your main organization:
+Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email recovery on behalf of suborgs. Check out our [Quickstart guide](/getting-started/quickstart) if you need help getting started. To allow an API user to initiate email recovery, you'll need the following policy in your main organization:
 
 ```json JSON
 {
