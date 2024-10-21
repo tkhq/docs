@@ -32,7 +32,7 @@ Turnkey's Embedded Wallets are built on top of our [Sub-Organizations](/concepts
 ##### Custodial vs non-custodial
 
 - For custodial wallets, your application holds the master key and can initiate transactions on behalf of users.
-- For non-custodial wallets, users hold their own private keys and must approve each transaction
+- For non-custodial wallets, users hold their own private keys and must approve each transaction, whether it's via their own passkey, API key, or iframe session.
 
 ##### Advanced features
 
