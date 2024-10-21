@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 description: Learn about Email Recovery on Turnkey
 slug: /features/email-recovery
 ---
