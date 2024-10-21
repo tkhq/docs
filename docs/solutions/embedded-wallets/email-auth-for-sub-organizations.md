@@ -12,7 +12,7 @@ Our [Demo Embedded Wallet](https://wallet.tx.xyz) application serves an example 
 
 ## Prerequisites
 
-Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email auth. Check out our [Quickstart guide](/getting-started/quickstart) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
+Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email auth on behalf of suborgs. Check out our [Quickstart guide](/getting-started/quickstart) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
 
 ```json JSON
 {
