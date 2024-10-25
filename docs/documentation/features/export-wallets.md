@@ -8,16 +8,79 @@ slug: /features/export-wallets
 
 Turnkey's export functionality allows your end users to backup or transfer a [Wallet](/concepts/Wallets) by securely viewing the wallet's [mnemonic phrase](https://learnmeabitcoin.com/technical/mnemonic). We engineered this feature to ensure that the user can export their mnemonic without exposing the mnemonic itself to Turnkey or your application.
 
-Follow along with the Embedded iframe guide.
+The process of exporting wallets or private keys from Turnkey is broken up into two primary steps:
 
-## Embedded iframe
+1. Export the wallet or private key via Turnkey. You must specify the wallet or private key ID, as well as a target public key, which the wallet or private key will be encrypted to. Encryption ensures that the key material is only accessible by the client, and cannot be extracted by any man-in-the-middle (MITM)
+2. Decrypt the resulting bundle returned by Turnkey
+
+See the [Cryptographic details section](#cryptographic-details) for more technical details.
+
+## Implementation guides
+
+Follow along with the Turnkey CLI, Embedded iframe guide, and NodeJS guides.
+
+<!-- TODO: embedded p256 key -->
+
+### CLI
+
+Install the latest version of Turnkey CLI to access the new import functionality. You can find detailed instructions for installation [here](https://github.com/tkhq/tkcli).
+
+#### Steps
+
+1. Export a wallet (Turnkey activity):
+
+```sh
+turnkey wallets export --name "New Wallet" -k <your Turnkey API key name> --organization <your organization ID> --export-bundle-output <path to your export bundle> --host api.turnkey.com
+```
+
+- The `--export-bundle-output` (required) flag is the desired output file path for the “encrypted bundle” that will be returned by Turnkey. This bundle contains the encrypted key material.
+
+2. Decrypt the bundle:
+
+```sh
+turnkey decrypt --export-bundle-input <path to your export bundle> --organization <your organization ID> --signer-quorum-key 04bce6666ca6c12e0e00a503a52c301319687dca588165b551d369496bd1189235bd8302ae5e001fde51d1e22baa1d44249f2de9705c63797316fc8b7e3969a665
+>> "<redacted mnemonic>"
+```
+
+- The `--export-bundle-output` (required) flag is the file path for the “encrypted bundle” (from the previous step) that will be decrypted.
+- The `--signer-quorum-key` is the public key of Turnkey's signer enclave. This is a static value.
+
+Congrats! You've exported your wallet 🎉
+
+#### Private Key support
+
+1. Export a wallet (Turnkey activity):
+
+```sh
+turnkey private-keys export --name "New Private Key" -k <your local encryption key> --organization <your organization ID> --export-bundle-output <path to your export bundle> --host api.turnkey.com
+```
+
+- The `--export-bundle-output` (required) flag is the desired output file path for the “encrypted bundle” that will be returned by Turnkey. This bundle contains the encrypted key material.
+
+2. Decrypt the bundle:
+
+```sh
+turnkey decrypt --export-bundle-input <path to your export bundle> --organization <your organization ID> --signer-quorum-key 04bce6666ca6c12e0e00a503a52c301319687dca588165b551d369496bd1189235bd8302ae5e001fde51d1e22baa1d44249f2de9705c63797316fc8b7e3969a665
+>> "<redacted private key>"
+```
+
+- The `--export-bundle-output` (required) flag is the file path for the “encrypted bundle” (from the previous step) that will be decrypted.
+- The `--signer-quorum-key` is the public key of Turnkey's signer enclave. This is a static value.
+
+Congrats! You've exported your private key 🎉
+
+<!-- #### Wallet Account support
+
+TODO: WIP -->
+
+### Embedded iframe
 
 - We have released open-source code to create target encryption keys and decrypt exported wallet mnemonics. We've deployed a static HTML page hosted on `export.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
 - We have also built a package to help you insert this iframe and interact with it in the context of export: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
 
 In the rest of this guide we'll assume you are using these helpers.
 
-### Steps
+#### Steps
 
 Here's a diagram summarizing the wallet export flow step-by-step ([direct link](/img/wallet_export_steps.png)):
 
@@ -108,6 +171,156 @@ Follow the same steps above for exporting Wallets as mnemonics, but instead use 
 
 At the end of a successful private key export, the iframe displays a private key.
 
+### NodeJS
+
+A full example Node script can be found here: https://github.com/tkhq/sdk/tree/main/examples/export-in-node
+
+#### Steps
+
+1. Initialize a new Turnkey client:
+
+```js
+import { Turnkey } from "@turnkey/sdk-server";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+```
+
+2. Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to:
+
+```js
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+
+3. Call export (Turnkey activity):
+
+```js
+const exportResult = await turnkeyClient.apiClient().exportWallet({
+  walletId: walletId,
+  targetPublicKey: publicKey,
+});
+```
+
+4. Decrypt encrypted bundle:
+
+```js
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId,
+  returnMnemonic: true,
+});
+```
+
+Congrats! You've exported your wallet 🎉
+
+The process is largely similar for both private keys and individual wallet accounts.
+
+#### Private Key support
+
+1. Initialize a new Turnkey client:
+
+```js
+import { Turnkey } from "@turnkey/sdk-server";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+```
+
+2. Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to:
+
+```js
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+
+3. Call export (Turnkey activity):
+
+```js
+const exportResult = await turnkeyClient.apiClient().exportPrivateKey({
+  privateKeyId: privateKeyId,
+  targetPublicKey: publicKey,
+});
+```
+
+4. Decrypt encrypted bundle:
+
+```js
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId,
+  returnMnemonic: false,
+});
+```
+
+Congrats! You've exported your private key 🎉
+
+#### Wallet Account support
+
+1. Initialize a new Turnkey client:
+
+```js
+import { Turnkey } from "@turnkey/sdk-server";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+```
+
+2. Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to:
+
+```js
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+
+3. Call export (Turnkey activity):
+
+```js
+const exportResult = await turnkeyClient.apiClient().exportWalletAccount({
+  address: address, // your specific wallet account address
+  targetPublicKey: publicKey,
+});
+```
+
+4. Decrypt encrypted bundle:
+
+```js
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId,
+  returnMnemonic: false,
+});
+```
+
+Congrats! You've exported your wallet account 🎉
+
 ## Cryptographic details
 
 Turnkey's export functionality ensures that neither your application nor Turnkey can view the wallet mnemonic or private key.
@@ -130,7 +343,7 @@ Our enclave encrypts the wallet's mnemonic or private key to the user's TEK usin
 
 Once the activity succeeds, the encrypted mnemonic or private key can be decrypted by the target public key offline or in an online script.
 
-### Solana notes
+## Solana notes
 
 Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
 
