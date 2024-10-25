@@ -31,6 +31,15 @@ const config = {
     defaultLocale: "en",
     locales: ["en"],
   },
+  plugins: [
+    [
+        "docusaurus-biel",
+        {
+            project: "5q3y720cqx",
+            headerTitle: "Turnkey Chatbot",
+        },
+    ],
+],
 
   presets: [
     [
