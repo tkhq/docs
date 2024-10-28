@@ -33,13 +33,13 @@ const config = {
   },
   plugins: [
     [
-        "docusaurus-biel",
-        {
-            project: "5q3y720cqx",
-            headerTitle: "Turnkey Chatbot",
-        },
+      "docusaurus-biel",
+      {
+        project: "5q3y720cqx",
+        headerTitle: "Turnkey Chatbot",
+      },
     ],
-],
+  ],
 
   presets: [
     [
