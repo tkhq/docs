@@ -7,6 +7,25 @@ slug: /faq
 
 ## Authentication and credentials
 
+### What authentication methods does Turnkey provide?
+
+Currently we provide: [email auth](/features/email-auth), [oauth](/features/oauth), [wallet auth](https://www.npmjs.com/package/@turnkey/wallet-stamper) (for Solana and EVM), [passkeys](/passkeys/introduction) and authentication via [API](/api-overview/introduction) keys.  We’re on track to release SMS very soon.
+
+### You said that you support Email Authentication but why don't I see it in my dashboard?
+
+New Turnkey organizations are not enabled for email authentication by default, you will have to opt into the feature. To do so, check out the [guide](/features/email-auth#authorization) on how to do this - copy and paste the code snippet from the bottom of the doc into the SDK example’s README to get started.
+
+### What is the OAuth latency?
+
+We’ve observed that at times OAuth can take up to one second to complete. This is due to the fact that establishing and fetching TLS happens twice inside the secure enclave, directly contributing to the latency. 
+
+### Can I re-use my passkeys across different domains? Can I transfer passkeys between different rpIds?
+
+- In short: No. Passkeys are domain bound, meaning the passkey you have setup for Turnkey.com (example) will not work for logging into your Turnkey Demo Wallet, these are two different domains.
+- As a matter of security, passkeys being non-transferable ensures that they cannot be used in front-end and phishing attacks.
+- However, you can use the same passkey type (e.g. YubiKey) across different domains, but this YubiKey will need to be registered as a second passkey on each domain.
+
+
 ### Can I sign up for Turnkey multiple times with the same email?
 
 When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and associated credentials. Currently we do not allow multiple users to be associated with the same email address.
@@ -89,6 +108,18 @@ Please get in touch with us (<help@turnkey.com>) if you need this limit adjusted
 
 ## Supported functionality
 
+### What is the maximum expiration time for sessions? How long can we persist the users not needing to run email auth again?
+
+Turnkey does not impose a maximum limit on session length. By default the configuration is set to 15 minutes (expressed as 900 seconds). The limits are specified by the client.
+
+### Can I customize my email templates? What about the sender email domain?
+
+Enterprise customers on our Scale plan and above are able to customize  email templates. See the guide on how-to [here](/embedded-wallets/sub-organization-auth#email-customization). The ability to change the domain name of the email sender is in beta - reach out to support or [hello@turnkey.com](hello@turnkey.com) if you’re interested in enabling this new feature.
+
+### Can I use Turnkey with Telegram mini apps (HTML5 running in Telegram's browser) to create embedded wallets?
+
+Yes, more support and documentation is coming soon. Stay tuned!
+
 ### Which cryptographic curves do you support?
 
 Turnkey currently supports secp256k1 and ed25519.
@@ -122,6 +153,10 @@ Unlike ECDSA, in which a message is hashed as a separate step _before_ signing, 
 An example for this case can be found in our [Solana signer](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/solana/src/index.ts#L64).
 
 ## Guidance
+
+### Where are the Turnkey servers hosted? Do you have plans to expand?
+
+Today, Turnkey operates out of US-East-1. This is our primary, and only datacenter. While we don’t have plans to diversify the geographic distribution of our servers in the near future, long term we plan to maintain low latency across the globe.
 
 ### Do you have a status page?
 
