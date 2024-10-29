@@ -113,7 +113,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 | Resource Type    | Action | Activity Type                             |
 | ---------------- | ------ | :---------------------------------------- |
-| **ORGANIZATION** | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V5  |
+| **ORGANIZATION** | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7  |
 |                  | UPDATE | ACTIVITY_TYPE_UPDATE_ROOT_QUORUM          |
 |                  | UPDATE | ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE    |
 |                  | REMOVE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE |
@@ -163,6 +163,10 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                  | DELETE | ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS      |
 
 ## Appendix
+
+### Root quorum activities
+
+There are a select few activities that are not governed by policies, but rather by an organization's [root quorum](../../concepts/user-management/Root-quorum.md). These activities are: `ACTIVITY_TYPE_UPDATE_ROOT_QUORUM`, `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`. For example, if a policy is added that allows a specific non-root user to perform `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activities, these requests will still fail as they are subject specifically to root quorum.
 
 ### Ethereum
 

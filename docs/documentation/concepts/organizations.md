@@ -14,7 +14,7 @@ All organizations are controlled by a [Root Quorum](/concepts/users/root-quorum)
 
 ## Features
 
-Organizations can opt-in or opt-out of the following features:
+Organization features are Turnkey product offerings that organizations can opt-in to or opt-out of. Note that these features can be set and updated using the activities `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` and `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`. The following is a list of such features:
 
 | Name                          | Description                                   | Default  | Notes                                                                                                                                                                                                                                                                              |
 | ----------------------------- | --------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
