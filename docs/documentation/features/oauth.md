@@ -102,7 +102,7 @@ Below, some details and pointers about specific providers we've worked with befo
 
 ### Google
 
-This provider is extensively tested and supported. We've integrated it in our demo wallet (hosted at https://wallet.tx.xyz):
+This provider is extensively tested and supported. We've integrated it in our demo wallet (hosted at https://wallet.tx.xyz), along with Apple and Facebook:
 
 <p style={{textAlign: 'center'}}>
     <img src="/img/oauth_demo_wallet.png" width="500"/>
@@ -110,7 +110,34 @@ This provider is extensively tested and supported. We've integrated it in our de
 
 The code is open-source, feel free to [check it out](https://github.com/tkhq/demo-embedded-wallet) for reference. The exact line where the OAuth component is loaded is here: [ui/src/screens/LandingScreen.tsx](https://github.com/tkhq/demo-embedded-wallet/blob/d4ec308e9ce0bf0da7b64da2b39e1a80c077eb82/ui/src/screens/LandingScreen.tsx#L384).
 
-The main documentation for Google OIDC is available [here](https://developers.google.com/identity/openid-connect/openid-connect).
+The main documentation for Google OIDC is available [here](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/auth.tsx#L157).
+
+### Apple
+
+Apple integration is also extensively tested and supported, and is integrated into our demo wallet (hosted at https://wallet.tx.xyz). The code provides an [example component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/apple-auth.tsx) as well as an [example redirect handler](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/apple/page.tsx).
+
+Documentation for Apple OIDC can be foudn [here](https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/authenticating_users_with_sign_in_with_apple).
+
+### Facebook
+
+Facebook OIDC requires a [manual flow with PFKE](https://developers.facebook.com/docs/facebook-login/guides/advanced/oidc-token/) (Proof for Key Exchange). This flow requires a few extra steps compared with Apple or Google. Specifically:
+
+- You will need to generate a **code verifier** that can either be recalled (e.g. from a database) or reassembled in a later request.
+- You will need to provide a **code challenge** as a parameter of the OAuth redirect that is either the code verifier itself or the hash of the code verifier.
+- Instead of receiving the OIDC token after the OAuth flow, you will receive an **auth code** that must be exchanged for an OIDC token in a subsequent request. The code verifier and your app's ID are also required in this exchange.
+
+In our example demo wallet, we opt to avoid using a database in the authentication process and instead generate our verification code serverside using the hash of a nonce and a secret salt value. The nonce is then passed to and returned from the Facebook API as a **state** parameter (see [the API spec](https://developers.facebook.com/docs/facebook-login/guides/advanced/oidc-token/) for details). Finally, the server reconstructs the verification code by re-hashing the nonce and the the salt. The full flow is displayed below:
+
+<p>
+    <img
+        src="/img/facebook-oauth.png"
+        alt="Facebook OAuth flow"
+    />
+</p>
+
+Code for the [redirect component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/facebook-auth.tsx), [OAuth callback](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/facebook/page.tsx), and [code exchange](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/actions/turnkey.ts#L54) are all available in the example wallet repo.
+
+If you prefer to use a database such as Redis instead of reassembling the verification code, you can store the verification code and retrieve it in the exchange stage using a lookup key either passed as **state** or stored in local browser storage.
 
 ### Auth0
 
