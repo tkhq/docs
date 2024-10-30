@@ -9,6 +9,13 @@ import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 import Parameter from "@site/src/components/parameter";
 
+## Overview
+
+The [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server) package exposes functionality that lets developers **build server-side functionality for applications that interact with the Turnkey API** with different types of authentication –  allowing applications to authenticate users, manage sessions, and perform organizational operations securely and efficiently.
+It consists of an API Client and API Proxies that enable requests to the Turnkey API to be authenticated with the appropriate credentials. Specifically, the API Client manages requests signed by the user’s authentication details, and the API proxies handle requests signed by the parent organization’s authentication details.
+
+<u>Use the sdk-server package to handle server-side interactions for applications that interact with the Turnkey API.</u>
+
 ## Installation
 
 <Tabs>
@@ -118,13 +125,13 @@ The API Public Key associated with the configured API Private Key above
 
 </Parameter>
 
-## Turnkey Clients
+## Creating Clients
 
 Calls to Turnkey's API must be signed with a valid credential from the user initiating the API call. When using the Server SDK, the user initiating the API call is normally your root organization, and the API call is authenticated with the API keypair you create on the Turnkey dashboard.
 
-#### 1. API Client
+#### `apiClient()`
 
-The api client will sign requests with the injected `apiPrivateKey`, and `apiPublicKey` credentials.
+The `apiClient` method returns an instance of the `TurnkeyApiClient` which will sign requests with the injected `apiPrivateKey`, and `apiPublicKey` credentials.
 
 ```typescript
 const apiClient = turnkey.apiClient();
@@ -133,13 +140,15 @@ const walletsResponse = await apiClient.getWallets();
 // this will sign the request with the configured api credentials
 ```
 
-## API Proxies
+## Creating API Proxies
 
 There are certain actions that are initiated by users, but require the activity to be signed by the root organization itself. Examples of this include the initial creation of the user `subOrganization`, sending an email to a user with a login credential as part of an `emailAuth` flow, and initializing an email recovery flow with the `initEmailRecovery` activity.
 
 These can be implemented in your backend by creating an `apiClient` and handling requests from your browser application at different routes, but we have also provided a convenience method for doing this by having allowing a single `apiProxy` to handle requests at a single route and automatically sign specific user actions with the root organization's credentials.
 
-#### 1. Express Proxy Handler
+#### expressProxyHandler()
+
+The `expressProxyHandler()` method creates a proxy handler designed as a **middleware for Express applications**. It provides an API endpoint that forwards requests to the Turnkey API server.
 
 ```typescript
 const turnkeyProxyHandler = turnkey.expressProxyHandler({
@@ -155,9 +164,25 @@ app.post("/apiProxy", turnkeyProxyHandler);
 // this will sign requests made with the client-side `serverSign` function with the root organization's API key for the allowedMethods in the config
 ```
 
-#### 2. Next JS Proxy Handler
+#### 2. nextProxyHandler()
 
-TODO: Add Documentation for NextJS Proxy Handler
+The `nextProxyHandler()` method creates a proxy handler designed as a middleware for Next.js applications. It provides an API endpoint that forwards requests to the Turnkey API server.
+
+```typescript
+// Configure the Next.js handler with allowed methods
+const turnkeyProxyHandler = turnkey.nextProxyHandler({
+  allowedMethods: [
+    "createSubOrganization",
+    "emailAuth",
+    "initUserEmailRecovery",
+    "getSubOrgIds",
+  ],
+});
+
+export default turnkeyProxyHandler;
+
+// this will sign requests made with the client-side `serverSign` function with the root organization's API key for the allowedMethods in the config
+```
 
 ## Examples
 
