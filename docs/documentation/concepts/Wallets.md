@@ -54,14 +54,6 @@ For a complete list of coin types and possible HD paths, refer to the [SLIP-0044
 
 See below for specific address formats that you can currently derive on Turnkey:
 
-| Type           | Address Format              | Curve           | Path Format       | Standard Path     |
-| -------------- | --------------------------- | --------------- | ----------------- | ----------------- |
-| **Public Key** | ADDRESS_FORMAT_COMPRESSED   | all             | PATH_FORMAT_BIP32 | none              |
-|                | ADDRESS_FORMAT_UNCOMPRESSED | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | none              |
-| **Ethereum**   | ADDRESS_FORMAT_ETHEREUM     | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/60'/0'/0/0  |
-| **Cosmos**     | ADDRESS_FORMAT_COSMOS       | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/118'/0'/0/0 |
-| **Solana**     | ADDRESS_FORMAT_SOLANA       | CURVE_ED25519   | PATH_FORMAT_BIP32 | m/44'/501'/0'/0'  |
-
 | Type | Address Format | Curve | Default HD Path |
 |------|---------------|--------|-----------------|
 | n/a | ADDRESS_FORMAT_COMPRESSED | CURVE_SECP256K1 | m/0'/0 |
