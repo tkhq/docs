@@ -20,6 +20,8 @@ Cryptographic curves are our fundamental primitive, allowing Turnkey private key
 
 Turnkey abstracts address generation, automatically deriving addresses for supported cryptocurrencies.
 
+For a full list of address formats you can derive on Turnkey, refer to [Address formats and Curves](/concepts/wallets).
+
 **Tier 3: SDK for transaction construction and signing**
 
 Our SDK provides tools and scripts to help in constructing and signing basic transactions, enabling an even smoother integration.

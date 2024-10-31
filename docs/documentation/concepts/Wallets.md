@@ -40,17 +40,56 @@ An account contains the directions for deriving a cryptographic key pair and cor
 
 **The account address is used to sign with the underlying extended private key.**
 
-#### Configuration
+#### HD Wallet Default Paths
+HD wallets use standardized derivation paths to generate multiple accounts from a single seed. These paths follow a specific structure that allows for consistent address generation across different wallet implementations. Here are common default paths for some of the ecosystems supported by Turnkey:
 
-Certain address formats can only be used with particular curves. See the table below:
+* Ethereum: `m/44'/60'/0'/0/0`
+* Cosmos: `m/44'/118'/0'/0/0`
+* Solana: `m/44'/501'/0'/0'`
 
-| Type           | Address Format              | Curve           | Path Format       | Standard Path     |
-| -------------- | --------------------------- | --------------- | ----------------- | ----------------- |
-| **Public Key** | ADDRESS_FORMAT_COMPRESSED   | all             | PATH_FORMAT_BIP32 | none              |
-|                | ADDRESS_FORMAT_UNCOMPRESSED | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | none              |
-| **Ethereum**   | ADDRESS_FORMAT_ETHEREUM     | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/60'/0'/0/0  |
-| **Cosmos**     | ADDRESS_FORMAT_COSMOS       | CURVE_SECP256K1 | PATH_FORMAT_BIP32 | m/44'/118'/0'/0/0 |
-| **Solana**     | ADDRESS_FORMAT_SOLANA       | CURVE_ED25519   | PATH_FORMAT_BIP32 | m/44'/501'/0'/0'  |
+For a complete list of coin types and possible HD paths, refer to the [SLIP-0044 specification](https://github.com/satoshilabs/slips/blob/master/slip-0044.md).
+
+
+#### Address formats and curves
+
+See below for specific address formats that you can currently derive on Turnkey:
+
+| Type | Address Format | Curve | Default HD Path |
+|------|---------------|--------|-----------------|
+| n/a | ADDRESS_FORMAT_COMPRESSED | CURVE_SECP256K1 | m/0'/0 |
+| n/a | ADDRESS_FORMAT_UNCOMPRESSED | CURVE_SECP256K1 | m/0'/0 |
+| Ethereum | ADDRESS_FORMAT_ETHEREUM | CURVE_SECP256K1 | m/44'/60'/0'/0/0 |
+| Cosmos | ADDRESS_FORMAT_COSMOS | CURVE_SECP256K1 | m/44'/118'/0'/0/0 |
+| Solana | ADDRESS_FORMAT_SOLANA | CURVE_ED25519 | m/44'/501'/0'/0 |
+| Tron | ADDRESS_FORMAT_TRON | CURVE_SECP256K1 | m/44'/195'/0'/0/0 |
+| Sui | ADDRESS_FORMAT_SUI | CURVE_ED25519 | m/44'/784'/0'/0/0 |
+| Aptos | ADDRESS_FORMAT_APTOS | CURVE_ED25519 | m/44'/637'/0'/0'/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_MAINNET_P2PKH | CURVE_SECP256K1 | m/44'/0'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_MAINNET_P2SH | CURVE_SECP256K1 | m/49'/0'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_MAINNET_P2WPKH | CURVE_SECP256K1 | m/84'/0'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_MAINNET_P2WSH | CURVE_SECP256K1 | m/48'/0'/0'/2'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_MAINNET_P2TR | CURVE_SECP256K1 | m/86'/0'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_TESTNET_P2PKH | CURVE_SECP256K1 | m/44'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_TESTNET_P2SH | CURVE_SECP256K1 | m/49'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_TESTNET_P2WPKH | CURVE_SECP256K1 | m/84'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_TESTNET_P2WSH | CURVE_SECP256K1 | m/48'/1'/0'/2'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_TESTNET_P2TR | CURVE_SECP256K1 | m/86'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_SIGNET_P2PKH | CURVE_SECP256K1 | m/44'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_SIGNET_P2SH | CURVE_SECP256K1 | m/49'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_SIGNET_P2WPKH | CURVE_SECP256K1 | m/84'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_SIGNET_P2WSH | CURVE_SECP256K1 | m/48'/1'/0'/2'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_SIGNET_P2TR | CURVE_SECP256K1 | m/86'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_REGTEST_P2PKH | CURVE_SECP256K1 | m/44'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_REGTEST_P2SH | CURVE_SECP256K1 | m/49'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_REGTEST_P2WPKH | CURVE_SECP256K1 | m/84'/1'/0'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_REGTEST_P2WSH | CURVE_SECP256K1 | m/48'/1'/0'/2'/0/0 |
+| Bitcoin | ADDRESS_FORMAT_BITCOIN_REGTEST_P2TR | CURVE_SECP256K1 | m/86'/1'/0'/0/0 |
+| Sei | ADDRESS_FORMAT_SEI | CURVE_ED25519 | m/44'/118'/0'/0/0 |
+| Stellar | ADDRESS_FORMAT_XLM | CURVE_ED25519 | m/44'/148'/0'/0'/0 |
+| Dogecoin | ADDRESS_FORMAT_DOGE_MAINNET | CURVE_SECP256K1 | m/44'/3'/0'/0/0 |
+| Dogecoin | ADDRESS_FORMAT_DOGE_TESTNET | CURVE_SECP256K1 | m/44'/1'/0'/0/0 |
+| TON | ADDRESS_FORMAT_TON_V3R2 | CURVE_ED25519 | m/44'/607'/0'/0/0 |
+| TON | ADDRESS_FORMAT_TON_V4R2 | CURVE_ED25519 | m/44'/607'/0'/0/0 |
 
 #### Where can I learn more?
 
