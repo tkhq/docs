@@ -33,9 +33,19 @@ This UI isn't very helpful, so we recommend making the timeout long (5 minutes).
 
 The `rp` options is an object with 2 fields: `id` and `name`.
 
-`rp.id` should be your app domain. If your app is hosted on "your.app.xyz" the RPID can be "your.app.xyz" or "app.xyz". Be aware: if you create passkeys on "your.app.xyz", they won't be usable on other subdomains (e.g. "other.app.xyz"). So unless you have good reasons not to, use the top-level domain as the RPID.
+`rp.id` (aka RPID) should be your app top-level domain. For example, if your app is hosted on `https://your.app.xyz` the RPID should be `app.xyz` unless you have good reasons to do otherwise (see below).
 
-To be specific, passkeys created on "your.app.xyz" will be bound to that exact domain in your browser, even if your RPID is "app.xyz" (for security purposes). Thus, if a passkey is created on a subdomain like "your.app.xyz", it will _not_ work on "app.xyz", even if the RPID is "app.xyz". However, if a passkey is created on "app.xyz", it _will_ work on a subdomain like "your.app.xyz".
+<details>
+  <summary>Reasons to set RPID to specific sub-domains</summary>
+
+`rp.id`, or RPID, is a way to identify the website a passkey is associated with. Once set at registration time, it **determines the set of origins on which the passkey may be be used**. The <a href="https://www.w3.org/TR/webauthn-2/#relying-party-identifier" target="_blank">WebAuthn spec</a> states that the RPID must be a “registrable domain suffix of, or equal to” the current domain. If the page creating a passkey is hosted at `https://your.app.xyz`, the RPID can thus be "your.app.xyz" or "app.xyz".
+
+A passkey with RPID "your.app.xyz" <strong>cannot</strong> be used on `https://www.app.xyz` or `https://foo.app.xyz`. However a passkey created with RPID "app.xyz" <strong>will</strong> be usable on all `https://*.app.xyz` sub-domains: `https://your.app.xyz`, `https://www.app.xyz`, `https://foo.app.xyz`, and so on. Hence our general recommendation above to set `app.xyz` (top-level domain) as the RPID to maximize flexibility.
+
+A reason why you might want to set the RPID to "your.app.xyz" instead of "app.xyz" like recommended above is extra security: if you are worried about user passkeys being usable across all your sub-domains, it makes sense to scope passkeys to the sub-domain they're meant to be used on, and only that sub-domain.
+
+If you scope passkeys to a specific sub-domain, be aware that migrating your app to a different sub-domain later will require a migration process where users have to re-enroll themselves by creating new passkeys on the new sub-domain. Passkeys cannot be transferred from one RPID to another.
+</details>
 
 `rp.id` will show up in the initial registration popup:
 
