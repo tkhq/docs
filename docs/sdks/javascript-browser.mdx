@@ -13,7 +13,7 @@ import Parameter from "@site/src/components/parameter";
 
 The [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser) package exposes functionality that lets developers build browser based applications that interact with the Turnkey API with different types of authentication. 
 
-It consists of different clients that enable requests to the API to be authenticated via different auth methods like user sessions, passkey and iFrames. It also contains methods to manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.
+It consists of different clients that enable requests to the API to be authenticated via different auth methods like user sessions, passkeys and iFrames. It also contains methods to manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.
 
 If you are working with React – check out our [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) package.
 
@@ -123,58 +123,57 @@ The URL to send requests that need to be signed from a backend codebase by the r
 
 </Parameter>
 
-## Clients and Methods
-
 Calls to Turnkey's API must be signed with a valid credential from the user initiating the API call. Turnkey's Browser SDK contains the following different clients that manage the process of validating these requests depending on the kind of authentication credential that is being used.
 
-### TurnkeyBrowserClient
+## TurnkeyBrowserClient
 
 The `TurnkeyBrowserClient` wraps Turnkey's basic SDK client with browser session management functionality. This client allows you to create a read only session that only authenticates read requests, or a read write session. It uses local storage for session management.
 
-Check out how to instantiate a read-only `TurnkeyBrowserClient` [here](#currentusersession)
-
 Below are all of the methods exposed by `TurnkeyBrowserClient`
 
-#### `login()`
+### `login()`
 
-Creates a read-only session for the current user, storing session details like userId, organizationId, and sessionExpiry in local storage. This session allows for read-only actions within the Turnkey API.
+Creates a read-only session for the current user, storing session details like userId, organizationId, and sessionExpiry in local storage. This session allows for read-only actions within the Turnkey API. If you would like to instantiate a read only `TurnkeyBrowserClient` after logging in, you can use the [`currentUserSession()` method](#currentusersession)
 
 ```typescript
 import { TurnkeyBrowserClient } from "@turnkey/sdk-browser";
 
 const config = {
-    apiBaseUrl: "https://your-api-base-url.com",
+    apiBaseUrl: "https://api.turnkey.com",
     defaultOrganizationId: "your-organization-id",
     serverSignUrl: "https://your-server-sign-url.com",
 };
 
 // Create a client instance
-const client = new TurnkeyBrowserClient(config);
+const browserClient = new TurnkeyBrowserClient(config);
 
 // Logs in to create a read-only session, storing the session in local storage
 const readOnlySession = await browserClient.login({ organizationId: "org-id" });
 ```
 
-#### `loginWithReadWriteSession()`
+### `loginWithReadWriteSession()`
 
-Creates a read-write session for the current user, storing an auth bundle in local storage. This session allows both read and write operations, and the API key is added to the Turnkey User with a defined expiration.
+Creates a read-write session. This method infers the current user's organization ID and target userId. To be used in conjunction with an `iframeStamper`: the resulting session's credential bundle can be injected into an iframeStamper to create a session that enables both read and write requests.
 
 ```typescript
 import { TurnkeyBrowserClient } from "@turnkey/sdk-browser";
 
 const config = {
-    apiBaseUrl: "https://your-api-base-url.com",
+    apiBaseUrl: "https://api.turnkey.com",
     defaultOrganizationId: "your-organization-id",
     serverSignUrl: "https://your-server-sign-url.com",
 };
 
+// Create a client instance
+const browserClient = new TurnkeyBrowserClient(config);
+
 // Logs in to create a read-write session, using a target embedded key and session expiration 
-const readWriteSession = await browserClient.loginWithReadWriteSession( "target-embedded-key", 
+const readWriteSession = await browserClient.loginWithReadWriteSession("target-embedded-key", 
 "900", // Session expires in 15 minutes 
 "user-id" );
 ```
 
-### TurnkeyPasskeyClient
+## TurnkeyPasskeyClient
 
 The `TurnkeyPasskeyClient` class extends `TurnkeyBrowserClient` and specializes it for user authentication through passkeys, which leverage the WebAuthn standard for passwordless authentication. This class enables the implementation of  strong, user-friendly authentication experiences in a web-based application without relying on passwords. TurnkeyPasskeyClient handles passkey creation, session management with passkeys and integrates with WebAuthn and Embedded API Keys.
 
@@ -183,12 +182,21 @@ For further information on using the `TurnkeyPasskeyClient`:
 
 Below are the methods exposed by the `TurnkeyPasskeyClient`
 
-#### `createUserPasskey()`
+### `createUserPasskey()`
 
 Creates a passkey for an end-user, handling lower-level configurations for the WebAuthn protocol, including challenges and user details.
 
 ```typescript
-import { TurnkeyPasskeyClient } from "@turnkey/sdk-browser";
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
 
 // Create a Passkey client instance 
 const passkeyClient = turnkeySDK.passkeyClient();
@@ -202,12 +210,21 @@ const passkey = await passkeyClient.createUserPasskey({
 });
 ```
 
-#### `createPasskeySession()`
+### `createPasskeySession()`
 
-Creates a read-write session using passkey authentication, with an encrypted API key. The session enables both read and write actions and persists in local storage.
+Uses passkey authentication to create a read-write session, via an embedded API key, and stores + returns the resulting auth bundle that contains the encrypted API key. This auth bundle (also referred to as a credential bundle) can be injected into an iframeStamper, resulting in a touch-free authenticator. Unlike `loginWithReadWriteSession`, this method assumes the end-user's organization ID (i.e. the sub-organization ID) is already known.
 
 ```typescript 
-import { TurnkeyPasskeyClient } from "@turnkey/sdk-browser";
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
 
 // Create a Passkey client instance 
 const passkeyClient = turnkeySDK.passkeyClient();
@@ -221,88 +238,196 @@ const session = await passkeyClient.createPasskeySession(
 );
 ```
 
-### TurnkeyIframeClient 
+## TurnkeyIframeClient 
 
-The `TurnkeyIframeClient` class extends `TurnkeyBrowserClient` and specializes it for use with an iframe-based session. It adds the ability to manage credentials and data exchanges securely through an iframe, allowing for a different form of session persistence and interaction within an embedded environment.
+The `TurnkeyIframeClient` class extends `TurnkeyBrowserClient` such that it is specialized for use with an iframe-based session. Our iFrame stamping implementation leverages the postMessage communication mechanism to send and receive messages within the iframe, ensuring the credential does not leave its secure environment. This approach is particularly crucial in sensitive flows such as Email Recovery / Auth, and Key or Wallet Export, where heightened security is required. 
 
 For further information on using the `TurnkeyIframeClient`: 
 - [How to instantiate an iFrame client](#iframeclient)
 
 Here are all of the methods exposed by `TurnkeyIframeClient`
 
-#### `injectCredentialBundle()`
+### `injectCredentialBundle()`
 
 Injects an encrypted credential bundle (API key or session token) directly into the iframe for session-based authentication and authorization.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+// Create a Passkey client instance 
+const iframeClient = turnkeySDK.iframeClient();
+
 // Injects a credential bundle into the iframe for session management
 const success = await iframeClient.injectCredentialBundle("your-credential-bundle");
 ```
 
-#### `injectWalletExportBundle()`
+### `injectWalletExportBundle()`
 
 Injects a wallet export bundle into the iframe, associating it with a specified organization. This allows secure transfer of wallet credentials.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+// Create a Passkey client instance 
+const iframeClient = turnkeySDK.iframeClient();
+
+
 // Injects a credential bundle into the iframe for session management
 const success = await iframeClient.injectWalletExportBundle("wallet-bundle", "org-id");
 ```
 
-#### `injectKeyExportBundle()`
+### `injectKeyExportBundle()`
 
 Injects a key export bundle into the iframe, supporting optional key formats. This is useful for transferring specific key credentials securely.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+// Create a Passkey client instance 
+const iframeClient = turnkeySDK.iframeClient();
+
+
 // Injects a key export bundle with an optional key format
 const success = await iframeClient.injectKeyExportBundle("key-bundle", "org-id", "PEM");
 ```
 
-#### `injectImportBundle()`
+### `injectImportBundle()`
 
 Injects an import bundle into the iframe, associating it with a specific organization and user, enabling secure import of user credentials.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+// Create a Passkey client instance 
+const iframeClient = turnkeySDK.iframeClient();
+
 // Injects an import bundle for a specific organization and user
 const success = await iframeClient.injectImportBundle("import-bundle", "org-id", "user-id");
 ```
 
-#### `extractWalletEncryptedBundle()`
+### `extractWalletEncryptedBundle()`
 
 Extracts an encrypted wallet bundle from the iframe. Useful for securely retrieving wallet credentials from the iframe to the main application.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+// Create a Passkey client instance 
+const iframeClient = turnkeySDK.iframeClient();
+
 // Extracts the encrypted wallet bundle from the iframe
 const walletBundle = await iframeClient.extractWalletEncryptedBundle();
 ```
 
-#### `extractKeyEncryptedBundle()`
+### `extractKeyEncryptedBundle()`
 
 Extracts an encrypted key bundle from the iframe, providing secure retrieval of key credentials.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+// Create a Passkey client instance 
+const iframeClient = turnkeySDK.iframeClient();
+
 // Extracts the encrypted key bundle from the iframe
 const keyBundle = await iframeClient.extractKeyEncryptedBundle();
 ```
 
-## Top Level SDK Functions
+## Top Level SDK Functions in `TurnkeyBrowserSDK`
 
-Here are all of the functions exposed by TurnkeyBrowserSDK 
+The `TurnkeyBrowserSDK` serves as the main entry point for interacting with Turnkey's services in a web browser environment. It contains methods to instantiate clients like the `TurnkeyPasskeyClient` and the `TurnkeyIframeClient`. manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.
 
-#### `passkeyClient()`
+### `passkeyClient()`
 
 Creates an instance of TurnkeyPasskeyClient with a specified or default rpId (relying party ID). This client can prompt users to sign with a passkey credential for authentication.
 
 ```typescript
-const passkeyClient = turnkey.passkeyClient();
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const passkeyClient = turnkeySDK.passkeyClient();
 const walletsResponse = await passkeyClient.getWallets();
 ```
 
-#### `iframeClient()`
+### `iframeClient()`
 
 Creates an instance of TurnkeyIframeClient by initializing an IframeStamper with the specified iframeUrl and optional element ID. The Iframe client is used to interact with a series of iframes hosted by Turnkey, designed for sensitive operations such as storing an expiring credential within the [Email Recovery](/features/email-recovery) and [Email Auth](/features/email-auth) flows, and facilitating Wallet [Import](/features/import-wallets) and [Export](/features/export-wallets). The code powering these iframes can be found at https://github.com/tkhq/frames.
 
 ```typescript
-const iframeClient = await turnkey.iframeClient({
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const iframeClient = await turnkeySDK.iframeClient({
   iframeContainer: document.getElementById("<iframe container id>"),
   iframeUrl: "https://auth.turnkey.com",
 });
@@ -316,12 +441,23 @@ if (response) {
 // this requires the developer to build a wrapper flow that can take user text input in their app and call the injectCredentialBundle function on the turnkey iframeClient
 ```
 
-#### `serverSign()`
+### `serverSign()`
 
 The serverSign function is used to proxy requests from a root parent organization to a child organization. The API key cannot be stored client-side, which is why the serverSign flow exists: to forward authenticated client-side requests to Turnkey via proxy backend.
 
 ```typescript
-const subOrgIdsResponse = await turnkey.serverSign(
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const subOrgIdsResponse = await turnkeySDK.serverSign(
  "getSubOrgIds",
    [{
      filterType: "EMAIL",
@@ -330,7 +466,7 @@ const subOrgIdsResponse = await turnkey.serverSign(
  )!
 
 if (subOrgIdsResponse.organizationIds?.length > 0) {
- const emailAuthResponse = await turnkey.serverSign(
+ const emailAuthResponse = await turnkeySDK.serverSign(
    "emailAuth",
    [{
      email: email,
@@ -341,38 +477,71 @@ if (subOrgIdsResponse.organizationIds?.length > 0) {
 }
 ```
 
-#### `currentUserSession()`
+### `currentUserSession()`
 
 Generally speaking, in order to ensure a seamless UX, you might not want a passkey user have to manually authenticate every read request from Turnkey's API with a credential (e.g. via FaceID or TouchID). In order to reduce friction, you can have a user login() to Turnkey with a credential once. This method facilitates this process and creates an instance of The TurnkeyBrowserClient that allows multiple read-only requests to Turnkey's API.
 
 ```typescript
-const passkeyClient = turnkey.passkeyClient();
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const passkeyClient = turnkeySDK.passkeyClient();
 await passkeySigner.login();
 
 // when a user logs in with the Turnkey SDK, a read-only API credential is saved in localStorage and can be used to make API read requests on their behalf
 
-const userSessionClient = await turnkey.currentUserSession();
+const userSessionClient = await turnkeySDK.currentUserSession();
 const walletsResponse = await userSessionClient.getWallets();
 
 // this API call happens without any confirmation step because the user now has an active read-only session
 ```
 
-#### `getReadWriteSession()`
+### `getReadWriteSession()`
 
 If there is a valid, current read-session, this will return an auth bundle and its expiration. This auth bundle can be used in conjunction with an iframeStamper to create a read + write session.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
 // gets auth bundle to be used with an iframeStamperto create a read write session
-const readWriteSession = await turnkey.getReadWriteSession(); 
+const readWriteSession = await turnkeySDK.getReadWriteSession(); 
 ```
 
-#### `getCurrentSubOrganization()`
+### `getCurrentSubOrganization()`
 
 Retrieves information about the user's current sub-organization from the user data stored in local storage. Useful for obtaining the user's organization context.
 
 ```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: "your-organization-id",
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
 // retrieves users current sub organization
-const subOrganization = await turnkey.getCurrentSubOrganization()
+const subOrganization = await turnkeySDK.getCurrentSubOrganization()
 ```
 
 ## Examples
