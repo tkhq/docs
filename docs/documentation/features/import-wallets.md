@@ -18,9 +18,7 @@ See the [Cryptographic details section](#cryptographic-details) for more technic
 
 ## Implementation guides
 
-Follow along with the Turnkey CLI, Embedded iframe, and NodeJS guides.
-
-<!-- TODO: embedded p256 key -->
+Follow along with the Turnkey CLI, Embedded iframe, NodeJS, and Local Storage guides.
 
 ### CLI
 
@@ -293,32 +291,117 @@ const privateKeyImportResult = await turnkeyClient
 
 Congrats! You've imported your private key 🎉
 
-## UI customization
+### Local Storage
 
-Everything is customizable in the import iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
+If you do not have access to an iframe (e.g. in a mobile context) or would prefer not to use an iframe, you can opt to use other environment-agnostic methods to perform import using Turnkey libraries. So while this section is called Local Storage (for consistency with the [Export](./export-wallets.md) guide), nothing is stored in Local Storage; instead, the relevant `encrypt{Wallet, PrivateKey}ToBundle` method uses an [ephemeral key](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/crypto/src/crypto.ts#L62-L70).
+
+#### Steps
+
+1. Initialize Turnkey client:
 
 ```js
-const iframeCss = `
-iframe {
-    box-sizing: border-box;
-    width: 400px;
-    height: 120px;
-    border-radius: 8px;
-    border-width: 1px;
-    border-style: solid;
-    border-color: rgba(216, 219, 227, 1);
-    padding: 20px;
-}
-`;
+import { Turnkey } from "@turnkey/sdk-browser";
+import { generateP256KeyPair, encryptWalletToBundle } from "@turnkey/crypto";
 
-return (
-  <div style={{ display: iframeDisplay }} id="your-container">
-    <style>{iframeCss}</style>
-  </div>
-);
+...
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+const passkeyClient = turnkey.passkeyClient();
 ```
 
+2. Initialize the import process (Turnkey activity):
+
+```js
+const initResult = await passkeyClient.initImportWallet({
+  userId, // your user ID
+});
+```
+
+3. Encrypt wallet to bundle:
+
+```js
+const walletBundle = await encryptWalletToBundle({
+  mnemonic,
+  importBundle: initResult.importBundle,
+  userId, // your user ID
+  organizationId, // your organization ID
+});
+```
+
+4. Import wallet (Turnkey activity):
+
+```js
+const walletImportResult = await passkeyClient.importWallet({
+  userId, // your user ID
+  walletName: "Your imported wallet!", // your desired name for the resulting imported wallet
+  encryptedBundle: walletBundle,
+  accounts: [], // these are the wallet accounts you'd like to derive; after all, you've just imported a HD wallet! See https://learnmeabitcoin.com/technical/hd-wallets for more
+});
+```
+
+Congrats! You've imported your wallet 🎉
+
+The process for importing a private key instead of wallet is largely similar, but has a key difference in that you must specify the format of your imported private key:
+
 #### Private Key support
+
+1. Initialize Turnkey client:
+
+```js
+import { Turnkey } from "@turnkey/sdk-browser";
+import { generateP256KeyPair, encryptPrivateKeyToBundle } from "@turnkey/crypto";
+
+...
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+const passkeyClient = turnkey.passkeyClient();
+```
+
+2. Initialize the import process (Turnkey activity):
+
+```js
+const initResult = await passkeyClient.initImportPrivateKey({
+  userId, // your user ID
+});
+```
+
+3. Encrypt private key to bundle:
+
+```js
+const privateKeyBundle = await encryptPrivateKeyToBundle({
+  privateKey, // your private key string
+  keyFormat, // your desired key format. See the Private Key notes section for more
+  importBundle: initResult.importBundle,
+  userId, // your user ID
+  organizationId, // your organization ID
+});
+```
+
+4. Import private key (Turnkey activity):
+
+```js
+const privateKeyImportResult = await passkeyClient
+  .importPrivateKey({
+    userId,
+    privateKeyName: "Your imported private key!", // your desired name for the resulting imported private key
+    encryptedBundle: privateKeyBundle,
+    curve: keyFormat == "SOLANA" ? "CURVE_ED25519" : "CURVE_SECP256K1",
+    addressFormats:
+      keyFormat == "SOLANA"
+        ? ["ADDRESS_FORMAT_SOLANA"]
+        : ["ADDRESS_FORMAT_ETHEREUM"],
+  });
+```
+
+Congrats! You've imported your private key 🎉
+
+## Private Key notes
 
 Turnkey also supports importing Private Keys. Follow the same steps above for importing Wallets as mnemonics, but instead use the `INIT_IMPORT_PRIVATE_KEY` and `IMPORT_PRIVATE_KEY` activities and the `extractKeyEncryptedBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). You can pass an optional `keyFormat` to `extractKeyEncryptedBundle(keyFormat)` that will apply either `Hexadecimal` or `Solana` formatting to the private key that is entered in the iframe. The default key format is `hexadecimal`, which is used by MetaMask, MyEtherWallet, Phantom, Ledger, and Trezor for Ethereum keys. For Solana keys, you will need to pass the `solana` key format.
 
@@ -339,3 +422,28 @@ The following diagram summarizes the flow:
 </p>
 
 The iframe encrypts the wallet's mnemonic or private key to the secure enclave's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/). The encrypted key material is then passed as a parameter inside of a signed `IMPORT_WALLET` or `IMPORT_PRIVATE_KEY` activity. During this activity, the Turnkey enclave decrypts the TEK and uses it to decrypt the encrypted key material to create a new wallet or private key.
+
+## UI customization
+
+Everything is customizable in the import iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
+
+```js
+const iframeCss = `
+  iframe {
+      box-sizing: border-box;
+      width: 400px;
+      height: 120px;
+      border-radius: 8px;
+      border-width: 1px;
+      border-style: solid;
+      border-color: rgba(216, 219, 227, 1);
+      padding: 20px;
+  }
+`;
+
+return (
+  <div style={{ display: iframeDisplay }} id="your-container">
+    <style>{iframeCss}</style>
+  </div>
+);
+```
