@@ -582,3 +582,28 @@ Once the activity succeeds, the encrypted mnemonic or private key can be decrypt
 Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
 
 When importing into a multichain wallet such as Phantom, see [this guide](https://help.phantom.app/hc/en-us/articles/12988493966227-What-derivation-paths-does-Phantom-wallet-support#:~:text=The%20addresses%20are%20grouped%20into,'%2F0'%2F0%2F0.) on matching private keys across Solana, Ethereum, and Polygon.
+
+## UI customization
+
+Everything is customizable in the import iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
+
+```js
+const iframeCss = `
+  iframe {
+      box-sizing: border-box;
+      width: 400px;
+      height: 120px;
+      border-radius: 8px;
+      border-width: 1px;
+      border-style: solid;
+      border-color: rgba(216, 219, 227, 1);
+      padding: 20px;
+  }
+`;
+
+return (
+  <div style={{ display: iframeDisplay }} id="your-container">
+    <style>{iframeCss}</style>
+  </div>
+);
+```
