@@ -386,17 +386,16 @@ const privateKeyBundle = await encryptPrivateKeyToBundle({
 4. Import private key (Turnkey activity):
 
 ```js
-const privateKeyImportResult = await passkeyClient
-  .importPrivateKey({
-    userId,
-    privateKeyName: "Your imported private key!", // your desired name for the resulting imported private key
-    encryptedBundle: privateKeyBundle,
-    curve: keyFormat == "SOLANA" ? "CURVE_ED25519" : "CURVE_SECP256K1",
-    addressFormats:
-      keyFormat == "SOLANA"
-        ? ["ADDRESS_FORMAT_SOLANA"]
-        : ["ADDRESS_FORMAT_ETHEREUM"],
-  });
+const privateKeyImportResult = await passkeyClient.importPrivateKey({
+  userId,
+  privateKeyName: "Your imported private key!", // your desired name for the resulting imported private key
+  encryptedBundle: privateKeyBundle,
+  curve: keyFormat == "SOLANA" ? "CURVE_ED25519" : "CURVE_SECP256K1",
+  addressFormats:
+    keyFormat == "SOLANA"
+      ? ["ADDRESS_FORMAT_SOLANA"]
+      : ["ADDRESS_FORMAT_ETHEREUM"],
+});
 ```
 
 Congrats! You've imported your private key 🎉

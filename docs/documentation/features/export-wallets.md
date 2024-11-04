@@ -380,7 +380,10 @@ const STORAGE_KEYS = {
   EMBEDDED_PUBLIC_KEY: "@turnkey/embedded_public_key",
 };
 
-await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PRIVATE_KEY, embeddedPrivateKey);
+await LocalStorage.setItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
 
 // Note that the public key can always be derived separately via the `getPublicKey` from `@turnkey/crypto`
 await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, embeddedPublicKey);
@@ -409,8 +412,14 @@ const decryptedBundle = await decryptExportBundle({
 6. Remove embedded key from Local Storage. This is recommended because (1) this key doesn't have to be persistent in the first place, and (2) reduces the risk of pattern detection.
 
 ```js
-await LocalStorage.removeItem(STORAGE_KEYS.EMBEDDED_PRIVATE_KEY, embeddedPrivateKey);
-await LocalStorage.removeItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, embeddedPublicKey);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PUBLIC_KEY,
+  embeddedPublicKey,
+);
 ```
 
 Congrats! You've exported your wallet 🎉
@@ -480,8 +489,14 @@ const decryptedBundle = await decryptExportBundle({
 6. Remove embedded key from Local Storage. This is recommended because (1) this key doesn't have to be persistent in the first place, and (2) reduces the risk of pattern detection.
 
 ```js
-await LocalStorage.removeItem(STORAGE_KEYS.EMBEDDED_PRIVATE_KEY, embeddedPrivateKey);
-await LocalStorage.removeItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, embeddedPublicKey);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PUBLIC_KEY,
+  embeddedPublicKey,
+);
 ```
 
 Congrats! You've exported your private key 🎉
@@ -549,8 +564,14 @@ const decryptedBundle = await decryptExportBundle({
 6. Remove embedded key from Local Storage. This is recommended because (1) this key doesn't have to be persistent in the first place, and (2) reduces the risk of pattern detection.
 
 ```js
-await LocalStorage.removeItem(STORAGE_KEYS.EMBEDDED_PRIVATE_KEY, embeddedPrivateKey);
-await LocalStorage.removeItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, embeddedPublicKey);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PUBLIC_KEY,
+  embeddedPublicKey,
+);
 ```
 
 Congrats! You've exported your wallet account 🎉
