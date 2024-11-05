@@ -6,7 +6,7 @@ slug: /features/otp-auth
 
 # OTP Auth
 
-OTP (one-time password) Auth enables a user to authenticate their Turnkey account with an email or phone number via a 6 digit one time password. Similar to email auth, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing OTP Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/otp-auth).
+OTP (one-time password) Auth enables a user to authenticate their Turnkey account with an email or phone number (SMS currently in beta) via a 6 digit one time password. Similar to email auth, the user is granted an expiring API key that is stored in memory within an iframe. This expiring API key can then be used by the user to access their wallet, similar to a session key. An example utilizing OTP Auth for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/otp-auth).
 
 #### Mechanism
 
