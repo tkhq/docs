@@ -45,6 +45,7 @@ A passkey with RPID "your.app.xyz" <strong>cannot</strong> be used on `https://w
 A reason why you might want to set the RPID to "your.app.xyz" instead of "app.xyz" like recommended above is extra security: if you are worried about user passkeys being usable across all your sub-domains, it makes sense to scope passkeys to the sub-domain they're meant to be used on, and only that sub-domain.
 
 If you scope passkeys to a specific sub-domain, be aware that migrating your app to a different sub-domain later will require a migration process where users have to re-enroll themselves by creating new passkeys on the new sub-domain. Passkeys cannot be transferred from one RPID to another.
+
 </details>
 
 `rp.id` will show up in the initial registration popup:

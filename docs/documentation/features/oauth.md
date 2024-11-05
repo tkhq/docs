@@ -114,7 +114,7 @@ The main documentation for Google OIDC is available [here](https://github.com/tk
 
 ### Apple
 
-Apple integration is also extensively tested and supported, and is integrated into our demo wallet (hosted at https://wallet.tx.xyz). The code provides an [example component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/apple-auth.tsx) as well as an [example redirect handler](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/apple/page.tsx).
+Apple integration is also extensively tested and supported, and is integrated into our demo wallet (hosted at https://wallet.tx.xyz). The code provides an [example component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/apple-auth.tsx) as well as an [example redirect handler](<https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/apple/page.tsx>).
 
 Documentation for Apple OIDC can be foudn [here](https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/authenticating_users_with_sign_in_with_apple).
 
@@ -135,7 +135,7 @@ In our example demo wallet, we opt to avoid using a database in the authenticati
     />
 </p>
 
-Code for the [redirect component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/facebook-auth.tsx), [OAuth callback](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/facebook/page.tsx), and [code exchange](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/actions/turnkey.ts#L54) are all available in the example wallet repo.
+Code for the [redirect component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/facebook-auth.tsx), [OAuth callback](<https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/facebook/page.tsx>), and [code exchange](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/actions/turnkey.ts#L54) are all available in the example wallet repo.
 
 If you prefer to use a database such as Redis instead of reassembling the verification code, you can store the verification code and retrieve it in the exchange stage using a lookup key either passed as **state** or stored in local browser storage.
 
