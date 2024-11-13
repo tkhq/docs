@@ -169,6 +169,7 @@ const config = {
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
+        additionalLanguages: ["swift"],
       },
       algolia: {
         appId: "89KSB43UFT",
