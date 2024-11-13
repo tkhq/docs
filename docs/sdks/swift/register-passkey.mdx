@@ -190,14 +190,14 @@ Define the methods that handle the passkey registration outcomes.
 
 ## Sign Up New User
 
-After successful passkey registration, use the PasskeyRegistrationResult to sign up a new user by creating a
-sub-organization using TurnkeyClient from the TurnkeySDK.
+After successful passkey registration, use the `PasskeyRegistrationResult` to sign up a new user by creating a
+sub-organization using the `TurnkeyClient` from the TurnkeySDK.
 
 <Steps>
 
 <Step>Initialize TurnkeyClient with Proxy</Step>
 
-When handling the completion of passkey registration, set up the TurnkeyClient with a proxy server URL using the ProxyMiddleware.
+When handling the completion of passkey registration, set up the `TurnkeyClient` with a proxy server URL using the [`ProxyMiddleware`](/sdks/swift/proxy-middleware).
 This configuration is essential for situations where the parent organization's API keys are required to authenticate requests
 for creating a sub-organization. Your backend should relay the request to the Turnkey API, ensuring it is authenticated with
 the parent organization's API keys.
@@ -221,57 +221,9 @@ func signUpWithPasskey(with passkeyRegistrationResult: PasskeyRegistrationResult
 
 :::note
 
-- The middleware adds an `X-Forwarded-For` header to each request, which contains the original request URL.
-- Ensure that the response from your backend matches exactly what is expected from Turnkey’s backend.
+The middleware adds an `X-Turnkey-Request-Url` header to each request, which contains the original request URL. For more details, see the [Proxy Middleware](/sdks/swift/proxy-middleware) guide.
 
 :::
-
-<details>
-<summary>Example Node.js Proxy Server</summary>
-
-```javascript
-const express = require("express");
-const app = express();
-
-app.use(express.json());
-
-app.post("/api/turnkey-proxy", async (req, res) => {
-  // The original request URL e.g. https://api.turnkey.com/public/v1/submit/create_sub_organization
-  const turnkeyApiRequestURL = req.headers["x-forwarded-for"];
-
-  // Remove the 'x-forwarded-for' header
-  delete req.headers["x-forwarded-for"];
-
-  try {
-    // Forward the request to the original URL
-    const response = await fetch(turnkeyApiRequestURL, {
-      method: "POST",
-      headers: req.headers,
-      body: JSON.stringify(req.body),
-    });
-
-    // Get the response data
-    const data = await response.json();
-
-    // Data will be the response from the create sub-organization request
-    // You may save this data to your database
-
-    // Important: Send the exact response back to the client
-    // This is necessary for TurnkeySDK to process the response correctly
-    res.status(response.status).json(data);
-  } catch (error) {
-    console.error("Error forwarding request:", error);
-    res.status(500).send("Internal Server Error");
-  }
-});
-
-// Start the server
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
-});
-```
-
-</details>
 
 <Step>Attestation Object</Step>
 
