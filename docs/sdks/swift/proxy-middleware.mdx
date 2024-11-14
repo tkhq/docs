@@ -1,0 +1,86 @@
+---
+title: "Proxy Middleware"
+description: Using the Proxy Middleware from the Turnkey Swift SDK
+slug: /sdks/swift/proxy-middleware
+---
+
+# Proxy Middleware
+
+## Overview
+
+The [`ProxyMiddleware`](https://github.com/tkhq/swift-sdk/blob/bd8993b4b6b35c44d4a917b06dd44490961c4f28/Sources/Middleware/ProxyMiddleware.swift) is integrated into the `TurnkeyClient` through its initializer that accepts a proxy server URL. This setup is particularly useful for handling scenarios where direct authenticated requests are not feasible, such as during onboarding flows or when additional server-side processing is required before reaching Turnkey's backend.
+
+## Initialize
+
+Here's how you can initialize the `TurnkeyClient` with a proxy server URL:
+
+```swift
+import TurnkeySDK
+
+// Initialize the TurnkeyClient with a proxy server URL
+let turnkeyClient = TurnkeyClient(proxyURL: "https://your-proxy-server.com/api/turnkey-proxy")
+```
+
+This initializer configures the `TurnkeyClient` to route all requests through the specified proxy server. The proxy server is then responsible for forwarding these requests to a backend capable of authenticating them using an API private key. After authentication, the proxy server forwards the requests to Turnkey's backend and relays the response back to the client.
+
+This setup is especially useful for operations like:
+
+- Email [authentication](/features/email-auth) & [recovery](/features/email-recovery)
+- Wallet [import](/features/import-wallets) & [export](/features/export-wallets)
+- [Sub-organization creation](/concepts/sub-organizations#creating-sub-organizations)
+
+## Request Header
+
+The middleware adds an `X-Turnkey-Request-Url` header to each request, which contains the original request URL. This is used to forward the request to Turnkey's backend.
+
+Example implementation of a Node.js proxy server:
+
+```javascript
+const express = require("express");
+const app = express();
+
+app.use(express.json());
+
+app.post("/api/turnkey-proxy", async (req, res) => {
+  // The original request URL e.g. https://api.turnkey.com/public/v1/submit/create_sub_organization
+  const turnkeyApiRequestURL = req.headers["X-Turnkey-Request-Url"];
+
+  // Remove the 'X-Turnkey-Request-Url' header
+  delete req.headers["X-Turnkey-Request-Url"];
+
+  try {
+    // Forward the request to the original URL
+    const response = await fetch(turnkeyApiRequestURL, {
+      method: "POST",
+      headers: req.headers,
+      body: JSON.stringify(req.body),
+    });
+
+    // Get the response data
+    const data = await response.json();
+
+    // Data will be the response from the create sub-organization request
+    // You may save this data to your database
+
+    // Important: Send the exact response back to the client
+    // This is necessary for TurnkeySDK to process the response correctly
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Error forwarding request:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+// Start the server
+app.listen(3000, () => {
+  console.log("Server is running on port 3000");
+});
+```
+
+### Response Matching
+
+It is crucial that the response from the developer's backend matches exactly with what would be expected from Turnkey's backend. Any discrepancy in the response format or data can cause the request to fail.
+
+## Conclusion
+
+While `ProxyMiddleware` is not required, it provides a convenient way to send requests on behalf of unauthenticated users looking to perform operations such as email authentication/recovery, wallet import/export, and sub-organization creation.

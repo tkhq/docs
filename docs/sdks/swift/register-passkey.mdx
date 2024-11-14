@@ -1,0 +1,349 @@
+---
+title: "Register Passkey"
+description: Register Passkey
+slug: /sdks/swift/register-passkey
+---
+
+# Introduction
+
+This guide explains how to use the `PasskeyManager` class to register a new passkey within your iOS application.
+We'll cover the necessary configurations and provide code examples with detailed explanations.
+
+## Prerequisites
+
+Before integrating passkey registration, ensure the following prerequisites are met.
+You may proceed to the [Passkey Registration](#passkey-registration) section if you have already configured the associated domains and the app site association file.
+
+### Associated Domains Entitlement
+
+Your app must have the Associated Domains capability enabled. This allows your app to access passkeys stored in the user's iCloud Keychain.
+Ensure that your domain supports HTTPS and is properly configured.
+
+1. In Xcode, select your project and navigate to the Signing & Capabilities tab.
+2. Click the + Capability button and add Associated Domains.
+3. Add your domain to the Associated Domains section, prefixed with webcredentials:. For example:
+
+```text
+webcredentials:your.domain.com
+```
+
+Reference: [Apple Developer Documentation - Supporting Associated Domains](https://developer.apple.com/documentation/xcode/supporting-associated-domains)
+
+### Apple App Site Association File
+
+Your domain must host an `apple-app-site-association` file that specifies the app identifiers allowed to access credentials.
+The file should be available at:
+
+```text
+https://your.domain.com/.well-known/apple-app-site-association
+```
+
+The content of the file should include the webcredentials service, as shown:
+
+```json
+{
+  "webcredentials": {
+    "apps": ["<your-app-prefix>.<your-app-bundle-id>"]
+  }
+}
+```
+
+Replace `<your-app-prefix>` and `<your-app-bundle-id>` with your actual App ID prefix and bundle identifier.
+
+## Passkey Registration
+
+Once the prerequisites are in place, you can proceed to implement passkey registration using `PasskeyManager`.
+
+import { Step, Steps } from "@site/src/components/step";
+
+<Steps>
+
+<Step>Import Required Modules</Step>
+
+At the top of your `ViewController` or relevant class, import the necessary modules:
+
+```swift title="ViewController.swift"
+import UIKit
+import AuthenticationServices
+import Shared  // Import Shared to use PasskeyManager
+import TurnkeySDK    // Import TurnkeySDK to use TurnkeyClient
+```
+
+<Step>Initialize PasskeyManager</Step>
+
+Create an instance of `PasskeyManager`, providing the [Relying Party Identifier](/passkeys/options#rp) and the [presentation anchor](<https://developer.apple.com/documentation/authenticationservices/asauthorizationcontrollerpresentationcontextproviding/presentationanchor(for:)>).
+
+```swift title="ViewController.swift"
+class ViewController: UIViewController {
+
+    var passkeyManager: PasskeyManager?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Additional setup if needed
+    }
+
+    // ... rest of the class
+}
+```
+
+<Step>Set Up User Interface</Step>
+
+Implement a method to initiate passkey registration, typically triggered by a user action such as tapping a button.
+
+The `PasskeyManager` requires two parameters:
+
+- `rpId`: The relying party identifier, typically your domain.
+  This must match the domain configured in the Associated Domains entitlement and the `apple-app-site-association` file.
+- `presentationAnchor`: The window in which the authentication services will present UI, usually obtained from `view.window`.
+
+```swift title="ViewController.swift"
+@IBAction func registerPasskeyTapped(_ sender: Any) {
+    guard let window = view.window else {
+        print("No window available")
+        return
+    }
+
+    let rpId = "your.domain.com"  // Replace with your actual domain
+    let email = "user@example.com" // Replace with the user's email
+
+    // Initialize PasskeyManager
+    passkeyManager = PasskeyManager(rpId: rpId, presentationAnchor: window)
+
+    // Register for passkey-related notifications
+    // We'll define this method in the next step
+    registerForPasskeyNotifications()
+
+    // Start the passkey registration process
+    passkeyManager?.registerPasskey(email: email)
+}
+```
+
+<Step>Register for Notifications</Step>
+
+To handle the results of the passkey registration process, register for the relevant notifications provided by PasskeyManager.
+
+```swift title="ViewController.swift"
+func registerForPasskeyNotifications() {
+    NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(passkeyRegistrationCompleted(_:)),
+        name: .PasskeyRegistrationCompleted,
+        object: nil
+    )
+    NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(passkeyRegistrationFailed(_:)),
+        name: .PasskeyRegistrationFailed,
+        object: nil
+    )
+    NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(passkeyRegistrationCanceled),
+        name: .PasskeyRegistrationCanceled,
+        object: nil
+    )
+}
+```
+
+##### Cleanup
+
+Remove the observers when they are no longer needed to avoid memory leaks.
+
+```swift title="ViewController.swift"
+deinit {
+    NotificationCenter.default.removeObserver(self)
+}
+```
+
+<Step>Implement Notification Handlers</Step>
+
+Define the methods that handle the passkey registration outcomes.
+
+```swift title="ViewController.swift"
+@objc func passkeyRegistrationCompleted(_ notification: Notification) {
+    if let result = notification.userInfo?["result"] as? PasskeyRegistrationResult {
+        // Handle successful registration
+        print("Passkey registration completed.")
+        print("Challenge: \(result.challenge)")
+        print("Credential ID: \(result.attestation.credentialId)")
+        // Send result to your server for verification and storage
+    }
+}
+
+@objc func passkeyRegistrationFailed(_ notification: Notification) {
+    if let error = notification.userInfo?["error"] as? PasskeyRegistrationError {
+        // Handle registration failure
+        print("Passkey registration failed with error: \(error.localizedDescription)")
+        // Display an error message or take appropriate action
+    }
+}
+
+@objc func passkeyRegistrationCanceled() {
+    // Handle user cancellation
+    print("Passkey registration was canceled by the user.")
+    // Update UI or take appropriate action
+}
+```
+
+</Steps>
+
+## Sign Up New User
+
+After successful passkey registration, use the `PasskeyRegistrationResult` to sign up a new user by creating a
+sub-organization using the `TurnkeyClient` from the TurnkeySDK.
+
+<Steps>
+
+<Step>Initialize TurnkeyClient with Proxy</Step>
+
+When handling the completion of passkey registration, set up the `TurnkeyClient` with a proxy server URL using the [`ProxyMiddleware`](/sdks/swift/proxy-middleware).
+This configuration is essential for situations where the parent organization's API keys are required to authenticate requests
+for creating a sub-organization. Your backend should relay the request to the Turnkey API, ensuring it is authenticated with
+the parent organization's API keys.
+
+```swift title="ViewController.swift"
+func signUpWithPasskey(with passkeyRegistrationResult: PasskeyRegistrationResult) {
+    Task {
+        do {
+            // Initialize the TurnkeyClient with a proxy server URL
+            let turnkeyClient = TurnkeyClient(proxyURL: "https://your-proxy-server.com/api/turnkey-proxy")
+
+            // Proceed to the next substep...
+
+        } catch {
+            print("Error signing up new user: \(error)")
+            // Handle error appropriately
+        }
+    }
+}
+```
+
+:::note
+
+The middleware adds an `X-Turnkey-Request-Url` header to each request, which contains the original request URL. For more details, see the [Proxy Middleware](/sdks/swift/proxy-middleware) guide.
+
+:::
+
+<Step>Attestation Object</Step>
+
+Construct the attestation object using the `PasskeyRegistrationResult`.
+
+```swift title="ViewController.swift"
+let attestation = Components.Schemas.Attestation(
+    credentialId: passkeyRegistrationResult.attestation.credentialId,
+    clientDataJson: passkeyRegistrationResult.attestation.clientDataJson,
+    attestationObject: passkeyRegistrationResult.attestation.attestationObject,
+    transports: [.AUTHENTICATOR_TRANSPORT_BLE]  // Adjust transports as needed
+)
+```
+
+<Step>Define Parameters</Step>
+
+Set up the necessary parameters for the sub-organization and root user.
+We'll use the `passkeyRegistrationResult` we received in the previous step to create a passkey authenticator for this new sub-organization.
+
+```swift title="ViewController.swift"
+let parentOrganizationId = "your-parent-organization-id"
+let subOrganizationName = "New Sub Organization"
+
+// This should come from the user's input
+let email = "user@example.com"
+
+let rootUsers: [Components.Schemas.RootUserParamsV4] = [
+    .init(
+        userName: email,
+        userEmail: email,
+        apiKeys: [],
+        authenticators: [
+            .init(
+                // We use the passkey registration result to create the authenticator
+                authenticatorName: "Passkey",
+                challenge: passkeyRegistrationResult.challenge,
+                attestation: attestation
+            )
+        ],
+        oauthProviders: []
+    )
+]
+
+let rootQuorumThreshold: Int32 = 1
+
+// Create an Ethereum wallet for the new sub-organization
+let wallet = Components.Schemas.WalletParams(
+    walletName: "Default Wallet",
+    accounts: [
+        .init(
+            curve: .CURVE_SECP256K1,
+            pathFormat: .PATH_FORMAT_BIP32,
+            path: "m/44'/60'/0'/0/0",
+            addressFormat: .ADDRESS_FORMAT_ETHEREUM
+        )
+    ]
+)
+
+// Set optional parameters
+let disableEmailRecovery = false
+let disableEmailAuth = false
+let disableSmsAuth = false
+let disableOtpEmailAuth = false
+```
+
+:::note
+
+You can find more information about the optional parameters in the [Organization Features](/concepts/organizations#features) section of the documentation.
+
+:::
+
+<Step>Create Sub-Organization</Step>
+
+Use the `TurnkeyClient` to create the sub-organization with the provided parameters.
+
+```swift title="ViewController.swift"
+let output = try await turnkeyClient.createSubOrganization(
+    organizationId: parentOrganizationId, // Organization ID can be empty when using proxy
+    subOrganizationName: subOrganizationName,
+    rootUsers: rootUsers,
+    rootQuorumThreshold: rootQuorumThreshold,
+    wallet: wallet,
+    disableEmailRecovery: disableEmailRecovery,
+    disableEmailAuth: disableEmailAuth,
+    disableSmsAuth: disableSmsAuth,
+    disableOtpEmailAuth: disableOtpEmailAuth
+)
+```
+
+<Step>Handle the Response</Step>
+
+Process the response from the `createSubOrganization` call to retrieve information about the new sub-organization and root users.
+
+```swift title="ViewController.swift"
+// Handle the response
+switch output {
+case let .ok(response):
+    switch response.body {
+    case let .json(activityResponse):
+        if let result = activityResponse.activity.result.createSubOrganizationResultV7 {
+            print("Created sub-organization: \(result.subOrganizationId ?? "Unknown ID")")
+            if let rootUserIds = result.rootUserIds {
+                print("Created root users: \(rootUserIds)")
+            }
+            // Proceed with additional setup or navigation as needed
+        }
+    }
+case let .undocumented(statusCode, undocumentedPayload):
+    if let body = undocumentedPayload.body {
+        let bodyString = try await String(decoding: body, as: UTF8.self)
+        print("Undocumented response body: \(bodyString)")
+    }
+    print("Undocumented response: \(statusCode)")
+}
+```
+
+</Steps>
+
+### References
+
+- [Apple Developer Documentation - Supporting Passkeys](https://developer.apple.com/documentation/authenticationservices/public-private_key_authentication/supporting_passkeys)
+- [Apple Developer Documentation - ASAuthorizationController](https://developer.apple.com/documentation/authenticationservices/asauthorizationcontroller)
+- [Apple Developer Documentation - ASAuthorizationPlatformPublicKeyCredentialProvider](https://developer.apple.com/documentation/authenticationservices/asauthorizationplatformpublickeycredentialprovider)
