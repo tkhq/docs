@@ -1,8 +1,8 @@
 ---
-sidebar_position: 2
+sidebar_position: 1
 description: Learn about Policies on Turnkey and how to manage them
 slug: /concepts/policies/overview
-sidebar_label: Overview
+sidebar_label: Policies
 ---
 
 # Policy overview

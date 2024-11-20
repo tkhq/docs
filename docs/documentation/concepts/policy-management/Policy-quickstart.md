@@ -1,5 +1,5 @@
 ---
-sidebar_position: 1
+sidebar_position: 2
 description: Add a new user to your Org and try out the policy engine
 slug: /concepts/policies/quickstart
 sidebar_label: Quickstart
