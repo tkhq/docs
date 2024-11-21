@@ -102,14 +102,15 @@ const walletClient = turnkey.walletClient(new EthereumWallet());
 ## Sign Up
 
 In this section, we'll guide you through the process of implementing a sign-up flow using an Ethereum wallet for authentication.
-The sign-up process involves creating a new suborganization within your existing organization.
+The sign-up process involves creating a new sub-organization within your existing organization.
 This requires authentication of the parent organization using its public/private key pair.
-Additionally, we'll cover how to verify if a user already has an associated suborganization before proceeding.
+Additionally, we'll cover how to verify if a user already has an associated sub-organization before proceeding.
 
 ### Server-side
 
 Initialize the Turnkey SDK on the **server-side** using the `@turnkey/sdk-server` package.
-This setup enables you to authenticate requests to Turnkey's API by leveraging the parent organization's public/private API key pair.
+This setup enables you to authenticate requests to Turnkey's API using the parent organization's public/private API key pair.
+This is required to create new sub-organizations on behalf of a user.
 
 <Tabs groupId="language" queryString="lang">
 <TabItem value="next" label="Next.js">
@@ -160,9 +161,19 @@ const turnkeyServer = new Turnkey({
 
 ### Check for Existing User
 
-Before signing up a new user, we can try and retrieve the user's suborganization ID using their public key.
-If a suborganization is found, we can proceed with authentication, otherwise we assume this the user is signing up
-and we need to create a new suborganization.
+Before signing up a new user, we can try and retrieve the user's sub-organization ID using the public key associated
+with the Ethereum or Solana account they want to authenticate with.
+If a sub-organization is found, we can proceed with authentication; otherwise, we assume the user is signing up.
+
+We'll use the `getPublicKey` method on the `WalletClient` instance which will retrieve the public key from the user's wallet.
+
+:::note
+The main distinction between signing with an Ethereum Wallet and a Solana Wallet lies in how the public key is obtained.
+For Solana, the public key can be directly derived from the wallet.
+In contrast, with Ethereum, the secp256k1 public key isn't directly accessible.
+Instead, you need to first obtain a signature from the user and then recover the public key from that signature.
+This requires an additional step of signing a message with the user's Ethereum wallet before we can retrieve the public key.
+:::
 
 <Tabs groupId="language" queryString="lang">
 <TabItem value="next" label="Next.js">
@@ -210,9 +221,9 @@ export default function WalletAuth() {
 
     const subOrg = await getSubOrg(publicKey);
     if (subOrg) {
-      // User already has a suborganization
+      // User already has a sub-organization
     } else {
-      // User does not have a suborganization, proceed with sign-up
+      // User does not have a sub-organization, proceed with sign-up
     }
   };
 
@@ -246,7 +257,7 @@ export const getSubOrg = async (publicKey: string) => {
 };
 ```
 
-We'll use the `getSubOrg` function in the login method to check if a user already has a suborganization.
+We'll use the `getSubOrg` function in the login method to check if a user already has a sub-organization.
 
 ```typescript title="src/wallet-auth.ts"
 import { getSubOrg } from "./wallet-auth-server";
@@ -263,9 +274,9 @@ export const login = async () => {
 
   const subOrg = await getSubOrg(publicKey);
   if (subOrg) {
-    // User already has a suborganization
+    // User already has a sub-organization
   } else {
-    // User does not have a suborganization, proceed with sign-up
+    // User does not have a sub-organization, proceed with sign-up
   }
 };
 ```
@@ -273,16 +284,16 @@ export const login = async () => {
 </TabItem>
 </Tabs>
 
-### Create Suborganization
+### Create Sub-Organization
 
-Next, we'll define a method to create a suborganization for new user sign-ups.
+Next, we'll define a method to create a sub-organization for new user sign-ups.
 
-For more information, refer to the [Suborganizations](/concepts/sub-organizations) guide.
+For more information, refer to the [Sub-Organizations](/concepts/sub-organizations) guide.
 
 <Tabs groupId="language" queryString="lang">
 <TabItem value="next" label="Next.js">
 
-We'll define another server action `createSubOrg` to create a suborganization for new user sign-ups.
+We'll define another server action `createSubOrg` to create a sub-organization for new user sign-ups.
 
 ```ts title="app/actions.ts"
 "use server";
@@ -322,7 +333,7 @@ export const createSubOrg = async (
     rootQuorumThreshold: 1,
     wallet: {
       walletName: "Default Wallet",
-      // This is used to create a new Ethereum wallet for the suborganization
+      // This is used to create a new Ethereum wallet for the sub-organization
       accounts: DEFAULT_ETHEREUM_ACCOUNTS,
     },
   });
@@ -352,15 +363,15 @@ export default function WalletAuth() {
 
     const subOrg = await getSubOrg(publicKey);
     if (subOrg) {
-      // User already has a suborganization
+      // User already has a sub-organization
     } else {
-      // User does not have a suborganization, proceed with sign-up
+      // User does not have a sub-organization, proceed with sign-up
       const subOrg = await createSubOrg(publicKey, "API_KEY_CURVE_SECP256K1");
 
       // In the next step we'll add logic  sign in the user
 
       if (!subOrg) {
-        throw new Error("Failed to create suborganization");
+        throw new Error("Failed to create sub-organization");
       }
     }
   };
@@ -376,7 +387,7 @@ export default function WalletAuth() {
 </TabItem>
 <TabItem value="ts" label="TypeScript">
 
-We'll define another server-side function `createSubOrg`, to create a suborganization for new user sign-ups.
+We'll define another server-side function `createSubOrg`, to create a sub-organization for new user sign-ups.
 
 ```typescript title="src/wallet-auth-server.ts"
 // ...
@@ -414,7 +425,7 @@ export const createSubOrg = async (
     rootQuorumThreshold: 1,
     wallet: {
       walletName: "Default Wallet",
-      // This is used to create a new Ethereum wallet for the suborganization
+      // This is used to create a new Ethereum wallet for the sub-organization
       accounts: DEFAULT_ETHEREUM_ACCOUNTS,
     },
   });
@@ -440,15 +451,15 @@ export const login = async () => {
 
   const subOrg = await getSubOrg(publicKey);
   if (subOrg) {
-    // User already has a suborganization
+    // User already has a sub-organization
   } else {
-    // User does not have a suborganization, proceed with sign-up
+    // User does not have a sub-organization, proceed with sign-up
     const subOrg = await createSubOrg(publicKey, "API_KEY_CURVE_SECP256K1");
 
     // In the next step we'll add logic to sign in the user
 
     if (!subOrg) {
-      throw new Error("Failed to create suborganization");
+      throw new Error("Failed to create sub-organization");
     }
   }
 };
