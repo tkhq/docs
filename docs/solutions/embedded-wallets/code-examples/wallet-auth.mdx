@@ -1,0 +1,805 @@
+---
+title: "Wallet Authentication"
+sidebar_position: 6
+description: Authenticate a User with an Ethereum Wallet
+slug: /embedded-wallets/code-examples/wallet-auth
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+import Parameter from "@site/src/components/parameter";
+
+# Wallet Authentication
+
+In this guide, we'll explore how to leverage the `WalletClient` in the Turnkey SDK to authenticate requests to Turnkey's API using either Solana or Ethereum wallets.
+
+## Initialize
+
+Begin by initializing the Turnkey SDK by passing in a config object containing:
+
+- `apiBaseUrl`: The base URL of the Turnkey API: `https://api.turnkey.com`.
+- `defaultOrganizationId`: Your parent organization ID, which you can find in the [Turnkey dashboard](https://app.turnkey.com/dashboard).
+- `wallet`: The wallet interface used to sign requests. In this example, we'll use the `EthereumWallet` interface.
+
+```ts title="config.ts"
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+
+export const turnkeyConfig = {
+  // Turnkey API base URL
+  apiBaseUrl: "https://api.turnkey.com",
+  // Your parent organization ID
+  defaultOrganizationId: process.env.NEXT_PUBLIC_TURNKEY_ORGANIZATION_ID,
+  // The wallet interface used to sign requests
+  wallet: new EthereumWallet(),
+};
+```
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+First, wrap your application with the `TurnkeyProvider` in your `app/layout.tsx` file:
+
+```tsx title="app/layout.tsx"
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+
+import { turnkeyConfig } from "./config";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        {/* Pass the Turnkey config defined above to the TurnkeyProvider */}
+        <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+Then, create a new page component `app/page.tsx` where we'll implement the wallet authentication functionality:
+
+```tsx title="app/page.tsx"
+"use client";
+
+import { useState } from "react";
+import { useTurnkey } from "@turnkey/sdk-react";
+
+export default function WalletAuth() {
+  const { walletClient } = useTurnkey();
+
+  // We'll add more functionality here in the following steps
+
+  return <div>{/* We'll add UI elements here */}</div>;
+}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+Create a new file `src/wallet-auth.ts` where we'll implement the wallet authentication functionality:
+
+```typescript title="src/wallet-auth.ts"
+import { Turnkey } from "@turnkey/sdk-browser";
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+import { turnkeyConfig } from "./config";
+
+// Initialize the Turnkey SDK with the config object defined above
+const turnkey = new Turnkey(turnkeyConfig);
+
+// Initialize the Wallet Client with the EthereumWallet interface
+const walletClient = turnkey.walletClient(new EthereumWallet());
+
+// We'll add more functionality here in the following steps
+```
+
+</TabItem>
+</Tabs>
+
+## Sign Up
+
+In this section, we'll guide you through the process of implementing a sign-up flow using an Ethereum wallet for authentication.
+The sign-up process involves creating a new sub-organization within your existing organization.
+This requires authentication of the parent organization using its public/private key pair.
+Additionally, we'll cover how to verify if a user already has an associated sub-organization before proceeding.
+
+### Server-side
+
+Initialize the Turnkey SDK on the **server-side** using the `@turnkey/sdk-server` package.
+This setup enables you to authenticate requests to Turnkey's API using the parent organization's public/private API key pair.
+This is required to create new sub-organizations on behalf of a user.
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+For Next.js, add the `"use server"` directive at the top of the file where you're initializing the Turnkey server client.
+This will ensure that the function is executed on the server-side and will have access to the
+server-side environment variables e.g. your parent organization's public/private API key pair.
+For more information on Next.js server actions, see the Next.js documentation on
+[Server Actions and Mutations](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+```ts title="app/actions.ts"
+"use server";
+
+import { Turnkey } from "@turnkey/sdk-server";
+import { turnkeyConfig } from "./config";
+
+const { baseUrl, defaultOrganizationId } = turnkeyConfig;
+
+// Initialize the Turnkey Server Client on the server-side
+const turnkeyServer = new Turnkey({
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  baseUrl,
+  defaultOrganizationId,
+}).apiClient();
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+```typescript title="src/wallet-auth-server.ts"
+import { Turnkey } from "@turnkey/sdk-server";
+import { turnkeyConfig } from "./config";
+
+const { baseUrl, defaultOrganizationId } = turnkeyConfig;
+
+// Initialize the Turnkey Server Client on the server-side
+const turnkeyServer = new Turnkey({
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  baseUrl,
+  defaultOrganizationId,
+}).apiClient();
+```
+
+</TabItem>
+</Tabs>
+
+### Check for Existing User
+
+Before signing up a new user, we can try and retrieve the user's sub-organization ID using the public key associated
+with the Ethereum or Solana account they want to authenticate with.
+If a sub-organization is found, we can proceed with authentication; otherwise, we assume the user is signing up.
+
+We'll use the `getPublicKey` method on the `WalletClient` instance which will retrieve the public key from the user's wallet.
+
+:::note
+The main distinction between signing with an Ethereum Wallet and a Solana Wallet lies in how the public key is obtained.
+For Solana, the public key can be directly derived from the wallet.
+In contrast, with Ethereum, the secp256k1 public key isn't directly accessible.
+Instead, you need to first obtain a signature from the user and then recover the public key from that signature.
+This requires an additional step of signing a message with the user's Ethereum wallet before we can retrieve the public key.
+:::
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+We'll define this function in the server-side code we initialized earlier.
+
+```ts title="app/actions.ts"
+"use server";
+
+// ...
+
+export const getSubOrg = async (publicKey: string) => {
+  const { organizationIds } = await turnkeyServer.getSubOrgIds({
+    // The parent organization ID
+    organizationId: turnkeyConfig.defaultOrganizationId,
+    filterType: "PUBLIC_KEY",
+    filterValue: publicKey,
+  });
+
+  return organizationIds[0];
+};
+```
+
+Next, we'll add the client-side functionality to the `app/page.tsx` file we created earlier importing
+the `getSubOrg` function we defined in our server action.
+
+```tsx title="app/page.tsx"
+"use client";
+
+import { useState } from "react";
+import { useTurnkey } from "@turnkey/sdk-react";
+// Import the getSubOrg function we defined earlier
+import { getSubOrg } from "./actions";
+
+export default function WalletAuth() {
+  const { walletClient } = useTurnkey();
+
+  const login = async () => {
+    // Get the public key of the wallet, for Ethereum wallets this will trigger a prompt for the user to sign a message
+    const publicKey = await walletClient?.getPublicKey();
+
+    if (!publicKey) {
+      throw new Error("No public key found");
+    }
+
+    const subOrg = await getSubOrg(publicKey);
+    if (subOrg) {
+      // User already has a sub-organization
+    } else {
+      // User does not have a sub-organization, proceed with sign-up
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={login}>Sign In</button>
+    </div>
+  );
+}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+We'll define the `getSubOrg` function in the server-side code we initialized earlier.
+
+```ts title="src/wallet-auth.ts"
+"use server";
+
+// ...
+
+export const getSubOrg = async (publicKey: string) => {
+  const { organizationIds } = await turnkeyServer.getSubOrgIds({
+    // The parent organization ID
+    organizationId: turnkeyConfig.defaultOrganizationId,
+    filterType: "PUBLIC_KEY",
+    filterValue: publicKey,
+  });
+
+  return organizationIds[0];
+};
+```
+
+We'll use the `getSubOrg` function in the login method to check if a user already has a sub-organization.
+
+```typescript title="src/wallet-auth.ts"
+import { getSubOrg } from "./wallet-auth-server";
+// ...
+const walletClient = turnkey.walletClient(new EthereumWallet());
+
+export const login = async () => {
+  // Get the public key of the wallet, for Ethereum wallets this will trigger a prompt for the user to sign a message
+  const publicKey = await walletClient.getPublicKey();
+
+  if (!publicKey) {
+    throw new Error("No public key found");
+  }
+
+  const subOrg = await getSubOrg(publicKey);
+  if (subOrg) {
+    // User already has a sub-organization
+  } else {
+    // User does not have a sub-organization, proceed with sign-up
+  }
+};
+```
+
+</TabItem>
+</Tabs>
+
+### Create Sub-Organization
+
+Next, we'll define a method to create a sub-organization for new user sign-ups.
+
+For more information, refer to the [Sub-Organizations](/concepts/sub-organizations) guide.
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+We'll define another server action `createSubOrg` to create a sub-organization for new user sign-ups.
+
+```ts title="app/actions.ts"
+"use server";
+
+// ...
+
+// Import the default Ethereum accounts helper
+import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+
+export const createSubOrg = async (
+  publicKey: string,
+  curveType: "API_KEY_CURVE_ED25519" | "API_KEY_CURVE_SECP256K1",
+) => {
+  const apiKeys = [
+    {
+      apiKeyName: `Wallet Auth - ${publicKey}`,
+      // The public key of the wallet that will be added as an API key and used to stamp future requests
+      publicKey,
+      // We set the curve type to 'API_KEY_CURVE_ED25519' for solana wallets
+      // If using an Ethereum wallet, set the curve type to 'API_KEY_CURVE_SECP256K1'
+      curveType,
+    },
+  ];
+
+  const subOrg = await turnkeyServer.createSubOrganization({
+    // The parent organization ID
+    organizationId: turnkeyConfig.defaultOrganizationId,
+    subOrganizationName: "New Sub Org",
+    rootUsers: [
+      {
+        // Replace with user provided values if desired
+        userName: "New User",
+        userEmail: "wallet@domain.com",
+        apiKeys,
+      },
+    ],
+    rootQuorumThreshold: 1,
+    wallet: {
+      walletName: "Default Wallet",
+      // This is used to create a new Ethereum wallet for the sub-organization
+      accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+    },
+  });
+
+  return subOrg;
+};
+```
+
+Then, we'll import and use this `createSubOrg` function within the login method. The curve type is set to `API_KEY_CURVE_SECP256K1`
+since we're using an Ethereum wallet in this example.
+
+```tsx title="app/page.tsx"
+"use client";
+import { getSubOrg, createSubOrg } from "./actions";
+// ...
+
+export default function WalletAuth() {
+  const { walletClient } = useTurnkey();
+
+  const login = async () => {
+    // Get the public key of the wallet, for Ethereum wallets this will trigger a prompt for the user to sign a message
+    const publicKey = await walletClient?.getPublicKey();
+
+    if (!publicKey) {
+      throw new Error("No public key found");
+    }
+
+    const subOrg = await getSubOrg(publicKey);
+    if (subOrg) {
+      // User already has a sub-organization
+    } else {
+      // User does not have a sub-organization, proceed with sign-up
+      const subOrg = await createSubOrg(publicKey, "API_KEY_CURVE_SECP256K1");
+
+      // In the next step we'll add logic  sign in the user
+
+      if (!subOrg) {
+        throw new Error("Failed to create sub-organization");
+      }
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={login}>Sign In</button>
+    </div>
+  );
+}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+We'll define another server-side function `createSubOrg`, to create a sub-organization for new user sign-ups.
+
+```typescript title="src/wallet-auth-server.ts"
+// ...
+
+// Import the default Ethereum accounts helper
+import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+
+export const createSubOrg = async (
+  publicKey: string,
+  curveType: "API_KEY_CURVE_ED25519" | "API_KEY_CURVE_SECP256K1",
+) => {
+  const apiKeys = [
+    {
+      apiKeyName: `Wallet Auth - ${publicKey}`,
+      // The public key of the wallet that will be added as an API key and used to stamp future requests
+      publicKey,
+      // We set the curve type to 'API_KEY_CURVE_ED25519' for solana wallets
+      // If using an Ethereum wallet, set the curve type to 'API_KEY_CURVE_SECP256K1'
+      curveType,
+    },
+  ];
+
+  const subOrg = await turnkeyServer.createSubOrganization({
+    // The parent organization ID
+    organizationId: turnkeyConfig.defaultOrganizationId,
+    subOrganizationName: "New Sub Org",
+    rootUsers: [
+      {
+        // Replace with user provided values if desired
+        userName: "New User",
+        userEmail: "wallet@domain.com",
+        apiKeys,
+      },
+    ],
+    rootQuorumThreshold: 1,
+    wallet: {
+      walletName: "Default Wallet",
+      // This is used to create a new Ethereum wallet for the sub-organization
+      accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+    },
+  });
+
+  return subOrg;
+};
+```
+
+Then, we'll import and use this `createSubOrg` function within the login method. The curve type is set to `API_KEY_CURVE_SECP256K1`
+since we're using an Ethereum wallet in this example.
+
+```typescript title="src/wallet-auth.ts"
+import { getSubOrg, createSubOrg } from "./wallet-auth-server";
+// ...
+const walletClient = turnkey.walletClient(new EthereumWallet());
+
+export const login = async () => {
+  const publicKey = await walletClient.getPublicKey();
+
+  if (!publicKey) {
+    throw new Error("No public key found");
+  }
+
+  const subOrg = await getSubOrg(publicKey);
+  if (subOrg) {
+    // User already has a sub-organization
+  } else {
+    // User does not have a sub-organization, proceed with sign-up
+    const subOrg = await createSubOrg(publicKey, "API_KEY_CURVE_SECP256K1");
+
+    // In the next step we'll add logic to sign in the user
+
+    if (!subOrg) {
+      throw new Error("Failed to create sub-organization");
+    }
+  }
+};
+```
+
+</TabItem>
+</Tabs>
+
+## Sign In
+
+At this point, we have a working sign-up flow. Next, we'll implement the signing in
+functionality by creating a read-only session and retrieving the user's wallets.
+
+### Read-only Session
+
+Create a read-only session for the user by calling the `login` method on the `WalletClient` instance.
+This will save a read-only session token to the `localStorage` to authenticate future read requests.
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+```tsx title="app/page.tsx"
+"use client";
+import { getSubOrg, createSubOrg } from "./actions";
+// ...
+const walletClient = turnkey.walletClient(new EthereumWallet());
+
+export default function WalletAuth() {
+  const { walletClient } = useTurnkey();
+
+  const login = async () => {
+    const publicKey = await walletClient?.getPublicKey();
+
+    if (!publicKey) {
+      throw new Error("No public key found");
+    }
+
+    const subOrg = await getSubOrg(publicKey);
+    if (subOrg) {
+      const loginResponse = await walletClient.login({
+        organizationId: subOrgId,
+      });
+
+      if (loginResponse?.organizationId) {
+        // User is authenticated 🎉
+      }
+    } else {
+      // ...
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={login}>Sign In</button>
+    </div>
+  );
+}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+```typescript title="src/wallet-auth.ts"
+import { getSubOrg, createSubOrg } from "./wallet-auth-server";
+// ...
+
+export const login = async (publicKey: string) => {
+  //...
+  const subOrg = await getSubOrg(publicKey);
+  if (subOrg) {
+    const loginResponse = await walletClient.login({
+      organizationId: subOrgId,
+    });
+
+    if (loginResponse?.organizationId) {
+      // User is authenticated 🎉
+    }
+  } else {
+    // ...
+  }
+};
+```
+
+</TabItem>
+</Tabs>
+
+### Retrieve Wallets
+
+Once the user is authenticated, we can retrieve the user's wallets by calling the `getWallets` method on the `WalletClient` instance.
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+```tsx title="app/page.tsx"
+"use client";
+import { getSubOrg, createSubOrg } from "./actions";
+// ...
+
+export default function WalletAuth() {
+  const { walletClient, client } = useTurnkey();
+  // State to hold the user's wallets
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+
+  const login = async () => {
+    // Get the public key of the wallet, for Ethereum wallets this will trigger a prompt for the user to sign a message
+    const publicKey = await walletClient?.getPublicKey();
+
+    if (!publicKey) {
+      throw new Error("No public key found");
+    }
+
+    const subOrg = await getSubOrg(publicKey);
+    if (subOrg) {
+      const loginResponse = await walletClient.login({
+        organizationId: subOrgId,
+      });
+
+      if (loginResponse?.organizationId) {
+        const wallets = await client.getWallets({
+          organizationId: loginResponse.organizationId,
+        });
+        setWallets(wallets);
+      }
+    } else {
+      // ...
+    }
+  };
+
+  // Render the user's wallets if defined
+  if (wallets) {
+    return (
+      <div>
+        {wallets.map((wallet) => (
+          <div key={wallet.walletId}>{wallet.walletName}</div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    // ...
+  );
+}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+```typescript title="src/wallet-auth.ts"
+import { getSubOrg, createSubOrg } from "./wallet-auth-server";
+// ...
+
+export const login = async (publicKey: string) => {
+  //...
+  const subOrg = await getSubOrg(publicKey);
+  if (subOrg) {
+    const loginResponse = await walletClient.login({
+      organizationId: subOrgId,
+    });
+
+    if (loginResponse?.organizationId) {
+      const wallets = await client.getWallets({
+        organizationId: loginResponse.organizationId,
+      });
+      // Log the user's wallets
+      console.log(wallets);
+    }
+  } else {
+    // ...
+  }
+};
+```
+
+</TabItem>
+</Tabs>
+
+### Read-write Session
+
+It is also possible to create a read-write session for the user by calling the `loginWithReadWriteSession` method
+on the `WalletClient` instance. This will save a read-write session token to the `localStorage` to authenticate
+future read/write requests. This session can be used with the `TurnkeyIframeClient` to make read/write requests to the Turnkey API.
+
+<Tabs groupId="language" queryString="lang">
+<TabItem value="next" label="Next.js">
+
+Most of the code is the same as the read-only session example. The only difference is that we replace `login` with `loginWithReadWriteSession`  
+and use the `getActiveClient` method to get the `IframeClient` instance and using it to create a new wallet.
+
+```tsx title="app/page.tsx"
+"use client";
+
+// ...
+
+export default function WalletAuth() {
+  const { walletClient, getActiveClient } = useTurnkey();
+  // State to hold the read-write client
+  const [readWriteClient, setReadWriteClient] = useState<IframeClient | null>(
+    null,
+  );
+
+  const login = async () => {
+    // ...
+    if (subOrg) {
+      // Create a read-write session by calling the loginWithReadWriteSession method
+      const readWriteResponse = await walletClient.loginWithReadWriteSession({
+        organizationId: subOrgId,
+      });
+
+      // If the login was successful, get the active client and set it to the state
+      if (readWriteResponse) {
+        const readWriteClient = await getActiveClient();
+        setReadWriteClient(readWriteClient);
+      }
+    } else {
+      // ...
+    }
+  };
+
+  // ...
+}
+```
+
+Define a new function `addWallet` which will create a new wallet using the read-write client.
+We'll also add a button to trigger this function.
+
+```tsx title="app/page.tsx"
+"use client";
+
+// ...
+
+export default function WalletAuth() {
+  const { walletClient, getActiveClient } = useTurnkey();
+  // State to hold the read-write client
+  const [readWriteClient, setReadWriteClient] = useState<IframeClient | null>(
+    null,
+  );
+
+  const login = async () => {
+    //...
+  };
+
+  const addWallet = async () => {
+    if (readWriteClient) {
+      const newWalletResponse = await readWriteClient.createWallet({
+        walletName: "New Wallet",
+        accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+      });
+    }
+  };
+
+  if (wallets) {
+    return (
+      <div>
+        <div>
+          {wallets.map((wallet) => (
+            <div key={wallet.walletId}>{wallet.walletName}</div>
+          ))}
+        </div>
+        <button onClick={login}>Add Wallet</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button onClick={login}>Sign In</button>
+    </div>
+  );
+}
+```
+
+</TabItem>
+<TabItem value="ts" label="TypeScript">
+
+Define a helper function to initialize the the iframe client and inject the credential bundle. This will
+return an `IframeClient` instance that can be used to make read/write requests to the Turnkey API.
+
+```typescript title="src/wallet-auth.ts"
+// ...
+
+const getReadWriteClient = async (credentialBundle: string) => {
+  // The iframe container ID is used to render the iframe in the DOM
+  // Ensure this element is present in the DOM when the iframe is mounted
+  const iframeContainerId = "turnkey-recovery-iframe-container-id";
+
+  const authIframeClient = await turnkey.iframeClient(
+    document.getElementById(iframeContainerId),
+  );
+
+  const authenticationResponse =
+    await authIframeClient.injectCredentialBundle(credentialBundle);
+
+  if (!authenticationResponse) {
+    throw new Error("Failed to create read-write session");
+  }
+
+  return authIframeClient;
+};
+
+export const login = async (publicKey: string) => {
+  /* .... */
+};
+```
+
+Use this `getReadWriteClient` function in the `login` method:
+
+```typescript title="src/wallet-auth.ts"
+// ...
+export const login = async (publicKey: string) => {
+  //...
+  const subOrg = await getSubOrg(publicKey);
+  if (subOrg) {
+    const readSessionResponse = await walletClient.loginWithReadWriteSession({
+      organizationId: subOrgId,
+    });
+
+    // If the login was successful, initialize the read-write client
+    if (readSessionResponse) {
+      const readWriteClient = await getReadWriteClient(
+        readSessionResponse.credentialBundle,
+      );
+
+      // We can use the read-write client to create a new wallet
+      const newWalletResponse = await readWriteClient.createWallet({
+        walletName: "New Wallet",
+        accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+      });
+    }
+  } else {
+    // ...
+  }
+};
+```
+
+</TabItem>
+</Tabs>
+
+### Examples
+
+You can find examples of how to implement the above functionality and more in the following repositories:
+
+- [Demo Embedded Wallet](https://github.com/tkhq/demo-embedded-wallet)
+- [Wallet stamper](https://github.com/tkhq/sdk/tree/main/examples/with-wallet-stamper)
