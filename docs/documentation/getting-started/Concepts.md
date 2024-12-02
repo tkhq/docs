@@ -14,8 +14,13 @@ When you sign up to Turnkey, you create a “parent organization”, which is a 
 
 Parent organizations can create “sub organizations”, a segregated set of users, policies, and wallets to which the parent has read access, but not write access. These sub organizations typically map to an end user in an embedded wallet setup, but can be used wherever you may need full segregation of Turnkey resources. 
 
-
-# [IMAGE 1 HERE]
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/all_concepts.png"
+    alt="all concepts screenshot"
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
+  />
+</p>
 
 # Concepts Dictionary
 
@@ -80,7 +85,13 @@ Learn more about leveraging Wallets across different crypto ecosystems on our [E
 
 Transaction automation entails a business signing transactions on its own behalf. For example, automating payments flows, managing smart contract deployment or programmatically trading in defi. 
 
-## [IMAGE HERE]
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/transaction_automation_example.png"
+    alt="transaction automation screenshot"
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
+  />
+</p>
 
 In this setup, the business is in full control of its wallets at all times. This use case typically does not require the use of sub-orgs and everything can be managed from the parent organization. We suggest the following setup:
 - **Root Users:** After initial setup of your parent organization, set a reasonable root quorum (e.g., 2 of 3), attach backup credentials to each user for safekeeping, and only use the root users in a “break glass” scenario.
@@ -91,6 +102,14 @@ In this setup, the business is in full control of its wallets at all times. This
 ## Embedded Wallets
 
 Embedded wallets entail a business creating non-custodial wallets controlled by its end users. For example, allowing an end user to onboard with a wallet via Web2 authentication methods like email or OAuth. 
+
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/embedded_wallets_example.png"
+    alt="embedded wallets screenshot"
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
+  />
+</p>
 
 This is a non-custodial setup where the end user is in control of its wallet at all times. This use case requires the use of sub-orgs which map to an individual end user, and does not require any wallets in the parent organization. The parent organization will be used by your backend service for onboarding new users and initiating certain authentication methods (e.g., email, SMS), while the sub-orgs will be used by the end users for day-to-day signing. We suggest the following setup:
 - **Root Users:** After initial setup of your parent organization, set a reasonable root quorum (e.g., 2 of 3), attach backup credentials to each user for safekeeping, and only use the root users in a “break glass” scenario.
