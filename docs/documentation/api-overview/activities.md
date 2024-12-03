@@ -1,14 +1,12 @@
 ---
 sidebar_position: 4
 description: Secure execution with Turnkey
-slug: /api-overview/submissions
+slug: /api-overview/activities
 ---
 
-# Submissions
+# Activities
 
-Submissions are requests to securely execute a workload. Submission URL paths are prefixed with `/public/v1/submit`. Submissions requests, if valid, produce an `Activity`.
-
-### Activites
+Activities are created after submitting requests to securely execute a workload via our public API. Activity submission URL paths are prefixed with `/public/v1/submit`. Request submissions, if valid, produce an `Activity`.
 
 Activities typically create, modify, or utilize a resource within Turnkey and are subject to consensus or condition enforcement via the policy engine. Activities are executed optimistically synchronous. This means that if we can process the request synchronously, we will. Otherwise, we'll fallback to asynchronous processing. Your services or applications should account for this by checking the response for the activity state:
 
