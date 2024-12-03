@@ -60,7 +60,7 @@ For more information on Turnkey user credentials [look here](/concepts/users/cre
 
 Activities are specific actions taken by users, such as signing a transaction, adding a new user, or creating a sub-organization. Activity requests are always evaluated through our policy engine, and can evaluate to ALLOW, DENY, or REQUIRES_CONSENSUS (i.e., requires additional approvals before being allowed). 
 
-For more information on Turnkey activities [look here](/api-overview/)
+For more information on Turnkey activities [look here](/api-overview/submissions)
 
 ## Policies
 
@@ -77,7 +77,7 @@ Resources used to generate crypto addresses and sign transactions or messages. W
 | Wallets (preferred) | A hierarchical deterministic (HD) wallet, which is a collection of cryptographic key pairs derived from a common seed phrase. A wallet (i.e., a single seed phrase) can have many wallet accounts (i.e., a set of derived addresses). Wallets support various cryptographic curves and can be represented by a checksummed mnemonic phrase, making them easier to back up and recover. We limit each organization to 100 Wallets, but there is no limit on the total number of wallet accounts. For more information on Turnkey HD wallets [look here](/concepts/wallets)|
 | Private Keys | Raw private keys represented by an alphanumeric string. We limit each organization to 1,000 private keys, therefore we recommend using wallets instead of private keys for better scalability. |
 
-Learn more about leveraging Wallets across different crypto ecosystems on our [Ecosystem Support](/ecosystem-integrations/) page.
+Learn more about leveraging Wallets across different crypto ecosystems on our [Ecosystem Support](/ecosystem-integrations/index) page.
 
 # Typical implementations
 
