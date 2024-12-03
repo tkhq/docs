@@ -68,9 +68,9 @@ There are a few considerations to note when using sessions with iframes:
 Another potential host for a TEK is directly in Local Storage. We’ve created libraries to create a target embedded key (P-256 implementation [here](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/crypto/src/crypto.ts#L268-L284)). Mechanically, it operates much like the iframe. However, unlike the iframe approach, anyone with access to your application’s domain also has direct access to items stored in Local Storage.
 
 Here are some considerations for using Local Storage:
-Generally more durable than using iframes in various contexts (i.e. web on both desktop and mobile)
-Can be used in other settings such as React Native, Flutter, etc.
-As mentioned, the developer has complete control over the target embedded key. As a result, it’s important to manage this credential with caution.
+- Generally more durable than using iframes in various contexts (i.e. web on both desktop and mobile)
+- Can be used in other settings such as React Native, Flutter, etc.
+- As mentioned, the developer has complete control over the target embedded key. As a result, it’s important to manage this credential with caution.
 
 For an example that leverages Local Storage with Email Auth, see [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth-local-storage).
 
