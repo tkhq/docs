@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 description: Learn about sub-orgs and how you can use them
 slug: /concepts/sub-organizations
 ---

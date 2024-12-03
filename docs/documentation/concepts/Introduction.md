@@ -1,5 +1,5 @@
 ---
-sidebar_position: 0
+sidebar_position: 1
 description: Understand Turnkey's core features and fundamentals.
 slug: /concepts/introduction
 ---
@@ -60,7 +60,7 @@ For more information on Turnkey user credentials [look here](/concepts/users/cre
 
 Activities are specific actions taken by users, such as signing a transaction, adding a new user, or creating a sub-organization. Activity requests are always evaluated through our policy engine, and can evaluate to ALLOW, DENY, or REQUIRES_CONSENSUS (i.e., requires additional approvals before being allowed). 
 
-For more information on Turnkey activities [look here](/api-overview/submissions)
+For more information on Turnkey activities [look here](/api-overview/)
 
 ## Policies
 
