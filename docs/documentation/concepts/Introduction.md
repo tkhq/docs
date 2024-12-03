@@ -1,5 +1,5 @@
 ---
-sidebar_position: 1
+sidebar_position: 0
 description: Understand Turnkey's core features and fundamentals.
 slug: /concepts/introduction
 ---
