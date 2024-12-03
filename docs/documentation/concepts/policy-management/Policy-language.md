@@ -178,7 +178,7 @@ See the [Policy examples](./Policy-examples.md) for sample scenarios.
 
 Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure. Notably, within our policy engine, a Solana transaction contains a list of Transfers, currently corresponding to native SOL transfers. Each transfer within a transaction is considered a separate entity. Here are some approaches you might take to govern native SOL transfers:
 
-- _All_ transfers need to match the policy condition Useful for allowlists ([example](./Policy-examples.md#allow-solana-transactions-that-include-a-transfer-with-only-one-specific-recipient))
+- _All_ transfers need to match the policy condition. Useful for allowlists ([example](./Policy-examples.md#allow-solana-transactions-that-include-a-transfer-with-only-one-specific-recipient))
 - _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](./Policy-examples.md#deny-all-solana-transactions-transferring-to-an-undesired-address))
 - Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](./Policy-examples.md#allow-solana-transactions-that-have-exactly-one-transfer-with-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
 
