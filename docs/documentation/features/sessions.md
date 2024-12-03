@@ -8,7 +8,7 @@ slug: /features/sessions
 
 ## What is a session?
 
-Generally, a session allows a user to take multiple, contiguous actions in a defined period of time. Such actions can be divided into two buckets:
+Turnkey sessions allow a user to take multiple, contiguous actions in a defined period of time. Such actions can be divided into two buckets:
 
 - Read operations: Retrieving data (e.g., viewing wallet balances)
 - Write operations: Modifying data or performing sensitive actions (e.g., signing transactions)
@@ -45,7 +45,7 @@ As illustrated above, once you have a target embedded key in place on the client
 
 Our SDK contains an abstraction called [loginWithReadWriteSession](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/sdk-browser/src/sdk-client.ts#L257-L284). Crucially, it is able to infer the organization (or sub-organization) based on a stamp, and create a read-write session on behalf of that organization. From an end-user experience perspective, this means that a developer can request an end-user’s passkey approval once, and subsequently give that user a read-write session.
 
-Crucially, `loginWithReadWriteSession` stores the resulting credential bundle (returned by Turnkey) in Local Storage. We store this credential bundle in Local Storage as it can be used across various React components and pages – as long as both the target embedded key and credential bundle exist, they can be used as a credential to create Turnkey requests.
+Note that `loginWithReadWriteSession` stores the resulting credential bundle (returned by Turnkey) in Local Storage. We store this credential bundle in Local Storage as it can be used across various React components and pages – as long as both the target embedded key and credential bundle exist, they can be used as a credential to create Turnkey requests. For details on the shape of this stored artifact, see [here](https://github.com/tkhq/sdk/blob/9e9943387123d077fa3b7f38ef3be007291a2c8a/packages/sdk-browser/src/storage.ts#L64-L117).
 
 ### Mechanisms
 
@@ -74,6 +74,10 @@ As mentioned, the developer has complete control over the target embedded key. A
 
 For an example that leverages Local Storage with Email Auth, see [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth-local-storage).
 
+#### API Key:
+
+Another option is to create an API key and store it directly within Local Storage. However, this is a riskier setup than via TEK (as mentioned in the above Local Storage section), as anyone who is able to access this client-side API key has full access to a User.
+
 <!-- Optional: coverage of createPasskeySession -->
 
 ### Sessions FAQ
@@ -84,7 +88,7 @@ Once a user has a valid session, it is trivial to use that session to create a n
 
 #### How can I delete a session?
 
-In order to delete a session, simply remove all user-related artifacts from Local Storage. See implementation in context here.
+In order to delete a session, simply remove all user-related artifacts from Local Storage. See implementation in context [here](https://github.com/tkhq/sdk/blob/9e9943387123d077fa3b7f38ef3be007291a2c8a/packages/sdk-browser/src/sdk-client.ts#L242-L255).
 
 ```javascript
 /**
@@ -95,6 +99,7 @@ In order to delete a session, simply remove all user-related artifacts from Loca
 logoutUser = async (): Promise<boolean> => {
   await removeStorageValue(StorageKeys.AuthBundle); // DEPRECATED
   await removeStorageValue(StorageKeys.CurrentUser);
+  await removeStorageValue(StorageKeys.UserSession);
   await removeStorageValue(StorageKeys.ReadWriteSession);
 
   return true;
@@ -103,7 +108,7 @@ logoutUser = async (): Promise<boolean> => {
 
 #### How long are sessions? 
 
-The expiration of session keys can be specified to any amount of time using the expirationSeconds parameter. The default length is 900 seconds (15 minutes). 
+The expiration of session keys can be specified to any amount of time using the `expirationSeconds` parameter. The default length is 900 seconds (15 minutes). 
 
 #### How many session keys can be active at once?
 
@@ -120,4 +125,4 @@ This is not recommended, because:
 - React Native doesn’t support iframes natively at all
 - Mobile browsers have different storage behaviors generally
 
-Instead, implement platform-specific session management using local storage for mobile. 
+Instead, implement platform-specific session management using Local Storage for mobile. 
