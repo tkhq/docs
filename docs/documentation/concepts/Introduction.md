@@ -4,6 +4,8 @@ description: Understand Turnkey's core features and fundamentals.
 slug: /concepts/introduction
 ---
 
+import DocCardList from '@theme/DocCardList';
+
 # Overview
 
 Turnkey is flexible, scalable, and secure wallet infrastructure that can be used for transaction automation (e.g., payments flows, smart contract management), or non-custodial embedded wallets. Turnkey offers low-level primitives that can be combined to accomplish a variety of goals. 
@@ -116,3 +118,6 @@ This is a non-custodial setup where the end user is in control of its wallet at 
 - **Normal Users:** Create a single service user used for user onboarding and authentication.
 - **Policies:** Set a policy granting the user permission to `CREATE_SUB_ORGANIZATION`, `EMAIL_AUTH`, `OAUTH`, `​INIT_USER_EMAIL_RECOVERY`. For examples of how to create such policies [look here](/concepts/policies/examples). 
 - **Sub-organizations:** Create individual sub-organizations for each user that contain a single root user with any relevant credentials, and a single wallet with any relevant wallet accounts. 
+
+For more details on each individual concepts, refer to the pages below:
+<DocCardList />
