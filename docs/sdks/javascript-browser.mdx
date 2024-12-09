@@ -13,7 +13,7 @@ import Parameter from "@site/src/components/parameter";
 
 The [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser) package exposes functionality that lets developers build browser based applications that interact with the Turnkey API with different types of authentication. 
 
-It consists of the `passkeyClient` and `iframeClient` that enable requests to the API to be authenticated via different auth methods. It also contains methods to manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.
+It consists of the `passkeyClient`, `iframeClient` and `walletClient` that enable requests to the API to be authenticated via different auth methods. It also contains methods to manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.
 
 If you are working with React – check out our [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) package.
 
@@ -127,13 +127,13 @@ Calls to Turnkey's API must be signed with a valid credential from the appropria
 
 ## TurnkeyBrowserClient
 
-The `TurnkeyBrowserClient` wraps Turnkey's basic SDK client with browser session management functionality. This client allows you to create a read only session that only authenticates read requests, or a read write session. It uses local storage for session management.
+The `TurnkeyBrowserClient` wraps Turnkey's basic SDK client with browser session management functionality. This client allows you to create a read only session that only authenticates read requests, or a read write session. It uses local storage for session management. The constructor for `TurnkeyBrowserClient` optionally takes in `AuthClient` which tracks which client was used for the initial authentication, to be used for retrieval purposes. Each subclass of `TurnkeyBrowserClient` (including `TurnkeyPasskeyClient`, `TurnkeyIframeClient` and `TurnkeyWalletClient`) will also set this to the respective value when used.
 
 Below are all of the methods exposed by `TurnkeyBrowserClient`
 
 ### `login()`
 
-Creates a read-only session for the current user, storing session details like userId, organizationId, and sessionExpiry in local storage. This session allows for read-only actions within the Turnkey API. If you would like to instantiate a read only `TurnkeyBrowserClient` after logging in, you can use the [`currentUserSession()` method](#currentusersession)
+Creates a read-only session for the current user, storing session details like userId, organizationId, sessionExpiry and which authentication client was used in local storage. This session allows for read-only actions within the Turnkey API. If you would like to instantiate a read only `TurnkeyBrowserClient` after logging in, you can use the [`currentUserSession()` method](#currentusersession)
 
 ```typescript
 import { TurnkeyBrowserClient } from "@turnkey/sdk-browser";
@@ -385,9 +385,55 @@ const iframeClient = turnkeySDK.iframeClient();
 const keyBundle = await iframeClient.extractKeyEncryptedBundle();
 ```
 
+## TurnkeyWalletClient
+
+The `TurnkeyWalletClient` extends `TurnkeyBrowserClient` such that it is specialized for using a wallet to stamp and authenticate requests to the Turnkey API. This stamping process leverages your wallet's signature key to authenticate requests securely.
+
+### `getPublicKey()`
+
+This method enables easy access to the wallet public key from the `TurnkeyWalletClient` to be used in authentication flows. 
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const walletClient = turnkeySDK.walletClient(new EthereumWallet());
+const publicKey = await walletsClient.getPublicKey();
+```
+
+### `getWalletInterface()`
+
+This method provides easy access to the full object that represents the wallet being used to  stamp requests for this client. 
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const walletClient = turnkeySDK.walletClient(new EthereumWallet());
+const wallet = await walletsClient.getWalletInterface();
+```
+
 ## Top Level SDK Functions in `TurnkeyBrowserSDK`
 
-The `TurnkeyBrowserSDK` serves as the main entry point for interacting with Turnkey's services in a web browser environment. It contains methods to instantiate clients like the `TurnkeyPasskeyClient` and the `TurnkeyIframeClient`. manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.
+The `TurnkeyBrowserSDK` serves as the main entry point for interacting with Turnkey's services in a web browser environment. It contains methods to instantiate clients like the `TurnkeyPasskeyClient` and the `TurnkeyIframeClient`. manage information and state related to authentication like auth bundles and sessions, retrieving user information and server signing API requests.The client enables easy access to the wallet public key to be used for authentication flows.
 
 ### `passkeyClient()`
 
@@ -411,7 +457,7 @@ const walletsResponse = await passkeyClient.getWallets();
 
 ### `iframeClient()`
 
-Creates an instance of TurnkeyIframeClient by initializing an iframe stamper with the specified iframeUrl and optional element ID. The iframe client is used to interact with a series of iframes hosted by Turnkey, designed for sensitive operations such as storing an expiring credential within the [Email Recovery](/features/email-recovery) and [Email Auth](/features/email-auth) flows, and facilitating Wallet [Import](/features/import-wallets) and [Export](/features/export-wallets). The code powering these iframes can be found at https://github.com/tkhq/frames.
+Creates an instance of `TurnkeyIframeClient` by initializing an iframe stamper with the specified iframeUrl and optional element ID. The iframe client is used to interact with a series of iframes hosted by Turnkey, designed for sensitive operations such as storing an expiring credential within the [Email Recovery](/features/email-recovery) and [Email Auth](/features/email-auth) flows, and facilitating Wallet [Import](/features/import-wallets) and [Export](/features/export-wallets). The code powering these iframes can be found at https://github.com/tkhq/frames.
 
 ```typescript
 import { Turnkey } from "@turnkey/sdk-browser";
@@ -437,6 +483,26 @@ if (response) {
 }
 
 // this requires the developer to build a wrapper flow that can take user text input in their app and call the injectCredentialBundle function on the turnkey iframeClient
+```
+
+### `walletClient()`
+
+Creates an instance of `TurnkeyWalletClient`, taking in an wallet, wrapped by an object that matches the `WalletInterface` class. The wallet client is used to interact with the Turnkey API, authenticating requests by using the wallet to stamp the requests.
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-browser";
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+
+const config = {
+    apiBaseUrl: "https://your-api-base-url.com",
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+    serverSignUrl: "https://your-server-sign-url.com",
+};
+
+// Create a client instance
+const turnkeySDK = new Turnkey(config);
+
+const walletClient = turnkeySDK.walletClient(new EthereumWallet());
 ```
 
 ### `serverSign()`
