@@ -22,14 +22,14 @@ Parent organizations can create **[sub-organizations](/concepts/sub-organization
   />
 </p>
 
-# Concepts Dictionary
+# Concepts dictionary
 
 ## Organizations
 
 An organization is a logical grouping of resources like users, policies, and wallets. There are two types of organizations: 
 
-| Organization Type | Description |
-|-------------------|-------------|
+| Organization type | Description |
+|:-------------------|:-------------|
 | Parent Organization | When you first setup your implementation of Turnkey by signing up on the dashboard you create a parent organization controlled by your business. In most implementations, a top-level organization represents an entire Turnkey-powered implementation. For more information on Turnkey parent organizations [look here](/concepts/organizations).|
 | Sub-Organization | A fully segregated organization nested under the parent organization. Parent organizations have read access to all their sub-organizations, but do not have write access. Each sub-organization typically maps to an individual end user in a Turnkey-powered application. Parent organizations can initiate limited actions for sub-organizations that then must be completed by the sub-organization, or without the need for completion by the sub-organization (e.g., INIT_USER_EMAIL_RECOVERY and INIT_OTP_AUTH require completion by sub-organization, EMAIL_AUTH does not). For more information on Turnkey sub-organizations [look here](/concepts/sub-organizations).|
 
@@ -40,8 +40,8 @@ Turnkey users are resources within organizations or sub-organizations that can s
 
 There are two main types of users: 
 
-| User Type | Description |
-|-----------|-------------|
+| User type | Description |
+|:-----------|:-------------|
 | Root Users | The first user(s) created in an organization will have root permissions, meaning they can bypass the policy engine to take any action within that specific organization. This ability can be limited via root quorum, which requires a threshold of root users to access root permissions. For example, if there are five root users and the threshold is three, at least three users must approve an activity for the root quorum threshold to be reached. When you first create a Turnkey organization, your user is automatically created as the sole member of the root quorum by default. |
 | Normal Users | Other than managing their own credentials, non-root users have no permissions unless explicitly granted by [policies](/concepts/policies/overview). By combining non-root users with policies granting permission for specific actions, you can build support for experiences providing [delegated access](/features/delegated-access) to business controlled service account. |
 
@@ -74,8 +74,8 @@ For more information on Turnkey policies [look here](/concepts/policies/overview
 
 Resources used to generate crypto addresses and sign transactions or messages. We currently support secp256k1 and ed25519 curves and have two main types:
 
-| Resource Type | Description |
-|---------------|-------------|
+| Resource type | Description |
+|:---------------|:-------------|
 | Wallets (preferred) | A hierarchical deterministic (HD) wallet, which is a collection of cryptographic key pairs derived from a common seed phrase. A wallet (i.e., a single seed phrase) can have many wallet accounts (i.e., a set of derived addresses). Wallets support various cryptographic curves and can be represented by a checksummed mnemonic phrase, making them easier to back up and recover. We limit each organization to 100 Wallets, but there is no limit on the total number of wallet accounts. For more information on Turnkey HD wallets [look here](/concepts/wallets).|
 | Private Keys | Raw private keys represented by an alphanumeric string. We limit each organization to 1,000 private keys, therefore we recommend using wallets instead of private keys for better scalability. |
 
