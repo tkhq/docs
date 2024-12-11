@@ -41,6 +41,8 @@ This activity returns an `otpId` in the result to be used in the following `ACTI
 
 Initiating OTP Auth for both `"OTP_TYPE_SMS"` and `"OTP_TYPE_EMAIL"` requires proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
 
+_Note: Non-paying accounts are currently limited to 50 SMS messages per month._
+
 ## Authorization
 
 Authorization for OTP auth is based on our usual activity authorization: our [policy engine](/concepts/policies/overview) controls who can and cannot execute auth-related activities.
