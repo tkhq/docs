@@ -125,6 +125,30 @@ A similar, simple application demonstrating how to create sub-organizations, cre
 
 See https://github.com/tkhq/demo-viem-passkeys for the code.
 
+### Demo Viem Passkeys with Gelato Relay ([code](https://github.com/gelatodigital/gelato-turnkey-passkeys-relay))
+
+This example demonstrates how to leverage Turnkey’s secure key management and Gelato's battle-tested relay infrastructure to enable seamless, sponsored interactions with meta-transactions using the [`@turnkey/viem`](https://github.com/tkhq/sdk/tree/main/packages/viem) signer and [`@gelatonetwork/relay-sdk-viem`](https://github.com/gelatodigital/relay-sdk-viem).
+
+<p style={{ textAlign: "center" }}>
+  <img
+    src="/gelato_turnkey.png"
+    alt="viem ui screenshot"
+    style={{ width: 800, borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}
+  />
+</p>
+
+
+#### How Infinex Leverages Turnkey and Gelato
+
+Infinex, a platform designed to unify the decentralized ecosystem and applications under a single UX layer, eliminates the complexities of navigating fragmented crypto protocols. By integrating **Turnkey** and **Gelato**, Infinex delivers a seamless, secure, and cost-efficient experience for decentralized finance users.
+
+- **Secure Key Management with Turnkey**: Infinex ensures private keys are securely managed within Turnkey’s infrastructure, removing the need for traditional wallet pop-ups. This approach streamlines authentication through passkeys, offering a frictionless and secure user experience.
+
+- **Gasless Transactions with Gelato**: Leveraging Gelato’s Relay (ERC-2771), Infinex enables fully **sponsored transactions**, allowing users to interact with decentralized applications without ever paying gas fees. This enhances accessibility and usability, ensuring that users can participate without holding or managing native blockchain tokens for fees.
+
+The synergy between Turnkey and Gelato allows Infinex to offer an intuitive, cost-free user experience while maintaining the highest standards of security and scalability.
+
+
 ### React Native Passkey App ([code](https://github.com/tkhq/passkeyapp))
 
 A simple React Native app that demonstrates sign up and sign in with passkeys, as well as Email Auth support.
