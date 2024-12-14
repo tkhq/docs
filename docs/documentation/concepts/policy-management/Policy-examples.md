@@ -247,66 +247,66 @@ The mint account address of the token will only be accessible when the transacti
 
 ### Example SPL transfer policies 
 
-#### Allow a user to sign a Solana transaction that includes a single instruction which is an SPL token transfer from a particular sending address
+#### Allow a user to sign Solana transactions that include a single instruction which is an SPL token transfer from a particular sending token address
 
 ```json JSON
 {
-  "policyName": "Allow user <USER_ID> to sign Solana transactions that include only a single SPL Transfer FROM a particular <ADDRESS>",
+  "policyName": "Allow user <USER_ID> to sign Solana transactions that include only a single SPL Transfer FROM <ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.from == '<ADDRESS>')"
 }
 ```
 
-#### Allow user <USER_ID> to sign a Solana transaction only if ALL of its instructions are SPL transfers TO <ADDRESS>
+#### Allow a user to sign Solana transactions only if ALL of the instructions are SPL transfers TO a particular token address
 
 ```json JSON 
 {
-  "policyName": "Allow user <USER_ID> to sign a Solana transaction only if ALL of its transactions are SPL transfers TO <ADDRESS>",
+  "policyName": "Allow user <USER_ID> to sign Solana transactions only if ALL of the instructions are SPL transfers TO <ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.to == '<ADDRESS>')"
 }
 ```
 
-#### Allow users with <USER_TAG> to sign a Solana transactions only if ALL of it's instructions are SPL token transfers with <ADDRESS> as the owner of the sending token address
+#### Allow users with a specific tag to sign Solana transactions only if ALL of the instructions are SPL token transfers with a specific address as the owner of the sending token address
 
 ```json JSON
 {
-  "policyName": "Allow users with <USER_TAG> to sign a Solana transaction only if ALL of it's instructions are SPL token transfers with <ADDRESS> as the owner of the sending token address",
+  "policyName": "Allow users with <USER_TAG> to sign Solana transactions only if ALL of the instructions are SPL token transfers with <ADDRESS> as the owner of the sending token address",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
   "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.any(transfer, transfer.owner == '<ADDRESS>')"
 }
 ```
 
-#### Allow <USER_ID> to sign a Solana transaction that includes a single instruction which is an SPL token transfer where the atomic units of the transfer are less than <AMOUNT>
+#### Allow a user to sign Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than a threshold amount
 
 ```json Json
 {
-  "policyName": "Allow Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than <AMOUNT>",
+  "policyName": "Allow user <USER_ID> to sign Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than <AMOUNT>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.amount <AMOUNT>)"
 }
 ```
 
-#### Allow <USER_ID> to sign a Solana transaction that only if ALL of it's instructions are SPL token transfers where the token mint is address is <TOKEN_MINT_ADDRESS>
+#### Allow a user to sign Solana transactions only if ALL of the instructions are SPL token transfers where the token mint address is a particular address
 
 ```json Json
 {
-  "policyName": "Allow <USER_ID> to sign a Solana transaction that only if ALL of it's instructions are SPL token transfers where the token mint address is <TOKEN_MINT_ADDRESS>",
+  "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of the instructions are SPL token transfers where the token mint address is <TOKEN_MINT_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.any(transfer, transfer.token_mint == '<TOKEN_MINT_ADDRESS>')"
 }
 ```
 
-#### Allow <USER_ID> to sign a Solana transaction that includes a single instruction which is an SPL token transfer where one of the multisig signers is <ADDRESS>
+#### Allow a user to sign Solana transactions that includes a single instruction which is an SPL token transfer where one of the multisig signers of the owner is a particular address
 
 ```json Json
 {
-  "policyName": "Allow <USER_ID> to sign a Solana transaction that only if ALL of it's instructions are SPL token transfers where the token mint address is <TOKEN_MINT_ADDRESS>",
+  "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of it's instructions are SPL token transfers where one of the multisig signers of the owner is a particular address",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.signers.any(s, s == '<ADDRESS>'))"
