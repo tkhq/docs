@@ -247,7 +247,7 @@ The mint account address of the token will only be accessible when the transacti
 
 ### Example SPL transfer policies 
 
-#### Allow <USER_ID> to sign a Solana transaction that includes a single instruction which is an SPL token transfer from a particular sending address, initiated by <USER_ID>
+#### Allow a user to sign a Solana transaction that includes a single instruction which is an SPL token transfer from a particular sending address
 
 ```json JSON
 {
