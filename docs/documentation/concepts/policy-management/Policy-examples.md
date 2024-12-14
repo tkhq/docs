@@ -240,7 +240,7 @@ For policies related to the receiving token address of an SPL transfer, the toke
 
 For further context on associated token addresses check out Solana’s documentation on it: https://spl.solana.com/associated-token-account 
 
-An example implementation of using a policy to allow transfers to the associated token address of the intended recipient wallet address can be found in our SDK examples here: [TODO ADD LINK ONCE MERGED]
+An example implementation of using a policy to allow transfers to the associated token address of the intended recipient wallet address can be found in our SDK examples [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana#6-running-the-create-spl-token-transfer-with-policy-example).
 
 **Mint Address Accessibility**
 The mint account address of the token will only be accessible when the transaction is constructed using instructions that specify the mint address – `TransferChecked` and `TransferCheckedWithFee`. For transactions constructed using the simple `Transfer` method, the mint account will be considered empty. 
