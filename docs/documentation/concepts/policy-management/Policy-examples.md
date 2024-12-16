@@ -229,7 +229,7 @@ Note: see the [language section](Policy-language.md#appendix) for various approa
 }
 ```
 
-### Solana -- SPL token transfers
+#### Solana SPL token transfers -- Context and Examples
 
 Turnkey’s policy engine supports policies for SPL token transfers. Specifically, we support creating policies for the `Transfer`, `TransferChecked` and `TransferCheckedWithFee` instructions across both the Solana Token Program and the Solana Token 2022 Program.
 
@@ -245,7 +245,7 @@ An example implementation of using a policy to allow transfers to the associated
 **Mint Address Accessibility**
 The mint account address of the token will only be accessible when the transaction is constructed using instructions that specify the mint address – `TransferChecked` and `TransferCheckedWithFee`. For transactions constructed using the simple `Transfer` method, the mint account will be considered empty. 
 
-### Example SPL transfer policies 
+Here are some example policies for SPL transfers:
 
 #### Allow a user to sign Solana transactions that include a single instruction which is an SPL token transfer from a particular sending token address
 
@@ -273,10 +273,10 @@ The mint account address of the token will only be accessible when the transacti
 
 ```json JSON
 {
-  "policyName": "Allow users with <USER_TAG> to sign Solana transactions only if ALL of the instructions are SPL token transfers with <ADDRESS> as the owner of the sending token address",
+  "policyName": "Allow users with <USER_TAG> to sign Solana transactions only if ALL of the instructions are SPL token transfers with <OWNER_ADDRESS> as the owner of the sending token address",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
-  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.any(transfer, transfer.owner == '<ADDRESS>')"
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.owner == '<OWNER_ADDRESS>')"
 }
 ```
 
@@ -298,7 +298,7 @@ The mint account address of the token will only be accessible when the transacti
   "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of the instructions are SPL token transfers where the token mint address is <TOKEN_MINT_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.any(transfer, transfer.token_mint == '<TOKEN_MINT_ADDRESS>')"
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.token_mint == '<TOKEN_MINT_ADDRESS>')"
 }
 ```
 
@@ -306,9 +306,9 @@ The mint account address of the token will only be accessible when the transacti
 
 ```json Json
 {
-  "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of it's instructions are SPL token transfers where one of the multisig signers of the owner is a particular address",
+  "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of it's instructions are SPL token transfers where one of the multisig signers of the owner is <SIGNER_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.signers.any(s, s == '<ADDRESS>'))"
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.signers.any(s, s == '<SIGNER_ADDRESS>'))"
 }
 ```
