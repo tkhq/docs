@@ -6,7 +6,13 @@ slug: /reference/react-components
 
 # React Components
 
-Turnkey offers react components to create embedded wallets without having to setup a backend by using Next.js [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) and associated directives. Each component uses the **authIframeClient** from [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react). An example is hosted [here](https://wallets.turnkey.com/), and reference to the code can be found [here](https://github.com/tkhq/sdk/tree/main/examples/react-components)
+Turnkey offers React components to create embedded wallets without having to setup a backend by using Next.js [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) and associated directives. Each component uses the **authIframeClient** from [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react).
+
+:::info
+
+An example is hosted [here](https://wallets.turnkey.com/), and reference to the code can be found [here](https://github.com/tkhq/sdk/tree/main/examples/react-components).
+
+:::
 
 ## How to Use Turnkey React Components
 
