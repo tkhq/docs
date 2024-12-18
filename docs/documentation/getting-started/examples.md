@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 description: Check out some of our example apps and use cases
 slug: /getting-started/examples
 ---
