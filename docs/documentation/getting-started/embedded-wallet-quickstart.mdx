@@ -9,78 +9,244 @@ title: "Embedded Wallets"
 
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
+import { Step, Steps } from "@site/src/components/step";
 
-## Get started with Embedded Wallets
+# Embedded Wallets Quickstart
 
-Turnkey's Embedded Wallets enable you to integrate secure, custom wallet experiences directly into your product. With features like advanced security, seamless authentication, and flexible UX options, you can focus on building great products while we handle the complexities of private key management.
+Turnkey's Embedded Wallets enable you to integrate secure, custom wallet experiences directly
+into your product. With features like advanced security, seamless authentication, and flexible
+UX options, you can focus on building great products while we handle the complexities of private key management.
 
-### Prerequisites
+## Prerequisites
 
-To follow this guide, you'll need:
+This guide assumes you've completed the steps to create an account and organization as described in the [Getting Started](/getting-started) section.
 
-{/* * Comment: account or org? */}
+## Installation
 
-- A [Turnkey Account](https://app.turnkey.com/dashboard/auth/initial)
+Create a new Next.js app via `npx create-next-app@latest`. Or install into an existing project.
 
-{/* * Comment: want to link to a doc explain how to get these, but don't know where the create api doc should live? */}
-
-- Your Turnkey [API Public & Private Keys](/faq#why-do-you-require-a-public--private-key-pair-to-access-turnkey-api) and Organization ID
-
-### Step 1: Configure your project
-
-Choose your preferred stack and install the required SDKs.
-
-#### Architecture
-
-<Tabs groupId="arch" queryString="arch">
-<TabItem value="server-client" label="Server and client">
-
-</TabItem>
-<TabItem value="client-only" label="Client-side only">
-
-</TabItem>
-</Tabs>
-
-#### Frontend Options
-
-<Tabs groupId="frontend" queryString="frontend">
-<TabItem value="next" label="Next.js">
-
-</TabItem>
-<TabItem value="react-native" label="React Native">
-
-</TabItem>
-<TabItem value="vanilla" label="Vanilla">
-
-</TabItem>
-</Tabs>
-
-#### Backend Options
-
-<Tabs groupId="backend" queryString="backend">
-<TabItem value="node" label="Node.js">
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-</TabItem>
-<TabItem value="ruby" label="Ruby">
-
-</TabItem>
-<TabItem value="go" label="Go">
-
-</TabItem>
-</Tabs>
-
-#### Install Dependencies
-
-To begin, install the Turnkey Node SDK via npm:
+<Tabs>
+  <TabItem value="npm" label="npm">
 
 ```bash
-npm install @turnkey-inc/node
+npm install @turnkey/sdk-react
 ```
 
-## Create new next app
-## Add Turnkey to next app
-##
-## Signing A message
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+
+```bash
+pnpm add @turnkey/sdk-react
+```
+
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+
+```bash
+yarn add @turnkey/sdk-react
+```
+
+  </TabItem>
+</Tabs>
+
+:::note
+
+**React 19 Users**
+
+If you're using Next.js 15 with React 19 you may encounter an installation error with `@turnkey/sdk-react`. Consider:
+
+- Downgrading React to `18.x.x`
+- Using `npm install --force` or `--legacy-peer-deps`
+
+You may learn more about this [here](https://ui.shadcn.com/docs/react-19).
+
+:::
+
+### Add Turnkey to your app
+
+<Steps>
+
+<Step>Configure</Step>
+
+Fill in with your Organization ID and API Base URL.
+
+```tsx title="src/app/layout.tsx"
+const config = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_TURNKEY_ORGANIZATION_ID,
+};
+```
+
+<Step>Provider</Step>
+
+Wrap your layout with the `TurnkeyProvider` component.
+
+```tsx title="src/app/layout.tsx"
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <TurnkeyProvider config={config}>{children}</TurnkeyProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+:::note
+
+**React 19 Users**
+
+`@turnkey/sdk-react` is built with React 18. If you're using React 19 you'll find a type mismatch on the children type.
+
+To fix this, you can use the `@ts-ignore` directive to suppress the error.
+
+```tsx title="src/app/layout.tsx"
+<TurnkeyProvider config={config}>
+  {/* @ts-ignore */}
+  {children}
+</TurnkeyProvider>
+```
+
+We're actively working towards React 19 compatibility.
+
+:::
+
+</Steps>
+
+## Auth Component
+
+<p
+  style={{
+    textAlign: "center",
+    width: "100%",
+    backgroundColor: "#222",
+    backgroundImage: "radial-gradient(#444 1px, transparent 1px)",
+    backgroundSize: "20px 20px",
+    backgroundPosition: "0 0",
+    padding: "24px",
+    borderRadius: "12px",
+  }}
+>
+  <img
+    src="/img/quickstart/auth-component.png"
+    alt="Auth Component"
+    style={{
+      width: 260,
+      borderRadius: "12px",
+      boxShadow: "0 2px 5px 0 #0003",
+    }}
+  />
+</p>
+
+The auth component contains the UI and logic to handle the authentication flow.
+
+<Steps>
+
+<Step>Configure</Step>
+
+For simplicity, this app will only support email authentication. We have other guides on additional authentication methods.
+Additionally, you can customize the order in which the auth methods are displayed.
+
+```tsx title="src/app/page.tsx"
+export default function Home() {
+  // The auth methods to display in the UI
+  const config = {
+    authConfig: {
+      emailEnabled: true,
+      passkeyEnabled: false,
+      phoneEnabled: false,
+      appleEnabled: false,
+      facebookEnabled: false,
+      googleEnabled: false,
+    },
+    // The order of the auth methods to display in the UI
+    configOrder: ["email" /* "passkey", "phone", "socials" */],
+  };
+
+  return <div></div>;
+}
+```
+
+<details>
+<summary>Auth Config Options</summary>
+
+```ts
+type AuthConfig = {
+  emailEnabled: boolean;
+  passkeyEnabled: boolean;
+  phoneEnabled: boolean;
+  appleEnabled: boolean;
+  googleEnabled: boolean;
+  facebookEnabled: boolean;
+};
+```
+
+</details>
+
+<Step>Import</Step>
+
+Import the auth component into your app and pass in the config object.
+
+```tsx title="src/app/page.tsx"
+import { Auth } from "@turnkey/sdk-react";
+
+export default function Home() {
+  const config = {
+    authConfig: {
+      emailEnabled: true,
+      passkeyEnabled: false,
+      phoneEnabled: false,
+      appleEnabled: false,
+      facebookEnabled: false,
+      googleEnabled: false,
+    },
+    configOrder: ["email"],
+  };
+
+  return (
+    <div>
+      <Auth {...config} />
+    </div>
+  );
+}
+```
+
+<Step>Handlers</Step>
+
+Define two function to handle the "success" and "error" states. Initially, the `onError` function will set an `errorMessage`
+state variable which will be used to display an error message to the user.
+
+```tsx title="src/app/page.tsx"
+"use client";
+
+import { useState } from "react";
+import { Auth } from "@turnkey/sdk-react";
+
+export default function Home() {
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const onAuthSuccess = async () => {};
+
+  const onError = (errorMessage: string) => {
+    setErrorMessage(errorMessage);
+  };
+
+  // Add the handlers to the config object
+  const config = {
+    // ...
+    onAuthSuccess: onAuthSuccess,
+    onError: onError,
+  };
+
+  return (
+    <div>
+      <Auth {...config} />
+    </div>
+  );
+}
+```
+
+</Steps>
