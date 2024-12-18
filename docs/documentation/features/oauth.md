@@ -116,7 +116,7 @@ The main documentation for Google OIDC is available [here](https://github.com/tk
 
 Apple integration is also extensively tested and supported, and is integrated into our demo wallet (hosted at https://wallet.tx.xyz). The code provides an [example component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/apple-auth.tsx) as well as an [example redirect handler](<https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/apple/page.tsx>).
 
-Documentation for Apple OIDC can be foudn [here](https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/authenticating_users_with_sign_in_with_apple).
+Documentation for Apple OIDC can be found [here](https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/authenticating_users_with_sign_in_with_apple).
 
 ### Facebook
 
