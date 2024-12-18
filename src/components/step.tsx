@@ -7,7 +7,7 @@ export const Step = ({ ...props }: React.ComponentProps<"h3">) => (
     style={{
       marginTop: "2rem",
       scrollMargin: "5rem",
-      fontSize: "1rem",
+
       fontWeight: "600",
     }}
     {...props}
