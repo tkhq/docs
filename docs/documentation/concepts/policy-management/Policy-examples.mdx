@@ -240,7 +240,11 @@ For policies related to the receiving token address of an SPL transfer, the toke
 
 For further context on associated token addresses check out Solana’s documentation on it: https://spl.solana.com/associated-token-account 
 
+:::info
+
 An example implementation of using a policy to allow transfers to the associated token address of the intended recipient wallet address can be found in our SDK examples [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana#6-running-the-create-spl-token-transfer-with-policy-example).
+
+:::
 
 **Mint Address Accessibility**
 The mint account address of the token will only be accessible when the transaction is constructed using instructions that specify the mint address – `TransferChecked` and `TransferCheckedWithFee`. For transactions constructed using the simple `Transfer` method, the mint account will be considered empty. 
@@ -251,10 +255,10 @@ Here are some example policies for SPL transfers:
 
 ```json JSON
 {
-  "policyName": "Allow user <USER_ID> to sign Solana transactions that include only a single SPL Transfer FROM <ADDRESS>",
+  "policyName": "Allow user <USER_ID> to sign Solana transactions that include only a single SPL Transfer FROM <TOKEN_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.from == '<ADDRESS>')"
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.from == '<TOKEN_ADDRESS>')"
 }
 ```
 
@@ -262,10 +266,10 @@ Here are some example policies for SPL transfers:
 
 ```json JSON 
 {
-  "policyName": "Allow user <USER_ID> to sign Solana transactions only if ALL of the instructions are SPL transfers TO <ADDRESS>",
+  "policyName": "Allow user <USER_ID> to sign Solana transactions only if ALL of the instructions are SPL transfers TO <TOKEN_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.to == '<ADDRESS>')"
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.to == '<TOKEN_ADDRESS>')"
 }
 ```
 
@@ -287,7 +291,7 @@ Here are some example policies for SPL transfers:
   "policyName": "Allow user <USER_ID> to sign Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than <AMOUNT>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.amount <AMOUNT>)"
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.amount < <AMOUNT>)"
 }
 ```
 
@@ -309,6 +313,6 @@ Here are some example policies for SPL transfers:
   "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of it's instructions are SPL token transfers where one of the multisig signers of the owner is <SIGNER_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.any(transfer, transfer.signers.any(s, s == '<SIGNER_ADDRESS>'))"
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.signers.any(s, s == '<SIGNER_ADDRESS>'))"
 }
 ```
