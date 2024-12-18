@@ -6,13 +6,13 @@ slug: /reference/react-components
 
 # React Components
 
-Turnkey offers react components to create embedded wallets without having to setup a backend by using NextJs server actions and associated directives. Each component uses the **authIframeClient** from [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react). An example is hosted TODO, and reference to the code can be found [here](https://github.com/tkhq/sdk/tree/main/examples/react-components)
+Turnkey offers react components to create embedded wallets without having to setup a backend by using Next.js [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) and associated directives. Each component uses the **authIframeClient** from [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react). An example is hosted [here](https://wallets.turnkey.com/), and reference to the code can be found [here](https://github.com/tkhq/sdk/tree/main/examples/react-components)
 
 ## How to Use Turnkey React Components
 
 To use the Turnkey React components effectively, your project is required to:
 
-1. Use **Next.js 13+** with the **App Directory structure** to leverage server actions.
+1. Use **Next.js 13+** with the [/app directory structure](https://nextjs.org/docs/app) to leverage server actions.
 2. Import Turnkey's default styles in your `layout.tsx` or equivalent entry point:
 
    ```tsx
@@ -61,7 +61,7 @@ function AuthPage() {
   const authConfig = {
     emailEnabled: true,
     passkeyEnabled: true,
-    phoneEnabled: true,
+    phoneEnabled: false,
     googleEnabled: true,
     appleEnabled: false,
     facebookEnabled: false,
@@ -75,13 +75,15 @@ function AuthPage() {
       configOrder={configOrder}
       onAuthSuccess={handleAuthSuccess}
       onError={handleAuthError}
-      customSmsMessage="Your Turnkey Demo OTP is {{.OtpCode}}"
     />
   );
 }
 
 export default AuthPage;
 ```
+Your component should look like the below 
+
+<img src="/img/auth.png" />
 
 ---
 
@@ -143,6 +145,14 @@ function ExportWallet() {
 
 export default ExportWallet;
 ```
+Your components should look like the below
+
+Export
+
+<img src="/img/export_button.png" />
+
+Import
+<img src="/img/import_button.png" />
 
 ---
 
@@ -170,5 +180,8 @@ export default function App() {
 }
 ```
 
-You can customize any CSS variable used by Turnkey components. For the full list of available variables, refer to the [this .css file](https://github.com/tkhq/sdk/blob/main/packages/sdk-react/src/components/theme.css)
+You can customize any CSS variable used by Turnkey components. For the full list of available variables, refer to the [this .css file](https://github.com/tkhq/sdk/blob/main/packages/sdk-react/src/components/theme.css) Below is an example of a dark mode theme.
+
+<img src="/img/auth_with_theme.png" />
+
 
