@@ -90,6 +90,7 @@ See below for specific address formats that you can currently derive on Turnkey:
 | Dogecoin | ADDRESS_FORMAT_DOGE_TESTNET           | CURVE_SECP256K1 | m/44'/1'/0'/0/0    |
 | TON      | ADDRESS_FORMAT_TON_V3R2               | CURVE_ED25519   | m/44'/607'/0'/0/0  |
 | TON      | ADDRESS_FORMAT_TON_V4R2               | CURVE_ED25519   | m/44'/607'/0'/0/0  |
+| XRP      | ADDRESS_FORMAT_XRP                    | CURVE_SECP256K1 | m/44'/144'/0'/0/0  |
 
 #### Where can I learn more?
 
