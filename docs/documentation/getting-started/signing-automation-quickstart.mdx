@@ -14,7 +14,7 @@ Turnkey's Signing Automation enables you to build secure, programmatic signing w
 
 ## Prerequisites
 
-This guide assumes you've completed the steps to create an account and organization as described in the [Getting Started](/getting-started) section.
+This guide assumes you've completed the steps to create an account, organization, and API keypair as described in the [Quickstart](/getting-started/quickstart) section.
 
 ## Installation
 
@@ -26,7 +26,37 @@ brew install tkhq/tap/turnkey
 
 We use Homebrew for a quick installation process. For a more secure installation that requires no trust in external parties, see our [CLI repository](https://github.com/tkhq/tkcli).
 
+## Transaction Signing
+
 <Steps>
+
+<Step>Setup</Step>
+
+Set the `ORGANIZATION_ID` environment variable to your organization ID. This will be used to identify your organization in the API requests.
+
+```sh
+export ORGANIZATION_ID=<YOUR_ORGANIZATION_ID>
+```
+
+An API keypair is required to authenticate requests to the Turnkey API.
+
+Create a new key named `quickstart` using the turnkey CLI:
+
+```sh
+turnkey generate api-key --organization $ORGANIZATION_ID --key-name quickstart
+```
+
+You'll see output like this:
+
+```json
+{
+  "privateKeyFile": "/home/user/.config/turnkey/keys/quickstart.private",
+  "publicKey": "03...72",
+  "publicKeyFile": "/home/user/.config/turnkey/keys/quickstart.public"
+}
+```
+
+Follow the instructions in this [guide](/sdks/cli#add-your-public-api-key) to add your new public API key to your organization via the dashboard.
 
 <Step> Create Wallet</Step>
 
@@ -36,14 +66,35 @@ Wallets are collections of cryptographic key pairs typically used for sending an
 turnkey wallets create --name default --key-name quickstart
 ```
 
+:::note
+
+This command requires a key named `quickstart` to exist in your configuration. This key should have been created during the [Quickstart](/getting-started/quickstart) guide. If you haven't created it yet, please complete the initial setup steps first.
+
+If the key doesn't exist, you'll see an error like this:
+
+```json
+{
+  "error": "failed to load key bytes \"quickstart\": failed to read from \"/.config/turnkey/keys/quickstart.private\": open /.config/turnkey/keys/quickstart.private: no such file or directory"
+}
+```
+
+If the key exists but has not been added to your organization, you'll see an error like this:
+
+```json
+{
+  "error": "failed to associate the API key with an organization; please manually specify the organization ID"
+}
+```
+
+:::
 
 <Step> Create Ethereum Account</Step>
 
-To create a cryptographic key pair on our new Wallet, we need to pass our desired address format:
+To create a cryptographic key pair on our new wallet, we need to pass our desired address format:
 
 ```sh
 turnkey wallets accounts create --wallet default --address-format ADDRESS_FORMAT_ETHEREUM --key-name quickstart
-````
+```
 
 This command will produce an Ethereum address (e.g. `0x08cb1216C95149DF66978b574E484869512CE2bF`) that we'll need to sign a transaction. You can see your new Wallet account with:
 
@@ -52,11 +103,6 @@ turnkey wallets accounts list --wallet default --key-name quickstart
 ```
 
 <Step> Sign a Transaction</Step>
-
-</Steps>
-
-
-## Sign a Transaction
 
 Now you can sign an Ethereum transaction with this new address with our [`sign_transaction` endpoint](https://docs.turnkey.com/api#tag/Signers/operation/SignTransaction). Make sure to replace the `unsignedTransaction` below with your own. You can use our [simple transaction generator](https://build.tx.xyz) if you need a quick transaction for testing:
 
@@ -74,6 +120,8 @@ turnkey request --path /public/v1/submit/sign_transaction --body '{
 ```
 
 If you'd like to broadcast your transaction, you can easily do so via [Etherscan](https://etherscan.io/pushTx).
+
+</Steps>
 
 ## Next Steps
 
