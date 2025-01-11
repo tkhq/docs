@@ -111,56 +111,60 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 ## Activity Breakdown
 
-| Resource Type    | Action | Activity Type                             |
-| ---------------- | ------ | :---------------------------------------- |
-| **ORGANIZATION** | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7  |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_ROOT_QUORUM          |
-|                  | UPDATE | ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE    |
-|                  | REMOVE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE |
-| **INVITATION**   | CREATE | ACTIVITY_TYPE_CREATE_INVITATIONS          |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_INVITATION           |
-|                  | ACCEPT | ACTIVITY_TYPE_ACCEPT_INVITATION_V2        |
-| **POLICY**       | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3            |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_POLICIES             |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY               |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_POLICY               |
-| **WALLET**       | CREATE | ACTIVITY_TYPE_CREATE_WALLET               |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS      |
-|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET               |
-|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT       |
-|                  | IMPORT | ACTIVITY_TYPE_INIT_IMPORT_WALLET          |
-|                  | IMPORT | ACTIVITY_TYPE_IMPORT_WALLET               |
-| **PRIVATE_KEY**  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2      |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG      |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG      |
-|                  | DELETE | ACTIVITY_TYPE_DISABLE_PRIVATE_KEY         |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS     |
-|                  | EXPORT | ACTIVITY_TYPE_EXPORT_PRIVATE_KEY          |
-|                  | IMPORT | ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY     |
-|                  | IMPORT | ACTIVITY_TYPE_IMPORT_PRIVATE_KEY          |
-|                  | SIGN   | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2         |
-|                  | SIGN   | ACTIVITY_TYPE_SIGN_TRANSACTION_V2         |
-| **USER**         | CREATE | ACTIVITY_TYPE_CREATE_USERS_V2             |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_USER_TAG             |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_API_ONLY_USERS       |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER                 |
-|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER_TAG             |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_USERS                |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_USER_TAGS            |
-|                  | UPDATE | ACTIVITY_TYPE_RECOVER_USER                |
-| **CREDENTIAL**   | CREATE | ACTIVITY_TYPE_CREATE_API_KEYS             |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2    |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_API_KEYS             |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_AUTHENTICATORS       |
-| **PAYMENT**      | UPDATE | ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2       |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_PAYMENT_METHOD       |
-| **SUBSCRIPTION** | UPDATE | ACTIVITY_TYPE_ACTIVATE_BILLING_TIER       |
-| **CONFIG**       | UPDATE | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS      |
-| **RECOVERY**     | UPDATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY    |
-| **AUTH**         | CREATE | ACTIVITY_TYPE_EMAIL_AUTH                  |
-|                  | CREATE | ACTIVITY_TYPE_OAUTH                       |
-|                  | CREATE | ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS      |
-|                  | DELETE | ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS      |
+| Resource Type    | Action | Activity Type                               |
+| ---------------- | ------ | :------------------------------------------ |
+| **ORGANIZATION** | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7    |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_ROOT_QUORUM            |
+|                  | UPDATE | ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE      |
+|                  | REMOVE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE   |
+| **INVITATION**   | CREATE | ACTIVITY_TYPE_CREATE_INVITATIONS            |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_INVITATION             |
+|                  | ACCEPT | ACTIVITY_TYPE_ACCEPT_INVITATION_V2          |
+| **POLICY**       | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3              |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_POLICIES               |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY                 |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_POLICY                 |
+| **WALLET**       | CREATE | ACTIVITY_TYPE_CREATE_WALLET                 |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS        |
+|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET                 |
+|                  | EXPORT | ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT         |
+|                  | IMPORT | ACTIVITY_TYPE_INIT_IMPORT_WALLET            |
+|                  | IMPORT | ACTIVITY_TYPE_IMPORT_WALLET                 |
+| **PRIVATE_KEY**  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2        |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG        |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG        |
+|                  | DELETE | ACTIVITY_TYPE_DISABLE_PRIVATE_KEY           |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS       |
+|                  | EXPORT | ACTIVITY_TYPE_EXPORT_PRIVATE_KEY            |
+|                  | IMPORT | ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY       |
+|                  | IMPORT | ACTIVITY_TYPE_IMPORT_PRIVATE_KEY            |
+|                  | SIGN   | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2           |
+|                  | SIGN   | ACTIVITY_TYPE_SIGN_TRANSACTION_V2           |
+| **USER**         | CREATE | ACTIVITY_TYPE_CREATE_USERS_V2               |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_USER_TAG               |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_API_ONLY_USERS         |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER                   |
+|                  | UPDATE | ACTIVITY_TYPE_UPDATE_USER_TAG               |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_USERS                  |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_USER_TAGS              |
+|                  | UPDATE | ACTIVITY_TYPE_RECOVER_USER                  |
+| **CREDENTIAL**   | CREATE | ACTIVITY_TYPE_CREATE_API_KEYS               |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2      |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_API_KEYS               |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_AUTHENTICATORS         |
+| **PAYMENT**      | UPDATE | ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2         |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_PAYMENT_METHOD         |
+| **SUBSCRIPTION** | UPDATE | ACTIVITY_TYPE_ACTIVATE_BILLING_TIER         |
+| **CONFIG**       | UPDATE | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS        |
+| **RECOVERY**     | UPDATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY      |
+| **AUTH**         | CREATE | ACTIVITY_TYPE_EMAIL_AUTH                    |
+|                  | CREATE | ACTIVITY_TYPE_INIT_OTP_AUTH                 |
+|                  | CREATE | ACTIVITY_TYPE_OTP_AUTH                      |
+|                  | CREATE | ACTIVITY_TYPE_OAUTH                         |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS        |
+|                  | DELETE | ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS        |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION     |
+|                  | CREATE | ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2  |
 
 ## Appendix
 
