@@ -156,7 +156,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                  | DELETE | ACTIVITY_TYPE_DELETE_PAYMENT_METHOD         |
 | **SUBSCRIPTION** | UPDATE | ACTIVITY_TYPE_ACTIVATE_BILLING_TIER         |
 | **CONFIG**       | UPDATE | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS        |
-| **RECOVERY**     | UPDATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY      |
+| **RECOVERY**     | CREATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY      |
 | **AUTH**         | CREATE | ACTIVITY_TYPE_EMAIL_AUTH                    |
 |                  | CREATE | ACTIVITY_TYPE_INIT_OTP_AUTH                 |
 |                  | CREATE | ACTIVITY_TYPE_OTP_AUTH                      |
