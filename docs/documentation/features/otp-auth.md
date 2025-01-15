@@ -19,6 +19,7 @@ OTP Auth starts with a new activity posted to Turnkey. This activity has the typ
 - `otpType`: specifiy delivery mechanism `"OTP_TYPE_SMS"` or `"OTP_TYPE_EMAIL"`
 - `contact`: the email or phone number of the user who would like to authenticate. This contact must be already attached to the user in organization data (i.e., previously approved by the user). This prevents malicious account takeover. If you try to pass a different email address or phone number, the activity will fail.
 - `emailCustomization`: optional parameters for customizing emails. If not provided, the default email will be used. For more info, see the [integration guide](/embedded-wallets/sub-organization-auth#email-customization).
+- `userIdentifier`: optional parameter to uniquely identify an end-user, for the purpose of rate limiting SMS OTP requests on a per-user basis. We recommend generating this value serverside based on either the user's IP address or their public key to mitigate the risk of abuse. If this value is omitted, no per-user rate limiting will be enforced for SMS OTP requests.
 
 This activity generates a 6 digit OTP, and sends it as an email or SMS
 
@@ -40,6 +41,8 @@ This activity returns an `otpId` in the result to be used in the following `ACTI
 - `invalidateExisting`: an optional boolean used to invalidate all other previously generated OTP Auth API keys
 
 Initiating OTP Auth for both `"OTP_TYPE_SMS"` and `"OTP_TYPE_EMAIL"` requires proper permissions via policies or being a parent organization. See [Authorization](#authorization) for more details.
+
+_Note: Non-paying accounts are currently limited to 50 SMS messages per month._
 
 ## Authorization
 
