@@ -99,6 +99,17 @@ sidebar_label: Examples
 }
 ```
 
+#### Allow a specific user to sign transactions with a specific wallet account address
+
+```json
+{
+  "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ID>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet_account.address == '<WALLET_ACCOUNT_ADDRESS>'"
+}
+```
+
 #### Allow a specific user to sign transactions with a specific private key
 
 ```json
