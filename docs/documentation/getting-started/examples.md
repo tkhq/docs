@@ -149,14 +149,14 @@ Infinex, a platform designed to unify the decentralized ecosystem and applicatio
 The synergy between Turnkey and Gelato allows Infinex to offer an intuitive, cost-free user experience while maintaining the highest standards of security and scalability.
 
 
-### React Native Passkey App ([code](https://github.com/tkhq/passkeyapp))
+### React Native Demo App ([code](https://github.com/tkhq/passkeyapp))
 
-A simple React Native app that demonstrates sign up and sign in with passkeys, as well as Email Auth support.
+A simple React Demo app that demonstrates sign up and sign in with passkeys, as well as Email Auth and SMS support.
 
 <p style={{ textAlign: "center" }}>
   <video controls width="800px" style={{ borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}>
-    <source src="https://github.com/r-n-o/passkeyapp/assets/104520680/9fabf71c-d88a-4631-8bfa-14b55c72967b"/>
+    <source src="https://github.com/tkhq/react-native-demo-wallet/raw/refs/heads/main/assets/videos/demo_video.mov"/>
   </video>
 </p>
 
-See https://github.com/tkhq/passkeyapp for the code.
+See https://github.com/tkhq/react-native-demo-wallet for the code.

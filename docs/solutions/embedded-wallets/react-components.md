@@ -1,12 +1,12 @@
 ---
 sidebar_position: 6
 description: Use Turnkey components to create embedded wallets
-slug: /reference/react-components
+slug: /reference/embedded-wallet-kit
 ---
 
-# React Components
+# Embedded Wallet Kit (EWK)
 
-Turnkey offers React components to create embedded wallets without having to setup a backend by using Next.js [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) and associated directives. Each component uses the **authIframeClient** from [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react).
+Turnkey offers a suite of react components to create embedded wallets without having to setup a backend by using Next.js [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) and associated directives. Each component uses the **authIframeClient** from [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react).
 
 :::info
 
@@ -14,9 +14,9 @@ An example is hosted [here](https://wallets.turnkey.com/), and reference to the 
 
 :::
 
-## How to Use Turnkey React Components
+## How to Use Turnkey EWK
 
-To use the Turnkey React components effectively, your project is required to:
+To use the embedded wallet kit effectively, your project is required to:
 
 1. Use **Next.js 13+** with the [/app directory structure](https://nextjs.org/docs/app) to leverage server actions.
 2. Import Turnkey's default styles in your `layout.tsx` or equivalent entry point:
