@@ -88,7 +88,7 @@ sidebar_label: Examples
 
 ## Signing control
 
-#### Allow a specific user to sign transactions with a specific wallet
+#### Allow a specific user to sign transactions with any account address within a specific wallet
 
 ```json
 {
@@ -96,6 +96,17 @@ sidebar_label: Examples
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "wallet.id == '<WALLET_ID>'"
+}
+```
+
+#### Allow a specific user to sign transactions with a specific wallet account address
+
+```json
+{
+  "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ACCOUNT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet_account.address == '<WALLET_ACCOUNT_ADDRESS>'"
 }
 ```
 
