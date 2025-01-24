@@ -10,7 +10,7 @@ Turnkey offers a suite of react components to create embedded wallets without ha
 
 :::info
 
-An example is hosted [here](https://wallets.turnkey.com/), and reference to the code can be found [here](https://github.com/tkhq/sdk/tree/main/examples/react-components).
+An example is hosted [here](https://wallets.turnkey.com/), and reference to the code can be found [here](https://github.com/tkhq/demo-ewk).
 
 :::
 
