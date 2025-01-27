@@ -62,7 +62,6 @@ Turnkey supports the EVM chains below for address derivation and signing arbitra
 - Avalanche C chain
 - Avalanche Fuji
 - Base
-- Base
 - Berachain
 - BNB Smart Chain
 - Celo
@@ -76,13 +75,13 @@ Turnkey supports the EVM chains below for address derivation and signing arbitra
 - Holesky Garnet
 - Lukso
 - Linea
+- Monad
 - Moonbeam
 - Optimism
 - Palm
 - Polygon
 - Redstone
 - Scroll
-- Zora
 - zkSync
 - Zora
 
