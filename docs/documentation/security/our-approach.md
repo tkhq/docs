@@ -6,7 +6,7 @@ slug: /security/our-approach
 
 # Our approach
 
-At Turnkey we’ve developed a security framework that allows, us and eventually our users to prove that all systems with security critical workloads are running exactly the software we expect at any given time, no single engineer can access any enclave or reconstruct a secret, and the system is always safe as long as enclaves are not compromised
+At Turnkey we’ve developed a security framework that allows, us and eventually our users to prove that all systems with security critical workloads are running exactly the software we expect at any given time, no single engineer can access any enclave or reconstruct a secret, and the system is always safe as long as enclaves are not compromised.
 
 At the highest level, Turnkey runs all secure workloads in **“Secure Enclaves,”** a type of Trusted Execution Environment. To run our secure enclaves we have built an OS from the ground up that gives us the ability to remotely attest to the integrity of the machines and the code running. Every time we deploy, we attest to the code running in the enclaves prior to posting shares of core secrets into the enclave. This helps to **ensure that we can trust the secure applications running in the enclaves,** which perform actions such as private key generation, transaction signing, and policy evaluation.
 
