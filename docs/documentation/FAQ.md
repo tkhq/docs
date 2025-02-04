@@ -164,3 +164,7 @@ To request the deletion of your parent organization from our records, please ema
 ### Is my country supported?
 
 Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions.
+
+### Where can I learn more about Turnkey's internal architecture?
+
+Check out our whitepaper, available at [whitepaper.turnkey.com](https://whitepaper.turnkey.com)! It covers our foundations and architecture in great detail.
