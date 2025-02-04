@@ -13,7 +13,7 @@ The process of exporting wallets or private keys from Turnkey is broken up into 
 1. Export the wallet or private key via Turnkey. You must specify the wallet or private key ID, as well as a target public key, which the wallet or private key will be encrypted to. Encryption ensures that the key material is only accessible by the client, and cannot be extracted by any man-in-the-middle (MITM)
 2. Decrypt the resulting bundle returned by Turnkey
 
-See the [Cryptographic details section](#cryptographic-details) for more technical details.
+See the [Enclave to end-user secure channel](../security/enclave-secure-channels.md) for more technical details.
 
 # Implementation Guides
 
