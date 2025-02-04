@@ -14,7 +14,7 @@ The process of importing wallets or private keys into Turnkey is broken up into 
 2. Encrypt the key material to the artifacts from the previous step
 3. Import the encrypted bundle to Turnkey
 
-See the [Cryptographic details section](#cryptographic-details) for more technical details.
+See the [Enclave to end-user secure channel](../security/enclave-secure-channel.md) for more technical details.
 
 # Implementation Guides
 

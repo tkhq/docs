@@ -10,7 +10,7 @@ Email Auth enables a user to authenticate their Turnkey account with email via e
 
 #### Mechanism
 
-In short, Email Auth is built with expiring API keys as the foundation: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [cryptographic details](#mechanism-and-cryptographic-details) section for more info on how we achieve secure delivery.
+In short, Email Auth is built with expiring API keys as the foundation: email is simply the mechanism through which the API key credential is safely delivered. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](../security/enclave-secure-channel.md) section for more info on how we achieve secure delivery.
 
 ## User Experience
 
@@ -60,22 +60,6 @@ If you want to use email auth in the context of an organization accessed via our
 Similar to email recovery, depending on your threat model, it may be unacceptable to rely on email as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable email auth with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_EMAIL_AUTH`.
 
 If you _never_ want to have email auth enabled for sub-organizations, our `CREATE_SUB_ORGANIZATION` activity takes a `disableEmailAuth` boolean in its parameters. Set it to `true` and the sub-organization will be created without the organization feature.
-
-## Mechanism and cryptographic details
-
-Note: if the following section looks familiar, it is! It shares the same cryptographic innerworkings as Email Recovery.
-
-Unlike typical email auth functionality, Turnkey's email auth doesn't send unencrypted tokens via emails. This ensures no man-in-the-middle attack can happen: even if the content of the auth email is leaked, an attacker wouldn't be able to decrypt the auth credential. The following diagram summarizes the flow:
-
-<img src="/img/email_auth_cryptography.png" />
-
-Our email auth flow works by anchoring auth in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
-
-The public part of this key pair is passed as a parameter inside of a signed `EMAIL_AUTH` activity. The signature on the activity has to come from a user who is [authorized](#authorization) to initiate email auth.
-
-Our enclave creates a fresh P256 key pair ("auth credential") and encrypts the private key to the recovering user's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/).
-
-Once the encrypted auth credential is received via email, it's decrypted where the target public key was originally created. The auth credential is then ready to be used to sign an activity, which is then submitted to Turnkey.
 
 ## Implementation notes
 
