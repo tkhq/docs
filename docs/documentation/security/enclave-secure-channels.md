@@ -2,7 +2,7 @@
 sidebar_position: 7
 title: Enclave secure channels
 description: Learn about Turnkey's enclave to end-user secure channels
-slug: /security/secure-channel
+slug: /security/enclave-secure-channels
 ---
 
 # Enclave to end-user secure channels
