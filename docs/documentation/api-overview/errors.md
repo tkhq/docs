@@ -26,7 +26,7 @@ The below table enumerates all errors across different actions that can be taken
 
 | GRPC Code | HTTP Code | Message |
 | ------ | -------- | --------- |
-| NotFound          | 404       | [no organization found with the given ID](#no-organization-found-with-the-given-ID) |
+| NotFound          | 404       | [no organization found with the given ID](#no-organization-found-with-the-given-id) |
 | InvalidArgument   | 400       | [malformed organization ID provided](#malformed-organization-id-provided) |
 | InvalidArgument   | 400       | [bad request body](#bad-request-body) |
 | PermissionDenied  | 403       | [api operations disabled](#api-operations-disabled) |
