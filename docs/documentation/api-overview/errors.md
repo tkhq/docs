@@ -171,7 +171,8 @@ Troubleshooting Tips:
 ---
 ### this organization cannot execute activities because it is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.
 Causes:
-- This error occurs if you have exceeded your monthly signing quota. The first 25 signatures a month are free for "free" users.
+- This error could occur if you have exceeded your monthly signing quota. The first 25 signatures a month are free for "free" users.
+- This error could occur if you have reach a resource limit on a particular resource. You can find out about our resource limits [here](../getting-started/resource-limits.md).
   
 Troubleshooting Tips:
 - If you need to increase your signature limit take a look at our [pricing page](https://www.turnkey.com/pricing) and contact us at help@turnkey.com!
@@ -179,7 +180,8 @@ Troubleshooting Tips:
 ### this sub-organization cannot execute activities because its parent is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.
 Causes:
 Causes:
-- This error occurs if you have exceeded your monthly signing quota. The first 25 signatures a month are free for "free" users.
+- This error could occur if you have exceeded your monthly signing quota. The first 25 signatures a month are free for "free" users.
+- This error could occur if you have reach a resource limit on a particular resource. You can find out about our resource limits [here](../getting-started/resource-limits.md).
   
 Troubleshooting Tips:
 - If you need to increase your signature limit take a look at our [pricing page](https://www.turnkey.com/pricing) and contact us at help@turnkey.com!
