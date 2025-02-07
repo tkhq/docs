@@ -35,7 +35,7 @@ In contrast to read-only sessions, a read-write session makes sense when a user 
 
 #### Creating a read-write session
 
-Developers can leverage the [CreateReadWriteSession](https://docs.turnkey.com/api#tag/Sessions/operation/CreateReadWriteSession) activity, which requires a target embedded key and returns a credential bundle. This is a pattern that many core, secure flows follow, including Email Recovery, Email Auth, and OTP Auth. See [documentation](https://docs.turnkey.com/features/email-auth#mechanism-and-cryptographic-details) for more details.
+Developers can leverage the [CreateReadWriteSession](https://docs.turnkey.com/api#tag/Sessions/operation/CreateReadWriteSession) activity, which requires a target embedded key and returns a credential bundle. This is a pattern that many core, secure flows follow, including Email Auth, and OTP Auth. See [documentation](https://docs.turnkey.com/features/email-auth#mechanism-and-cryptographic-details) for more details.
 
 <p style={{textAlign: 'center'}}>
     <img src="/img/read_write_sessions.png" width="500" height="200"/>

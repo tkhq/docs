@@ -1,10 +1,16 @@
 ---
-sidebar_position: 3
+sidebar_position: 100
 description: Learn about Email Recovery on Turnkey
 slug: /features/email-recovery
 ---
 
-# Email Recovery
+# Email Recovery (legacy)
+
+:::info
+
+Email Recovery is a legacy flow, now superseded by [Email Auth](./email-auth.md), which can used to implement recovery flows and more.
+
+:::
 
 Email Recovery lets a user gain access to their Turnkey account via email in case they've lost access to their API keys and authenticators.
 

@@ -95,19 +95,25 @@ Once the activity succeeds, the encrypted mnemonic or private key can be decrypt
 
 ## Auth flow
 
-Unlike typical auth and recovery flows, Turnkey doesn't send unencrypted tokens. We use the protocol above to send credentials to end-users with no man-in-the-middle risk. This ensures that even if the content of a recovery or auth email is leaked, an attacker cannot decrypt and use the underlying credential. The following diagram summarizes the email auth flow:
+Unlike typical auth and recovery flows in the industry, Turnkey doesn't send unencrypted tokens. We use the protocol above to send credentials to end-users with no man-in-the-middle risk. This ensures that even if the content of an auth email is leaked, an attacker cannot decrypt and use the underlying credential. The following diagram summarizes the email auth flow:
 
 <p style={{ textAlign: "center" }}>
     <img src="/img/email_auth_cryptography.png" alt="email auth cryptography" />
 </p>
 
-Our email recovery flow works by anchoring recovery in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
+Our email auth flow works by anchoring on a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
 
-The public part of this key pair is passed as a parameter inside of a signed `INIT_USER_EMAIL_RECOVERY` or `EMAIL_AUTH` activity.
+The public part of this key pair is passed as a parameter inside of a signed `INIT_OTP_AUTH` or `EMAIL_AUTH` activity.
 
 Our enclave creates a fresh P256 key pair ("credential") and encrypts its private key to the recovering user's TEK using the protocol above.
 
 Once the encrypted credential is received via email, it's decrypted where the target public key was originally created. The credential is then ready to be used to sign Turnkey activity requests.
+
+Our OTP flows work similarly, except the bundle is not emailed to the user directly. Instead, it is returned as part of the `OTP_AUTH` activity results.
+
+<p style={{ textAlign: "center" }}>
+  <img src="/img/otp_auth_cryptography.png" alt="OTP auth cryptography"/>
+</p>
 
 ## Security details
 

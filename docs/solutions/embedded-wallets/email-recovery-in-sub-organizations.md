@@ -6,6 +6,12 @@ slug: /embedded-wallets/sub-organization-recovery
 
 # Email Recovery
 
+:::info
+
+Email Recovery is a legacy flow, now superseded by [Email Auth](./email-auth-for-sub-organizations.md), which can used to implement recovery flows and more.
+
+:::
+
 Email recovery shines if you are leveraging [sub-organizations](/concepts/Sub-Organizations) to create embedded wallets for your users. This allows your users to recover their Turnkey account if something goes wrong with their passkeys, and keeps you out of the loop: we engineered this feature to ensure your organization is unable to take over sub-organizations even if it wanted to.
 
 A simple example demonstrating email recovery end-to-end can be found [here](https://github.com/tkhq/sdk/tree/main/examples/email-recovery).

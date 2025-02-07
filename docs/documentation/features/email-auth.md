@@ -57,7 +57,7 @@ If you want to use email auth in the context of an organization accessed via our
 
 ## Opting out of email auth
 
-Similar to email recovery, depending on your threat model, it may be unacceptable to rely on email as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable email auth with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_EMAIL_AUTH`.
+Depending on your threat model, it may be unacceptable to rely on email as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable email auth with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_EMAIL_AUTH`.
 
 If you _never_ want to have email auth enabled for sub-organizations, our `CREATE_SUB_ORGANIZATION` activity takes a `disableEmailAuth` boolean in its parameters. Set it to `true` and the sub-organization will be created without the organization feature.
 
