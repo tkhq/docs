@@ -1,10 +1,16 @@
 ---
-sidebar_position: 3
+sidebar_position: 100
 description: Learn about Email Recovery on Turnkey
 slug: /features/email-recovery
 ---
 
-# Email Recovery
+# Email Recovery (legacy)
+
+:::info
+
+Email Recovery is a legacy flow, now superseded by [Email Auth](./email-auth.md), which can used to implement recovery flows and more.
+
+:::
 
 Email Recovery lets a user gain access to their Turnkey account via email in case they've lost access to their API keys and authenticators.
 
@@ -73,19 +79,3 @@ If you're a root user and you have lost access to your authenticators, **Turnkey
 Depending on your threat model it may be unacceptable to rely on email as an authentication factor. We envision this to be the case when an organization has a mature set of root users with multiple authenticators, or when a sub-organization "graduates" from one to many redundant passkeys or API keys. When you're ready, you can disable email recovery with `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` (see Remove [Organization Feature](/api#tag/Features/operation/RemoveOrganizationFeature)). The feature name to remove is `FEATURE_NAME_EMAIL_RECOVERY`.
 
 If you _never_ want to have email recovery enabled, our `CREATE_SUB_ORGANIZATION` activity takes a `disableEmailRecovery` boolean in its parameters. Set it to `true` and the sub-organization will be created without the organization feature.
-
-## Cryptographic details
-
-Unlike typical email recovery functionality, Turnkey's email recovery doesn't send unencrypted tokens via emails. This ensures no man-in-the-middle attack can happen: even if the content of the recovery email is leaked, an attacker wouldn't be able to decrypt the recovery credential. The following diagram summarizes the flow:
-
-<p style={{ textAlign: "center" }}>
-    <img src="/img/email_recovery_cryptography.png" alt="email recovery cryptography" />
-</p>
-
-Our email recovery flow works by anchoring recovery in a **target encryption key** (TEK). This target encryption key is a standard P-256 key pair and can be created in many ways: completely offline, or online inside of script using the web crypto APIs.
-
-The public part of this key pair is passed as a parameter inside of a signed `INIT_USER_EMAIL_RECOVERY` activity. The signature on the activity has to come from a user who is [authorized](#authorization) to initiate email recovery.
-
-Our enclave creates a fresh P256 key pair ("recovery credential") and encrypts the private key to the recovering user's TEK using the **Hybrid Public Key Encryption standard**, also known as **HPKE** or [RFC 9180](https://datatracker.ietf.org/doc/rfc9180/).
-
-Once the encrypted recovery credential is received via email, it's decrypted where the target public key was originally created. The recovery credential is then ready to be used to sign a `RECOVER_USER` activity, submitted to Turnkey.
