@@ -165,6 +165,6 @@ See [`attestation`](#attestation) above.
 
 See [`timeout`](#timeout) above.
 
-## `UserVerification`
+### `UserVerification`
 
 See [`UserVerification`](#userverification) above.
