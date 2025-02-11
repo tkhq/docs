@@ -13,7 +13,7 @@ Turnkey supports Solana address derivation with `ADDRESS_TYPE_SOLANA`. Solana ad
 
 ## Transaction construction and signing
 
-To construct and sign a Solana transaction we offer a `@turnkey/solana` NPM package. It offers a `TurnkeySigner` which integrates our remote signer with the official Solana [`web3js`](https://solana-labs.github.io/solana-web3.js/) library.
+To construct and sign a Solana transaction we offer a `@turnkey/solana` NPM package. It offers a `TurnkeySigner` which integrates our remote signer with the official Solana [`web3js`](https://github.com/anza-xyz/solana-web3.js) library.
 
 ## Transaction parsing, policies, and signing
 
