@@ -18,14 +18,14 @@ This GRPC error wraps what we call a Turnkey Error which looks something like:
 ```
 organization mismatch: request is targeting organization ("USER SUB ORG"), but voters are in organization ("OUR MAIN ORG")
 ```
-What is more important to you as a developer is the TurnkeyError. This will give you information about what error occured and how you can handle it. In fact, you should **not** perform error handling based on the GRPC code. More on that [here](#grpc-error-codes). This page enumerates all errors that might be received while using the Turnkey API and also provides information about causes for these errors and helpful troubleshooting tips.
+What is more important to you as a developer is the TurnkeyError. This will give you information about what error occured and how you can handle it. In fact, you should **not** perform error handling based on the GRPC code. These codes are meant to be used internally and will eventually be removed from our error responses. More on that [here](#grpc-error-codes). This page enumerates all errors that might be received while using the Turnkey API and also provides information about causes for these errors and helpful troubleshooting tips.
 
 ## All Error Codes for Actions
 
-The below table enumerates all errors across different actions that can be taken using the API. It contains both the GRPC codes as well as the HTTP codes corresponding with each error as well as the displayed error message. More on GRPC error codes below this table. Click on the message to view a details explanation of possible causes and trouble shooting tips for tha tspecific error
+The below table enumerates all errors across different actions that can be taken using the API. It contains both the GRPC codes as well as the HTTP codes corresponding with each error as well as the displayed error message. More on GRPC error codes below this table. Click on the message to view a details explanation of possible causes and trouble shooting tips for that specific error
 
 | GRPC Code | HTTP Code | Message |
-| ------ | -------- | --------- |
+| :----- | :------- | :-------- |
 | NotFound          | 404       | [no organization found with the given ID](#no-organization-found-with-the-given-id) |
 | InvalidArgument   | 400       | [malformed organization ID provided](#malformed-organization-id-provided) |
 | InvalidArgument   | 400       | [bad request body](#bad-request-body) |
@@ -116,21 +116,21 @@ Source: https://grpc.io/docs/guides/status-codes/
 
 ## Troubleshooting
 ### no organization found with the given ID
-Causes:
+Common causes:
 - An unknown organization ID was passed in a request made to the Turnkey API
   
 Troubleshooting Tips:
 - Confirm that you are using the proper Organization ID. All Turnkey resources are identified with a UUID, so confirm you are not passing a different resource's UUID as the organization ID in your request.
 ---
 ### malformed organization ID provided
-Causes:
+Common causes:
 - An improperly formatted organization ID UUID was passed in a request made to the Turnkey API
   
 Troubleshooting Tips:
 - Confirm the the UUID conforms to the UUID standard `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`
 ---
 ### bad request body
-Causes:
+Common causes:
 - A malformed request body was passed in a request made to the Turnky API
   
 Troubleshooting Tips:
@@ -163,14 +163,14 @@ Troubleshooting Tips:
 ```
 ---
 ### api operations disabled
-Causes:
+Common causes:
 - This error occurs if Turnkey disables API operations globally. 
   
 Troubleshooting Tips:
 - This situation will only happen in the most extreme case and should not be something you need to worry about.
 ---
 ### this organization cannot execute activities because it is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.
-Causes:
+Common causes:
 - This error could occur if you have exceeded your monthly signing quota. The first 25 signatures a month are free for "free" users.
 - This error could occur if you have reach a resource limit on a particular resource. You can find out about our resource limits [here](../getting-started/resource-limits.md).
   
@@ -178,8 +178,8 @@ Troubleshooting Tips:
 - If you need to increase your signature limit take a look at our [pricing page](https://www.turnkey.com/pricing) and contact us at help@turnkey.com!
 ---
 ### this sub-organization cannot execute activities because its parent is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.
-Causes:
-Causes:
+Common causes:
+Common causes:
 - This error could occur if you have exceeded your monthly signing quota. The first 25 signatures a month are free for "free" users.
 - This error could occur if you have reach a resource limit on a particular resource. You can find out about our resource limits [here](../getting-started/resource-limits.md).
   
@@ -187,21 +187,21 @@ Troubleshooting Tips:
 - If you need to increase your signature limit take a look at our [pricing page](https://www.turnkey.com/pricing) and contact us at help@turnkey.com!
 ---
 ### this organization cannot execute activities because it has been rate limited. Please reach out to the Turnkey team (help@turnkey.com) for more information.
-Causes:
+Common causes:
 - This error occurs if you have exceeded your rate limit. We need to maintain a per-customer rate limit to ensure that the service we provide to all of our customers service can be exceptional.
   
 Troubleshooting Tips:
 - If you are interested in increasing your rate limit reach out to us at help@turnkey.com!
 ---
 ### this sub-organization cannot execute activities because its parent has been rate limited. Please reach out to the Turnkey team (help@turnkey.com) for more information.
-Causes:
+Common causes:
 - This error occurs if you have exceeded your rate limit. We need to maintain a per-customer rate limit to ensure that the service we provide to all of our customers service can be exceptional.
   
 Troubleshooting Tips:
 - If you are interested in increasing your rate limit reach out to us at help@turnkey.com!
 ---
 ### request not authorized
-Causes:
+Common causes:
 - This error occurs when a user that created a request is not allowed to complete the action that was requested.
 - For example a parent-organization trying to create a wallet within a sub-organization that does not have a delegated access API key.
   
@@ -210,7 +210,7 @@ Troubleshooting Tips:
 - Confirm that all necessary [policies](../concepts/policy-management/Policy-overview.md) are in place so that the action that is requested can be performed.
 ---
 ### no valid authentication signature found for request
-Causes:
+Common causes:
 - This error occurs if no signature, or [stamp](../api-overview/stamps.md), is attached to a request. All requests made to Turnkey's api must be stamped so that Turnkey can authenticate and authorize the user who performed the request.
   
 Troubleshooting Tips:
@@ -218,7 +218,7 @@ Troubleshooting Tips:
 - At a base level our SDK's abstract away the complicated stamping process for you. [Here](https://github.com/tkhq/sdk/tree/main/examples) are some example projects with our JS/TS SDK to get you started!
 ---
 ### could not find public key in organization
-Causes:
+Common causes:
 - This occurs if the public key corresponding to the signature in a stamp is not found in the organization the request is targeting. This means that a request was formatted properly, but the authenticator used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -226,7 +226,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### failed while looking up public key in parent organization
-Causes:
+Common causes:
 - This occurs if the public key corresponding to the signature in a stamp is not found in the organization the request is targeting. This means that a request was formatted properly, but the authenticator used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -234,7 +234,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### could not find public key in organization or its parent organization
-Causes:
+Common causes:
 - This occurs if the public key corresponding to the signature in a stamp is not found in the organization the request is targeting. This means that a request was formatted properly, but the authenticator used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -242,7 +242,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### could not verify WebAuthN signature
-Causes:
+Common causes:
 - This error occurs when the signature used to create a stamp for a request cannot be verified for the organization the request is targeting. Again this means the request is formatted properly, but the authenticator used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -250,7 +250,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### credential ID could not be found in organization or its parent organization
-Causes:
+Common causes:
 - This error occurs when Turnkey cannot translate a public key obtained from a stamp that was created with a WebAuthn authenticator to a parent organization or one of its corresponding sub-organizations that the request was made for.
   
 Troubleshooting Tips:
@@ -258,7 +258,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### public key could not be found in organization or its parent organization
-Causes:
+Common causes:
 - This error occurs when Turnkey cannot translate a public key obtained from a stamp to a parent organization or one of its corresponding sub-organizations that the request was made for.
   
 Troubleshooting Tips:
@@ -266,7 +266,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### more than one suborg associated with a credential ID
-Causes:
+Common causes:
 - This error occurs for requests like [whoami](https://docs.turnkey.com/api#tag/Sessions/operation/GetWhoami). In particular this request tries to go backwards from the stamp to the public key then to a corresponding sub-orgnaization under a parent organization. If there are multiple sub-organizations with the same public key corresponding to an authenticator it is unknown who is initiating that particular request without more context.
   
 Troubleshooting Tips:
@@ -274,7 +274,7 @@ Troubleshooting Tips:
 - Avoid including the same authenticator in multiple sub-organizations
 ---
 ### more than one suborg associated with a public key
-Causes:
+Common causes:
 - This error occurs for requests like [whoami](https://docs.turnkey.com/api#tag/Sessions/operation/GetWhoami). In particular this request tries to go backwards from the stamp to the public key then to a corresponding sub-orgnaization under a parent organization. If there are multiple sub-organizations with the same public key it is unknown who is initiating that particular request without more context.
   
 Troubleshooting Tips:
@@ -282,7 +282,7 @@ Troubleshooting Tips:
 - Avoid including the same authenticator in multiple sub-organizations
 ---
 ### could not verify api key signature
-Causes:
+Common causes:
 - This error occurs when the signature used to create a stamp for a request cannot be verified for the organization the request is targeting. This means the request is formatted properly, but the api-key used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -290,7 +290,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the peroper organization.
 ---
 ### expired api key
-Causes:
+Common causes:
 - The API key used for the request has expired
   
 Troubleshooting Tips:
@@ -298,7 +298,7 @@ Troubleshooting Tips:
 - Create an API key that doesn't expire
 ---
 ### malformed activity stamp
-Causes:
+Common causes:
 - This error occurs when the stamp attached to a request is not formatted properly.
   
 Troubleshooting Tips:
@@ -306,7 +306,7 @@ Troubleshooting Tips:
 - At a base level our SDK's abstract away the complicated stamping process for you. [Here](https://github.com/tkhq/sdk/tree/main/examples) are some example projects with our JS/TS SDK to get you started!
 ---
 ### could not extract webauthn stamp
-Causes:
+Common causes:
 - This error occurs when a stamp is not attached to a request.
   
 Troubleshooting Tips:
@@ -314,7 +314,7 @@ Troubleshooting Tips:
 - At a base level our SDK's abstract away the complicated stamping process for you. [Here](https://github.com/tkhq/sdk/tree/main/examples) are some example projects with our JS/TS SDK to get you started!
 ---
 ### could not extract api key stamp
-Causes:
+Common causes:
 - This error occurs when a stamp is not attached to a request.
   
 Troubleshooting Tips:
@@ -322,7 +322,7 @@ Troubleshooting Tips:
 - At a base level our SDK's abstract away the complicated stamping process for you. [Here](https://github.com/tkhq/sdk/tree/main/examples) are some example projects with our JS/TS SDK to get you started!
 ---
 ### cannot authenticate public API activity request without a stamp (X-Stamp/X-Stamp-Webauthn header)
-Causes:
+Common causes:
 - This error occurs when a stamp is not attached to a request.
   
 Troubleshooting Tips:
@@ -330,7 +330,7 @@ Troubleshooting Tips:
 - At a base level our SDK's abstract away the complicated stamping process for you. [Here](https://github.com/tkhq/sdk/tree/main/examples) are some example projects with our JS/TS SDK to get you started!
 ---
 ### webauthn authenticator not found in organization
-Causes:
+Common causes:
 - This error occurs when the signature used to create a stamp for a request cannot be verified for the organization the request is targeting. This means the request is formatted properly, but the webauthn authenticator used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -338,7 +338,7 @@ Troubleshooting Tips:
 - Ensure that you are targeting the proper organization.
 ---
 ### webauthn authenticator not found in organization or parent organization
-Causes:
+Common causes:
 - This error occurs when the signature used to create a stamp for a request cannot be verified for the organization the request is targeting. This means the request is formatted properly, but the webauthn authenticator used to create the request is not associated with the organization that the request was made for.
   
 Troubleshooting Tips:
@@ -346,14 +346,14 @@ Troubleshooting Tips:
 - Ensure that you are targeting the proper organization.
 ---
 ### invalid payload encoding
-Causes:
+Common causes:
 - This error is specific to the [sign_raw_payload](https://docs.turnkey.com/api#tag/Signing/operation/SignRawPayload) endpoint. A valid encoding needs to be passed so that Turnkey can properly sign the requested message.
   
 Troubleshooting Tips:
 - Use a valid encoding scheme from the following: `PAYLOAD_ENCODING_HEXADECIMAL`, `PAYLOAD_ENCODING_TEXT_UTF8`
 ---
 ### invalid hash function
-Causes:
+Common causes:
 - This error is specific to the [sign_raw_payload](https://docs.turnkey.com/api#tag/Signing/operation/SignRawPayload) endpoint. A valid hash function needs to be passed so that Turnkey can properly hash and sign the requested message.
   
 Troubleshooting Tips:
@@ -362,7 +362,7 @@ Troubleshooting Tips:
 - More information about `HASH_FUNCTION_NOT_APPLICABLE` [here](../FAQ.md#what-is-hash_function_not_applicable-and-how-does-it-differ-from-hash_function_no_op)
 ---
 ### invalid magic link template
-Causes:
+Common causes:
 - This error occurs if the email template provided for specific activities is invalid.
   
 Troubleshooting Tips:
@@ -370,14 +370,14 @@ Troubleshooting Tips:
 - Reach out to Turnkey at help@turnkey.com!
 ---
 ### failed to get email template contents
-Causes:
+Common causes:
 - This error occurs if there was an error getting the email template for an associated activity
   
 Troubleshooting Tips:
 - Reach out to Turnkey at help@turnkey.com
 ---
 ### failed to unmarshal template variables
-Causes:
+Common causes:
 - This occurs if there are invalid template variables used in your email template.
   
 Troubleshooting Tips:
@@ -385,7 +385,7 @@ Troubleshooting Tips:
 - Reach out to Turnkey at help@turnkey.com!
 ---
 ### authentication failed
-Causes:
+Common causes:
 - This occurs if the user that performed the reuqest is not allowed to perform the action requested.
   
 Troubleshooting Tips:
@@ -393,14 +393,14 @@ Troubleshooting Tips:
 - Confirm that all necessary [policies](../concepts/policy-management/Policy-overview.md) are in place so that the action that is requested can be performed.
 ---
 ### failed to load organizations
-Causes:
+Common causes:
 - This error can occur if a request that is made targets an unknown organization ID.
   
 Troubleshooting Tips:
 - Ensure that the passed organization ID in the request is valid.
 ---
 ### policy label must be unique
-Causes:
+Common causes:
 - A new policy that is to be created shares the same name as a different policy. Policy names must be unique, and names in general must be unique per resource, so that they can be properly identified.
   
 Troubleshooting Tips:
@@ -409,64 +409,64 @@ Troubleshooting Tips:
 - Update the old policy to have a new name.
 ---
 ### invalid policy consensus
-Causes:
+Common causes:
 - This error occurs when an invalid consensus expression is passed. 
   
 Troubleshooting Tips:
 - Read more about policy structure [here](../concepts/policy-management/Policy-overview.md#policy-structure)
 ---
 ### invalid policy condition
-Causes:
-Causes:
+Common causes:
+Common causes:
 - This error occurs when an invalid condition expression is passed. 
   
 Troubleshooting Tips:
 - Read more about policy structure [here](../concepts/policy-management/Policy-overview.md#policy-structure)
 ---
 ### quorum threshold must be non-zero integer
-Causes:
+Common causes:
 - Quorum is the required amount of approvals by [root quorum members](../concepts/user-management/Root-quorum.md) needed for an action to take place within an organization.
   
 Troubleshooting Tips:
 - When creating a sub-organization or updating the root quroum amount, use a non-zero positive integer.
 ---
 ### quorum users missing
-Causes:
+Common causes:
 - This issue occurs when a user marked as part of the root quorum is missing from the set of users within an organization. This is a validation error that can occur when trying to delete a user that is part of the root quorum.
   
 Troubleshooting Tips:
 - Before deleting the user, remove them from the root quroum using [Update Root Quorum](https://docs.turnkey.com/api#tag/Organizations/operation/UpdateRootQuorum)
 ---
 ### invalid api key expiration
-Causes:
+Common causes:
 - An invalid expiration time was passed in for an api key's expiration time parameter when using [Create API Key](https://docs.turnkey.com/api#tag/API-Keys/operation/CreateApiKeys)
   
 Troubleshooting Tips:
 - The `expirationSeconds` parameter is passed as string of seconds of how long the key should last.
 ---
 ### missing parameter: user authenticator attestation
-Causes:
+Common causes:
 - This error occurs when an attestation parameter is not passed when performing a request regarding an authenticator. For example [Create Authenticators](https://docs.turnkey.com/api#tag/Authenticators/operation/CreateAuthenticators)
   
 Troubleshooting Tips:
 - An example of getting the correct parameters needed to use the Create Authenticators endpoint can be found within our [react-components](https://github.com/tkhq/sdk/blob/main/examples/react-components/src/app/dashboard/page.tsx) SDK example
 ---
 ### invalid authenticator attestation
-Causes:
+Common causes:
 - This error occurs when an attestation parameter is not valid when performing a request regarding an authenticator. For example [Create Authenticators](https://docs.turnkey.com/api#tag/Authenticators/operation/CreateAuthenticators)
   
 Troubleshooting Tips:
 - An example of getting the correct parameters needed to use the Create Authenticators endpoint can be found within our [react-components](https://github.com/tkhq/sdk/blob/main/examples/react-components/src/app/dashboard/page.tsx) SDK example
 ---
 ### missing parameter: user authenticator attestation auth data
-Causes:
+Common causes:
 - This error occurs when an attestation auth data parameter is not valid when performing a request regarding an authenticator. For example [Create Authenticators](https://docs.turnkey.com/api#tag/Authenticators/operation/CreateAuthenticators). This parameter is obtained as part of the attestation object.
   
 Troubleshooting Tips:
 - An example of getting the correct parameters needed to use the Create Authenticators endpoint can be found within our [react-components](https://github.com/tkhq/sdk/blob/main/examples/react-components/src/app/dashboard/page.tsx) SDK example
 ---
 ### user has exceeded maximum authenticators
-Causes:
+Common causes:
 - Turnkey allows for 10 authenticators per user. This is a hard resource limit. More information on resource limits [here](../getting-started/resource-limits.md).
   
 Troubleshooting Tips:
@@ -474,7 +474,7 @@ Troubleshooting Tips:
 - Create a new user within the same organization and attach the authenicator to that user.
 ---
 ### user has exceeded maximum long-lived api keys
-Causes:
+Common causes:
 - Turnkey allows for 10 long-lived api keys per user. This is a hard resource limit. More information on resource limits [here](../getting-started/resource-limits.md).
   
 Troubleshooting Tips:
@@ -482,8 +482,8 @@ Troubleshooting Tips:
 - Create a new user within the same organization and attach the API key to that user.
 ---
 ### user has exceeded maximum short-lived api keys
-Causes:
-Causes:
+Common causes:
+Common causes:
 - Turnkey allows for 10 short-lived api keys per user. This is a hard resource limit. More information on resource limits [here](../getting-started/resource-limits.md). Short-lived API keys will automatically be deleted from an organization when they are expired.
   
 Troubleshooting Tips:
@@ -491,22 +491,22 @@ Troubleshooting Tips:
 - Create a new user within the same organization and attach the API key to that user.
 ---
 ### missing wallet params
-Causes:
+Common causes:
 - 
   
 Troubleshooting Tips:
 - 
 ---
 ### invalid path format
-Causes:
+Common causes:
 - This error occurs when an invalid path format parameter is passed to a request like [Create Wallet Accounts](https://docs.turnkey.com/api#tag/Wallets/operation/CreateWalletAccounts).
   
 Troubleshooting Tips:
 - For now the path format must be: `PATH_FORMAT_BIP32`.
 ---
 ### invalid path
-Causes:
-Causes:
+Common causes:
+Common causes:
 - This error occurs when an invalid path parameter is passed to a request like [Create Wallet Accounts](https://docs.turnkey.com/api#tag/Wallets/operation/CreateWalletAccounts). Paths cannot be reused within the same HD wallet.
   
 Troubleshooting Tips:
@@ -514,7 +514,7 @@ Troubleshooting Tips:
 - Paths cannot be reused within the same HD wallet.
 ---
 ### invalid address format
-Causes:
+Common causes:
 - This error occurs when an invalid address format parameter is passed to a request like [Create Wallet Accounts](https://docs.turnkey.com/api#tag/Wallets/operation/CreateWalletAccounts).
   
 Troubleshooting Tips:
@@ -522,7 +522,7 @@ Troubleshooting Tips:
 - More about Turnkey and general ecosystem support can be found [here](https://docs.turnkey.com/documentation/ecosystem-integrations/).
 ---
 ### invalid curve
-Causes:
+Common causes:
 - This error occurs when an invalid curve parameter is passed to a request like [Create Wallet Accounts](https://docs.turnkey.com/api#tag/Wallets/operation/CreateWalletAccounts).
   
 Troubleshooting Tips:
@@ -530,7 +530,7 @@ Troubleshooting Tips:
 - More about Turnkey and general ecosystem support can be found [here](https://docs.turnkey.com/documentation/ecosystem-integrations/).
 ---
 ### curve required
-Causes:
+Common causes:
 - This error occurs when a curve parameter is not passed to a request like [Create Wallet Accounts](https://docs.turnkey.com/api#tag/Wallets/operation/CreateWalletAccounts).
   
 Troubleshooting Tips:
@@ -538,17 +538,17 @@ Troubleshooting Tips:
 - More about Turnkey and general ecosystem support can be found [here](https://docs.turnkey.com/documentation/ecosystem-integrations/).
 ---
 ### No activity found with fingerprint. Consensus activities must target an existing activity by fingerprint
-Causes:
+Common causes:
 - This error occurs during the [Approve/Reject Activity](https://docs.turnkey.com/api#tag/Consensus/operation/ApproveActivity) activity. A parameter passed into this activity is the fingerprint of the activity that is to be approved or rejected. If the fingerprint is not one of a valid activity this error occurs.
   
 Troubleshooting Tips:
 - Confirm that a valid fingerprint is passed as part of this activity. 
 ---
 ### internal server error
-Causes:
+Common causes:
 - This error is thrown for a variety of internal server errors that are not due to user error. These activities will have an error id passed with them like: `internal server error (9fbfda54-7141-4192-ae72-8bac3512149a)`
   
 Troubleshooting Tips:
-- Retry the activity, this could be a fluke case and the following activity could pass without failure.
+- Retry the activity. This could be a fluke case and the following activity could pass without failure.
 - If you think there is problem, or your service is degraded please reach out to Turnkey help@turnkey.com and provide the error id in the error message.
 ---
