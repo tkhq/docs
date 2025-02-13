@@ -12,29 +12,30 @@ That said, we have built out several example services and applications to help i
 
 ## Code Examples
 
-| Example                                                                                              | Description                                                                                                                                           |
-| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`demo-consumer-wallet`](https://github.com/tkhq/demo-consumer-wallet)                               | A minimal consumer wallet app powered by Turnkey and WalletConnect                                                                                    |
-| [`demo-embedded-wallet`](https://github.com/tkhq/demo-embedded-wallet)                               | A minimal consumer wallet app powered by Turnkey and passkeys                                                                                         |
-| [`demo-ethers-passkeys`](https://github.com/tkhq/demo-ethers-passkeys)                               | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                                                    |
-| [`demo-viem-passkeys`](https://github.com/tkhq/demo-viem-passkeys)                                   | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                                                      |
-| [`passkeyapp`](https://github.com/tkhq/passkeyapp)                                                   | A React Native + Expo app powered by Turnkey and passkeys                                                                                             |
-| [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                               | Compile and deploy a smart contract                                                                                                                   |
-| [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer/)                           | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users                                       |
-| [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                 | Sweep funds from one address to a different address                                                                                                   |
-| [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner/)                   | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap                           |
-| [`wallet-export`](https://github.com/tkhq/sdk/tree/main/examples/wallet-export/)                     | A NextJS app that demonstrates how to use `@turnkey/iframe-stamper` to export a wallet as a mnemonic                                                  |
-| [`with-bitcoin`](https://github.com/tkhq/sdk/tree/main/examples/with-bitcoin)                        | Construct, sign, and broadcast a Bitcoin transaction using Turnkey                                                                                    |
-| [`with-ethers`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/)                         | Create a new Ethereum address, then sign and broadcast a transaction using the Ethers signer with Infura                                              |
-| [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem/)                             | Sign and broadcast a transaction using the Turnkey Custom Account and Infura                                                                          |
-| [`with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs/)                         | Create a new Cosmos address, then sign and broadcast a transaction on Celestia testnet using the CosmJS signer                                        |
-| [`with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider/)   | Example using a Turnkey-compatible Ethereum provider that adheres to the EIP-1193 standards                                                           |
-| [`with-solana`](https://github.com/tkhq/sdk/tree/main/examples/with-solana/)                         | Create a new Solana address, then sign and broadcast a transaction on Solana’s devnet. Also includes SPL token creation + transfer, and Jupiter swaps |
-| [`with-gnosis`](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis/)                         | Create new Ethereum addresses, configure a 3/3 Gnosis safe, and create + execute a transaction from it                                                |
-| [`with-uniswap`](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap/)                       | Sign and broadcast a Uniswap v3 trade using the Ethers signer with Infura                                                                             |
-| [`with-nonce-manager`](https://github.com/tkhq/sdk/tree/main/examples/with-nonce-manager/)           | Create a new Ethereum address, then sign and broadcast multiple transactions in a sequential or optimistic manner                                     |
-| [`with-offline`](https://github.com/tkhq/sdk/tree/main/examples/with-offline/)                       | Sign a Turnkey request in offline context                                                                                                             |
-| [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys/) | A NextJS app that demonstrates how to use Turnkey to build a federated, webauthn powered authentication flow                                          |
+| Example                                                                                              | Description                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`demo-consumer-wallet`](https://github.com/tkhq/demo-consumer-wallet)                               | A minimal consumer wallet app powered by Turnkey and WalletConnect                                                                                                                       |
+| [`demo-embedded-wallet`](https://github.com/tkhq/demo-embedded-wallet)                               | A minimal consumer wallet app powered by Turnkey and passkeys                                                                                                                            |
+| [`demo-ethers-passkeys`](https://github.com/tkhq/demo-ethers-passkeys)                               | A NextJS app that demonstrates how to use `@turnkey/ethers` to build a passkey-powered application                                                                                       |
+| [`demo-viem-passkeys`](https://github.com/tkhq/demo-viem-passkeys)                                   | A NextJS app that demonstrates how to use `@turnkey/viem` to build a passkey-powered application                                                                                         |
+| [`react-native-demo-wallet`](https://github.com/tkhq/react-native-demo-wallet)                       | A React Native app that demonstrates how to use the Turnkey's JavaScript packages in a mobile environment to authenticate users, create wallets, export wallets, sign messages, and more |
+| [`flutter-demo-app`](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app)           | A Flutter app that demonstrates how to use the Turnkey's Flutter packages to authenticate users, create wallets, export wallets, sign messages, and more                                 |
+| [`deployer`](https://github.com/tkhq/sdk/tree/main/examples/deployer/)                               | Compile and deploy a smart contract                                                                                                                                                      |
+| [`rebalancer`](https://github.com/tkhq/sdk/tree/main/examples/rebalancer/)                           | A demo application which showcases an example of how to use Turnkey for managing multiple types of keys & users                                                                          |
+| [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/sweeper/)                                 | Sweep funds from one address to a different address                                                                                                                                      |
+| [`trading-runner`](https://github.com/tkhq/sdk/tree/main/examples/trading-runner/)                   | A sample application demonstrating a trading operation, using various private keys, users, and policies, powered by Uniswap                                                              |
+| [`wallet-export`](https://github.com/tkhq/sdk/tree/main/examples/wallet-export/)                     | A NextJS app that demonstrates how to use `@turnkey/iframe-stamper` to export a wallet as a mnemonic                                                                                     |
+| [`with-bitcoin`](https://github.com/tkhq/sdk/tree/main/examples/with-bitcoin)                        | Construct, sign, and broadcast a Bitcoin transaction using Turnkey                                                                                                                       |
+| [`with-ethers`](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/)                         | Create a new Ethereum address, then sign and broadcast a transaction using the Ethers signer with Infura                                                                                 |
+| [`with-viem`](https://github.com/tkhq/sdk/tree/main/examples/with-viem/)                             | Sign and broadcast a transaction using the Turnkey Custom Account and Infura                                                                                                             |
+| [`with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs/)                         | Create a new Cosmos address, then sign and broadcast a transaction on Celestia testnet using the CosmJS signer                                                                           |
+| [`with-eip-1193-provider`](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider/)   | Example using a Turnkey-compatible Ethereum provider that adheres to the EIP-1193 standards                                                                                              |
+| [`with-solana`](https://github.com/tkhq/sdk/tree/main/examples/with-solana/)                         | Create a new Solana address, then sign and broadcast a transaction on Solana’s devnet. Also includes SPL token creation + transfer, and Jupiter swaps                                    |
+| [`with-gnosis`](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis/)                         | Create new Ethereum addresses, configure a 3/3 Gnosis safe, and create + execute a transaction from it                                                                                   |
+| [`with-uniswap`](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap/)                       | Sign and broadcast a Uniswap v3 trade using the Ethers signer with Infura                                                                                                                |
+| [`with-nonce-manager`](https://github.com/tkhq/sdk/tree/main/examples/with-nonce-manager/)           | Create a new Ethereum address, then sign and broadcast multiple transactions in a sequential or optimistic manner                                                                        |
+| [`with-offline`](https://github.com/tkhq/sdk/tree/main/examples/with-offline/)                       | Sign a Turnkey request in offline context                                                                                                                                                |
+| [`with-federated-passkeys`](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys/) | A NextJS app that demonstrates how to use Turnkey to build a federated, webauthn powered authentication flow                                                                             |
 
 ## Demos built with Turnkey
 
@@ -136,7 +137,6 @@ This example demonstrates how to leverage Turnkey’s secure key management and 
   />
 </p>
 
-
 #### How Infinex Leverages Turnkey and Gelato
 
 Infinex, a platform designed to unify the decentralized ecosystem and applications under a single UX layer, eliminates the complexities of navigating fragmented crypto protocols. By integrating **Turnkey** and **Gelato**, Infinex delivers a seamless, secure, and cost-efficient experience for decentralized finance users.
@@ -147,15 +147,26 @@ Infinex, a platform designed to unify the decentralized ecosystem and applicatio
 
 The synergy between Turnkey and Gelato allows Infinex to offer an intuitive, cost-free user experience while maintaining the highest standards of security and scalability.
 
+### React Native Demo App ([code](https://github.com/tkhq/react-native-demo-wallet))
 
-### React Native Demo App ([code](https://github.com/tkhq/passkeyapp))
-
-A simple React Demo app that demonstrates sign up and sign in with passkeys, as well as Email Auth and SMS support.
+A React Native app that demonstrates how to use the Turnkey's JavaScript packages in a mobile environment to authenticate users, create wallets, export wallets, sign messages, and more
 
 <p style={{ textAlign: "center" }}>
-  <video controls width="800px" style={{ borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}>
+  <video controls width="400px" style={{ borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}>
     <source src="https://github.com/tkhq/react-native-demo-wallet/raw/refs/heads/main/assets/videos/demo_video.mov"/>
   </video>
 </p>
 
 See https://github.com/tkhq/react-native-demo-wallet for the code.
+
+### Flutter Demo App ([code](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app))
+
+A Flutter app that demonstrates how to use the Turnkey's Flutter packages to authenticate users, create wallets, export wallets, sign messages, and more
+
+<p style={{ textAlign: "center" }}>
+  <video controls width="400px" style={{ borderRadius: "4px", boxShadow: "0 2px 5px 0 #0003" }}>
+    <source src="https://github.com/tkhq/dart-sdk/raw/refs/heads/main/examples/flutter-demo-app/assets/videos/flutter-demo.mov"/>
+  </video>
+</p>
+
+See https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app for the code
