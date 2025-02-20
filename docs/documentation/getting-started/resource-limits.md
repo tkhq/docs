@@ -23,6 +23,7 @@ Currently, the resource limits within a single organization are as follows:
 | API keys per user (long-lived) |              10              |            10             |
 | API keys per user (expiring)   |              10              |            10             |
 | Sub-Organizations              |          unlimited           |             0             |
+| OAuth providers                |              10              |             10            |
 
 Note that if you create an expiring API key that would exceed the limit above, Turnkey automatically deletes one of your existing keys using the following priority:
 
