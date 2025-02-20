@@ -50,6 +50,7 @@ Our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcl
 - [WebAuthn Stamper](https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper)
 - [React Native Stamper](https://github.com/tkhq/sdk/tree/main/packages/react-native-passkey-stamper)
 - [iFrame Stamper](https://github.com/tkhq/sdk/tree/main/packages/iframe-stamper)
+- [Telegram Cloud Storage Stamper](https://github.com/tkhq/sdk/tree/main/packages/telegram-cloud-storage-stamper)
 - [CLI](https://github.com/tkhq/tkcli/blob/main/src/cmd/turnkey/pkg/request.go)
 
 Our CLI has a `--no-post` option to generate stamps without sending anything over the network. This is a useful tool should you have trouble with debugging stamping-related logic. A sample command might look something like:
