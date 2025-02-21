@@ -71,7 +71,7 @@ Reach out to our team (<hello@turnkey.com>) for additional guidance.
 
 ### Are there limits on how many resources I can create, or activities I can execute?
 
-See [resource limits](./getting-started/resource-limits).
+See [resource limits](/concepts/resource-limits).
 
 ### Do you have any rate limits in place in your public API?
 
@@ -91,15 +91,15 @@ Please get in touch with us (<help@turnkey.com>) if you need this limit adjusted
 
 ### Does Turnkey support Ethereum (EVM)?
 
-Yes! See [Ethereum (EVM) support on Turnkey](./ecosystem-integrations/ethereum.md) for more information and concrete examples.
+Yes! See [Ethereum (EVM) support on Turnkey](/ecosystems/ethereum) for more information and concrete examples.
 
 ### Does Turnkey support Solana (SVM)?
 
-Yes! See [Solana (SVM) support on Turnkey](./ecosystem-integrations/solana.md) for more information and concrete examples.
+Yes! See [Solana (SVM) support on Turnkey](/ecosystems/solana) for more information and concrete examples.
 
 ### Does Turnkey support Bitcoin?
 
-Yes! See [Bitcoin support on Turnkey](./ecosystem-integrations/bitcoin.md) for more information and concrete examples.
+Yes! See [Bitcoin support on Turnkey](/ecosystems/bitcoin) for more information and concrete examples.
 
 ### Which cryptographic curves do you support?
 
@@ -107,9 +107,9 @@ Turnkey currently supports SECP256k1 and Ed25519.
 
 ### Which ecosystems and chains do you support?
 
-Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. Our approach to supporting assets is tiered, see [this page](./ecosystem-integrations/index.md) for more information.
+Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. Our approach to supporting assets is tiered, see [this page](/ecosystems/framework) for more information.
 
-We have deeper support for [Ethereum](./ecosystem-integrations/ethereum.md), [Solana](./ecosystem-integrations/solana.md), and [Bitcoin](./ecosystem-integrations/bitcoin.md).
+We have deeper support for [Ethereum](/ecosystems/ethereum), [Solana](/ecosystems/solana), and [Bitcoin](/ecosystems/bitcoin).
 
 If there are specific ecosystems or chains you'd like to see us offer deeper support for, please let us know by contacting us at <hello@turnkey.com>, on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-2837d2isy-gbH60kJ~XnXSSFHiqVOrqw).
 

@@ -8,11 +8,11 @@ slug: /embedded-wallets/sub-organizations-as-wallets
 
 Turnkey has built a new model for private key management that utilizes secure enclaves. All transactions are signed within an enclave and private keys are never exposed to Turnkey, your software, or your team. Turnkey’s role is similar to that of a safety deposit box operator — Turnkey secures and provides access to the safety deposit boxes, but our system requires cryptographic proof of ownership to take any action with the keys held within.
 
-We've seen in [Sub-Organizations](/concepts/Sub-Organizations) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as embedded wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
+We've seen in [Sub-Organizations](/concepts/sub-organizations) that sub-organizations are independent from their parent. This guide walks through 3 ways to use sub-organizations as embedded wallets for your users. We first show that it can be used to create non-custodial wallets, or end-user controlled wallets. Then we explain how you can create custodial wallets or shared custody wallets using the same primitive.
 
 ## Sub-Organizations as end-user controlled wallets
 
-In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](/passkeys/introduction) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing. Your application will construct transactions on behalf of the end-user, and then surface the relevant Turnkey activity request client-side for end-user approval.
+In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](/authentication/passkeys/introduction) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing. Your application will construct transactions on behalf of the end-user, and then surface the relevant Turnkey activity request client-side for end-user approval.
 
 Note that Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
 
@@ -107,7 +107,7 @@ const stamper = new WebAuthnStamper({
 // New HTTP client able to sign with passkeys!
 const httpClient = new TurnkeyClient(
   { baseUrl: "https://api.turnkey.com" },
-  stamper,
+  stamper
 );
 
 // Signs and sends a request to Turnkey
