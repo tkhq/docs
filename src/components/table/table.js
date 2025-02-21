@@ -11,7 +11,7 @@ export default function Table({ referenceType, columnHeadings, tableRows }) {
               className={`column-heading ${referenceType} bold`}
               key={`${headingIndex}`}
             >
-              <a href={heading?.url}>{heading?.text}</a>
+              {heading?.text}
             </div>
           );
         })}
