@@ -1,13 +1,16 @@
 import React from "react";
 import "./table.css";
 
-export default function Table({ children, style, columnHeadings, tableRows }) {
+export default function Table({ referenceType, columnHeadings, tableRows }) {
   return (
-    <div className="table-wrapper">
-      <div className="column-headings">
+    <div className={`table-wrapper ${referenceType}`}>
+      <div className={`column-headings ${referenceType}`}>
         {columnHeadings.map((heading, headingIndex) => {
           return (
-            <div className="column-heading bold" key={`${headingIndex}`}>
+            <div
+              className={`column-heading ${referenceType} bold`}
+              key={`${headingIndex}`}
+            >
               <a href={heading?.url}>{heading?.text}</a>
             </div>
           );
@@ -19,7 +22,7 @@ export default function Table({ children, style, columnHeadings, tableRows }) {
           <div key={tableRowIndex} className="table-row">
             {tableRow.map((row, rowIndex) => {
               return (
-                <div key={rowIndex} className="table-cell">
+                <div key={rowIndex} className={`table-cell ${referenceType}`}>
                   {row}
                 </div>
               );
