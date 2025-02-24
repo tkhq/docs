@@ -13,7 +13,7 @@ Before deploying your Turnkey integration in production, take a look at our reco
 - Many of our customers prefer to maintain separate Development and Production [organizations](/concepts/organizations). If you choose to do so, ensure your production environment is referencing the correct organization ID.
 - Ensure you have an active subscription via the Account Settings page in the Turnkey dashboard.
 - If you are on an Enterprise plan, confirm your production organization ID with your account rep.
-- Double check our [resource limits](../getting-started/resource-limits.md) and [rate limits](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) to ensure your implementation will not trigger these limits at production scale.
+- Double check our [resource limits](/concepts/resource-limits) and [rate limits](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) to ensure your implementation will not trigger these limits at production scale.
 
 ## Security
 

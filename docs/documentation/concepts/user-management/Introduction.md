@@ -6,7 +6,7 @@ slug: /concepts/users/introduction
 
 # Introduction to users
 
-Turnkey users are resources within organizations or sub-organizations that can submit activities to Turnkey via a valid credential (e.g., API key, passkey). These requests can be made either by making direct API calls or through the Turnkey Dashboard. Users must have at least one valid credential (one of API key, passkey), with upper limits on credentials defined here in our [resource limits](https://docs.turnkey.com/getting-started/resource-limits). Users can also have associated “tags” which are logical groupings that can be referenced in policies. Users can only submit activities within their given organization — they cannot take action across organizations. 
+Turnkey users are resources within organizations or sub-organizations that can submit activities to Turnkey via a valid credential (e.g., API key, passkey). These requests can be made either by making direct API calls or through the Turnkey Dashboard. Users must have at least one valid credential (one of API key, passkey), with upper limits on credentials defined here in our [resource limits](/concepts/resource-limits). Users can also have associated “tags” which are logical groupings that can be referenced in policies. Users can only submit activities within their given organization — they cannot take action across organizations.
 
 A User's attributes are:
 

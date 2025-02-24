@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
-description: Learn about Organizations on Turnkey
+sidebar_label: Organizations
+description: Understanding Turnkey organizations
 slug: /concepts/organizations
 ---
 
@@ -44,7 +45,7 @@ All activity requests are subject to enforcement by Turnkey's policy engine. The
 
 ## Resource Limits
 
-Organizations have [resource limits](../getting-started/resource-limits.md) for performance and security considerations. If you're bumping into these limits, check out sub-organizations below.
+Organizations have [resource limits](/concepts/resource-limits) for performance and security considerations. If you're bumping into these limits, check out sub-organizations below.
 
 ## Sub-Organizations
 

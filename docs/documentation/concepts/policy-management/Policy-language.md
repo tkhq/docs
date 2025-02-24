@@ -1,4 +1,5 @@
 ---
+sidebar_position: 5
 description: A guide to authoring policies with our policy lanugage
 slug: /concepts/policies/language
 sidebar_label: Language

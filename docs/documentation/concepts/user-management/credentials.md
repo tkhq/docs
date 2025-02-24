@@ -11,7 +11,7 @@ Credentials represent ways for Users to authenticate to Turnkey. All Turnkey Cre
 - Authenticators
 - API Keys
 
-Note that every Turnkey user needs at least one long-lived credential (a passkey, or non-expiring API key). This is to prevent users from getting locked out of their accounts. The exception is if the user belongs to a suborg, and [Email Auth](/features/email-auth) is enabled for that sub-organization.
+Note that every Turnkey user needs at least one long-lived credential (a passkey, or non-expiring API key). This is to prevent users from getting locked out of their accounts. The exception is if the user belongs to a suborg, and [Email Auth](/authentication/email) is enabled for that sub-organization.
 
 ### Authenticators
 

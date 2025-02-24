@@ -88,15 +88,9 @@ const config = {
         items: [
           {
             type: "doc",
-            docId: "overview",
+            docId: "welcome",
             position: "left",
             label: "Documentation",
-          },
-          {
-            to: "/getting-started/quickstart",
-            label: "Quickstart",
-            position: "left",
-            activeBaseRegex: "/docs/getting-started/quickstart/", // Regex to explicitly match only this path
           },
           {
             type: "doc",
@@ -114,11 +108,6 @@ const config = {
             position: "left",
             label: "API Reference",
             to: "/api",
-          },
-          {
-            position: "left",
-            label: "Changelog",
-            to: "/changelog",
           },
           // {to: '/blog', label: 'Blog', position: 'left'},
           {
