@@ -1,0 +1,104 @@
+---
+title: "Authenticate a User with Email"
+mode: wide
+---
+
+<Steps>
+<Step title="Initialize Turnkey">
+
+```JavaScript
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+```
+</Step>
+
+<Step title="Initialize the Iframe Client">
+
+Note that the iframe client must be initialized with the dom element where the iframe will be injected. If you are using the [react-sdk](/sdks/react) you can import the `iframeClient` from the `useTurnkey()` hook without this step and the iframe dom element will be managed for you. Note that the `iframeClient` must be initialized before calling `emailAuth` because you need the `iframePublicKey` as a parameter to the `emailAuth` call.
+
+```JavaScript
+import { Turnkey, TurnkeySDKBrowserConfig } from "@turnkey/sdk-browser";
+
+const turnkeyConfig: TurnkeySDKBrowserConfig = {...};
+const turnkey = new Turnkey(turnkeyConfig);
+
+const iframeContainerId = "turnkey-auth-iframe-container-id";
+
+// ensure the HTML element exists somewhere in the rendered DOM
+<div id={iframeContainerId} />
+
+const iframeClient = await turnkey.iframeClient(document.getElementById(iframeContainerId))
+```
+</Step>
+
+<Step title="Call emailAuth from your backend">
+
+```JavaScript
+await turnkey.serverSign(
+  "emailAuth",
+  [{
+    email: <userEmail>,
+    targetPublicKey: iframeClient.iframePublicKey,
+    organizationId: <userSubOrganizationId>
+  }]
+)
+```
+
+If you need to lookup the user `subOrganizationId` by email, you can call the `getSubOrgIds` method with the `filterType` parameter set to `"EMAIL"`
+
+```JavaScript
+const subOrgIds = await turnkey.serverSign(
+  "getSubOrgIds",
+  [{
+    filterType: "EMAIL",
+    filterValue: <userEmail>
+  }]
+)
+
+const userSubOrganizationId = subOrgIds.organizationIds[0];
+```
+</Step>
+
+<Step title="Inject the emailed credentialBundle into the iframe to authenticate the user">
+
+```JavaScript
+const authenticationResponse =
+  await iframeClient.injectCredentialBundle(credentialBundle);
+if (authenticationResponse) {
+  // user is authenticated and can perform actions from the `iframeClient`
+  await iframeClient.login();
+  navigate("/authenticated-route");
+} else {
+  // credential bundle does not match emailed credential
+  navigate("/not-authenticated-route");
+}
+```
+
+</Step>
+
+<Step title="Make read requests on behalf of the authenticated user from the currentUserSession">
+
+```JavaScript
+const currentUserSession = await turnkey.currentUserSession();
+const walletsResponse = await currentUserSession.getWallets();
+const walletName = walletsResponse.wallets[0].walletName;
+```
+
+</Step>
+
+<Step title="Call the `iframeClient` directly for write requests">
+
+```JavaScript
+import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+const newWalletResponse = await iframeClient.createWallet({
+  walletName: "New Wallet for User",
+  accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+});
+```
+
+</Step>
+</Steps>

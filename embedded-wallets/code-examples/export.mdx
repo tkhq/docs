@@ -1,0 +1,623 @@
+---
+title: "Export Wallet or Private Key"
+description: "This is a guide to exporting your wallet or private key from Turnkey. For more information about the security of this flow, check out [Enclave secure channels](/security/enclave-secure-channels)."
+---
+
+## Implementation guides
+
+Follow along with the Turnkey CLI, Embedded iframe, NodeJS, and Local Storage guides.
+
+### CLI
+
+Install the latest version of Turnkey CLI to access the new import functionality. You can find detailed instructions for installation [here](https://github.com/tkhq/tkcli).
+
+#### Steps
+
+<Steps>
+<Step title="Export a wallet (Turnkey activity)">
+
+```bash
+turnkey wallets export --name "New Wallet" -k <your Turnkey API key name> --organization <your organization ID> --export-bundle-output <path to your export bundle> --host api.turnkey.com
+```
+
+* The `--export-bundle-output` (required) flag is the desired output file path for the “encrypted bundle” that will be returned by Turnkey. This bundle contains the encrypted key material.
+
+</Step>
+
+<Step title="Decrypt the bundle">
+
+```bash
+turnkey decrypt --export-bundle-input <path to your export bundle> --organization <your organization ID> --signer-quorum-key 04bce6666ca6c12e0e00a503a52c301319687dca588165b551d369496bd1189235bd8302ae5e001fde51d1e22baa1d44249f2de9705c63797316fc8b7e3969a665>> "<redacted mnemonic>"
+```
+
+* The `--export-bundle-input` (required) flag is the file path for the “encrypted bundle” (from the previous step) that will be decrypted.
+* The `--signer-quorum-key` is the public key of Turnkey's signer enclave. This is a static value.
+
+Congrats! You've exported your wallet
+
+</Step>
+</Steps>
+
+#### Private Key support
+
+<Steps>
+<Step title="Export a wallet (Turnkey activity)">
+
+```bash
+turnkey private-keys export --name "New Private Key" -k <your local encryption key> --organization <your organization ID> --export-bundle-output <path to your export bundle> --host api.turnkey.com
+```
+
+* The `--export-bundle-output` (required) flag is the desired output file path for the “encrypted bundle” that will be returned by Turnkey. This bundle contains the encrypted key material.
+
+</Step>
+
+<Step title="Decrypt the bundle">
+
+```bash
+turnkey decrypt --export-bundle-input <path to your export bundle> --organization <your organization ID> --signer-quorum-key 04bce6666ca6c12e0e00a503a52c301319687dca588165b551d369496bd1189235bd8302ae5e001fde51d1e22baa1d44249f2de9705c63797316fc8b7e3969a665>> "<redacted private key>"
+```
+
+* The `--export-bundle-input` (required) flag is the file path for the “encrypted bundle” (from the previous step) that will be decrypted.
+* The `--signer-quorum-key` is the public key of Turnkey's signer enclave. This is a static value.
+
+Congrats! You've exported your private key 🎉
+
+</Step>
+</Steps>
+
+### Embedded iframe
+
+* We have released open-source code to create target encryption keys and decrypt exported wallet mnemonics. We've deployed a static HTML page hosted on `export.turnkey.com` meant to be embedded as an iframe element (see the code [here](https://github.com/tkhq/frames)). This ensures the mnemonics are encrypted to keys that the user has access to, but that your organization does not (because they live in the iframe, on a separate domain).
+* We have also built a package to help you insert this iframe and interact with it in the context of export: [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper)
+
+In the rest of this guide we'll assume you are using these helpers.
+
+#### Steps
+
+Here's a diagram summarizing the wallet export flow step-by-step
+([direct link](/assets/files/wallet_export_steps-5bb19c72eb9596fab8db3b1dcc52e60a.png)):
+
+<Frame>
+   <img src="/images/embedded-wallets/code-examples/img/wallet_export_steps.png" alt="wallet export steps" />
+</Frame>
+
+Let's review these steps in detail:
+<Steps>
+   <Step>
+   When a user on your application clicks "export", display a new export UI. We recommend setting this export UI as a new hosted page of your application that contains language explaining the security best practices users should follow once they've successfully exported their wallet. Remember: once the wallet has been exported, Turnkey can no longer ensure its security.
+
+   While the UI is in a loading state, your application uses [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper) to insert a new iframe element:
+
+   ```ts
+   const iframeStamper = new IframeStamper({
+   iframeUrl: "https://export.turnkey.com",
+   // Configure how the iframe element is inserted on the page
+   iframeContainer: yourContainer,
+   iframeElementId: "turnkey-iframe",
+   });
+
+   // Inserts the iframe in the DOM. This creates the new encryption target key
+   const publicKey = await iframeStamper.init();
+
+   // Set state to not display iframe
+   let displayIframe = "none";
+
+   return (
+   // The iframe element can be hidden until the wallet is exported
+   <div style={{ display: displayIframe }} />
+   );
+   ```
+</Step>
+
+<Step>
+Your code receives the iframe public key. Your application prompts the user to sign a new `EXPORT_WALLET` activity with the wallet ID and the iframe public key in the parameters.
+</Step>
+
+<Step>
+Your application polls for the activity response, which contains an export bundle. Remember: this export bundle is an encrypted mnemonic which can only be decrypted within the iframe.
+
+   Need help setting up async polling? Checkout our guide and helper [here](https://github.com/tkhq/sdk/tree/main/packages/http#withasyncpolling-helper).
+
+</Step>
+
+<Step>
+Your application injects the export bundle into the iframe for decryption and displays the iframe upon success:
+
+   ```ts
+   // Inject export bundle into iframe
+   let success = await iframeStamper.injectWalletExportBundle(exportBundle);
+
+   if (success !== true) {
+   throw new Error("unexpected error while injecting export bundle");
+   }
+
+   // If successfully injected, update the state to display the iframe
+   iframeDisplay = "block";
+   ```
+
+Export is complete! The iframe now displays a sentence of words separated by spaces.
+
+<Frame>
+   <img src="/images/embedded-wallets/code-examples/img/wallet_export_mnemonic.png" alt="wallet mnemonic" />
+</Frame>
+
+The exported wallet will remain stored within Turnkey’s infrastructure. In your Turnkey dashboard, the exported user Wallet will be flagged as “Exported”.
+</Step>
+</Steps>
+
+#### Export as Private Keys
+
+Turnkey also supports exporting Wallet Accounts and Private Keys as private keys.
+
+##### Wallet Accounts
+
+Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_WALLET_ACCOUNT` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper).
+
+##### Private Keys
+
+Follow the same steps above for exporting Wallets as mnemonics, but instead use the `EXPORT_PRIVATE_KEY` activity and the `injectKeyExportBundle` method from the [`@turnkey/iframe-stamper`](https://www.npmjs.com/package/@turnkey/iframe-stamper). You can pass an optional `keyFormat` to `injectKeyExportBundle(keyFormat)` that will apply either `hexadecimal` or `solana` formatting to the private key that is exported in the iframe. The default key format is `hexadecimal`, which is used by MetaMask, MyEtherWallet, Phantom, Ledger, and Trezor for Ethereum keys. For Solana keys, you will need to pass the `solana` key format.
+
+<Frame>
+   <img src="/images/embedded-wallets/code-examples/img/private_key_export.png" alt="private key export" />
+</Frame>
+
+At the end of a successful private key export, the iframe displays a private key.
+
+### NodeJS
+
+A full example Node script can be found here: [https://github.com/tkhq/sdk/tree/main/examples/export-in-node](https://github.com/tkhq/sdk/tree/main/examples/export-in-node)
+
+#### Steps
+
+<Steps>
+<Step title="Initialize a new Turnkey client">
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+```
+</Step>
+
+<Step title="Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to">
+
+```ts
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+</Step>
+
+<Step title="Call export (Turnkey activity)">
+
+```ts
+const exportResult = await turnkeyClient.apiClient().exportWallet({
+  walletId: walletId,
+  targetPublicKey: publicKey,
+});
+```
+</Step>
+
+<Step title="Decrypt encrypted bundle">
+
+```ts
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId,
+  returnMnemonic: true,
+});
+```
+
+Congrats! You've exported your wallet
+
+The process is largely similar for both private keys and individual wallet accounts.
+</Step>
+</Steps>
+
+
+#### Private Key support
+
+<Steps>
+<Step title="Initialize a new Turnkey client">
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+```
+</Step>
+
+<Step title="Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to">
+
+```ts
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+</Step>
+
+<Step title="Call export (Turnkey activity)">
+
+```ts
+const exportResult = await turnkeyClient.apiClient().exportPrivateKey({
+  privateKeyId: privateKeyId,
+  targetPublicKey: publicKey,
+});
+```
+</Step>
+
+<Step title="Decrypt encrypted bundle">
+
+```ts
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId,
+  returnMnemonic: false,
+});
+```
+
+Congrats! You've exported your private key
+</Step>
+</Steps>
+
+#### Wallet Account support
+
+<Steps>
+<Step title="Initialize a new Turnkey client">
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+```
+</Step>
+
+<Step title="Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to">
+
+```ts
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+</Step>
+
+<Step title="Call export (Turnkey activity)">
+
+```ts
+const exportResult = await turnkeyClient.apiClient().exportWalletAccount({
+  address: address, // your specific wallet account address
+  targetPublicKey: publicKey,
+});
+```
+</Step>
+
+<Step title="Decrypt encrypted bundle">
+
+```ts
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId,
+  returnMnemonic: false,
+});
+```
+
+Congrats! You've exported your wallet account
+</Step>
+</Steps>
+
+### Local Storage
+
+If you do not have access to an iframe (e.g. in a mobile context) or would prefer not to use an iframe, using Local Storage is an alternative method. Note that there are security considerations here due to the fact that anyone in control of your domain can access Local Storage variables.
+
+#### Steps
+
+<Steps>
+<Step title="Initialize Turnkey client">
+
+```ts
+import { Turnkey } from "@turnkey/sdk-browser";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+const passkeyClient = turnkey.passkeyClient();
+```
+</Step>
+
+<Step title="Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to">
+
+```ts
+const embeddedKeyPair = generateP256KeyPair();
+const embeddedPrivateKey = keyPair.privateKey;
+const embeddedPublicKey = keyPair.publicKeyUncompressed;
+```
+</Step>
+
+<Step title="Save the private key in Local Storage">
+
+```ts
+// Storage keys
+const STORAGE_KEYS = {
+  EMBEDDED_PRIVATE_KEY: "@turnkey/embedded_private_key",
+  EMBEDDED_PUBLIC_KEY: "@turnkey/embedded_public_key",
+};
+
+await LocalStorage.setItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+
+// Note that the public key can always be derived separately via the `getPublicKey` from `@turnkey/crypto`
+await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, embeddedPublicKey);
+```
+</Step>
+
+<Step title="Call export (Turnkey activity)">
+4. Call export (Turnkey activity), using the embedded key as the target key for the `exportWallet` activity:
+
+```ts
+const exportResult = await passkeyClient.exportWallet({
+  walletId, // desired wallet ID
+  targetPublicKey: embeddedPublicKey,
+});
+```
+</Step>
+
+<Step title="Decrypt encrypted bundle">
+
+```ts
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: embeddedPrivateKey,
+  organizationId, // your organization ID (this may be a suborg)
+  returnMnemonic: true,
+});
+```
+</Step>
+<Step title=" Remove embedded key from Local Storage. This is recommended because (1) this key doesn't have to be persistent in the first place, and (2) reduces the risk of pattern detection.">
+
+```ts
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PUBLIC_KEY,
+  embeddedPublicKey,
+);
+```
+
+Congrats! You've exported your wallet
+
+The process is largely similar for both private keys and individual wallet accounts.
+</Step>
+</Steps>
+
+#### Private Key support
+
+<Steps>
+<Step title="Initialize Turnkey client">
+
+```ts
+import { Turnkey } from "@turnkey/sdk-browser";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+const passkeyClient = turnkey.passkeyClient();
+```
+</Step>
+
+<Step title="Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to">
+
+```ts
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+</Step>
+
+<Step title="Save the private key in Local Storage">
+
+```ts
+// Storage keys
+const STORAGE_KEYS = {
+  EMBEDDED_PRIVATE_KEY: "@turnkey/embedded_private_key",
+  EMBEDDED_PUBLIC_KEY: "@turnkey/embedded_public_key",
+};
+
+await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PRIVATE_KEY, privateKey);
+
+// Note that the public key can always be derived separately via the `getPublicKey` from `@turnkey/crypto`
+await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, publicKey);
+```
+</Step>
+
+<Step title="Call export (Turnkey activity)">
+
+```ts
+const exportResult = await passkeyClient.exportPrivateKey({
+  privateKeyId, // desired private key ID
+  targetPublicKey: publicKey,
+});
+```
+</Step>
+
+<Step title="Decrypt encrypted bundle">
+
+```ts
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId, // your organization ID (this may be a suborg)
+  returnMnemonic: false, // N/A as we're working with a private key, not a wallet
+});
+```
+</Step>
+
+<Step title="Remove embedded key from Local Storage. This is recommended because (1) this key doesn't have to be persistent in the first place, and (2) reduces the risk of pattern detection.">
+
+```ts
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PUBLIC_KEY,
+  embeddedPublicKey,
+);
+```
+
+Congrats! You've exported your private key 🎉
+</Step>
+</Steps>
+
+#### Wallet Account support
+
+<Steps>
+<Step title="Initialize Turnkey client">
+
+```ts
+import { Turnkey } from "@turnkey/sdk-browser";
+import { generateP256KeyPair, decryptExportBundle } from "@turnkey/crypto";
+
+...
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+const passkeyClient = turnkey.passkeyClient();
+```
+</Step>
+
+<Step title="Generate a new P256 Keypair — this will serve as the target that Turnkey will encrypt key material to">
+
+```ts
+const keyPair = generateP256KeyPair();
+const privateKey = keyPair.privateKey;
+const publicKey = keyPair.publicKeyUncompressed;
+```
+</Step>
+
+<Step title="Save the private key in Local Storage">
+
+```ts
+// Storage keys
+const STORAGE_KEYS = {
+  EMBEDDED_PRIVATE_KEY: "@turnkey/embedded_private_key",
+  EMBEDDED_PUBLIC_KEY: "@turnkey/embedded_public_key",
+};
+
+await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PRIVATE_KEY, privateKey);
+
+// Note that the public key can always be derived separately via the `getPublicKey` from `@turnkey/crypto`
+await LocalStorage.setItem(STORAGE_KEYS.EMBEDDED_PUBLIC_KEY, publicKey);
+```
+</Step>
+
+<Step title="Call export (Turnkey activity)">
+4. Call export (Turnkey activity), using the embedded key as the target key for the `exportWalletAccount` activity:
+
+```ts
+const exportResult = await passkeyClient.exportWalletAccount({
+  address, // your specific wallet account address
+  targetPublicKey: publicKey,
+});
+```
+</Step>
+
+<Step title="Decrypt encrypted bundle">
+
+```ts
+const decryptedBundle = await decryptExportBundle({
+  exportBundle: exportResult.exportBundle,
+  embeddedKey: privateKey,
+  organizationId, // your organization ID (this may be a suborg)
+  returnMnemonic: false, // N/A as we're working with a wallet account, not a wallet
+});
+```
+</Step>
+
+<Step title="Remove embedded key from Local Storage. This is recommended because (1) this key doesn't have to be persistent in the first place, and (2) reduces the risk of pattern detection.">
+
+```ts
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PRIVATE_KEY,
+  embeddedPrivateKey,
+);
+await LocalStorage.removeItem(
+  STORAGE_KEYS.EMBEDDED_PUBLIC_KEY,
+  embeddedPublicKey,
+);
+```
+
+Congrats! You've exported your wallet account
+</Step>
+</Steps>
+
+## Solana notes
+
+Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
+
+When importing into a multichain wallet such as Phantom, see [this guide](https://help.phantom.app/hc/en-us/articles/12988493966227-What-derivation-paths-does-Phantom-wallet-support#:~:text=The%20addresses%20are%20grouped%20into,'%2F0'%2F0%2F0.) on matching private keys across Solana, Ethereum, and Polygon.
+
+## UI customization
+
+Everything is customizable in the import iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
+
+```ts
+const iframeCss = `
+  iframe {
+      box-sizing: border-box;
+      width: 400px;
+      height: 120px;
+      border-radius: 8px;
+      border-width: 1px;
+      border-style: solid;
+      border-color: rgba(216, 219, 227, 1);
+      padding: 20px;
+  }
+`;
+
+return (
+  <div style={{ display: iframeDisplay }} id="your-container">
+    <style>{iframeCss}</style>
+  </div>
+);
+```

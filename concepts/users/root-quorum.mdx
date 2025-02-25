@@ -1,0 +1,69 @@
+---
+title: "Root Quorum"
+description: "When you create a Turnkey organization, your user is created and will default to being the sole member of the root quorum. Because of the wide scope of permissions, it is important to take care when using any users in the root quorum. The following offers a technical overview and some best practices."
+---
+
+## Technical overview
+
+The root quorum is a group of users who can execute any action and bypass the policy engine.
+
+The root quorum is defined by
+
+* `userIds`: the Ids of users who compose the quorum set
+* `threshold`: the number of quorum members required to execute an action as root
+
+Actions approved by the root quorum do not go through the policy engine; thus it is impossible to limit root quorum actions with any policies.
+
+The reason the root must be able to bypass the policy engine is that it is the only way for an organization to unbrick itself if it sets overly restrictive policies that do not allow it to update itself.
+
+We can refer to a root quorum configuration as `threshold / userIds.length`. So a quorum with a threshold of 2 and set size of 5 can be referred to as `2 / 5`.
+
+### Defaults
+
+When you create an organization, the root quorum will default to being your user and a threshold of 1.
+
+### Updating the root quorum
+
+Only the current root quorum can approve updates to the quorum. It is not possible to add editing permissions to the root quorum through policies.
+
+Both the website and public APIs expose the ability to update the root quorum.
+
+## Best practices
+
+### Limit tasks you perform with the root quorum
+
+The root quorum should only be used in cases where it is absolutely necessary. In particular, the root quorum should primarily be used to unblock an organization in the event of incorrect policies or lockout. For example, if you accidentally set overly-restrictive policies that prevent users from taking any action, the root quorum can be used to delete the relevant policies.
+
+### Create scoped users for day-to-day actions
+
+Ensure that you have scoped policies for day-to-day actions that you expect to complete. For example, you may have an API user with permissions to only create sub-organizations. You can read more about creating policies in our [Policy Overview](/concepts/policies/overview).
+
+### Configuration considerations
+
+There are primarily two factors to consider when setting the root quorum
+
+* how hard is to get locked out of root? I.E. how many authenticators need to be lost/destroyed so the threshold cannot be met.
+* how many authenticators need to be compromised for an attacker to take root actions?
+
+For example, if a quorum is configured as 2/5, then
+
+* if 4 users lost all their authenticators, no root actions could be taken (including updating the quorum itself).
+* if 2 different users authenticators are compromised, an attacker could steal all the organizations funds.
+
+**Example Setups**
+
+The below examples are provided as a convenience only. It is up to you to ensure that the root quorum setup you design is appropriate for your particular circumstances in order to secure your organization and minimize the risk of lockout of root functionality. Failure to properly configure your root quorom setup could result in complete loss of funds.
+
+*High Value Organization*
+
+Special users should be created that are only used for root actions. Those users' authenticators should be stored in geographically distributed locations that have personal access controls, are natural disaster resistant, and have redundancy in case of hardware failure. These would only be used in the case of a disaster.
+
+For day to day admin operations, admin policies that use consensus can be put in place. These can be a set of finely scoped policies.
+
+*Low Value, End-User Directed Organization*
+
+The end-user and the business both have one user in the organization. The root quorum would be configured as a 1/2, which includes the business and end-users' Users. This allows the business support channel to unbrick the user if they lose access to their account or otherwise add overly restrictive policies.
+
+### Monitor for unintended use
+
+Monitor your account for any unexpected activities coming from the root users. If you see an unexpected activity, you should remove any compromised authenticators or API keys.
