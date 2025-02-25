@@ -1,0 +1,668 @@
+---
+title: "Recover a User with Email"
+description: "In this guide, we'll walk through the process of recovering a user using their email."
+---
+
+<Note>
+  Email Recovery is a legacy flow, now superseded by [Email Auth](/embedded-wallets/code-examples/authenticate-user-email), which can used to implement recovery flows and more.
+</Note>
+
+## Overview
+
+This process involves using the following Turnkey SDK packages:
+
+1. [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server): Used on the server-side to leverage the parent organization's public/private API key pair for initializing the email recovery.
+2. [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser): Used on the client-side to complete the email recovery process by adding an end-user passkey.
+3. [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react): Used for Next.js applications to initialize the Turnkey SDK.
+
+The email recovery process is split between client-side and server-side operations to prevent exposing the parent organization's private API key.
+
+For an in-depth understanding of the email recovery process at Turnkey, refer to our docs on [email recovery](/authentication/email#recovery-flow).
+
+## Implementation
+
+### Initialize the Turnkey SDKs
+
+Begin by initializing the Turnkey SDK with your organization ID and the Turnkey API's base URL on the **client-side**.
+
+<Tabs>
+  <Tab title="Next.js">
+
+Wrap the root layout of your application with the `TurnkeyProvider` providing the required configuration options. This allows you to use the Turnkey client throughout your app via the `useTurnkey()` hook.
+
+```tsx app/layout.tsx
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <TurnkeyProvider
+          config={{
+            rpId: process.env.NEXT_PUBLIC_TURNKEY_RP_ID,
+            apiBaseUrl: "https://api.turnkey.com",
+            defaultOrganizationId:
+              process.env.NEXT_PUBLIC_ORGANIZATION_ID,
+          }}
+        >
+          {children}
+        </TurnkeyProvider>
+      </body>
+    </html>
+  );
+}
+```
+<Note>
+  The `NEXT_PUBLIC_ORGANIZATION_ID` should be set to the parent organization ID which can be found in the [Turnkey Dashboard](https://app.turnkey.com/dashboard).
+
+  The `NEXT_PUBLIC_TURNKEY_RP_ID` should be set to your application's desired relying party ID; this is typically your domain, or localhost if developing locally. See [this page](/authentication/passkeys/options#rp) for more details.
+</Note>
+  </Tab>
+  <Tab title="TypeScript">
+```tsx src/turnkey.ts
+import { Turnkey } from "@turnkey/sdk-browser";
+
+// Initialize the Turnkey SDK with your organization ID and API base URL
+const turnkeyBrowser = new Turnkey({
+  rpId: process.env.TURNKEY_RP_ID,
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+```
+<Note>
+  The `TURNKEY_ORGANIZATION_ID` should be set to the parent organization ID which can be found in the [Turnkey Dashboard](https://app.turnkey.com/dashboard).
+
+  The `TURNKEY_RP_ID` should be set to your application's desired relying party ID; this is typically your domain, or localhost if developing locally. See [this page](/authentication/passkeys/options#rp) for more details.
+</Note>
+  </Tab>
+</Tabs>
+
+
+#### Server-side Initialization
+
+Initialize the Turnkey SDK on the **server-side** using the `@turnkey/sdk-server` package. This allows you to use the parent organization's public/private API key pair to initialize the email recovery process securely.
+
+<Tabs>
+  <Tab title="Next.js">
+For Next.js, add the `"use server"` directive at the top of the file where you're initializing the Turnkey server client. This will ensure that the function is executed on the server-side and will have access to the server-side environment variables e.g. your parent organization's public/private API key pair. For more information on Next.js server actions, see the Next.js documentation on [Server Actions and Mutations](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+
+```tsx app/actions.ts
+"use server";
+
+import { Turnkey } from "@turnkey/sdk-server";
+
+// Initialize the Turnkey Server Client on the server-side
+const turnkeyServer = new Turnkey({
+  baseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+</Tab>
+
+<Tab title="TypeScript">
+```tsx src/turnkey.ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+// Initialize the Turnkey Server Client on the server-side
+const turnkeyServer = new Turnkey({
+  baseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+</Tab>
+</Tabs>
+
+#### Initialize the Iframe Client
+
+Next, we'll initialize the `iframeClient` which will create a secure iframe within your application. The `iframeClient` must be initialized before beginning the user recovery process, as we'll need the iframe's public key as a parameter for the `initEmailRecovery` method.
+
+<Tabs>
+  <Tab title="Next.js">
+
+We add the `"use client"` directive to the Recovery component to as react hooks can only be used client-side.
+
+```tsx app/recovery.tsx
+"use client";
+
+import { useTurnkey } from "@turnkey/sdk-react";
+
+export default function Recovery() {
+  const { authIframeClient } = useTurnkey();
+
+  return <div>{/* ... rest of the code */}</div>;
+}
+```
+</Tab>
+
+<Tab title="TypeScript">
+```ts src/turnkey.ts
+const iframeContainerId = "turnkey-recovery-iframe-container-id";
+
+const authIframeClient = await turnkey.iframeClient(
+  document.getElementById(iframeContainerId),
+);
+```
+
+When using the TypeScript SDK, you'll need to ensure that the HTML element exists somewhere in the rendered DOM.
+
+
+
+```html index.html
+<div id="turnkey-recovery-iframe-container-id" />
+```
+</Tab>
+</Tabs>
+
+### Create a Recovery Function
+
+Next we'll create a new function called `initEmailRecovery` that will be used to initialize the email recovery process on the server-side. This method will be called from the client-side with the user's email and the target public key from the iframe client. Calling the `initEmailRecovery` method will trigger an email sent to the user containing a credential bundle which will be used to authenticate the authIframeClient in the next step.
+
+<Tabs>
+  <Tab title="Next.js">
+
+We export the `initEmailRecovery` server action to be called from the client-side.
+
+```tsx app/actions.ts
+// ... previous code
+
+export const initEmailRecovery = async ({
+  email,
+  targetPublicKey,
+}: {
+  email: string;
+  targetPublicKey: string;
+}) => {
+  const recoveryResponse = await turnkeyServer.initUserEmailRecovery({
+    email,
+    targetPublicKey,
+  });
+  return recoveryResponse;
+};
+```
+</Tab>
+
+<Tab title="TypeScript">
+```tsx src/turnkey-server.ts
+export const initEmailRecovery = async ({
+  email,
+  targetPublicKey,
+}: {
+  email: string;
+  targetPublicKey: string;
+}) => {
+  const recoveryResponse = await turnkeyServer.initUserEmailRecovery({
+    email,
+    targetPublicKey,
+  });
+  return recoveryResponse;
+};
+```
+</Tab>
+</Tabs>
+
+### Initialize Email Recovery
+
+At this stage, we initialize the email recovery process using the **server-side** function we created in the previous step. The user will need to paste the credential bundle they receive in their email into your app, which is then used to authenticate the `authIframeClient` via the `injectCredentialBundle` method.
+
+<Tabs>
+  <Tab title="Next.js">
+<Steps>
+<Step title="Import the server action">
+
+```tsx app/recovery.tsx
+import { initEmailRecovery } from "./actions";
+```
+</Step>
+
+<Step title="Add an input field for the user's email">
+
+```tsx app/recovery.tsx
+// ...
+
+export default function Recovery() {
+  // ...
+
+  // Create a state variable for the user's email
+  const [email, setEmail] = useState("");
+
+  return (
+    <div>
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        type="text"
+      />
+    </div>
+  );
+}
+```
+</Step>
+
+<Step title="Create a function to initiate the recovery process">
+
+```tsx app/recovery.tsx
+//...
+
+export default function Recovery() {
+  // ...
+
+  // We'll use this later to conditionally render the input for the credential bundle
+  const [initRecoveryResponse, setInitRecoveryResponse] = useState(null);
+
+  const initRecovery = async (email: string) => {
+    // Call the initEmailRecovery server action
+    const response = await initEmailRecovery({
+      email,
+      targetPublicKey: authIframeClient?.iframePublicKey,
+    });
+    if (response) {
+      setInitRecoveryResponse(response);
+    }
+  };
+
+  return (
+    <div>
+      {/* <input ... /> */}
+      <button onClick={() => initRecovery(email)}>Init Recovery</button>
+    </div>
+  );
+}
+```
+</Step>
+
+<Step title="Add an input for the credential bundle">
+
+```tsx app/recovery.tsx
+//...
+
+export default function Recovery() {
+  // ...
+  const [initRecoveryResponse, setInitRecoveryResponse] = useState(null);
+  const [credentialBundle, setCredentialBundle] = useState("");
+
+  return (
+    <div>
+      {/* If we have initiated the recovery process we'll render an input
+      for the user to paste their credential bundle they received in their email */}
+      {initRecoveryResponse ? (
+        <input
+          value={credentialBundle}
+          onChange={(e) => setCredentialBundle(e.target.value)}
+          type="text"
+        />
+      ) : (
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+        />
+      )}
+      <button onClick={() => initRecovery(email)}>Init Recovery</button>
+    </div>
+  );
+}
+```
+
+<Accordion title="recovery.tsx">
+```ts
+"use client";
+
+import { useState } from "react";
+import { useTurnkey } from "@turnkey/sdk-react";
+
+// Import the initEmailRecovery server action
+import { initEmailRecovery } from "./actions";
+
+export default function Recovery() {
+  const { authIframeClient } = useTurnkey();
+
+  // Create a state variable for the user's email
+  const [email, setEmail] = useState("");
+  const [initRecoveryResponse, setInitRecoveryResponse] = useState(null);
+  const [credentialBundle, setCredentialBundle] = useState("");
+
+  const initRecovery = async (email: string) => {
+    // Call the initEmailRecovery server action
+    const response = await initEmailRecovery({
+      email,
+      targetPublicKey: authIframeClient?.iframePublicKey,
+    });
+    if (response) {
+      setInitRecoveryResponse(response);
+    }
+  };
+
+  return (
+    <div>
+      {/* If we have initiated the recovery process we'll render an input
+      for the user to paste their credential bundle they received in their email */}
+      {initRecoveryResponse ? (
+        <input
+          value={credentialBundle}
+          onChange={(e) => setCredentialBundle(e.target.value)}
+          type="text"
+        />
+      ) : (
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+        />
+      )}
+      <button onClick={() => initRecovery(email)}>Init Recovery</button>
+    </div>
+  );
+}
+  ```
+</Accordion>
+</Step>
+</Steps>
+</Tab>
+
+<Tab title="TypeScript">
+```tsx src/turnkey.ts
+import { initEmailRecovery } from "./turnkey-server";
+
+// ... rest of the code
+
+const initRecoveryResponse = await initEmailRecovery({
+  email,
+  targetPublicKey: authIframeClient?.iframePublicKey,
+});
+
+// Inject the recovery bundle into the iframe client
+// The recovery bundle is the credential bundle that the user will receive in their email
+// The application will need to provide a way for the user to input this recovery bundle
+// by pasting it into the UI
+await authIframeClient.injectCredentialBundle(credentialBundle);
+```
+</Tab>
+</Tabs>
+
+### Create User Passkey
+
+Next, we'll create a new passkey for the user and associate it with the email that was used in the recovery process. Assuming that the user has successfully received and entered their credential bundle, we generate a passkey to be used authenticate Turnkey requests.
+
+<Tabs>
+  <Tab title="Next.js">
+<Steps>
+<Step title="Add a function to complete the recovery process">
+
+We'll add a new function called `completeRecovery` that will create a new passkey for the user which will be used in the final recovery step.
+
+```ts app/recovery.tsx
+//...export default function Recovery() {  //...  // We'll use //...
+
+export default function Recovery() {
+  //...
+
+  // We'll use the useTurnkey hook to get the turnkey instance
+  const { authIframeClient, turnkey } = useTurnkey();
+
+  const completeRecovery = async () => {
+    const passkeyClient = await turnkey.passkeyClient();
+
+    const passkeyResponse = await passkeyClient?.createUserPasskey({
+      publicKey: {
+        user: {
+          name: email,
+          displayName: email,
+        },
+      },
+    });
+  };
+
+  return <div>{/* ... */}</div>;
+}
+```
+</Step>
+
+<Step title="Add a button to call the completeRecovery function">
+
+```tsx app/recovery.tsx
+//...
+
+export default function Recovery() {
+  //...
+  const completeRecovery = async () => {/* ... */*/};
+
+  return (
+    <div>
+      {/* ... */}
+
+      {/* If we have the credential bundle, we'll render a button to complete the recovery process */}
+      {credentialBundle ? (
+        <button onClick={() => completeRecovery(credentialBundle)}>
+          Complete Recovery
+        </button>
+      ) : (
+        <button onClick={() => initRecovery(email)}>Init Recovery</button>
+      )}
+    </div>
+  );
+}
+```
+</Step>
+</Steps>
+</Tab>
+
+<Tab title="TypeScript">
+```ts src/turnkey.ts
+const completeRecovery = async () => {
+  const passkeyClient = await turnkey.passkeyClient();
+
+  const passkeyResponse = await passkeyClient?.createUserPasskey({
+    publicKey: {
+      user: {
+        name: email,
+        displayName: email,
+      },
+    },
+  });
+};
+```
+</Tab>
+</Tabs>
+
+### Complete Email Recovery
+
+Finally, we complete the email recovery process by passing the `encodedChallenge` and `attestation` from the passkey we previously created to the `recoverUser` method. This method will complete the email recovery process and if successful, will return a response containing the authenticator ID of the new passkey authenticator.
+
+<Tabs>
+  <Tab title="Next.js">
+
+
+```ts app/recovery.tsx
+
+//...
+
+export default function Recovery() {
+  // We'll use the useTurnkey hook to get the turnkey instance
+  const { authIframeClient, turnkey } = useTurnkey();
+
+  const [initRecoveryResponse, setInitRecoveryResponse] = useState(null);
+
+  const completeRecovery = async () => {
+    const passkeyClient = await turnkey.passkeyClient();
+
+    const passkeyResponse = await passkeyClient?.createUserPasskey({
+      publicKey: {
+        user: {
+          name: email,
+          displayName: email,
+        },
+      },
+    });
+
+    // If we have the encodedChallenge and attestation, we can complete the recovery process
+    if (passkeyResponse?.encodedChallenge && passkeyResponse?.attestation) {
+      const response = await authIframeClient!.recoverUser({
+        organizationId: initRecoveryResponse?.activity.organizationId,
+        userId: initRecoveryResponse.userId,
+        authenticator: {
+          // This should be set by the user to name their authenticator
+          authenticatorName: "User Passkey",
+          challenge: passkeyResponse.encodedChallenge,
+          attestation: passkeyResponse.attestation,
+        },
+      });
+      if (response) {
+        console.log("User recovered successfully");
+      }
+    }
+  };
+
+  return (
+    <div>
+      {/* ... */}
+
+      {/* If we have the credential bundle, we'll render a button to complete the recovery process */}
+      {credentialBundle ? (
+        <button onClick={() => completeRecovery(credentialBundle)}>
+          Complete Recovery
+        </button>
+      ) : (
+        <button onClick={() => initRecovery(email)}>Init Recovery</button>
+      )}
+    </div>
+  );
+}
+```
+<Accordion title="Complete recovery.tsx component">
+
+```ts app/recovery.tsx
+"use client";
+
+import { useState } from "react";
+import { useTurnkey } from "@turnkey/sdk-react";
+
+// Import the initEmailRecovery server action
+import { initEmailRecovery } from "./actions";
+
+export default function Recovery() {
+  const { authIframeClient, turnkey } = useTurnkey();
+
+  // Create a state variable for the user's email
+  const [email, setEmail] = useState("");
+  const [initRecoveryResponse, setInitRecoveryResponse] = useState(null);
+  const [credentialBundle, setCredentialBundle] = useState("");
+
+  const initRecovery = async (email: string) => {
+    // Call the initEmailRecovery server action
+    const response = await initEmailRecovery({
+      email,
+      targetPublicKey: authIframeClient?.iframePublicKey,
+    });
+    if (response) {
+      setInitRecoveryResponse(response);
+    }
+  };
+
+  const completeRecovery = async () => {
+    const passkeyClient = await turnkey.passkeyClient();
+
+    const passkeyResponse = await passkeyClient?.createUserPasskey({
+      publicKey: {
+        user: {
+          name: email,
+          displayName: email,
+        },
+      },
+    });
+
+    // If we have the encodedChallenge and attestation, we can complete the recovery process
+    if (passkeyResponse?.encodedChallenge && passkeyResponse?.attestation) {
+      const response = await authIframeClient!.recoverUser({
+        organizationId: initRecoveryResponse?.activity.organizationId,
+        userId: initRecoveryResponse.userId,
+        authenticator: {
+          // This should be set by the user to name their authenticator
+          authenticatorName: "User Passkey",
+          challenge: passkeyResponse.encodedChallenge,
+          attestation: passkeyResponse.attestation,
+        },
+      });
+      if (response) {
+        console.log("User recovered successfully");
+      }
+    }
+  };
+
+  return (
+    <div>
+      {initRecoveryResponse ? (
+        <input
+          value={credentialBundle}
+          onChange={(e) => setCredentialBundle(e.target.value)}
+          type="text"
+        />
+      ) : (
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+        />
+      )}
+      {credentialBundle ? (
+        <button onClick={() => completeRecovery(credentialBundle)}>
+          Complete Recovery
+        </button>
+      ) : (
+        <button onClick={() => initRecovery(email)}>Init Recovery</button>
+      )}
+    </div>
+  );
+}
+  ```
+</Accordion>
+</Tab>
+
+<Tab title="TypeScript">
+
+```ts src/turnkey.ts
+const completeRecovery = async () => {
+  const passkeyClient = await turnkey.passkeyClient();
+
+  const passkeyResponse = await passkeyClient?.createUserPasskey({
+    publicKey: {
+      user: {
+        name: email,
+        displayName: email,
+      },
+    },
+  });
+
+  // If we have the encodedChallenge and attestation, we can complete the recovery process
+  if (passkeyResponse?.encodedChallenge && passkeyResponse?.attestation) {
+    const response = await authIframeClient!.recoverUser({
+      organizationId: initRecoveryResponse?.activity.organizationId,
+      userId: initRecoveryResponse.userId,
+      authenticator: {
+        // This should be set by the user to name their authenticator
+        authenticatorName: "User Passkey",
+        challenge: passkeyResponse.encodedChallenge,
+        attestation: passkeyResponse.attestation,
+      },
+    });
+    if (response) {
+      console.log("User recovered successfully");
+    }
+  }
+};
+```
+</Tab>
+</Tabs>
+
+## Conclusion
+
+In this guide, we've walked through the process of recovering a user using their email using the Turnkey SDKs. By following these steps, you can implement email recovery in your application, providing users with a reliable way to regain access to their accounts or to onboard new users using only their email address.
+
+For a complete example, check out our [email recovery app](https://github.com/tkhq/sdk/tree/main/examples/email-recovery).

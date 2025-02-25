@@ -1,0 +1,51 @@
+---
+title: "Authenticate a User with a Passkey Credential"
+mode: wide
+---
+
+<Steps>
+<Step title="Initialize the Passkey Client">
+```tsx
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+const passkeyClient = turnkey.passkeyClient();
+```
+</Step>
+
+<Step title="Call the login function">
+```tsx
+const response = await passkeyClient.login();
+if (response.organizationId) {
+  navigate("/authenticated-route");
+} else {
+  navigate("/not-authenticated-route");
+}
+```
+</Step>
+
+<Step title="Make read requests on behalf of the authenticated user from the currentUserSession">
+
+```tsx
+const currentUserSession = await turnkey.currentUserSession();
+const walletsResponse = await currentUserSession.getWallets();
+const walletName = walletsResponse.wallets[0].walletName;
+```
+</Step>
+
+<Step title="Call the passkeyClient directly for write requests">
+
+This will always prompt a user to confirm the action with their passkey credential
+
+```tsx
+import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+const newWalletResponse = await passkeyClient.createWallet({
+  walletName: "New Wallet for User",
+  accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+});
+```
+</Step>
+</Steps>
