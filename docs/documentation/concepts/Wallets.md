@@ -85,7 +85,7 @@ See below for specific address formats that you can currently derive on Turnkey:
 | Bitcoin  | ADDRESS_FORMAT_BITCOIN_REGTEST_P2WPKH | CURVE_SECP256K1 | m/84'/1'/0'/0/0    |
 | Bitcoin  | ADDRESS_FORMAT_BITCOIN_REGTEST_P2WSH  | CURVE_SECP256K1 | m/48'/1'/0'/2'/0/0 |
 | Bitcoin  | ADDRESS_FORMAT_BITCOIN_REGTEST_P2TR   | CURVE_SECP256K1 | m/86'/1'/0'/0/0    |
-| Sei      | ADDRESS_FORMAT_SEI                    | CURVE_ED25519   | m/44'/118'/0'/0/0  |
+| Sei      | ADDRESS_FORMAT_SEI                    | CURVE_SECP256K1 | m/44'/118'/0'/0/0  |
 | Stellar  | ADDRESS_FORMAT_XLM                    | CURVE_ED25519   | m/44'/148'/0'/0'/0 |
 | Dogecoin | ADDRESS_FORMAT_DOGE_MAINNET           | CURVE_SECP256K1 | m/44'/3'/0'/0/0    |
 | Dogecoin | ADDRESS_FORMAT_DOGE_TESTNET           | CURVE_SECP256K1 | m/44'/1'/0'/0/0    |
