@@ -122,7 +122,6 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                  | REMOVE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE  |
 | **INVITATION**   | CREATE | ACTIVITY_TYPE_CREATE_INVITATIONS           |
 |                  | DELETE | ACTIVITY_TYPE_DELETE_INVITATION            |
-|                  | ACCEPT | ACTIVITY_TYPE_ACCEPT_INVITATION_V2         |
 | **POLICY**       | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3             |
 |                  | CREATE | ACTIVITY_TYPE_CREATE_POLICIES              |
 |                  | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY                |
