@@ -117,14 +117,10 @@ The language is strongly typed which makes policies easy to author and maintain.
 | Resource Type      | Action | Activity Type                              |
 |--------------------|--------|-:------------------------------------------|
 | **ORGANIZATION**   | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7   |
-|                    | UPDATE | ACTIVITY_TYPE_UPDATE_ROOT_QUORUM           |
-|                    | UPDATE | ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE     |
-|                    | REMOVE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE  |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_ORGANIZATION          |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_SUB_ORGANIZATION      |
 | **INVITATION**     | CREATE | ACTIVITY_TYPE_CREATE_INVITATIONS           |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_INVITATION            |
-|                    | ACCEPT | ACTIVITY_TYPE_ACCEPT_INVITATION_V2         |
 | **POLICY**         | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3             |
 |                    | CREATE | ACTIVITY_TYPE_CREATE_POLICIES              |
 |                    | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY                |
@@ -156,7 +152,6 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                    | UPDATE | ACTIVITY_TYPE_UPDATE_USER_TAG              |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_USERS                 |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_USER_TAGS             |
-|                    | UPDATE | ACTIVITY_TYPE_RECOVER_USER                 |
 | **CREDENTIAL**     | CREATE | ACTIVITY_TYPE_CREATE_API_KEYS_V2           |
 |                    | CREATE | ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2     |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_API_KEYS              |
@@ -165,7 +160,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                    | DELETE | ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS       |
 | **PAYMENT_METHOD** | UPDATE | ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2        |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_PAYMENT_METHOD        |
-| **SUBSCRIPTION**   | UPDATE | ACTIVITY_TYPE_ACTIVATE_BILLING_TIER        |
+| **SUBSCRIPTION**   | CREATE | ACTIVITY_TYPE_ACTIVATE_BILLING_TIER        |
 | **CONFIG**         | UPDATE | ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS       |
 | **RECOVERY**       | CREATE | ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY     |
 | **AUTH**           | CREATE | ACTIVITY_TYPE_EMAIL_AUTH_V2                |
