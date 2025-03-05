@@ -149,7 +149,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                    | SIGN   | ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2          |
 |                    | SIGN   | ACTIVITY_TYPE_SIGN_RAW_PAYLOADS            |
 |                    | SIGN   | ACTIVITY_TYPE_SIGN_TRANSACTION_V2          |
-| **USER**           | CREATE | ACTIVITY_TYPE_CREATE_USERS_V2              |
+| **USER**           | CREATE | ACTIVITY_TYPE_CREATE_USERS_V3              |
 |                    | CREATE | ACTIVITY_TYPE_CREATE_USER_TAG              |
 |                    | CREATE | ACTIVITY_TYPE_CREATE_API_ONLY_USERS        |
 |                    | UPDATE | ACTIVITY_TYPE_UPDATE_USER                  |
