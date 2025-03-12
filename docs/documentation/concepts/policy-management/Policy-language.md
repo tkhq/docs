@@ -115,7 +115,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 ## Activity Breakdown
 
 | Resource Type      | Action | Activity Type                              |
-|--------------------|--------|-:------------------------------------------|
+|--------------------|--------|--------------------------------------------|
 | **ORGANIZATION**   | CREATE | ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7   |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_ORGANIZATION          |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_SUB_ORGANIZATION      |
@@ -123,7 +123,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                    | DELETE | ACTIVITY_TYPE_DELETE_INVITATION            |
 | **POLICY**         | CREATE | ACTIVITY_TYPE_CREATE_POLICY_V3             |
 |                    | CREATE | ACTIVITY_TYPE_CREATE_POLICIES              |
-|                    | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY                |
+|                    | UPDATE | ACTIVITY_TYPE_UPDATE_POLICY_V2             |
 |                    | DELETE | ACTIVITY_TYPE_DELETE_POLICY                |
 | **WALLET**         | CREATE | ACTIVITY_TYPE_CREATE_WALLET                |
 |                    | CREATE | ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS       |
