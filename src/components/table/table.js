@@ -23,7 +23,7 @@ export default function Table({ referenceType, columnHeadings, tableRows }) {
             {tableRow.map((row, rowIndex) => {
               return (
                 <div key={rowIndex} className={`table-cell ${referenceType}`}>
-                  {row}
+                  {row?.text ? <a href={row?.url}>{row?.text}</a> : row}
                 </div>
               );
             })}
