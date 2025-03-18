@@ -56,7 +56,7 @@ const turnkey = new Turnkey({
     name: 'config',
     type: {
       name: 'TurnkeySDKServerConfig',
-      link: 'https://github.com/tkhq/sdk/blob/main/packages/sdk-server/src/__types__/base.ts#L79'
+      link: 'https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L88'
     }
   }}
   isRequired
@@ -173,3 +173,506 @@ export default turnkeyProxyHandler;
 
 // this will sign requests made with the client-side `serverSign` function with the root organization's API key for the allowedMethods in the config
 ```
+
+## TurnkeyServerClient
+
+The `@turnkey/sdk-server` exposes NextJS Server Actions. These server actions can be used to facilitate implementing common authentication flows.
+
+### `sendOtp()`
+
+Initiate an OTP authentication flow for either an `EMAIL` or `SMS`
+
+```typescript
+import { server } from "@turnkey/sdk-server";
+
+const initAuthResponse = await server.sendOtp({
+  suborgID: suborgId!,
+  otpType,
+  contact: value,
+  ...(emailCustomization && { emailCustomization }),
+  ...(sendFromEmailAddress && { sendFromEmailAddress }),
+  ...(customSmsMessage && { customSmsMessage }),
+  userIdentifier: authIframeClient?.iframePublicKey!,
+});
+
+if (initAuthResponse && initAuthResponse.otpId) {
+  // proceed to verifyOtp
+} else {
+  // error handling
+}
+```
+
+#### Parameters
+
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'request',
+    type: {
+      name: 'SendOtpRequest',
+      link: 'https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L172'
+    }
+  }}
+  isRequired
+>
+
+An object containing the parameters to initiate an `EMAIL` or `SMS` OTP authentication flow.
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'suborgID',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The ID of the sub organization for the given request
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'otpType',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The type of OTP request, either `EMAIL` or `SMS`
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'contact',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The contact
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'customSmsMessage',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Use to customize the SMS message
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'userIdentifier',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+IP Address, iframePublicKey, or other unique identifier used for rate limiting
+
+</Parameter>
+
+</Parameter>
+
+### `verifyOtp()`
+
+Verify the OTP Code sent to the user via `EMAIL` or `SMS`. If verification is successful, a Session is returned which is used to log in with.
+
+```typescript
+import { server } from "@turnkey/sdk-server";
+
+const authSession = await server.verifyOtp({
+  suborgID: suborgId,
+  otpId,
+  otpCode: otp,
+  targetPublicKey: authIframeClient!.iframePublicKey!,
+  sessionLengthSeconds,
+});
+
+if (authSession?.token) {
+  // log in with Session
+  await authIframeClient!.loginWithSession(authSession);
+  // call onValidateSuccess callback
+  await onValidateSuccess();
+} else {
+  // error handling
+}
+```
+
+#### Parameters
+
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'request',
+    type: {
+      name: 'VerifyOtpRequest',
+      link: 'https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L157'
+    }
+  }}
+  isRequired
+>
+
+An object containing the parameters to verify an OTP authentication attempt.
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'suborgID',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The ID of the sub organization for the given request
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'otpId',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The ID for the given OTP request. This ID is returned in the [`SendOtpResponse`](https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L182) from [`sendOtp()`](#sendotp)
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'otpCode',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The OTP Code sent to the user
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'targetPublicKey',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The public key of the target user.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'sessionLengthSeconds',
+    type: {
+      name: 'number',
+    }
+  }}
+>
+
+Specify the length of the session in seconds. Defaults to 900 seconds or 15 minutes.
+
+</Parameter>
+
+</Parameter>
+
+### `oauth()`
+
+Complete an OAuth authentication flow once the OIDC Token has been obtain from the OAuth provider.
+
+```typescript
+import { server } from "@turnkey/sdk-server";
+
+const oauthSession = await server.oauth({
+  suborgID: suborgId!,
+  oidcToken: credential,
+  targetPublicKey: authIframeClient?.iframePublicKey!,
+  sessionLengthSeconds: authConfig.sessionLengthSeconds,
+});
+
+if (oauthSession && oauthSession.token) {
+  // log in with Session
+  await authIframeClient!.loginWithSession(oauthSession);
+  // call onAuthSuccess callback
+  await onAuthSuccess();
+} else {
+  // error handling
+}
+```
+
+#### Parameters
+
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'request',
+    type: {
+      name: 'OauthRequest',
+      link: 'https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L165'
+    }
+  }}
+  isRequired
+>
+
+An object containing the parameters to complete an OAuth authentication flow.
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'suborgID',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The ID of the sub organization for the given request
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'oidcToken',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The OIDC (OpenID Connect) Token issued by the OAuth provider which contains basic profile information about the user.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'targetPublicKey',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The public key of the target user.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'sessionLengthSeconds',
+    type: {
+      name: 'number',
+    }
+  }}
+>
+
+Specify the length of the session in seconds. Defaults to 900 seconds or 15 minutes.
+
+</Parameter>
+
+</Parameter>
+
+### `sendCredential()`
+
+```typescript
+import { server } from "@turnkey/sdk-server";
+
+const sendCredentialResponse = await server.sendCredential({
+  email,
+  targetPublicKey: authIframeClient?.iframePublicKey!,
+  organizationId: suborgId!,
+  ...(apiKeyName && { apiKeyName }),
+  ...(sendFromEmailAddress && { sendFromEmailAddress }),
+  ...(sessionLengthSeconds && { sessionLengthSeconds }),
+  ...(invalidateExisting && { invalidateExisting }),
+  ...(emailCustomization && { emailCustomization }),
+  ...(sendFromEmailAddress && { sendFromEmailAddress }),
+});
+```
+
+#### Parameters
+
+<Parameter
+  style={{ borderBottom: "none", paddingBottom: "none"}}
+  param={{
+    name: 'request',
+    type: {
+      name: 'InitEmailAuthRequest',
+      link: 'https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L186'
+    }
+  }}
+  isRequired
+>
+
+An object containing the parameters to verify an OTP authentication attempt.
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'suborgID',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The ID of the sub organization for the given request
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'email',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The email address provided by the user
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'targetPublicKey',
+    type: {
+      name: 'string',
+    }
+  }}
+  isRequired
+>
+
+The public key of the target user.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'apiKeyName',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+The name of the API Key
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'userIdentifier',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+IP Address, iframePublicKey, or other unique identifier used for rate limiting
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'sessionLengthSeconds',
+    type: {
+      name: 'number',
+    }
+  }}
+>
+
+Specify the length of the session in seconds. Defaults to 900 seconds or 15 minutes.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'invalidateExisting',
+    type: {
+      name: 'boolean',
+    }
+  }}
+>
+
+Invalidate all pre-existing sessions. Defaults to `false`.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'emailCustomization',
+    type: {
+      name: 'EmailCustomization',
+      link: 'https://github.com/tkhq/sdk/blob/494911d948d0a53c0d00aa01e9821aefd5e3f80d/packages/sdk-server/src/__types__/base.ts#L280'
+    }
+  }}
+>
+
+An optional to customize the email.
+
+</Parameter>
+
+<Parameter
+  style={{ paddingTop: '0', paddingLeft: "12px"}}
+  param={{
+    name: 'sendFromEmailAddress',
+    type: {
+      name: 'string',
+    }
+  }}
+>
+
+Provide a custom email address which will be used as the sender of the email.
+
+</Parameter>
+
+</Parameter>
