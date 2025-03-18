@@ -1,0 +1,308 @@
+---
+title: "Policy examples"
+sidebarTitle: "Examples"
+---
+
+## Access control
+
+#### Allow a specific user to create wallets
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to create wallets",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.resource == 'WALLET' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow users with a specific tag to create users
+
+```json
+{
+  "policyName": "Allow user_tag <USER_TAG_ID> to create users",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
+  "condition": "activity.resource == 'USER' && activity.action == 'CREATE'"
+}
+```
+
+#### Require two users with a specific tag to add policies
+
+```json
+{
+  "policyName": "Require two users with user_tag <USER_TAG_ID> to create policies",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.filter(user, user.tags.contains('<USER_TAG_ID>')).count() >= 2",
+  "condition": "activity.resource == 'POLICY' && activity.action == 'CREATE'"
+}
+```
+
+#### Deny all delete actions for users with a specific tag
+
+```json
+{
+  "policyName": "Only user_tag <USER_TAG_ID> can take actions",
+  "effect": "EFFECT_DENY",
+  "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
+  "condition": "activity.action == 'DELETE'"
+}
+```
+
+#### Allow a specific user (e.g. API-only user) to create a sub-org
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to create a sub-org",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'ORGANIZATION' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow a specific user to perform auth type activities (full list [here](Policy-language.md#activity-breakdown))
+Note: The activity.resource portion determines which activities can be performed. The activity.action determines what types of actions can be taken upon those resources.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to initiate auth type activities",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'AUTH' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow a specific user to perform a specific activity type (full list [here](Policy-language.md#activity-breakdown))
+Note: Activities may be upgraded over time, and thus new versions may be introduced. These policies will NOT be valid if an activity type is upgraded and requests are made on the new activity type. For example, if Turnkey introduces `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` (upgraded from `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2`) and a request is made with the newer `V3` version, this policy with not allow that user to perform `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` activities.
+
+```json JSON
+{
+  "policyName": "Allow user <USER_ID> to perform create read write session v2",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2'"
+}
+```
+
+## Signing control
+
+#### Allow a specific user to sign transactions with any account address within a specific wallet
+
+```JSON
+{
+  "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ID>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet.id == '<WALLET_ID>'"
+}
+```
+
+#### Allow a specific user to sign transactions with a specific wallet account address
+
+```json
+{
+  "policyName": "Allow <USER_ID> to sign transactions with <WALLET_ACCOUNT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet_account.address == '<WALLET_ACCOUNT_ADDRESS>'"
+}
+```
+
+#### Allow a specific user to sign transactions with a specific private key
+
+```json
+{
+  "policyName": "Allow <USER_ID> to sign transactions with <PRIVATE_KEY_ID>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "private_key.id == '<PRIVATE_KEY_ID>'"
+}
+```
+
+### Ethereum (EVM)
+
+Note: see the [language section](/concepts/policies/language#appendix) for more details.
+
+#### Allow ERC-20 transfers for a specific token smart contract
+
+```json
+{
+  "policyName": "Enable ERC-20 transfers for <CONTRACT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.to == '<CONTRACT_ADDRESS>' && eth.tx.data[0..10] == '0xa9059cbb'"
+}
+```
+
+#### Allow anyone to sign transactions for testnet (Sepolia)
+
+```json
+{
+  "policyName": "Allow signing ethereum sepolia transactions",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.chain_id == 11155111"
+}
+```
+
+#### Allow ETH transactions with a specific nonce range
+
+```json
+{
+  "policyName": "Allow signing Ethereum transactions with an early nonce",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.nonce <= 3"
+}
+```
+
+### Solana
+
+Note: see the [language section](/concepts/policies/language#appendix) for various approaches on writing Solana policies.
+
+#### Allow Solana transactions that include a transfer from one specific sender
+
+```json
+{
+  "policyName": "Enable transactions with a transfer sent by <SENDER_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.all(transfer, transfer.from == '<SENDER_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions that include a transfer to only one specific recipient
+
+```json
+{
+  "policyName": "Enable transactions with a single transfer sent to <RECIPIENT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.count == 1 && solana.tx.transfers[0].to == '<RECIPIENT_ADDRESS>'"
+}
+```
+
+#### Allow Solana transactions that have exactly one transfer, to one specific recipient
+
+```json
+{
+  "policyName": "Enable transactions with a transfer sent to <RECIPIENT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.transfers.all(transfer, transfer.to == '<RECIPIENT_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions that only use the Solana System Program
+
+```json
+{
+  "policyName": "Enable transactions that only use the system program",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.program_keys.all(p, p == '11111111111111111111111111111111')"
+}
+```
+
+#### Deny all Solana transactions transferring to an undesired address
+
+```json
+{
+  "policyName": "Reject transactions with a transfer sent to <BAD_ADDRESS>",
+  "effect": "EFFECT_DENY",
+  "condition": "solana.tx.transfers.any(transfer, transfer.to == '<BAD_ADDRESS>')"
+}
+```
+
+#### Allow Solana transactions with specific expected instruction data
+
+```json
+{
+  "policyName": "Enable transactions where the first instruction has precisely <HEX BYTES>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].instruction_data_hex == '<HEX BYTES>'"
+}
+```
+
+#### Allow Solana transactions whose first instruction involves a specific address
+
+```json
+{
+  "policyName": "Enable transactions where the first instruction has a first account involving <ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.instructions[0].accounts[0].account_key == '<ADDRESS>'"
+}
+```
+
+#### Solana SPL token transfers -- Context and Examples
+
+Turnkey’s policy engine supports policies for SPL token transfers. Specifically, we support creating policies for the `Transfer`, `TransferChecked` and `TransferCheckedWithFee` instructions across both the Solana Token Program and the Solana Token 2022 Program.
+
+Some important context for using SPL token policies with Turnkey:
+
+**Token Account Addresses** For context, Solana implements SPL token balances for a particular wallet address by creating a whole new account called a "token account" which has a pointer in its data field labeled "owner" that points back to the wallet address in question. So to hold a particular token in your Solana wallet, you have to have to create a new token account meant to hold that token, owned by your Solana wallet. For policies related to the receiving token address of an SPL transfer, the token address receiving the tokens will have to be used, NOT the wallet address that is the owner for the receiving token address. This is because, while both the owning wallet address and the receiving token address are specified in the transfer instruction, the owning wallet address of the recipient token address is not specified. For this we highly recommend using the convention of “associated token addresses” to set policies that, for example, allow SPL token transfers to a particular wallet address.
+
+For further context on associated token addresses check out Solana’s documentation on it: [https://spl.solana.com/associated-token-account](https://spl.solana.com/associated-token-account)
+
+<Note>
+  An example implementation of using a policy to allow transfers to the associated token address of the intended recipient wallet address can be found in our SDK examples [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana#6-running-the-create-spl-token-transfer-with-policy-example).
+</Note>
+
+**Mint Address Accessibility** The mint account address of the token will only be accessible when the transaction is constructed using instructions that specify the mint address – `TransferChecked` and `TransferCheckedWithFee`. For transactions constructed using the simple `Transfer` method, the mint account will be considered empty.
+
+Here are some example policies for SPL transfers:
+
+#### Allow a user to sign Solana transactions that include a single instruction which is an SPL token transfer from a particular sending token address
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign Solana transactions that include only a single SPL Transfer FROM <TOKEN_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.from == '<TOKEN_ADDRESS>')"}
+```
+
+#### Allow a user to sign Solana transactions only if ALL of the instructions are SPL transfers TO a particular token address
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign Solana transactions only if ALL of the instructions are SPL transfers TO <TOKEN_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.to == '<TOKEN_ADDRESS>')"}
+```
+
+#### Allow users with a specific tag to sign Solana transactions only if ALL of the instructions are SPL token transfers with a specific address as the owner of the sending token address
+
+```json
+{
+  "policyName": "Allow users with <USER_TAG> to sign Solana transactions only if ALL of the instructions are SPL token transfers with <OWNER_ADDRESS> as the owner of the sending token address",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID'))",
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.owner == '<OWNER_ADDRESS>')"}
+```
+
+#### Allow a user to sign Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than a threshold amount
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than <AMOUNT>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.amount < <AMOUNT>)"
+}
+```
+
+#### Allow a user to sign Solana transactions only if ALL of the instructions are SPL token transfers where the token mint address is a particular address
+
+```json
+{
+  "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of the instructions are SPL token transfers where the token mint address is <TOKEN_MINT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.token_mint == '<TOKEN_MINT_ADDRESS>')"}
+```
+
+#### Allow a user to sign Solana transactions that includes a single instruction which is an SPL token transfer where one of the multisig signers of the owner is a particular address
+
+```json
+{
+  "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of it's instructions are SPL token transfers where one of the multisig signers of the owner is <SIGNER_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.signers.any(s, s == '<SIGNER_ADDRESS>'))"
+}
+```
