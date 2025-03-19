@@ -245,6 +245,7 @@ A new [sub-organization](/concepts/sub-organizations) and [wallet](/concepts/wal
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Auth } from "@turnkey/sdk-react";
 
 export default function Home() {
@@ -291,6 +292,8 @@ Calling `turnkey.getCurrentUser()` will return the current user's session inform
 Add a state variable to store the user:
 
 ```tsx title="src/app/dashboard/page.tsx" {2,8}
+"use client";
+
 import { useState, useEffect } from "react";
 import { useTurnkey } from "@turnkey/sdk-react";
 
@@ -299,10 +302,13 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (turnkey) {
-      const user = turnkey.getCurrentUser();
-      setUser(user);
-    }
+    const fetchUser = async () => {
+      if (turnkey) {
+        const user = await turnkey.getCurrentUser();
+        setUser(user);
+      }
+    };
+    fetchUser();
   }, [turnkey]);
 
   return <div>Dashboard</div>;
@@ -373,6 +379,8 @@ The `signRawPayload` method requires these parameters:
 For simplicity, a human readable string, `message`, will be the payload to sign. Add a state variable to store the message and an input field to allow the user to enter the message:
 
 ```tsx title="src/app/dashboard/page.tsx" {6}
+"use client";
+
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {
@@ -404,6 +412,8 @@ Create a function called `getSignWith`, to get the user's wallet account address
 Use the `getActiveClient` method from the `useTurnkey` hook to get the client authenticated with the user's read-write session:
 
 ```tsx title="src/app/dashboard/page.tsx" {5,7-32}
+"use client";
+
 import { useState, useEffect } from "react";
 import { useTurnkey } from "@turnkey/sdk-react";
 
@@ -474,6 +484,8 @@ const signMessage = async () => {
 Add a button to the UI to trigger the `signMessage` function.
 
 ```tsx title="src/app/dashboard/page.tsx" {2,8}
+"use client";
+
 import { useState, useEffect } from "react";
 import { useTurnkey } from "@turnkey/sdk-react";
 import { hashMessage } from "viem";
@@ -527,10 +539,35 @@ In this quickstart guide, you've learned how to:
 <details>
 <summary>Complete Code</summary>
 
+```tsx title="src/app/layout.tsx"
+
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+import "@turnkey/sdk-react/styles"; // required to render auth component styles properly
+
+const config = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID,
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <TurnkeyProvider config={config}>
+          {/* @ts-ignore */}
+          {children}
+          </TurnkeyProvider>
+      </body>
+    </html>
+  );
+}
+```
+
 ```tsx title="src/app/page.tsx"
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Auth } from "@turnkey/sdk-react";
 
 export default function Home() {
@@ -568,6 +605,8 @@ export default function Home() {
 ```
 
 ```tsx title="src/app/dashboard/page.tsx"
+"use client";
+
 import { useState, useEffect } from "react";
 import { useTurnkey } from "@turnkey/sdk-react";
 import { hashMessage } from "viem";
@@ -604,10 +643,13 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (turnkey) {
-      const user = turnkey.getCurrentUser();
-      setUser(user);
-    }
+    const fetchUser = async () => {
+      if (turnkey) {
+        const user = await turnkey.getCurrentUser();
+        setUser(user);
+      }
+    };
+    fetchUser();
   }, [turnkey]);
 
   return (
