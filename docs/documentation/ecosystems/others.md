@@ -15,8 +15,9 @@ We support address derivation and have published a package on NPM to help with t
 
 We support address derivation for these ecosystems. We also have two SDK examples:
 
-- [`examples/with-sui`](https://github.com/tkhq/sdk/tree/main/examples/with-sui) demonstrates transaction construction and broadcast on Sui.
-- [`examples/with-aptos`](https://github.com/tkhq/sdk/tree/main/examples/with-aptos) demonstrates transaction construction and broadcast on Aptos.
+* [`examples/with-sui`](https://github.com/tkhq/sdk/tree/main/examples/with-sui) demonstrates transaction construction and broadcast on Sui.
+* [`examples/with-aptos`](https://github.com/tkhq/sdk/tree/main/examples/with-aptos) demonstrates transaction construction and broadcast on Aptos.
+* [`examples/with-movement`](https://github.com/tkhq/sdk/tree/main/examples/with-movement) demonstrates transaction construction and broadcast on Movement.
 
 ## Ed25519 and SECP256k1 Signing
 
