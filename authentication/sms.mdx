@@ -17,28 +17,28 @@ SMS authentication uses two activities:
 
 To start SMS authentication, create an activity with `ACTIVITY_TYPE_INIT_OTP_AUTH` and the following parameters:
 
-* `otpType`: must be set to `"OTP_TYPE_SMS"`
-* `contact`: user's phone number (must be previously approved and attached to the user's organization data)
-* `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user. We recommend generating this serverside based on the user's IP address or public key.
+- `otpType`: must be set to `"OTP_TYPE_SMS"`
+- `contact`: user's phone number (must be previously approved and attached to the user's organization data)
+- `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user.
+  We recommend generating this server-side based on the user's IP address or public key.
+  See the [OTP Rate Limits](#otp-rate-limits) section below for more details.
 
 ### Verifying the OTP
 
 Once the user receives their code, use `ACTIVITY_TYPE_OTP_AUTH` with these parameters:
 
-* `otpId`: ID from the `INIT_OTP_AUTH` response
-* `otpCode`: the 6-digit code received via SMS
-* `targetPublicKey`: public key for credential encryption
-* `apiKeyName`: optional name for the API Key (defaults to `OTP Auth - <Timestamp>`)
-* `expirationSeconds`: optional duration in seconds (defaults to 15 minutes)
-* `invalidateExisting`: optional boolean to invalidate previous OTP Auth API keys
+- `otpId`: ID from the `INIT_OTP_AUTH` response
+- `otpCode`: the 6-digit code received via SMS
+- `targetPublicKey`: public key for credential encryption
+- `apiKeyName`: optional name for the API Key (defaults to `OTP Auth - <Timestamp>`)
+- `expirationSeconds`: optional duration in seconds (defaults to 15 minutes)
+- `invalidateExisting`: optional boolean to invalidate previous OTP Auth API keys
 
 ## Authorization
 
 SMS authentication requires proper permissions through policies or parent organization status.
 
-<Info>
-  Non-paying accounts are limited to **50 SMS messages** per month.
-</Info>
+<Info>Non-paying accounts are limited to **50 SMS messages** per month.</Info>
 
 ## Enabling/Disabling SMS Auth
 
@@ -59,11 +59,19 @@ turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization
 
 ### For Sub-organizations
 
-* SMS auth is enabled by default
-* Disable during creation using `disableSmsAuth: true` in the `CreateSubOrganizationIntentV7` activity
-* Disable after creation using `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` with feature name `FEATURE_NAME_SMS_AUTH`
+- SMS auth is enabled by default
+- Disable during creation using `disableSmsAuth: true` in the `CreateSubOrganizationIntentV7` activity
+- Disable after creation using `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` with feature name `FEATURE_NAME_SMS_AUTH`
 
 ## Implementation Notes
 
-* Users are limited to 10 long-lived API keys and 10 expiring API keys
-* When the expiring API key limit is reached, the oldest key is automatically discarded
+- Users are limited to 10 long-lived API keys and 10 expiring API keys
+- When the expiring API key limit is reached, the oldest key is automatically discarded
+
+## OTP Rate Limits
+
+In order to safeguard users, Turnkey enforces rate limits for OTP auth activities. If a `userIdentifier` parameter is provided, the following limits are enforced:
+
+- 3 requests per 3 minutes per unique `userIdentifier`
+- 3 retries max per code, after which point that code will be locked
+- 3 active codes per user, each with a 5 minute TTL
