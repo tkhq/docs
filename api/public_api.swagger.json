@@ -2265,7 +2265,10 @@
         "ACTIVITY_TYPE_INIT_OTP_AUTH",
         "ACTIVITY_TYPE_OTP_AUTH",
         "ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7",
-        "ACTIVITY_TYPE_UPDATE_WALLET"
+        "ACTIVITY_TYPE_UPDATE_WALLET",
+        "ACTIVITY_TYPE_UPDATE_POLICY_V2",
+        "ACTIVITY_TYPE_CREATE_USERS_V3",
+        "ACTIVITY_TYPE_INIT_OTP_AUTH_V2"
       ]
     },
     "AddressFormat": {
@@ -3880,12 +3883,26 @@
       },
       "required": ["users"]
     },
+    "CreateUsersIntentV3": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UserParamsV3"
+          },
+          "description": "A list of Users."
+        }
+      },
+      "required": ["users"]
+    },
     "CreateUsersRequest": {
       "type": "object",
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ACTIVITY_TYPE_CREATE_USERS_V2"]
+          "enum": ["ACTIVITY_TYPE_CREATE_USERS_V3"]
         },
         "timestampMs": {
           "type": "string",
@@ -3896,7 +3913,7 @@
           "description": "Unique identifier for a given Organization."
         },
         "parameters": {
-          "$ref": "#/definitions/CreateUsersIntentV2"
+          "$ref": "#/definitions/CreateUsersIntentV3"
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -5777,12 +5794,51 @@
       },
       "required": ["otpType", "contact"]
     },
+    "InitOtpAuthIntentV2": {
+      "type": "object",
+      "properties": {
+        "otpType": {
+          "type": "string",
+          "description": "Enum to specifiy whether to send OTP via SMS or email"
+        },
+        "contact": {
+          "type": "string",
+          "description": "Email or phone number to send the OTP code to"
+        },
+        "otpLength": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Optional length of the OTP code. Default = 9"
+        },
+        "emailCustomization": {
+          "$ref": "#/definitions/EmailCustomizationParams",
+          "description": "Optional parameters for customizing emails. If not provided, the default email will be used."
+        },
+        "smsCustomization": {
+          "$ref": "#/definitions/SmsCustomizationParams",
+          "description": "Optional parameters for customizing SMS message. If not provided, the default sms message will be used."
+        },
+        "userIdentifier": {
+          "type": "string",
+          "description": "Optional client-generated user identifier to enable per-user rate limiting for SMS auth. We recommend using a hash of the client-side IP address."
+        },
+        "sendFromEmailAddress": {
+          "type": "string",
+          "description": "Optional custom email address from which to send the OTP email"
+        },
+        "alphanumeric": {
+          "type": "boolean",
+          "description": "Optional flag to specify if the OTP code should be alphanumeric (Crockford’s Base32). Default = true"
+        }
+      },
+      "required": ["otpType", "contact"]
+    },
     "InitOtpAuthRequest": {
       "type": "object",
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ACTIVITY_TYPE_INIT_OTP_AUTH"]
+          "enum": ["ACTIVITY_TYPE_INIT_OTP_AUTH_V2"]
         },
         "timestampMs": {
           "type": "string",
@@ -5793,12 +5849,22 @@
           "description": "Unique identifier for a given Organization."
         },
         "parameters": {
-          "$ref": "#/definitions/InitOtpAuthIntent"
+          "$ref": "#/definitions/InitOtpAuthIntentV2"
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
     "InitOtpAuthResult": {
+      "type": "object",
+      "properties": {
+        "otpId": {
+          "type": "string",
+          "description": "Unique identifier for an OTP authentication"
+        }
+      },
+      "required": ["otpId"]
+    },
+    "InitOtpAuthResultV2": {
       "type": "object",
       "properties": {
         "otpId": {
@@ -6103,6 +6169,15 @@
         },
         "updateWalletIntent": {
           "$ref": "#/definitions/UpdateWalletIntent"
+        },
+        "updatePolicyIntentV2": {
+          "$ref": "#/definitions/UpdatePolicyIntentV2"
+        },
+        "createUsersIntentV3": {
+          "$ref": "#/definitions/CreateUsersIntentV3"
+        },
+        "initOtpAuthIntentV2": {
+          "$ref": "#/definitions/InitOtpAuthIntentV2"
         }
       }
     },
@@ -6347,7 +6422,7 @@
         },
         "otpCode": {
           "type": "string",
-          "description": "6 digit OTP code sent out to a user's contact (email or SMS)"
+          "description": "OTP sent out to a user's contact (email or SMS)"
         },
         "targetPublicKey": {
           "type": "string",
@@ -6366,7 +6441,7 @@
           "description": "Invalidate all other previously generated OTP Auth API keys"
         }
       },
-      "required": ["otpId", "otpCode"]
+      "required": ["otpId", "otpCode", "targetPublicKey"]
     },
     "OtpAuthRequest": {
       "type": "object",
@@ -6938,6 +7013,12 @@
         },
         "updateWalletResult": {
           "$ref": "#/definitions/UpdateWalletResult"
+        },
+        "updatePolicyResultV2": {
+          "$ref": "#/definitions/UpdatePolicyResultV2"
+        },
+        "initOtpAuthResultV2": {
+          "$ref": "#/definitions/InitOtpAuthResultV2"
         }
       }
     },
@@ -7543,12 +7624,42 @@
       },
       "required": ["policyId"]
     },
+    "UpdatePolicyIntentV2": {
+      "type": "object",
+      "properties": {
+        "policyId": {
+          "type": "string",
+          "description": "Unique identifier for a given Policy."
+        },
+        "policyName": {
+          "type": "string",
+          "description": "Human-readable name for a Policy."
+        },
+        "policyEffect": {
+          "$ref": "#/definitions/Effect",
+          "description": "The instruction to DENY or ALLOW an activity (optional)."
+        },
+        "policyCondition": {
+          "type": "string",
+          "description": "The condition expression that triggers the Effect (optional)."
+        },
+        "policyConsensus": {
+          "type": "string",
+          "description": "The consensus expression that triggers the Effect (optional)."
+        },
+        "policyNotes": {
+          "type": "string",
+          "description": "Accompanying notes for a Policy (optional)."
+        }
+      },
+      "required": ["policyId"]
+    },
     "UpdatePolicyRequest": {
       "type": "object",
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ACTIVITY_TYPE_UPDATE_POLICY"]
+          "enum": ["ACTIVITY_TYPE_UPDATE_POLICY_V2"]
         },
         "timestampMs": {
           "type": "string",
@@ -7559,12 +7670,22 @@
           "description": "Unique identifier for a given Organization."
         },
         "parameters": {
-          "$ref": "#/definitions/UpdatePolicyIntent"
+          "$ref": "#/definitions/UpdatePolicyIntentV2"
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
     "UpdatePolicyResult": {
+      "type": "object",
+      "properties": {
+        "policyId": {
+          "type": "string",
+          "description": "Unique identifier for a given Policy."
+        }
+      },
+      "required": ["policyId"]
+    },
+    "UpdatePolicyResultV2": {
       "type": "object",
       "properties": {
         "policyId": {
@@ -7990,6 +8111,61 @@
         }
       },
       "required": ["userName", "apiKeys", "authenticators", "userTags"]
+    },
+    "UserParamsV3": {
+      "type": "object",
+      "properties": {
+        "userName": {
+          "type": "string",
+          "description": "Human-readable name for a User."
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "The user's email address."
+        },
+        "userPhoneNumber": {
+          "type": "string",
+          "description": "The user's phone number in E.164 format e.g. +13214567890"
+        },
+        "apiKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ApiKeyParamsV2"
+          },
+          "description": "A list of API Key parameters. This field, if not needed, should be an empty array in your request body."
+        },
+        "authenticators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthenticatorParamsV2"
+          },
+          "description": "A list of Authenticator parameters. This field, if not needed, should be an empty array in your request body."
+        },
+        "oauthProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OauthProviderParams"
+          },
+          "description": "A list of Oauth providers. This field, if not needed, should be an empty array in your request body."
+        },
+        "userTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A list of User Tag IDs. This field, if not needed, should be an empty array in your request body."
+        }
+      },
+      "required": [
+        "userName",
+        "apiKeys",
+        "authenticators",
+        "oauthProviders",
+        "userTags"
+      ]
     },
     "Vote": {
       "type": "object",
