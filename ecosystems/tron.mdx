@@ -1,0 +1,121 @@
+---
+title: "Tron support on Turnkey"
+sidebarTitle: "Tron"
+---
+
+## Address derivation
+
+Turnkey supports Tron address derivation with `ADDRESS_TYPE_TRON`. Tron addresses are derived from the same SECP256k1 curve that is used for Ethereum addresses, but with a different address encoding format.
+
+## Transaction construction and signing
+
+Tron's transaction format is supported for signing in Turnkey. You can use the core signing capabilities to sign Tron transactions by constructing the transaction following the Tron protocol specifications and then using Turnkey's signing API.
+
+## Complete Integration Example
+
+Here's a more complete example of how to integrate Turnkey with TronWeb for transaction signing:
+
+```javascript
+import { Turnkey } from "@turnkey/sdk-server";
+import TronWeb from "tronweb";
+
+// Initialize Turnkey client
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.API_PRIVATE_KEY,
+  apiPublicKey: process.env.API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.ORGANIZATION_ID,
+});
+
+// Initialize TronWeb without a private key
+const tronWeb = new TronWeb({
+  fullHost: "https://api.trongrid.io", // Mainnet
+  // Use testnet for development: "https://api.shasta.trongrid.io"
+});
+
+// Create a custom signer function for TronWeb that uses Turnkey
+async function createTronTransaction() {
+  const turnkeyAddress = process.env.TRON_ADDRESS; // Your Tron address in Turnkey
+  const recipientAddress = "TYour_Recipient_Address";
+  const amount = 100; // Amount in SUN (1 TRX = 1,000,000 SUN)
+
+  try {
+    // 1. Create an unsigned transaction
+    const unsignedTx = await tronWeb.transactionBuilder.sendTrx(
+      recipientAddress,
+      amount,
+      turnkeyAddress
+    );
+
+    // 2. Get the transaction for signing (returns the raw data hex)
+    const signedTxInfo = await tronWeb.trx.sign(
+      unsignedTx,
+      // This value isn't used since we intercept and sign with Turnkey
+      "placeholder",
+      false, // broadcast: false to not send immediately
+      // Override the standard sign function
+      async (transaction, privateKey) => {
+        // This custom function replaces the default TronWeb signing
+        console.log("Signing transaction with Turnkey...");
+
+        // Get transaction hash that needs to be signed
+        const txID = transaction.txID;
+        const txToSign = Buffer.from(txID, "hex").toString("hex");
+
+        // Sign with Turnkey
+        const signResult = await turnkeyClient.signRawPayload({
+          organizationId: process.env.ORGANIZATION_ID,
+          signWith: turnkeyAddress,
+          payload: txToSign,
+          encoding: "hex",
+        });
+
+        // Set signature in transaction object
+        transaction.signature = [signResult.signature];
+        return transaction;
+      }
+    );
+
+    // 3. Broadcast the signed transaction
+    const result = await tronWeb.trx.sendRawTransaction(signedTxInfo);
+    console.log("Transaction sent! ID:", result.txid);
+    return result;
+  } catch (error) {
+    console.error("Error creating transaction:", error);
+    throw error;
+  }
+}
+```
+
+## Tron Transaction Types
+
+You can use Turnkey to sign various Tron transaction types:
+
+- TRX transfers
+- TRC10 token transfers
+- TRC20 token transfers (smart contract interactions)
+- Smart contract deployments
+- Smart contract function calls
+
+## Networks
+
+Turnkey supports both:
+
+- Tron Mainnet
+- Tron Shasta Testnet
+
+## Integration with Tron Tools
+
+Turnkey can be integrated with popular Tron development tools such as:
+
+- [TronWeb](https://github.com/tronprotocol/tronweb) - The official JavaScript API for interacting with the Tron network
+- [TronBox](https://github.com/tronprotocol/tronbox) - A development framework for Tron smart contracts
+
+## Benefits of Using Turnkey with Tron
+
+- **Enhanced Security**: Private keys never leave Turnkey's secure infrastructure
+- **Policy Controls**: Apply transaction policies to control what can be signed
+- **Simplified Key Management**: No need to manage private keys in your application code
+- **Multi-signature Support**: Enable quorum-based approvals for transactions
+
+If you have any questions about using Turnkey with Tron or need assistance with integration, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-31v4yhgw6-PwBzyNsWCCBTk2xft3EoHQ).

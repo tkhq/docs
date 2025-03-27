@@ -1,0 +1,111 @@
+---
+title: "Cosmos support on Turnkey"
+sidebarTitle: "Cosmos"
+---
+
+## Address derivation
+
+Turnkey supports Cosmos address derivation. The address formats we support follow the [Cosmos SDK](https://docs.cosmos.network/) standard for bech32 addresses.
+
+## Transaction construction and signing
+
+To construct and sign Cosmos transactions with Turnkey, we offer:
+
+- [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs): exports a `TurnkeyDirectWallet` that serves as a drop-in replacement for a CosmJS direct wallet. It includes support for `signDirect`.
+
+See it in action in our example:
+
+- [`examples/with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs): demonstrates transaction construction and broadcast on Cosmos.
+
+## Integration Example
+
+Here's a minimal example showing how to initialize a Turnkey signer for Cosmos and perform basic operations:
+
+```js
+import { Turnkey } from "@turnkey/sdk-server";
+import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
+import { toHex } from "@cosmjs/encoding";
+import { SigningStargateClient } from "@cosmjs/stargate";
+
+// Initialize the Turnkey client
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.API_PRIVATE_KEY,
+  apiPublicKey: process.env.API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.ORGANIZATION_ID,
+});
+
+// Initialize a Turnkey signer for Cosmos
+async function initializeCosmosWallet() {
+  // Create a Turnkey-powered Cosmos wallet
+  const wallet = await TurnkeyDirectWallet.init({
+    config: {
+      client: turnkeyClient.apiClient(),
+      organizationId: process.env.ORGANIZATION_ID,
+      signWith: process.env.COSMOS_ADDRESS, // Your Cosmos address in Turnkey
+    },
+    prefix: "cosmos", // Change to the appropriate chain prefix (e.g., "celestia", "osmo", etc.)
+  });
+
+  // Get the account details
+  const account = (await wallet.getAccounts())[0];
+  if (!account) throw new Error("No account found");
+
+  console.log("Wallet address:", account.address);
+  // Compressed public key
+  console.log("Public key:", toHex(account.pubkey));
+
+  return wallet;
+}
+
+// Connect to a chain and send a transaction
+async function sendTransaction() {
+  const wallet = await initializeCosmosWallet();
+
+  // Connect to a Cosmos chain RPC endpoint
+  const client = await SigningStargateClient.connectWithSigner(
+    "https://rpc.cosmos.network", // Replace with your preferred RPC endpoint
+    wallet
+  );
+
+  // Get account balance
+  const balance = await client.getAllBalances(wallet.address);
+
+  // Send tokens
+  const recipient = "cosmos1..."; // Recipient address
+  const amount = [{ denom: "uatom", amount: "1000" }]; // 0.001 ATOM
+
+  const result = await client.sendTokens(
+    wallet.address,
+    recipient,
+    amount,
+    {
+      amount: [{ denom: "uatom", amount: "5000" }], // Fee
+      gas: "200000",
+    },
+    "Transaction memo"
+  );
+}
+```
+
+## Supported Cosmos Chains
+
+Turnkey supports various Cosmos ecosystem chains for address derivation and signing, including but not limited to:
+
+- Cosmos Hub (ATOM)
+- Celestia
+- Osmosis
+- Injective
+- Juno
+- Stargaze
+- Akash
+- Secret Network
+
+## Key Features
+
+- **Drop-in Replacement**: `TurnkeyDirectWallet` works as a direct replacement for standard CosmJS signers
+- **Chain Agnostic**: Works with any Cosmos SDK-based chain by changing the prefix
+- **Secure Signing**: All private keys remain secure in Turnkey's infrastructure
+- **Policy Control**: Apply custom signing policies to control transaction approvals
+
+If you are using a Cosmos chain we do not explicitly support, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-31v4yhgw6-PwBzyNsWCCBTk2xft3EoHQ).

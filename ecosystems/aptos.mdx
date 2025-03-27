@@ -1,0 +1,203 @@
+---
+title: "Aptos support on Turnkey"
+sidebarTitle: "Aptos"
+---
+
+## Address derivation
+
+Turnkey supports Aptos address derivation with `ADDRESS_TYPE_APTOS`. Aptos addresses are derived from the Ed25519 curve, which Turnkey fully supports.
+
+## Transaction construction and signing
+
+Turnkey supports Aptos transaction signing through our core signing capabilities. We have an example repository that demonstrates how to construct and sign Aptos transactions:
+
+- [`examples/with-aptos`](https://github.com/tkhq/sdk/tree/main/examples/with-aptos): demonstrates transaction construction and broadcast on Aptos.
+
+## Integration Example
+
+Here's a comprehensive example showing how to integrate Turnkey with the Aptos SDK for transaction signing:
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-server";
+import {
+  AptosClient,
+  AptosAccount,
+  TxnBuilderTypes,
+  BCS,
+  TransactionBuilder,
+  HexString
+} from "aptos";
+
+// Custom Turnkey signer for Aptos
+class TurnkeyAptosSigner {
+  private turnkeyClient: Turnkey;
+  private aptosClient: AptosClient;
+  private address: string;
+  private organizationId: string;
+
+  constructor(
+    apiPrivateKey: string,
+    apiPublicKey: string,
+    organizationId: string,
+    address: string,
+    nodeUrl: string = "https://fullnode.mainnet.aptoslabs.com/v1"
+  ) {
+    this.turnkeyClient = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey,
+      apiPublicKey,
+      defaultOrganizationId: organizationId
+    });
+
+    this.aptosClient = new AptosClient(nodeUrl);
+    this.address = address;
+    this.organizationId = organizationId;
+  }
+
+  // Get the account address
+  getAddress(): string {
+    return this.address;
+  }
+
+  // Sign a transaction using Turnkey
+  async signTransaction(rawTxn: TxnBuilderTypes.RawTransaction): Promise<Uint8Array> {
+    // Serialize the raw transaction to BCS
+    const serializer = new BCS.Serializer();
+    rawTxn.serialize(serializer);
+    const toSign = serializer.getBytes();
+
+    // Sign the serialized transaction with Turnkey
+    const signResult = await this.turnkeyClient.signRawPayload({
+      organizationId: this.organizationId,
+      signWith: this.address,
+      payload: Buffer.from(toSign).toString('hex'),
+      encoding: "hex"
+    });
+
+    // Return the signed transaction bytes
+    return Buffer.from(signResult.signature, 'hex');
+  }
+
+  // Submit a transaction
+  async submitTransaction(payload: any): Promise<string> {
+    try {
+      // Create a raw transaction from the payload
+      const rawTxn = await this.createRawTransaction(payload);
+
+      // Sign the transaction
+      const signature = await this.signTransaction(rawTxn);
+
+      // Get the authenticator
+      const authenticator = new TxnBuilderTypes.TransactionAuthenticatorEd25519(
+        new TxnBuilderTypes.Ed25519PublicKey(
+          // Note: In a real implementation, you would need to get the actual public key
+          new Uint8Array(32) // Placeholder - replace with actual public key
+        ),
+        new TxnBuilderTypes.Ed25519Signature(signature)
+      );
+
+      // Create a signed transaction
+      const signedTxn = new TxnBuilderTypes.SignedTransaction(
+        rawTxn,
+        authenticator
+      );
+
+      // Submit the transaction
+      const pendingTxn = await this.aptosClient.submitSignedBCSTransaction(
+        BCS.bcsToBytes(signedTxn)
+      );
+
+      return pendingTxn.hash;
+    } catch (error) {
+      console.error("Error submitting transaction:", error);
+      throw error;
+    }
+  }
+
+  // Helper method to create a raw transaction
+  private async createRawTransaction(payload: any): Promise<TxnBuilderTypes.RawTransaction> {
+    const account = await this.aptosClient.getAccount(this.address);
+    const chainId = await this.aptosClient.getChainId();
+
+    // Create a raw transaction
+    return new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(this.address),
+      BigInt(account.sequence_number),
+      payload,
+      BigInt(2000), // Max gas amount
+      BigInt(100), // Gas unit price
+      BigInt(Math.floor(Date.now() / 1000) + 30), // Expiration timestamp (30 seconds from now)
+      new TxnBuilderTypes.ChainId(chainId)
+    );
+  }
+}
+
+// Example usage: Transfer coins
+async function transferCoins() {
+  const signer = new TurnkeyAptosSigner(
+    process.env.API_PRIVATE_KEY!,
+    process.env.API_PUBLIC_KEY!,
+    process.env.ORGANIZATION_ID!,
+    process.env.APTOS_ADDRESS!, // Your Aptos address in Turnkey
+    "https://fullnode.testnet.aptoslabs.com/v1" // Testnet URL
+  );
+
+  const recipientAddress = "0x..."; // Recipient address
+  const amount = 1000000; // Amount in octas (1 APT = 100,000,000 octas)
+
+  // Create a transfer transaction payload
+  const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
+      "0x1::coin",
+      "transfer",
+      [new TxnBuilderTypes.TypeTagStruct(
+        TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin")
+      )],
+      [
+        BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(recipientAddress)),
+        BCS.bcsSerializeUint64(amount)
+      ]
+    )
+  );
+
+  try {
+    const txnHash = await signer.submitTransaction(payload);
+    console.log(`Transaction submitted successfully! Hash: ${txnHash}`);
+    return txnHash;
+  } catch (error) {
+    console.error("Error transferring coins:", error);
+    throw error;
+  }
+}
+
+## Aptos Network Support
+
+Turnkey supports:
+
+* Aptos Mainnet
+* Aptos Testnet
+* Aptos Devnet
+
+## Key Features for Aptos
+
+* **Ed25519 Signing**: Turnkey fully supports the Ed25519 curve used by Aptos
+* **BCS Format Support**: Sign transactions serialized in the Binary Canonical Serialization format
+* **Integration Example**: Our example repository provides a reference implementation for integrating with the Aptos ecosystem
+
+## Benefits of Using Turnkey with Aptos
+
+* **Secure Key Management**: Private keys are securely stored in Turnkey's infrastructure
+* **Policy Controls**: Apply custom policies to authorize transactions based on criteria
+* **Developer-Friendly**: Integrate with existing Aptos development workflows
+* **Multi-environment Support**: Use the same code across testnet and mainnet environments
+
+## Move Development
+
+Aptos utilizes the Move programming language for smart contracts. When developing Move smart contracts on Aptos, Turnkey can securely manage your private keys for:
+
+* Deploying Move modules
+* Executing Move functions
+* Managing account resources
+
+If you're building on Aptos and need assistance with your Turnkey integration, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-31v4yhgw6-PwBzyNsWCCBTk2xft3EoHQ).
+```

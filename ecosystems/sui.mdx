@@ -1,0 +1,153 @@
+---
+title: "Sui support on Turnkey"
+sidebarTitle: "Sui"
+---
+
+## Address derivation
+
+Turnkey supports Sui address derivation with `ADDRESS_TYPE_SUI`. Sui addresses are derived from the Ed25519 curve, which Turnkey fully supports.
+
+## Transaction construction and signing
+
+Turnkey supports Sui transaction signing through the core signing capabilities. We provide an example repository that demonstrates how to construct and sign Sui transactions:
+
+- [`examples/with-sui`](https://github.com/tkhq/sdk/tree/main/examples/with-sui): demonstrates transaction construction and broadcast on Sui.
+
+## Integration Example
+
+Here's a practical example showing how to integrate Turnkey with the Sui SDK:
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-server";
+import {
+  Connection,
+  JsonRpcProvider,
+  Ed25519Keypair,
+  RawSigner,
+  TransactionBlock,
+} from "@mysten/sui.js";
+
+// Custom Turnkey signer for Sui
+class TurnkeySuiSigner {
+  private turnkeyClient: Turnkey;
+  private organizationId: string;
+  private suiAddress: string;
+
+  constructor(
+    apiPrivateKey: string,
+    apiPublicKey: string,
+    organizationId: string,
+    suiAddress: string
+  ) {
+    this.turnkeyClient = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey,
+      apiPublicKey,
+      defaultOrganizationId: organizationId,
+    });
+
+    this.organizationId = organizationId;
+    this.suiAddress = suiAddress;
+  }
+
+  // Sign bytes using Turnkey
+  async signData(data: Uint8Array): Promise<Uint8Array> {
+    const dataToSign = Buffer.from(data).toString("hex");
+
+    const signResult = await this.turnkeyClient.signRawPayload({
+      organizationId: this.organizationId,
+      signWith: this.suiAddress,
+      payload: dataToSign,
+      encoding: "hex",
+    });
+
+    // Return signature as bytes
+    return Buffer.from(signResult.signature, "hex");
+  }
+
+  // Get the Sui address associated with this signer
+  getAddress(): string {
+    return this.suiAddress;
+  }
+}
+
+// Usage example
+async function sendSuiTransaction() {
+  // Initialize your Turnkey signer
+  const turnkeySigner = new TurnkeySuiSigner(
+    process.env.API_PRIVATE_KEY!,
+    process.env.API_PUBLIC_KEY!,
+    process.env.ORGANIZATION_ID!,
+    process.env.SUI_ADDRESS! // Your Sui address in Turnkey
+  );
+
+  // Connect to Sui network
+  const connection = new Connection({
+    fullnode: "https://fullnode.mainnet.sui.io", // Use testnet for development
+  });
+  const provider = new JsonRpcProvider(connection);
+
+  // Create a keypair that acts as an adapter between our signer and Sui SDK
+  // Note: We don't use the actual keypair for signing, only as an adapter
+  const dummyKeypair = new Ed25519Keypair();
+
+  // Create a Sui signer that will use our Turnkey signer for actual signing
+  const signer = new RawSigner(
+    // Override the signData method to use our Turnkey signer
+    {
+      getPublicKey: async () => {
+        return dummyKeypair.getPublicKey();
+      },
+      signData: async (data: Uint8Array) => {
+        return {
+          signature: await turnkeySigner.signData(data),
+          signatureScheme: dummyKeypair.getKeyScheme(),
+        };
+      },
+    },
+    provider
+  );
+
+  // Build a transaction
+  const tx = new TransactionBlock();
+
+  // Example: Transfer SUI tokens
+  tx.transferObjects(
+    [
+      tx.object("0x..."), // Object ID to transfer
+    ],
+    tx.pure("0x...")
+  ); // Recipient address
+
+  // Sign and execute transaction
+  const result = await signer.signAndExecuteTransactionBlock({
+    transactionBlock: tx,
+  });
+
+  console.log("Transaction executed:", result.digest);
+  return result;
+}
+```
+
+## Sui Network Support
+
+Turnkey supports:
+
+- Sui Mainnet
+- Sui Testnet
+- Sui Devnet
+
+## Key Features for Sui
+
+- **Ed25519 Signing**: Turnkey fully supports the Ed25519 curve used by Sui
+- **Raw Transaction Signing**: Sign any Sui transaction format with Turnkey's flexible signing API
+- **Integration Example**: Our example repository provides a reference implementation
+
+## Benefits of Using Turnkey with Sui
+
+- **Secure Key Management**: Private keys never leave Turnkey's secure infrastructure
+- **Developer Friendly**: Integrate with existing Sui development workflows
+- **Signing Policies**: Apply custom policies to control transaction approvals
+- **Multi-user Support**: Manage multiple Sui addresses under a single organization
+
+If you're building on Sui and need assistance with Turnkey integration, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-31v4yhgw6-PwBzyNsWCCBTk2xft3EoHQ).
