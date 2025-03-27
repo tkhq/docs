@@ -17,11 +17,13 @@ See it in action in our example:
 
 - [`examples/with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/with-cosmjs): demonstrates transaction construction and broadcast on Cosmos.
 
-## Integration Example
+## Example
 
 Here's a minimal example showing how to initialize a Turnkey signer for Cosmos and perform basic operations:
 
-```js [expandable]
+<CodeGroup>
+
+```typescript example.ts [expandable]
 import { Turnkey } from "@turnkey/sdk-server";
 import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
 import { toHex } from "@cosmjs/encoding";
@@ -35,10 +37,50 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID,
 });
 
-// Initialize a Turnkey signer for Cosmos
-async function initializeCosmosWallet() {
-  // Create a Turnkey-powered Cosmos wallet
-  const wallet = await TurnkeyDirectWallet.init({
+const signer = await initializeCosmosSigner(turnkeyClient);
+
+// Connect to a Cosmos chain RPC endpoint
+const rpcEndpoint = "https://rpc.celestia-arabica-11.com";
+const client = await SigningStargateClient.connectWithSigner(
+  rpcEndpoint,
+  signer
+);
+
+// Get account balance
+const balance = await client.getAllBalances(signer.address);
+
+const recipient = "celestia1vsvx8n7f8dh5udesqqhgrjutyun7zqrgehdq2l";
+const amount = coins(1000, "utia");
+const fee = calculateFee(200000, GasPrice.fromString("0.01usei"));
+
+const result = await client.sendTokens(
+  signer.address,
+  recipient,
+  amount,
+  fee,
+  "Sent via Turnkey"
+);
+
+const result = await signingClient.sendTokens(
+  signer.address,
+  recipient,
+  [{ denom: "utia", amount: transactionAmount }],
+  {
+    amount: [{ denom: "utia", amount: "20000" }],
+    gas: "200000",
+  },
+  "Hello from Turnkey!"
+);
+```
+
+```typescript wallet.ts [expandable]
+import { type TurnkeyApiClient } from "@turnkey/sdk-server";
+import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
+
+// Connect to Cosmos and initialize signer
+export async function initializeCosmosSigner(turnkeyClient: TurnkeyApiClient) {
+  // Create a Turnkey-powered Cosmos signer
+  const signer = await TurnkeyDirectWallet.init({
     config: {
       client: turnkeyClient.apiClient(),
       organizationId: process.env.ORGANIZATION_ID,
@@ -48,45 +90,17 @@ async function initializeCosmosWallet() {
   });
 
   // Get the account details
-  const account = (await wallet.getAccounts())[0];
-  if (!account) throw new Error("No account found");
+  const accounts = await wallet.getAccounts();
+  const account = accounts[0];
 
-  console.log("Wallet address:", account.address);
-  // Compressed public key
+  console.log("Cosmos wallet address:", account.address);
   console.log("Public key:", toHex(account.pubkey));
 
-  return wallet;
-}
-
-// Connect to a chain and send a transaction
-async function sendTransaction() {
-  const wallet = await initializeCosmosWallet();
-
-  // Connect to a Cosmos chain RPC endpoint
-  const client = await SigningStargateClient.connectWithSigner(
-    "https://rpc.cosmos.network", // Replace with your preferred RPC endpoint
-    wallet
-  );
-
-  // Get account balance
-  const balance = await client.getAllBalances(wallet.address);
-
-  // Send tokens
-  const recipient = "cosmos1..."; // Recipient address
-  const amount = [{ denom: "uatom", amount: "1000" }]; // 0.001 ATOM
-
-  const result = await client.sendTokens(
-    wallet.address,
-    recipient,
-    amount,
-    {
-      amount: [{ denom: "uatom", amount: "5000" }], // Fee
-      gas: "200000",
-    },
-    "Transaction memo"
-  );
+  return signer;
 }
 ```
+
+</CodeGroup>
 
 ## Supported Cosmos Chains
 

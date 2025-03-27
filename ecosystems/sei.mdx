@@ -5,7 +5,7 @@ sidebarTitle: "Sei"
 
 ## Address derivation
 
-Turnkey supports Sei address derivation. Sei is part of the Cosmos ecosystem and uses the bech32 address format with the "sei" prefix. Addresses are derived using the SECP256k1 curve.
+Turnkey supports Sei address derivation. Sei is part of the Cosmos ecosystem and uses the bech32 address format with the `sei` prefix. Addresses are derived using the SECP256k1 curve.
 
 ## Transaction construction and signing
 
@@ -13,20 +13,23 @@ Since Sei is based on the Cosmos SDK, you can leverage our Cosmos support for tr
 
 - [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs): our CosmJS integration works with Sei as well, allowing you to use a `TurnkeyDirectWallet` as a drop-in replacement.
 
-## Integration Example
+## Example
 
 Here's a practical example showing how to use Turnkey with Sei for a complete transaction flow:
 
-```typescript [expandable]
+<CodeGroup>
+
+```typescript example.ts [expandable]
 import { Turnkey } from "@turnkey/sdk-server";
-import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
 import {
   SigningStargateClient,
   GasPrice,
   calculateFee,
 } from "@cosmjs/stargate";
 import { coins } from "@cosmjs/amino";
-import { toHex } from "@cosmjs/encoding";
+
+// Import the initializeSeiSigner function from wallet.ts
+import { initializeSeiSigner } from "./wallet";
 
 // Initialize the Turnkey client
 const turnkeyClient = new Turnkey({
@@ -36,10 +39,40 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID,
 });
 
-// Connect to Sei and initialize wallet
-async function initializeSeiWallet() {
-  // Create a Turnkey-powered Sei wallet
-  const wallet = await TurnkeyDirectWallet.init({
+const signer = await initializeSeiSigner(turnkeyClient);
+
+// Connect to Sei network - use the appropriate endpoint for mainnet/testnet
+const rpcEndpoint = "https://sei-rpc.polkachu.com"; // Example RPC endpoint
+const client = await SigningStargateClient.connectWithSigner(
+  rpcEndpoint,
+  signer,
+  {
+    gasPrice: GasPrice.fromString("0.01usei"),
+  }
+);
+
+const recipient = "sei1recipient..."; // Recipient address
+const amount = coins(1000000, "usei"); // 1 SEI
+const fee = calculateFee(200000, GasPrice.fromString("0.01usei"));
+
+const result = await client.sendTokens(
+  signer.address,
+  recipient,
+  amount,
+  fee,
+  "Sent via Turnkey"
+);
+console.log("Transaction hash:", result.transactionHash);
+```
+
+```typescript wallet.ts [expandable]
+import { type TurnkeyApiClient } from "@turnkey/sdk-server";
+import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
+
+// Connect to Sei and initialize signer
+export async function initializeSeiSigner(turnkeyClient: TurnkeyApiClient) {
+  // Create a Turnkey-powered Sei signer
+  const signer = await TurnkeyDirectWallet.init({
     config: {
       client: turnkeyClient.apiClient(),
       organizationId: process.env.ORGANIZATION_ID,
@@ -49,82 +82,17 @@ async function initializeSeiWallet() {
   });
 
   // Get the account details
-  const accounts = await wallet.getAccounts();
+  const accounts = await signer.getAccounts();
   const account = accounts[0];
-  if (!account) throw new Error("No account found");
 
-  console.log("Sei wallet address:", account.address);
-  console.log("Public key:", toHex(account.pubkey));
+  console.log("Sei signer address:", account.address);
+  console.log("Public key:", account.pubkey);
 
-  return { wallet, senderAddress: account.address };
-}
-
-// Example: Sending tokens on Sei
-async function sendTokens() {
-  const { wallet, senderAddress } = await initializeSeiWallet();
-
-  // Connect to Sei network - use the appropriate endpoint for mainnet/testnet
-  const rpcEndpoint = "https://sei-rpc.polkachu.com"; // Example RPC endpoint
-  const client = await SigningStargateClient.connectWithSigner(
-    rpcEndpoint,
-    wallet,
-    {
-      gasPrice: GasPrice.fromString("0.01usei"),
-    }
-  );
-
-  // Check balance
-  const balance = await client.getAllBalances(senderAddress);
-  console.log("Current balance:", balance);
-
-  // Send transaction
-  const recipient = "sei1recipient..."; // Recipient address
-  const amount = coins(1000000, "usei"); // 1 SEI
-
-  // Calculate fee
-  const fee = calculateFee(200000, GasPrice.fromString("0.01usei"));
-
-  try {
-    const result = await client.sendTokens(
-      senderAddress,
-      recipient,
-      amount,
-      fee,
-      "Sent via Turnkey"
-    );
-
-    console.log("Transaction sent successfully!");
-    console.log("Transaction hash:", result.transactionHash);
-    return result;
-  } catch (error) {
-    console.error("Error sending tokens:", error);
-    throw error;
-  }
-}
-
-// Example: Query contract data
-async function querySmartContract() {
-  const { wallet } = await initializeSeiWallet();
-
-  const rpcEndpoint = "https://sei-rpc.polkachu.com";
-  const client = await SigningStargateClient.connectWithSigner(
-    rpcEndpoint,
-    wallet
-  );
-
-  // Example: Query a contract state
-  const contractAddress = "sei1contract...";
-  const queryMsg = { get_state: {} }; // Replace with your contract's query message
-
-  const queryResult = await client.queryContractSmart(
-    contractAddress,
-    queryMsg
-  );
-
-  console.log("Contract query result:", queryResult);
-  return queryResult;
+  return signer;
 }
 ```
+
+</CodeGroup>
 
 ## Sei Network Support
 

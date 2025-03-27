@@ -11,11 +11,11 @@ Turnkey supports Tron address derivation with `ADDRESS_TYPE_TRON`. Tron addresse
 
 Tron's transaction format is supported for signing in Turnkey. You can use the core signing capabilities to sign Tron transactions by constructing the transaction following the Tron protocol specifications and then using Turnkey's signing API.
 
-## Complete Integration Example
+## Example
 
 Here's a more complete example of how to integrate Turnkey with TronWeb for transaction signing:
 
-```javascript [expandable]
+```typescript [expandable]
 import { Turnkey } from "@turnkey/sdk-server";
 import TronWeb from "tronweb";
 
@@ -29,62 +29,35 @@ const turnkeyClient = new Turnkey({
 
 // Initialize TronWeb without a private key
 const tronWeb = new TronWeb({
-  fullHost: "https://api.trongrid.io", // Mainnet
-  // Use testnet for development: "https://api.shasta.trongrid.io"
+  fullHost: "https://api.shasta.trongrid.io", // Testnet
 });
 
-// Create a custom signer function for TronWeb that uses Turnkey
-async function createTronTransaction() {
-  const turnkeyAddress = process.env.TRON_ADDRESS; // Your Tron address in Turnkey
-  const recipientAddress = "TYour_Recipient_Address";
-  const amount = 100; // Amount in SUN (1 TRX = 1,000,000 SUN)
+const turnkeyAddress = process.env.TRON_ADDRESS; // Your Tron address in Turnkey
+const recipientAddress = "TYour_Recipient_Address";
+const amount = 100; // Amount in SUN (1 TRX = 1,000,000 SUN)
 
-  try {
-    // 1. Create an unsigned transaction
-    const unsignedTx = await tronWeb.transactionBuilder.sendTrx(
-      recipientAddress,
-      amount,
-      turnkeyAddress
-    );
+// 1. Create an unsigned transaction
+const unsignedTx = await tronWeb.transactionBuilder.sendTrx(
+  recipientAddress,
+  amount,
+  turnkeyAddress
+);
 
-    // 2. Get the transaction for signing (returns the raw data hex)
-    const signedTxInfo = await tronWeb.trx.sign(
-      unsignedTx,
-      // This value isn't used since we intercept and sign with Turnkey
-      "placeholder",
-      false, // broadcast: false to not send immediately
-      // Override the standard sign function
-      async (transaction, privateKey) => {
-        // This custom function replaces the default TronWeb signing
-        console.log("Signing transaction with Turnkey...");
+// Sign with Turnkey
+const { r, s, v } = await turnkeyClient.signTransaction({
+  organizationId: process.env.ORGANIZATION_ID,
+  signWith: turnkeyAddress,
+  payload: unsignedTx.raw_data_hex,
+  encoding: "hex",
+});
 
-        // Get transaction hash that needs to be signed
-        const txID = transaction.txID;
-        const txToSign = Buffer.from(txID, "hex").toString("hex");
+// Add the signature to the transaction
+unsignedTx["signature"] = r + s + v;
 
-        // Sign with Turnkey
-        const signResult = await turnkeyClient.signRawPayload({
-          organizationId: process.env.ORGANIZATION_ID,
-          signWith: turnkeyAddress,
-          payload: txToSign,
-          encoding: "hex",
-        });
+// 3. Broadcast the signed transaction
+const result = await tronWeb.trx.sendRawTransaction(unsignedTx);
 
-        // Set signature in transaction object
-        transaction.signature = [signResult.signature];
-        return transaction;
-      }
-    );
-
-    // 3. Broadcast the signed transaction
-    const result = await tronWeb.trx.sendRawTransaction(signedTxInfo);
-    console.log("Transaction sent! ID:", result.txid);
-    return result;
-  } catch (error) {
-    console.error("Error creating transaction:", error);
-    throw error;
-  }
-}
+console.log("Transaction sent! ID:", result.txid);
 ```
 
 ## Tron Transaction Types
