@@ -1,4 +1,4 @@
-.PHONY: gen validate-redirects validate-docs-redirects validate-redirect-destinations validate-redirect-consistency fix-redirects
+.PHONY: gen validate-redirects validate-docs-redirects validate-redirect-destinations validate-redirect-consistency fix-redirects openapi-gen
 
 # Default configuration values
 CHECK_DESTINATIONS ?= false
@@ -32,3 +32,8 @@ validate-redirect-consistency:
 # Run in fix mode (experimental)
 fix-redirects:
 	npx ts-node scripts/redirect-validator/docs-redirect-validator.ts --fix 
+
+# Run the OpenAPI generator
+# Usage: make openapi-gen ARGS="--file=path/to/openapi.json --path=components.schemas"
+openapi-gen:
+	cd scripts/openapi-gen && npx ts-node openapi-gen.ts $(ARGS) 
