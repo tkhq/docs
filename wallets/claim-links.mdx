@@ -1,6 +1,7 @@
 ---
 title: "Claim Links"
-description: "Enable your users to send crypto to people who haven’t signed up yet through secure, non-custodial magic claim links. This feature creates pre-funded wallets that new users can claim by simply clicking a URL. "
+description: "Enable your users to send crypto to people who haven’t signed up yet through secure, non-custodial magic claim links. This feature creates pre-funded wallets that new users can claim by simply clicking a URL."
+mode: wide
 ---
 
 ### **How it works**
@@ -9,23 +10,21 @@ You will create a temporary “escrow” wallet where funds are held securely un
 
 When the new user clicks on the claim link, they will land directly in your app and see a wallet that’s already been topped up with crypto from an existing user. You can view an example of the feature below:
 
-<Frame>
-  ![](/images/moonshot-demo.gif)
-</Frame>
+<Frame>![](/images/moonshot-demo.gif)</Frame>
 
 ### **Implementation guide**
 
-**Step 1: Set up your application:** 
+**Step 1: Set up your application:**
 
-Before you start building this feature, ensure: 
+Before you start building this feature, ensure:
 
-- Your organization is set up with embedded wallets in a [<u>sub-organization model</u>](https://docs.turnkey.com/embedded-wallets/sub-organizations-as-wallets#sub-organizations-as-end-user-controlled-wallets): Each of your users should map to a dedicated sub-org in Turnkey. 
-- [<u>Email authentication</u>](https://docs.turnkey.com/embedded-wallets/sub-organization-auth) is enabled so that new users can sign up through a secure email flow. 
+- Your organization is set up with embedded wallets in a [<u>sub-organization model</u>](https://docs.turnkey.com/embedded-wallets/sub-organizations-as-wallets#sub-organizations-as-end-user-controlled-wallets): Each of your users should map to a dedicated sub-org in Turnkey.
+- [<u>Email authentication</u>](https://docs.turnkey.com/embedded-wallets/sub-organization-auth) is enabled so that new users can sign up through a secure email flow.
 - Your backend can store mapping records between transactions and sub-organizations
 
 **Step 2: The Sender initiates the flow**
 
-When an existing user (the “Sender”) wants to send funds to someone new, here’s what needs to happen: 
+When an existing user (the “Sender”) wants to send funds to someone new, here’s what needs to happen:
 
 <Steps>
   <Step title="Create a temporary sub-org">
@@ -35,6 +34,7 @@ When an existing user (the “Sender”) wants to send funds to someone new, her
     - Contain a root user with two authenticators: 
       - The Sender’s email or phone number, included so that they can reclaim funds later on if necessary. 
       - A programmatically generated API key (“Claim Key”). This key will later be passed to the Receiver via a claim link. 
+
   </Step>
   <Step title="Initialize transfer of funds">
     Initiate the transfer of funds from the Sender’s primary wallet to this new escrow wallet. 
@@ -44,41 +44,53 @@ When an existing user (the “Sender”) wants to send funds to someone new, her
   </Step>
 </Steps>
 
-<Tooltip tip="Using sessions">You can take all of these actions via a session to ensure the user experience is as simple as setting an amount and copying a link to send.</Tooltip>
+<Tooltip tip="Using sessions">
+  You can take all of these actions via a session to ensure the user experience
+  is as simple as setting an amount and copying a link to send.
+</Tooltip>
 
 **Step 3: Generate and share the claim link**
 
-<Step title="Create your claim link">
-  Construct a link containing, as query parameters: 
-
-  - Base64-encoded private key from the Claim Key 
-  - Transaction id
-</Step>
-
-You can now show the Sender a “Copy link” or “Share via…” button. 
-
-**Step 4: Receiver claims funds**
-
-When the Receiver opens the link in your app: 
-
 <Steps>
-  <Step>
-    Your app parses the transaction id and looks up the associated temporary sub-org ID
-  </Step>
-  <Step title="Reconstruct claim key">
-    Reconstruct the Claim Key using the private key from the URL and store it in local storage. Now, the Receiver has an API key in local storage that grants them the ability to send funds out of the escrow wallet. 
-  </Step>
-  <Step title="Create permanent sub-org">
-    Guide the Receiver through your typical signup flow to create a permanent sub-organization containing a new permanent wallet (“Receiver Wallet”) and permanent authenticators. 
-  </Step>
-  <Step title="Use claim key to authorize fund transfer">
-    Use the Claim Key in local storage to authorize transferring the claimable funds from the escrow wallet to the Receiver Wallet. 
-  </Step>
-  <Step title="Delete temporary sub-org">
-    After successful transfer, delete the temporary sub-org using the Claim Key. 
+  <Step title="Create your claim link">
+    Construct a link containing, as query parameters: 
+    - Base64-encoded private key from the Claim Key
+    - Transaction id
+
   </Step>
 </Steps>
 
-The receiver now controls their own wallet under a permanent sub-org which contains the new funds.  
+You can now show the Sender a “Copy link” or “Share via…” button.
+
+**Step 4: Receiver claims funds**
+
+When the Receiver opens the link in your app:
+
+<Steps>
+  <Step>
+    Your app parses the transaction id and looks up the associated temporary
+    sub-org ID
+  </Step>
+  <Step title="Reconstruct claim key">
+    Reconstruct the Claim Key using the private key from the URL and store it in
+    local storage. Now, the Receiver has an API key in local storage that grants
+    them the ability to send funds out of the escrow wallet. 
+  </Step>
+  <Step title="Create permanent sub-org">
+    Guide the Receiver through your typical signup flow to create a permanent
+    sub-organization containing a new permanent wallet (“Receiver Wallet”) and
+    permanent authenticators. 
+  </Step>
+  <Step title="Use claim key to authorize fund transfer">
+    Use the Claim Key in local storage to authorize transferring the claimable
+    funds from the escrow wallet to the Receiver Wallet. 
+  </Step>
+  <Step title="Delete temporary sub-org">
+    After successful transfer, delete the temporary sub-org using the Claim
+    Key. 
+  </Step>
+</Steps>
+
+The receiver now controls their own wallet under a permanent sub-org which contains the new funds.
 
 If the funds are never claimed or the Sender wishes to revoke the gift for any reason, your app can allow the sender to reclaim them by using their email or phone number to restart a new session for the escrow sub-organization.
