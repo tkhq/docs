@@ -2,7 +2,7 @@
 
 ## Overview
 
-This utility will parse and dereference OpenAPI specification files, with the initial goal of displaying a portion of the dereferenced spec for evaluation. The later goal will be to generate content based on the API specification.
+This utility will parse and dereference OpenAPI specification files, with the initial goal of displaying a portion of the dereferenced spec for evaluation. The next goal is to generate structured API endpoint interfaces that can be used for documentation and client library generation.
 
 ## Technical Specifications
 
@@ -65,7 +65,7 @@ program
   .parse(process.argv);
 ```
 
-### 3. Output Generation
+### 3. Output Formatting
 
 - Implement output formatting for the console
 - Allow filtering of output by JSON path
@@ -103,6 +103,15 @@ function outputResults(
 - Provide clear error messages for common issues
 - Set appropriate exit codes for automation
 
+### 5. API Endpoint Generation
+
+- Parse OpenAPI paths to extract endpoint information
+- Generate structured ApiEndpoint objects
+- Handle versioned endpoints with matching intent, result, and activity types
+- Output ApiEndpoint objects in the desired format
+
+See [openapi-to-api-endpoints.md](openapi-to-api-endpoints.md) for detailed implementation plan of this feature.
+
 ## File Structure
 
 ```
@@ -113,11 +122,19 @@ scripts/
       ├── tsconfig.json        # TypeScript configuration
       ├── README.md            # Documentation
       ├── types.ts             # Type definitions
+      ├── openapi-to-api-endpoints.md  # API Endpoint generator documentation
+      ├── api-endpoints-completed.log  # Completed tasks for API endpoint feature
+      ├── api-endpoints-decisions.log  # Decisions log for API endpoint feature
       └── utils/
           ├── parser.ts        # OpenAPI parsing utilities
           ├── cli.ts           # CLI configuration
           ├── formatter.ts     # Output formatting
-          └── error-handler.ts # Error handling utilities
+          ├── error-handler.ts # Error handling utilities
+          └── endpoint-parser/  # API Endpoint parsing utilities
+              ├── types.ts     # Type definitions for API endpoints
+              ├── parser.ts    # Endpoint parsing logic
+              ├── formatter.ts # Endpoint formatter
+              └── string-utils.ts # String transformation utilities
 ```
 
 ## Makefile Integration
@@ -131,7 +148,7 @@ openapi-gen:
 
 ## Implementation Plan
 
-### Phase 1: Project Setup
+### Phase 1: Project Setup (Completed)
 
 - Create the directory structure
 - Initialize package.json
@@ -140,7 +157,7 @@ openapi-gen:
 - Create initial entry point file
 - Add to Makefile
 
-### Phase 2: Core Functionality
+### Phase 2: Core Functionality (Completed)
 
 - Implement file reading functionality
 - Add basic OpenAPI spec parsing
@@ -151,13 +168,16 @@ openapi-gen:
 - Create help documentation
 - Integrate CLI with parser functionality
 
-### Phase 3: Output Formatting
+### Phase 3: API Endpoint Generation (Current)
 
-- Implement JSON output formatting
-- Create pretty-printing for console output
-- Add filtering capabilities for specific parts of the spec
-- Implement stdout output for piping to other tools
-- Add file output option
+- Define ApiEndpoint types and related interfaces
+- Implement string transformation utilities
+- Add path and method extraction
+- Create schema to ApiField conversion utilities
+- Implement version detection and processing
+- Add new CLI option for generating ApiEndpoint objects
+
+See [openapi-to-api-endpoints.md](openapi-to-api-endpoints.md) for detailed implementation phases of this feature.
 
 ### Phase 4: Error Handling and Refinement
 
@@ -175,9 +195,9 @@ openapi-gen:
 
 ### Phase 6: Future Planning
 
-- Outline plan for content generation
+- Outline plan for further content generation
 - Design template system
-- Identify output formats
+- Identify additional output formats
 - Plan for integration with other tools
 
 ## Success Criteria
@@ -185,8 +205,10 @@ openapi-gen:
 1. The CLI tool accepts an OpenAPI specification file path and successfully parses it
 2. All references in the OpenAPI specification are properly dereferenced
 3. The tool can output specific portions of the API specification
-4. Output can be directed to stdout for piping to tools like jq
-5. Output can be saved to a file if specified
-6. Error handling is robust and provides clear messages
-7. The tool can be easily executed via the Makefile
-8. The code is well-structured and maintainable for future extensions
+4. The tool can generate structured ApiEndpoint objects from the OpenAPI spec
+5. ApiEndpoint objects correctly represent versioned endpoints
+6. Output can be directed to stdout for piping to tools like jq
+7. Output can be saved to a file if specified
+8. Error handling is robust and provides clear messages
+9. The tool can be easily executed via the Makefile
+10. The code is well-structured and maintainable for future extensions
