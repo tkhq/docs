@@ -3,14 +3,30 @@ title: "Delegated Access"
 description: "With Turnkey you can create multi-user accounts with flexible co-ownership controls. This primitive enables you to establish delegated access to a user’s wallet, reducing or removing the need for them to manually approve each action. You can provide a smoother user experience while ensuring that end-users maintain full control over their wallets."
 ---
 
-To set up delegated access, here’s one example of how you can create a limited-permissions user within the end-user’s sub-organization:
+## Overview
+
+Delegated access works by creating a specialized user within each end-user’s sub-organization that has carefully scoped permissions to perform only specific actions, such as signing transactions to designated addresses. This can enable your backend to do things like: 
+* Automate common transactions (e.g., staking, redemptions) 
+* Sign transactions to whitelisted addresses without user involvement 
+* Perform scheduled operations 
+* Respond to specific onchain events programmatically 
+
+## Implementation flow 
+
+Here’s how to implement delegated access for an embedded wallet setup:
+Create a sub-organization with two root users: The end user and your “Delegated User” with an API key authenticator that you control 
+Apply any set of policies you’d like to enable the Delegated Account to take particular actions 
+Update the root quorum to ensure only the end-user retains root privileges
+
+## Step-by-step implementation
+
 
 ### Step 1: Create a sub-organization with two root users[​](#step-1-create-a-sub-organization-with-two-root-users "Direct link to Step 1: Create a sub-organization with two root users")
 
 * Create your sub-organization with the two root users being:
 
   * The end-user
-  * A user you control (let’s call it the ‘Service Account’)
+  * A user you control (we'll call it the ‘Delegated Account’)
 
 ```json
 {
@@ -39,13 +55,13 @@ To set up delegated access, here’s one example of how you can create a limited
       "oidcProviders": []
       },
       {
-        "userName": "Service Account",
+        "userName": "Delegated Account",
         "userEmail": "<email>(optional)",
         "authenticators": [],
         "apiKeys": [
           {
-            "apiKeyName": "<service-account-api-key-name>",
-            "publicKey": "<service-account-api-public-key>"
+            "apiKeyName": "<delegated-account-api-key-name>",
+            "publicKey": "<delegated-account-api-public-key>"
           }
         ],
       "oidcProviders": []
@@ -67,9 +83,7 @@ To set up delegated access, here’s one example of how you can create a limited
 }
 ```
 
-### Step 2: Create a new Delegated Access user using the Service Account
-
-* Create a new user, the ‘Delegated Account’
+### Step 2: Limit the permissions of the Delegated Account user via policies
 
 * Create a custom policy granting the Delegated Account specific permissions. You might grant that user permissions to:
 
@@ -78,26 +92,9 @@ To set up delegated access, here’s one example of how you can create a limited
   * Create new users in the sub-org
   * Or any other activity you want to be able to take using your Delegated Account
 
-Here’s one example, creating a Delegated Account that only has permission to sign transactions to a specific receiver address:
+Here’s one example, granting the Delegated Account only the permission to sign transactions to a specific receiver address:
 
 ```json
-// 1. Create the Delegated Account
-{
-  "type": "ACTIVITY_TYPE_CREATE_USER",
-  "timestampMs": "<time-in-ms>",
-  "organizationId": "sub-organization-id",
-  "parameters": {
-    "userName": "Delegated Account",
-    "apiKeys": [
-      {
-        "apiKeyName": "Delegated Account API Key",
-        "publicKey": "DELEGATED_ACCOUNT_PUBLIC_KEY"
-      }
-    ]
-  }
-}
-
-// 2. Create a policy for the Delegated Account
 {
   "type": "ACTIVITY_TYPE_CREATE_POLICY",
   "timestampMs": "<time-in-ms>",
@@ -113,12 +110,10 @@ Here’s one example, creating a Delegated Account that only has permission to s
 }
 ```
 
-### Step 3: Remove the Service Account from the root quorum.
+### Step 3: Remove the Delegated Account from the root quorum.
 
-* Using the Service Account:
+* Using the Delegated Account:
 
-  * Create a new policy that explicitly grants the Service Account permission to delete users. This is necessary because, once removed from the Root Quorum, the Service Account will have no permissions by default.
-  * [Update the root quorum](/api-reference/organizations/update-root-quorum) to remove the Service Account from the root quorum
-  * Delete the Service Account user from the organization
+  * [Update the root quorum](/api-reference/organizations/update-root-quorum) to remove the Delegated Account from the root quorum
 
 After completing these steps, the sub-organization will have two users: the end-user (the only root-user) and the Delegated Account user, which has the permissions granted earlier.
