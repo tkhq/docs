@@ -1,5 +1,5 @@
 ---
-title: "Backend Setup for Turnkey Authentication"
+title: "Backend Authentication"
 description: "Guide for setting up a secure backend proxy with Turnkey authentication, focusing on JWT implementation and user data management."
 ---
 
@@ -69,23 +69,42 @@ Before you can authenticate a user with Turnkey, you need their sub-organization
 
 2. **Turnkey API Lookup**: Query Turnkey directly for sub-organizations associated with an email
 
-   ```typescript
-   const { organizationIds } = await turnkeyServer.getSubOrgIds({
-     // The parent organization ID
-     organizationId: YOUR_PARENT_ORG_ID,
-     filterType: "PUBLIC_KEY",
-     filterValue: publicKey, // Or use EMAIL for email-based lookup
-   });
+<CodeGroup>
 
-   const subOrgId = organizationIds[0]; // First matching sub-org
-   ```
+```typescript app.ts
+import { turnkeyServer } from "./turnkey";
+
+const { organizationIds } = await turnkeyServer.getSubOrgIds({
+  // The parent organization ID
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID,
+  filterType: "EMAIL",
+  filterValue: userEmail,
+});
+
+const subOrgId = organizationIds[0]; // First matching sub-org
+```
+
+```typescript turnkey.ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+// Initialize server-side client
+export const turnkeyServer = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+
+</CodeGroup>
 
 3. **JWT Cookie**: Extract the sub-organization ID from an existing JWT in cookies (for returning users)
-   ```typescript
-   const token = req.cookies.authToken;
-   const decoded = jwt.verify(token, JWT_SECRET);
-   const subOrgId = decoded.subOrgId;
-   ```
+
+```typescript
+const token = req.cookies.authToken;
+const decoded = jwt.verify(token, JWT_SECRET);
+const subOrgId = decoded.subOrgId;
+```
 
 #### Login Flow
 
@@ -93,19 +112,26 @@ Before you can authenticate a user with Turnkey, you need their sub-organization
   <Step title="Client-side">
   Generate a signed Turnkey request
 
-    ```typescript
-    import { Turnkey } from "@turnkey/sdk-browser";
-
-    const turnkeyClient = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      defaultOrganizationId: subOrgId, // From previous step
-    });
+  <CodeGroup> 
+    ```typescript app.ts
+    import { turnkeyClient } from "./turnkey";
 
     // This will require passkey authentication from the user
     const signedWhoamiRequest = await turnkeyClient.stampGetWhoami({
       organizationId: subOrgId,
     });
     ```
+
+    ```typescript turnkey.ts
+    import { Turnkey } from "@turnkey/sdk-browser";
+
+    export const turnkeyClient = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      defaultOrganizationId: subOrgId, // From previous step
+    });
+    ```
+
+  </CodeGroup>
 
   </Step>
 
@@ -115,7 +141,7 @@ Before you can authenticate a user with Turnkey, you need their sub-organization
     ```typescript
     const response = await fetch("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ signedRequest: whoamiRequest }),
+      body: JSON.stringify({ signedRequest: signedWhoamiRequest }),
       headers: { "Content-Type": "application/json" },
     });
     ```
@@ -124,25 +150,30 @@ Before you can authenticate a user with Turnkey, you need their sub-organization
 
   <Step title="Backend Verification">
     Process the request and issue JWT
-    
-    ```typescript
-    import { Turnkey } from "@turnkey/sdk-server";
-    import jwt from "jsonwebtoken";
 
-    // Initialize the server-side Turnkey client
-    const turnkeyServer = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    }).apiClient();
+    <CodeGroup>
+
+    ```typescript app.ts [expandable]
+    import { turnkeyServer } from "./turnkey";
+    import jwt from "jsonwebtoken";
 
     app.post("/api/auth/login", async (req, res) => {
       const { signedRequest } = req.body;
 
       try {
-        // Forward to Turnkey - the request is already signed by the user's passkey
-        const turnkeyResponse = await turnkeyServer.postWhoami(signedRequest);
+      // Forward to Turnkey - the request is already signed by the user's passkey
+        const { url, body, stamp } = signedRequest;
+
+        // Forward to Turnkey
+        const response = await fetch(url, {
+          method: 'POST',
+          body,
+          headers: {
+            [stamp.stampHeaderName]: stamp.stampHeaderValue,
+          },
+        });
+
+        const turnkeyResponse = await response.json();
 
         // If we get here without error, the authentication succeeded
         if (turnkeyResponse.organizationId) {
@@ -169,6 +200,20 @@ Before you can authenticate a user with Turnkey, you need their sub-organization
     });
     ```
 
+```typescript turnkey.ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+// Initialize server-side client
+export const turnkeyServer = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+
+</CodeGroup>
+
   </Step>
 </Steps>
 
@@ -180,57 +225,80 @@ For new users, the flow is similar but involves creating a new sub-organization:
   <Step title="Client-side">
     Collect user information
 
-    ```typescript
+    <CodeGroup>
+
+    ```typescript app.ts
+    import { turnkeyClient } from "./turnkey";
+
     const email = "user@example.com";
-    const username = "New User";
-    const attestation = await browserClient.createPasskeyAttestation();
+
+    const { encodedChallenge, attestation } =
+    (await turnkeyClient?.createUserPasskey({
+      publicKey: {
+        user: {
+          name: 'Popup Wallet Demo',
+          displayName: 'Popup Wallet Demo',
+        },
+      },
+    })) || {};
 
     // Send to backend
     const response = await fetch("/api/auth/signup", {
       method: "POST",
       body: JSON.stringify({
         email,
-        username,
+        challenge: encodedChallenge,
         attestation,
       }),
       headers: { "Content-Type": "application/json" },
     });
     ```
 
+    ```typescript turnkey.ts
+    import { Turnkey } from "@turnkey/sdk-browser";
+
+    const turnkey =  new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+      // Set this to your domain for production
+      rpId: "localhost",
+    });
+
+    export const turnkeyClient = turnkey.passkeyClient();
+    ```
+
+    </CodeGroup>
+
   </Step>
 
   <Step title="Backend Processing">
     Create sub-organization and issue JWT
 
-    ```typescript
-    import { Turnkey } from "@turnkey/sdk-server";
+    <CodeGroup>
+    ```typescript app.ts [expandable]
+    import { turnkeyServer } from "./turnkey";
+    import jwt from "jsonwebtoken";
     import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
 
-    // Initialize server-side client
-    const turnkeyServer = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    }).apiClient();
+    const JWT_SECRET = process.env.JWT_SECRET;
 
     app.post("/api/auth/signup", async (req, res) => {
-      const { email, username, attestation } = req.body;
+      const { email, challenge, attestation } = req.body;
 
       try {
         // Create the sub-organization
         const createSubOrgResponse = await turnkeyServer.createSubOrganization({
-          subOrganizationName: `${username}'s Organization`,
+          subOrganizationName: `${email} - Organization`,
           rootUsers: [
             {
-              userName: username,
+              userName: email,
               userEmail: email,
               apiKeys: [],
               authenticators: [
                 {
                   authenticatorName: "Default Passkey",
-                  challenge: YOUR_CHALLENGE, // Should be stored in session
-                  attestation: attestation,
+                  challenge,
+                  attestation,
                 },
               ],
             },
@@ -271,6 +339,21 @@ For new users, the flow is similar but involves creating a new sub-organization:
     });
     ```
 
+    ```typescript turnkey.ts
+    import { Turnkey } from "@turnkey/sdk-server";
+
+    // Initialize server-side client
+    export const turnkeyServer = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+    }).apiClient();
+
+    ```
+
+    </CodeGroup>
+
   </Step>
 </Steps>
 
@@ -300,7 +383,7 @@ Once a user is authenticated and has a valid JWT, you can use it to authenticate
 
 2. **Backend Verification**: Your backend verifies the JWT and processes the request
 
-   ```typescript
+   ```typescript [expandable]
    // Example: JWT middleware
    const verifyJwt = (req, res, next) => {
      const token =
@@ -347,7 +430,7 @@ Once a user is authenticated and has a valid JWT, you can use it to authenticate
 
 When implementing JWT authentication:
 
-```typescript
+```typescript [expandable]
 import jwt from "jsonwebtoken";
 
 // Get this from a secure environment variable
@@ -605,10 +688,3 @@ async function cosignTransaction(transaction, userId) {
   return cosignedTx;
 }
 ```
-
-## Example Applications
-
-For complete example applications demonstrating these patterns, check out:
-
-- [Next.js Turnkey Sample App](https://github.com/tkhq/example-apps/nextjs-sample) (placeholder)
-- [Express Turnkey Backend Proxy](https://github.com/tkhq/example-apps/express-proxy) (placeholder)
