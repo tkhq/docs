@@ -5,7 +5,7 @@ description: "With Turnkey you can create multi-user accounts with flexible co-o
 
 ## Overview
 
-Delegated access works by creating a specialized user within each end-user’s sub-organization that has carefully scoped permissions to perform only specific actions, such as signing transactions to designated addresses. This can enable your backend to do things like: 
+Delegated access works by creating a specialized business-controlled user within each end-user’s sub-organization that has carefully scoped permissions to perform only specific actions, such as signing transactions to designated addresses. This can enable your backend to do things like: 
 * Automate common transactions (e.g., staking, redemptions) 
 * Sign transactions to whitelisted addresses without user involvement 
 * Perform scheduled operations 
@@ -14,9 +14,9 @@ Delegated access works by creating a specialized user within each end-user’s s
 ## Implementation flow 
 
 Here’s how to implement delegated access for an embedded wallet setup:
-Create a sub-organization with two root users: The end user and your “Delegated User” with an API key authenticator that you control 
-Apply any set of policies you’d like to enable the Delegated Account to take particular actions 
-Update the root quorum to ensure only the end-user retains root privileges
+* Create a sub-organization with two root users: The end user and your “Delegated User” with an API key authenticator that you control 
+* Enable the Delegated Account to take particular actions by setting policies explicitly allowing those specific actions
+* Update the root quorum to ensure only the end-user retains root privileges
 
 ## Step-by-step implementation
 
@@ -92,7 +92,7 @@ Update the root quorum to ensure only the end-user retains root privileges
   * Create new users in the sub-org
   * Or any other activity you want to be able to take using your Delegated Account
 
-Here’s one example, granting the Delegated Account only the permission to sign transactions to a specific receiver address:
+Here’s one example, granting the Delegated Account only the permission to sign ethereum transactions to a specific receiver address:
 
 ```json
 {
@@ -110,10 +110,20 @@ Here’s one example, granting the Delegated Account only the permission to sign
 }
 ```
 
-### Step 3: Remove the Delegated Account from the root quorum.
+### Step 3: Remove the Delegated Account from the root quorum using the Delegated Account's credentials:
 
-* Using the Delegated Account:
+```json
+{
+  "type": "ACTIVITY_TYPE_UPDATE_ROOT_QUORUM",
+  "timestampMs": "<time-in-ms>",
+  "organizationId": "<sub-organization-id>",
+  "parameters": {
+    "threshold": 1,
+    "userIds": [
+      "<end-user-id>" // Update the root quorum of the sub organization to ONLY include the end user, removing the delegated access user
+    ]
+  }
+}'
+```
 
-  * [Update the root quorum](/api-reference/organizations/update-root-quorum) to remove the Delegated Account from the root quorum
-
-After completing these steps, the sub-organization will have two users: the end-user (the only root-user) and the Delegated Account user, which has the permissions granted earlier.
+After completing these steps, the sub-organization will have two users: the end-user (the only root-user) and the Delegated Account user, which only has the permissions granted earlier via policies and no longer retains root user privileges.
