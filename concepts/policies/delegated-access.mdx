@@ -128,3 +128,105 @@ Here’s one example, granting the Delegated Account only the permission to sign
 ```
 
 After completing these steps, the sub-organization will have two users: the end-user (the only root-user) and the Delegated Account user, which only has the permissions granted earlier via policies and no longer retains root user privileges.
+
+## Delegated Access Code Example
+
+Below is a code example outlining the implementation of the delegated access setup flow described above
+
+```js
+import { Turnkey } from "@turnkey/sdk-server";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+  // Initialize the Turnkey Server Client on the server-side
+  const turnkeyServer = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+  }).apiClient();
+
+
+  // To create an API key programmatically check https://github.com/tkhq/sdk/blob/main/examples/kitchen-sink/src/sdk-server/createApiKey.ts
+  const publicKey = "<delegated_api_public_key>";
+  const curveType = "API_KEY_CURVE_P256"; // this is the default
+  const apiKeys = [
+    {
+      apiKeyName: "Delegated - API Key",
+      publicKey,
+      curveType,
+    },
+  ];
+
+  // STEP 1: Create a sub org with End User and Delegated access user in Root Quorum
+
+  const subOrg = await turnkeyClient.createSubOrganization({
+    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    subOrganizationName: `Sub Org - With Delegated Access User`,
+    rootUsers: [
+      {
+        userName: "Delegated Access User",
+        apiKeys,
+        authenticators: [],
+        oauthProviders: []
+      },
+      {
+          userName: "End User",
+          userEmail: "<some-email>",
+          apiKeys: [],
+          authenticators: [],
+          oauthProviders: []
+      },
+    ],
+    rootQuorumThreshold: 1,
+    wallet: {
+      "walletName": "Default ETH Wallet",
+      "accounts": [
+        {
+          "curve": "CURVE_SECP256K1",
+          "pathFormat": "PATH_FORMAT_BIP32",
+          "path": "m/44'/60'/0'/0/0",
+          "addressFormat": "ADDRESS_FORMAT_ETHEREUM"
+        }
+      ]
+    },
+  });
+
+  console.log("sub-org id:", subOrg.subOrganizationId);
+
+  // Initializing the Turkey client used by the Delegated Access User
+  // Notice the subOrganizationId created above 
+  const turnkeyDelegatedAccessClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: process.env.DELEGATED_API_PRIVATE_KEY!,
+    apiPublicKey: process.env.DELEGATED_API_PUBLIC_KEY!,
+    defaultOrganizationId: subOrg.subOrganizationId,
+  }).apiClient();
+
+  // STEP 2: Create a policy allowing the Delegated access user to send Ethereum transactions to a particular address
+
+  // Creating a policy for the Delegated account 
+  const delegated_userid = subOrg.rootUserIds[0];
+  const policyName = "Allow Delegated Account to sign transactions to specific address";
+  const effect = "EFFECT_ALLOW";
+  const consensus = `approvers.any(user, user.id == '${delegated_userid}')`;
+  const condition = `eth.tx.to == '${process.env.RECIPIENT_ADDRESS}'`;
+  const notes = "";
+
+  const { policyId } = await turnkeyDelegated.createPolicy({
+    policyName,
+    condition,
+    consensus,
+    effect,
+    notes,
+  });
+
+  // STEP 3: Update the root quorum to only include the End User, removing the Delegated Access user
+
+  // Remove the Delegated Account from the root quorum
+  const RootQuorum = await turnkeyDelegated.updateRootQuorum({
+    threshold: 1,
+    userIds: [subOrg.rootUserIds[1]], // retain the end user
+  });
+```
