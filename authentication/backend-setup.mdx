@@ -685,43 +685,297 @@ When implementing this pattern, keep these security considerations in mind:
 
 ### Co-signing Transactions
 
-Your backend can participate as a co-signer in a 2/2 multisig arrangement:
+To implement a true multi-signature arrangement with Turnkey,
+you need to create a sub-organization with multiple root users and set a quorum threshold.
+Here's how to set up and use a 2/2 multi-sig wallet:
 
-```typescript
-// Backend co-signing implementation
-async function cosignTransaction(transaction, userId) {
-  // Get the user's sub-organization ID
-  const user = await db.users.findUnique({
-    where: { id: userId },
-    select: { turnkeySubOrgId: true },
-  });
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Turnkey
 
-  if (!user) {
-    throw new Error("User not found");
-  }
+    %% Setup Phase
+    Note over User,Turnkey: Setup Phase
+    User->>Frontend: Sign up / Create wallet
+    Frontend->>User: Request passkey creation
+    User->>Frontend: Create passkey (attestation)
+    Frontend->>Backend: Send user info & attestation
+    Backend->>Turnkey: Create sub-org with 2 root users:<br/>1. User (passkey)<br/>2. Backend (API key)
+    Backend->>Turnkey: Set root quorum threshold = 2
+    Turnkey->>Backend: Return sub-org ID & wallet info
+    Backend->>Backend: Store sub-org ID in user record
+    Backend->>Frontend: Return wallet info
+    Frontend->>User: Display wallet address
 
-  // Sign the transaction with the backend's key
-  const cosignedTx = await turnkeyServer.signTransaction({
-    organizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    parameters: {
-      type: "TRANSACTION_TYPE_ETHEREUM",
-      signWith: BACKEND_WALLET_ADDRESS, // The address of the wallet you want to sign with
-      unsignedTransaction: transaction, // The RLP-encoded unsigned transaction as a hex string
-    },
-  });
-
-  const { url, body, stamp } = signRequest;
-
-  const response = await fetch(url, {
-    method: "POST",
-    body,
-    headers: {
-      [stamp.stampHeaderName]: stamp.stampHeaderValue,
-    },
-  });
-
-  const cosignedTx = await response.json();
-
-  return cosignedTx;
-}
+    %% Transaction Phase
+    Note over User,Turnkey: Transaction Phase
+    User->>Frontend: Initiate transaction
+    Frontend->>User: Request passkey authentication
+    User->>Frontend: Authenticate with passkey
+    Frontend->>Turnkey: Submit transaction signing request
+    Turnkey->>Turnkey: Verify user passkey signature
+    Turnkey->>Frontend: Return activity fingerprint
+    Frontend->>Backend: Send activity fingerprint for approval
+    Backend->>Turnkey: Verify & validate activity details
+    Backend->>Turnkey: Approve activity (using backend API key)
+    Turnkey->>Turnkey: Sign transaction (requires both approvals)
+    Turnkey->>Backend: Return signed transaction
+    Backend->>Frontend: Return signed transaction
+    Frontend->>User: Show transaction success
 ```
+
+<Steps>
+  <Step title="Create a Sub-Organization with Multiple Root Users">
+    To set up a multi-sig wallet in Turnkey, you first need to create a sub-organization with two root users. 
+    This sub-organization will function as a separate entity with its own wallet and security settings.
+    
+    The key configuration here is setting up:
+    - A root user for the end-user, authenticated with their passkey
+    - A root user for your application service, authenticated with an API key
+    - A root quorum threshold of 2, requiring both users to approve critical operations
+    
+    This creates a true multi-sig arrangement where neither party can unilaterally control the wallet.
+    The following code shows how to implement this setup on your backend:
+
+    <CodeGroup>
+
+    ```typescript app.ts [expandable] {43}
+    import { turnkeyServer } from "./turnkey";
+    import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+
+    async function createMultiSigWallet(
+      userId,
+      userEmail,
+      userPasskeyChallenge,
+      userPasskeyAttestation
+    ) {
+      // Create a sub-organization with two root users and a threshold of 2
+      const subOrg = await turnkeyServer.createSubOrganization({
+        organizationId: process.env.TURNKEY_ORGANIZATION_ID,
+        subOrganizationName: `Multi-Sig Wallet for ${userEmail}`,
+        rootUsers: [
+          // First root user - the end user with their passkey
+          {
+            userName: "End User",
+            userEmail: userEmail,
+            apiKeys: [],
+            authenticators: [
+              {
+                authenticatorName: "User Passkey",
+                challenge: userPasskeyChallenge,
+                attestation: userPasskeyAttestation,
+              },
+            ],
+          },
+          // Second root user - your application's service account
+          {
+            userName: "Application Service",
+            userEmail: "service@yourapp.com",
+            apiKeys: [
+              {
+                apiKeyName: "Service API Key",
+                publicKey: process.env.SERVICE_API_PUBLIC_KEY,
+                curveType: "API_KEY_CURVE_SECP256K1",
+              },
+            ],
+            authenticators: [],
+          },
+        ],
+        // This is the key setting - requiring both users to approve
+        rootQuorumThreshold: 2,
+        wallet: {
+          walletName: "Shared Wallet",
+          accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+        },
+      });
+
+      // Save the sub-organization ID in your database
+      await db.users.update({
+        where: { id: userId },
+        data: { turnkeySubOrgId: subOrg.organizationId },
+      });
+
+      return subOrg;
+    }
+    ```
+
+    ```typescript turnkey.ts
+    import { Turnkey } from "@turnkey/sdk-server";
+
+    // Initialize server-side client
+    export const turnkeyServer = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+    }).apiClient();
+
+    ```
+
+    </CodeGroup>
+
+  </Step>
+
+  <Step title="Client-Side Transaction Initiation">
+    When the user wants to sign a transaction using their multi-sig wallet, they need to initiate the process from your frontend application.
+    This step involves:
+    
+    - Authenticating the user with their passkey (handled automatically by Turnkey)
+    - Creating a transaction signing request to Turnkey
+    - Receiving an activity fingerprint that needs further approval
+    - Forwarding this fingerprint to your backend for the second signature
+    
+    The transaction won't be fully signed yet - it will be in a "requires consensus" state until your backend approves it.
+    Here's how to implement this flow in your frontend:
+
+    <CodeGroup>
+
+    ```typescript app.ts [expandable]
+    import { turnkeyPasskeyClient } from "./turnkey";
+
+
+    // User initiates a transaction signing
+    async function initiateTransaction(txData, walletAddress) {
+      // This will trigger the user's passkey authentication
+      const signActivity = await turnkeyPasskeyClient.signTransaction({
+        organizationId: subOrgId,
+        parameters: {
+          type: "TRANSACTION_TYPE_ETHEREUM",
+          signWith: walletAddress,
+          unsignedTransaction: txData,
+        },
+      });
+
+      // The activity needs approval from the backend service
+      // Send the activity fingerprint to your backend
+      const response = await fetch("/api/proxy/turnkey/approve-transaction", {
+        method: "POST",
+        body: JSON.stringify({
+          activityFingerprint: signActivity.fingerprint,
+          subOrgId: subOrgId,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Include cookies for JWT authentication
+      });
+
+      const result = await response.json();
+      return result;
+    }
+      ```
+
+    ```typescript turnkey.ts
+    import { Turnkey } from "@turnkey/sdk-browser";
+
+    // Initialize server-side client
+    export const turnkeyPasskeyClient = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+      rpid: process.env.RPID || 'localhost',
+    }).passkeyClient();
+
+    ```
+
+    </CodeGroup>
+
+  </Step>
+
+  <Step title="Backend Approval">
+    The final step in the multi-sig flow is having your backend service approve the transaction.
+    This is where the second signature required by the root quorum is applied. Your backend should:
+    
+    - Validate the incoming request to ensure it's legitimate
+    - Verify the user has permission to use the specified sub-organization
+    - Optionally retrieve and validate the activity details (e.g., checking transaction amount, recipient)
+    - Approve the activity using your service's API key
+    
+    Only after both the user and your backend have approved will Turnkey complete the signing process.
+    This provides strong security guarantees as it requires compromise of both authentication mechanisms to execute unauthorized transactions.
+
+    ```typescript [expandable] {22-26}
+    // API endpoint for approving transaction signing activities
+    app.post(
+      "/api/proxy/turnkey/approve-transaction",
+      async (req, res) => {
+        const { activityFingerprint, subOrgId } = req.body;
+        const { userId } = req.user;
+
+        try {
+          // Retrieve the user's associated sub-organization ID for verification
+          const user = await db.users.findUnique({
+            where: { id: userId },
+            select: { turnkeySubOrgId: true },
+          });
+
+          if (!user || user.turnkeySubOrgId !== subOrgId) {
+            return res
+              .status(403)
+              .json({ error: "Unauthorized: Organization ID mismatch" });
+          }
+
+          // Approve the activity
+          const approvalResult = await turnkeyServer.approveActivity({
+            organizationId: subOrgId,
+            fingerprint: activityFingerprint,
+          });
+
+          // Log the approval - Can be replaced with your own logging/metrics
+          console.log("Transaction approved:", approvalResult);
+
+          // Return the result to the client
+          return res.status(200).json(approvalResult);
+        } catch (error) {
+          console.error("Error approving transaction:", error);
+          return res.status(500).json({
+            error: "Failed to approve transaction",
+            message: error.message,
+          });
+        }
+      }
+    );
+    ```
+
+  </Step>
+</Steps>
+
+#### Security Considerations and Best Practices
+
+- **Validation Before Approval**: Always validate transaction details (recipient, amount, etc.) before approving activities.
+
+- **Initial Setup Flexibility**: For a better user experience during setup, you can:
+
+  - Create the sub-organization initially with a root quorum threshold of 1
+  - Complete initial setup tasks (like adding wallet accounts)
+  - Update the root quorum threshold to 2 when ready for production use
+
+  ```typescript
+  // Update the root quorum threshold after initial setup
+  await turnkeyServer.updateRootQuorum({
+    organizationId: subOrgId,
+    threshold: 2,
+    userIds: [endUserId, serviceUserId],
+  });
+  ```
+
+- **Policy-Based Controls**: For more granular control, you can create policies specifying which transactions require multi-sig approval:
+
+  ```typescript
+  await turnkeyServer.createPolicy({
+    organizationId: subOrgId,
+    policy: {
+      policyName: "High-value transaction multi-sig",
+      effect: "EFFECT_ALLOW",
+      consensus: "approvers.count() >= 2",
+      condition: "eth.tx.value >= 1000000000000000000", // 1 ETH
+    },
+  });
+  ```
+
+- **Monitoring**: Track all multi-sig activities for audit purposes, especially approvals and rejections.
+
+- **Recovery Mechanisms**: Document and test recovery procedures in case one of the signers loses access.
+
+This approach provides true multi-signature security, requiring explicit approval from both parties before any transaction can be executed.
