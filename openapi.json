@@ -2812,7 +2812,10 @@
           "ACTIVITY_TYPE_INIT_OTP_AUTH",
           "ACTIVITY_TYPE_OTP_AUTH",
           "ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7",
-          "ACTIVITY_TYPE_UPDATE_WALLET"
+          "ACTIVITY_TYPE_UPDATE_WALLET",
+          "ACTIVITY_TYPE_UPDATE_POLICY_V2",
+          "ACTIVITY_TYPE_CREATE_USERS_V3",
+          "ACTIVITY_TYPE_INIT_OTP_AUTH_V2"
         ]
       },
       "AddressFormat": {
@@ -4041,6 +4044,10 @@
           "expirationSeconds": {
             "type": "string",
             "description": "Expiration window (in seconds) indicating how long the API key is valid. If not provided, a default of 15 minutes will be used."
+          },
+          "invalidateExisting": {
+            "type": "boolean",
+            "description": "Invalidate all other previously generated ReadWriteSession API keys"
           }
         }
       },
@@ -4626,6 +4633,21 @@
           }
         }
       },
+      "CreateUsersIntentV3": {
+        "required": [
+          "users"
+        ],
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "description": "A list of Users.",
+            "items": {
+              "$ref": "#/components/schemas/UserParamsV3"
+            }
+          }
+        }
+      },
       "CreateUsersRequest": {
         "required": [
           "organizationId",
@@ -4638,7 +4660,7 @@
           "type": {
             "type": "string",
             "enum": [
-              "ACTIVITY_TYPE_CREATE_USERS_V2"
+              "ACTIVITY_TYPE_CREATE_USERS_V3"
             ]
           },
           "timestampMs": {
@@ -4650,7 +4672,7 @@
             "description": "Unique identifier for a given Organization."
           },
           "parameters": {
-            "$ref": "#/components/schemas/CreateUsersIntentV2"
+            "$ref": "#/components/schemas/CreateUsersIntentV3"
           }
         }
       },
@@ -4825,7 +4847,9 @@
           "CREDENTIAL_TYPE_API_KEY_SECP256K1",
           "CREDENTIAL_TYPE_EMAIL_AUTH_KEY_P256",
           "CREDENTIAL_TYPE_API_KEY_ED25519",
-          "CREDENTIAL_TYPE_OTP_AUTH_KEY_P256"
+          "CREDENTIAL_TYPE_OTP_AUTH_KEY_P256",
+          "CREDENTIAL_TYPE_READ_WRITE_SESSION_KEY_P256",
+          "CREDENTIAL_TYPE_OAUTH_KEY_P256"
         ]
       },
       "Curve": {
@@ -5603,6 +5627,10 @@
           "sendFromEmailAddress": {
             "type": "string",
             "description": "Optional custom email address from which to send the email"
+          },
+          "sendFromEmailSenderName": {
+            "type": "string",
+            "description": "Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'"
           }
         }
       },
@@ -5639,6 +5667,10 @@
           "sendFromEmailAddress": {
             "type": "string",
             "description": "Optional custom email address from which to send the email"
+          },
+          "sendFromEmailSenderName": {
+            "type": "string",
+            "description": "Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'"
           }
         }
       },
@@ -6865,6 +6897,54 @@
           "sendFromEmailAddress": {
             "type": "string",
             "description": "Optional custom email address from which to send the OTP email"
+          },
+          "sendFromEmailSenderName": {
+            "type": "string",
+            "description": "Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'"
+          }
+        }
+      },
+      "InitOtpAuthIntentV2": {
+        "required": [
+          "contact",
+          "otpType"
+        ],
+        "type": "object",
+        "properties": {
+          "otpType": {
+            "type": "string",
+            "description": "Enum to specifiy whether to send OTP via SMS or email"
+          },
+          "contact": {
+            "type": "string",
+            "description": "Email or phone number to send the OTP code to"
+          },
+          "otpLength": {
+            "type": "integer",
+            "description": "Optional length of the OTP code. Default = 9",
+            "format": "int32"
+          },
+          "emailCustomization": {
+            "$ref": "#/components/schemas/EmailCustomizationParams"
+          },
+          "smsCustomization": {
+            "$ref": "#/components/schemas/SmsCustomizationParams"
+          },
+          "userIdentifier": {
+            "type": "string",
+            "description": "Optional client-generated user identifier to enable per-user rate limiting for SMS auth. We recommend using a hash of the client-side IP address."
+          },
+          "sendFromEmailAddress": {
+            "type": "string",
+            "description": "Optional custom email address from which to send the OTP email"
+          },
+          "alphanumeric": {
+            "type": "boolean",
+            "description": "Optional flag to specify if the OTP code should be alphanumeric (Crockford’s Base32). Default = true"
+          },
+          "sendFromEmailSenderName": {
+            "type": "string",
+            "description": "Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'"
           }
         }
       },
@@ -6880,7 +6960,7 @@
           "type": {
             "type": "string",
             "enum": [
-              "ACTIVITY_TYPE_INIT_OTP_AUTH"
+              "ACTIVITY_TYPE_INIT_OTP_AUTH_V2"
             ]
           },
           "timestampMs": {
@@ -6892,11 +6972,23 @@
             "description": "Unique identifier for a given Organization."
           },
           "parameters": {
-            "$ref": "#/components/schemas/InitOtpAuthIntent"
+            "$ref": "#/components/schemas/InitOtpAuthIntentV2"
           }
         }
       },
       "InitOtpAuthResult": {
+        "required": [
+          "otpId"
+        ],
+        "type": "object",
+        "properties": {
+          "otpId": {
+            "type": "string",
+            "description": "Unique identifier for an OTP authentication"
+          }
+        }
+      },
+      "InitOtpAuthResultV2": {
         "required": [
           "otpId"
         ],
@@ -7214,6 +7306,15 @@
           },
           "updateWalletIntent": {
             "$ref": "#/components/schemas/UpdateWalletIntent"
+          },
+          "updatePolicyIntentV2": {
+            "$ref": "#/components/schemas/UpdatePolicyIntentV2"
+          },
+          "createUsersIntentV3": {
+            "$ref": "#/components/schemas/CreateUsersIntentV3"
+          },
+          "initOtpAuthIntentV2": {
+            "$ref": "#/components/schemas/InitOtpAuthIntentV2"
           }
         }
       },
@@ -7341,6 +7442,10 @@
           "expirationSeconds": {
             "type": "string",
             "description": "Expiration window (in seconds) indicating how long the API key is valid. If not provided, a default of 15 minutes will be used."
+          },
+          "invalidateExisting": {
+            "type": "boolean",
+            "description": "Invalidate all other previously generated Oauth API keys"
           }
         }
       },
@@ -7470,7 +7575,8 @@
       "OtpAuthIntent": {
         "required": [
           "otpCode",
-          "otpId"
+          "otpId",
+          "targetPublicKey"
         ],
         "type": "object",
         "properties": {
@@ -7480,7 +7586,7 @@
           },
           "otpCode": {
             "type": "string",
-            "description": "6 digit OTP code sent out to a user's contact (email or SMS)"
+            "description": "OTP sent out to a user's contact (email or SMS)"
           },
           "targetPublicKey": {
             "type": "string",
@@ -8119,6 +8225,12 @@
           },
           "updateWalletResult": {
             "$ref": "#/components/schemas/UpdateWalletResult"
+          },
+          "updatePolicyResultV2": {
+            "$ref": "#/components/schemas/UpdatePolicyResultV2"
+          },
+          "initOtpAuthResultV2": {
+            "$ref": "#/components/schemas/InitOtpAuthResultV2"
           }
         }
       },
@@ -8801,6 +8913,37 @@
           }
         }
       },
+      "UpdatePolicyIntentV2": {
+        "required": [
+          "policyId"
+        ],
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "description": "Unique identifier for a given Policy."
+          },
+          "policyName": {
+            "type": "string",
+            "description": "Human-readable name for a Policy."
+          },
+          "policyEffect": {
+            "$ref": "#/components/schemas/Effect"
+          },
+          "policyCondition": {
+            "type": "string",
+            "description": "The condition expression that triggers the Effect (optional)."
+          },
+          "policyConsensus": {
+            "type": "string",
+            "description": "The consensus expression that triggers the Effect (optional)."
+          },
+          "policyNotes": {
+            "type": "string",
+            "description": "Accompanying notes for a Policy (optional)."
+          }
+        }
+      },
       "UpdatePolicyRequest": {
         "required": [
           "organizationId",
@@ -8813,7 +8956,7 @@
           "type": {
             "type": "string",
             "enum": [
-              "ACTIVITY_TYPE_UPDATE_POLICY"
+              "ACTIVITY_TYPE_UPDATE_POLICY_V2"
             ]
           },
           "timestampMs": {
@@ -8825,11 +8968,23 @@
             "description": "Unique identifier for a given Organization."
           },
           "parameters": {
-            "$ref": "#/components/schemas/UpdatePolicyIntent"
+            "$ref": "#/components/schemas/UpdatePolicyIntentV2"
           }
         }
       },
       "UpdatePolicyResult": {
+        "required": [
+          "policyId"
+        ],
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "description": "Unique identifier for a given Policy."
+          }
+        }
+      },
+      "UpdatePolicyResultV2": {
         "required": [
           "policyId"
         ],
@@ -9302,6 +9457,58 @@
             "description": "A list of Authenticator parameters. This field, if not needed, should be an empty array in your request body.",
             "items": {
               "$ref": "#/components/schemas/AuthenticatorParamsV2"
+            }
+          },
+          "userTags": {
+            "type": "array",
+            "description": "A list of User Tag IDs. This field, if not needed, should be an empty array in your request body.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UserParamsV3": {
+        "required": [
+          "apiKeys",
+          "authenticators",
+          "oauthProviders",
+          "userName",
+          "userTags"
+        ],
+        "type": "object",
+        "properties": {
+          "userName": {
+            "type": "string",
+            "description": "Human-readable name for a User."
+          },
+          "userEmail": {
+            "type": "string",
+            "description": "The user's email address."
+          },
+          "userPhoneNumber": {
+            "type": "string",
+            "description": "The user's phone number in E.164 format e.g. +13214567890"
+          },
+          "apiKeys": {
+            "type": "array",
+            "description": "A list of API Key parameters. This field, if not needed, should be an empty array in your request body.",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyParamsV2"
+            }
+          },
+          "authenticators": {
+            "type": "array",
+            "description": "A list of Authenticator parameters. This field, if not needed, should be an empty array in your request body.",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticatorParamsV2"
+            }
+          },
+          "oauthProviders": {
+            "type": "array",
+            "description": "A list of Oauth providers. This field, if not needed, should be an empty array in your request body.",
+            "items": {
+              "$ref": "#/components/schemas/OauthProviderParams"
             }
           },
           "userTags": {
