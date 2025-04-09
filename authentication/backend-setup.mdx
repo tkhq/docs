@@ -416,9 +416,17 @@ Once a user is authenticated and has a valid JWT, you can use it to authenticate
        }
 
        // Forward to Turnkey
-       const turnkeyResponse = await turnkeyApiClient.signTransaction(
-         signedTurnkeyRequest
-       );
+       const { url, body, stamp } = signedTurnkeyRequest;
+
+       const response = await fetch(url, {
+         method: "POST",
+         body,
+         headers: {
+           [stamp.stampHeaderName]: stamp.stampHeaderValue,
+         },
+       });
+
+       const turnkeyResponse = await response.json();
 
        // Process and return response
        return res.status(200).json(turnkeyResponse);
@@ -551,7 +559,17 @@ export async function proxySignTransaction(request) {
     }
 
     // Proxy the request to Turnkey
-    const response = await turnkeyServer.signTransaction(request);
+    const { url, body, stamp } = request;
+
+    const response = await fetch(url, {
+      method: "POST",
+      body,
+      headers: {
+        [stamp.stampHeaderName]: stamp.stampHeaderValue,
+      },
+    });
+
+    const result = await response.json();
 
     // Log the activity
     await db.activity.create({
@@ -559,11 +577,11 @@ export async function proxySignTransaction(request) {
         userId,
         type: "SIGN_TRANSACTION",
         status: "SUCCESS",
-        metadata: { txHash: response.hash },
+        metadata: { txHash: result.hash },
       },
     });
 
-    return response;
+    return result;
   } catch (error) {
     console.error("Error proxying request:", error);
     throw new Error("Failed to process request");
@@ -623,10 +641,17 @@ app.post("/api/proxy/turnkey/sign-transaction", verifyJwt, async (req, res) => {
 
   try {
     // Forward to Turnkey
-    const turnkeyResponse = await turnkeyServer.signTransaction(signedRequest);
+    const { url, body, stamp } = signedRequest;
 
-    // Log the activity in your database if needed
-    // ...
+    const response = await fetch(url, {
+      method: "POST",
+      body,
+      headers: {
+        [stamp.stampHeaderName]: stamp.stampHeaderValue,
+      },
+    });
+
+    const turnkeyResponse = await response.json();
 
     // Return the response
     return res.status(200).json(turnkeyResponse);
@@ -684,6 +709,18 @@ async function cosignTransaction(transaction, userId) {
       unsignedTransaction: transaction, // The RLP-encoded unsigned transaction as a hex string
     },
   });
+
+  const { url, body, stamp } = signRequest;
+
+  const response = await fetch(url, {
+    method: "POST",
+    body,
+    headers: {
+      [stamp.stampHeaderName]: stamp.stampHeaderValue,
+    },
+  });
+
+  const cosignedTx = await response.json();
 
   return cosignedTx;
 }
