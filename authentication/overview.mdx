@@ -5,116 +5,74 @@ description: Learn about supported authentication methods for Turnkey, how to ad
 
 # Overview
 
-Authentication methods are security mechanisms used to verify identity and authorize actions within the Turnkey platform. Unlike traditional password-based systems, Turnkey prioritizes stronger authentication methods that provide enhanced security while maintaining excellent user experience.
+Turnkey's wallet system supports granular controls on who can access wallets and what actions different users can perform.
 
-This guide covers all supported authentication methods, providing details on how to accommodate different security requirements and use cases.
+To enforce these controls, Turnkey's API must verify the identity of the party requesting a wallet action, ensuring that only authorized actions are executed by the system. This process is known as **authentication**.
 
-## Supported Authentication Methods
+Turnkey supports both **API authentication** and **user authentication** for authenticating access to wallets.
 
-Turnkey supports various authentication methods to accommodate different security requirements and use cases:
+## API authentication
 
-### WebAuthN/Passkeys
+With **API authentication**, Turnkey authenticates a request from your server directly using an **API secret**. This ensures that Turnkey only executes requests sent by your servers alone, and no other party.
 
-[WebAuthN](https://webauthn.guide/) provides a secure authentication standard using public key cryptography, enabling passwordless authentication through devices like biometric sensors and security keys.
-
-For comprehensive information about implementing passkeys in your application, see our [Passkeys Introduction](/authentication/passkeys/introduction) guide.
-
-#### Types of WebAuthN Devices
-
-- **Platform Authenticators**: Built into the device (e.g., Touch ID, Face ID)
-- **Cross-Platform Authenticators**: External devices (e.g., YubiKeys, other FIDO2 compliant security keys)
-
-#### Supported Transport Methods
-
-- `AUTHENTICATOR_TRANSPORT_BLE` - Bluetooth Low Energy
-- `AUTHENTICATOR_TRANSPORT_INTERNAL` - Device-integrated authenticators
-- `AUTHENTICATOR_TRANSPORT_NFC` - Near Field Communication
-- `AUTHENTICATOR_TRANSPORT_USB` - USB connection
-- `AUTHENTICATOR_TRANSPORT_HYBRID` - Multiple transport methods
-
-Learn more about [passkey configuration options](/authentication/passkeys/options) and [integration best practices](/authentication/passkeys/integration).
-
-#### Key Considerations for WebAuthN/Passkeys
-
-- Every Turnkey user needs at least one long-lived credential (a passkey or non-expiring API key) to prevent account lockouts
-- WebAuthN/passkeys are recommended for dashboard access and user authentication
-- See our guide on [discoverable vs. non-discoverable credentials](/authentication/passkeys/discoverable-vs-non-discoverable) for important implementation details
-
-**API Reference**: [Create Authenticators](/api-reference/authenticators/create-authenticators), [Get Authenticators](/api-reference/authenticators/get-authenticators)
-
-### API Keys
-
-API keys use asymmetric cryptography (P-256 key pairs) for programmatic access to the Turnkey API.
+In addition to the API secret, you can also configure **authorization policies** that control specific wallets, private keys, and other resources. Any requests to use or update these resources require approval according to the corresponding policy. This allows you to enforce granular controls on all Turnkey resources.
 
 For backend implementation details, see our [Backend Setup](/authentication/backend-setup) guide.
 
-#### Key Considerations for API Keys
-
-- Turnkey only stores the public key; you are responsible for securely storing the private key
-- API keys are primarily intended for programmatic/server access
-- API key requests must include properly formatted signatures
-
 **API Reference**: [Create API Keys](/api-reference/api-keys/create-api-keys), [Get API Keys](/api-reference/api-keys/get-api-key)
 
-### Email Authentication
+## User authentication
 
-Email authentication provides a familiar and accessible method for users to authenticate, particularly useful for sub-organizations and embedded wallet implementations.
+Turnkey is a powerful toolkit for progressive authentication of users. With fine-grained control over onboarding flows and wallet connections, you can improve conversion and craft better UX.
 
-For detailed implementation instructions and examples, see our [Email Authentication](/authentication/email) guide.
+Using any of Turnkey's client-side SDKs, your app can authenticate users across web2 and web3 accounts, including:
 
-#### Types of Email Authentication
+- **WebAuthN/Passkeys**: Biometric or passkey-based login based on the WebAuthn standard. [Learn more](/authentication/passkeys/introduction)
+- **Email or SMS**: Passwordless login via a one-time passcode sent to a user's email address or phone number. [Learn more](/authentication/email) | [SMS Authentication](/authentication/sms)
+- **OAuth and social logins**: Social login with Google, Apple, Twitter, Discord, GitHub, LinkedIn, and more. [Learn more](/authentication/social-logins)
+- **Wallets**: External wallet login via Sign-In With Ethereum and Sign-In With Solana.
 
-- OTP-based Email Auth (one-time passwords)
-- Credential bundle Email Auth
+Your app can configure each of these authentication methods to be an upfront login method, or as an account that users link later.
 
-#### Key Considerations for Email Authentication
+All of Turnkey's authentication methods create a common user object, where you can easily find a user's unique ID and all of the accounts they've linked to their profile. A user is a user, regardless of whether they've connected with a wallet, email or other account.
 
-- Email authentication is enabled by default for sub-organizations
-- Can be disabled during sub-organization creation if needed
-
-**API Reference**: [Perform Email Auth](/api-reference/user-auth/perform-email-auth)
-
-### SMS Authentication
-
-SMS authentication uses phone numbers and one-time passwords sent via text message to verify user identity.
-
-For implementation details and code examples, see our [SMS Authentication](/authentication/sms) guide.
-
-#### Key Considerations for SMS Authentication
-
-- Creates temporary API keys for session access
-- Requires phone number verification
-- Has rate limiting per user to prevent abuse
-
-**API Reference**: [Init OTP Auth](/api-reference/user-auth/init-otp-auth), [OTP Auth](/api-reference/user-auth/otp-auth)
-
-### OAuth Authentication (Beta)
-
-Authentication using OpenID Connect (OIDC) tokens from third-party identity providers.
-
-Learn more about implementing social logins in our [Social Logins](/authentication/social-logins) documentation.
-
-#### Key Considerations for OAuth Authentication
-
-- Currently in Beta status
-- Provides integration with existing identity systems
-
-**API Reference**: [OAuth](/api-reference/user-auth/oauth), [Create OAuth Providers](/api-reference/user-auth/create-oauth-providers)
-
-## Best Practices
-
-- **Multiple Authentication Methods**: Register multiple authentication methods to ensure account access if one method becomes unavailable
-- **Security Considerations**: Different authentication methods offer various security levels; choose based on your security requirements
-- **User Experience**: Balance security requirements with usability considerations
-- **Recovery Planning**: Always have backup authentication methods configured
+Once a user successfully authenticates with Turnkey, Turnkey creates a session for that user that your app can use to represent an authenticated session or to make authenticated requests to your backend.
 
 For information about managing authenticated sessions, see our [Sessions](/authentication/sessions) documentation.
 
 ## Related Resources
 
-- [Passkey Introduction](/authentication/passkeys/introduction)
-- [Email Authentication](/authentication/email)
-- [SMS Authentication](/authentication/sms)
-- [Social Logins](/authentication/social-logins)
-- [Sessions](/authentication/sessions)
-- [API Stamps](/developer-reference/api-overview/stamps)
+<CardGroup cols={2}>
+  <Card
+    title="Passkey Introduction"
+    icon="key"
+    href="/authentication/passkeys/introduction"
+  >
+    Biometric and hardware-based passwordless authentication using WebAuthn
+    standard.
+  </Card>
+  <Card
+    title="Email Authentication"
+    icon="envelope"
+    href="/authentication/email"
+  >
+    Passwordless login via one-time codes sent to users' email addresses.
+  </Card>
+  <Card title="SMS Authentication" icon="message" href="/authentication/sms">
+    User verification through one-time passwords sent via text message.
+  </Card>
+  <Card title="Social Logins" icon="users" href="/authentication/social-logins">
+    OAuth authentication with popular social providers like Google, Apple, and
+    Twitter.
+  </Card>
+  <Card title="Sessions" icon="clock" href="/authentication/sessions">
+    Manage authenticated user sessions and access tokens in your application.
+  </Card>
+  <Card
+    title="API Stamps"
+    icon="stamp"
+    href="/developer-reference/api-overview/stamps"
+  >
+    Authenticate and sign requests to the Turnkey API with cryptographic stamps.
+  </Card>
+</CardGroup>
