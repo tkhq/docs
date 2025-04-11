@@ -106,7 +106,6 @@ async function getUserIdFromCookie(req) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    // JWT payload now only contains userId
     return decoded.userId;
   } catch (error) {
     // Invalid or expired token
@@ -334,7 +333,7 @@ For new users, the flow is similar but involves creating a new sub-organization:
           // Generate JWT containing only the application's user ID
           const token = jwt.sign(
             {
-              userId: user.id, // Only include userId in the JWT payload
+              userId: user.id,
             },
             JWT_SECRET,
             { expiresIn: "1h" }
@@ -426,92 +425,98 @@ sequenceDiagram
   The user provides their email. The frontend gets the Turnkey iframe's public key (referred to as `targetPublicKey`) and sends both to the backend. The backend finds the user's sub-organization and asks Turnkey to send the OTP email by calling `sendOtp`, passing the iframe's public key as the `targetPublicKey` parameter (used by Turnkey for credential encryption upon successful verification).
 
   <CodeGroup>
-  
-  ```typescript frontend.ts [expandable]
-  import { useTurnkey } from "@turnkey/sdk-react"; // Or however you access the client
+      
+    ```typescript frontend.ts [expandable]
+    import { useTurnkey } from "@turnkey/sdk-react"; // Or however you access the client
 
-// User enters email and clicks 'Send OTP'
-const handleRequestOtp = async (email: string) => {
-const { authIframeClient } = useTurnkey();
-if (!authIframeClient) {
-console.error("Turnkey iframe client not available");
-// Handle error: Inform user or disable button
-return;
-}
+    // User enters email and clicks 'Send OTP'
+    const handleRequestOtp = async (email: string) => {
+      const { authIframeClient } = useTurnkey();
+      if (!authIframeClient) {
+        console.error("Turnkey iframe client not available");
+        // Handle error: Inform user or disable button
+        return;
+      }
 
-    try {
-      // Get the public key associated with the Turnkey iframe client instance.
-      // This is sent to the backend for the sendOtp request.
-      const targetPublicKey = await authIframeClient.getPublicKey();
+      try {
+        // Get the public key associated with the Turnkey iframe client instance.
+        // This is sent to the backend for the sendOtp request.
+        const targetPublicKey = await authIframeClient.getPublicKey();
 
-      const response = await fetch('/api/auth/otp/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, targetPublicKey }),
-      });
+        const response = await fetch("/api/auth/otp/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, targetPublicKey }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (response.ok) {
-        // Store otpId returned from backend for the verification step
-        const otpId = data.otpId;
-        console.log('OTP requested successfully, otpId:', otpId);
-        // Show UI for OTP input, store otpId for the next step
-        // e.g., setOtpIdState(otpId);
-      } else {
-        console.error('Failed to request OTP:', data.error);
+        if (response.ok) {
+          // Store otpId returned from backend for the verification step
+          const otpId = data.otpId;
+          console.log("OTP requested successfully, otpId:", otpId);
+          // Show UI for OTP input, store otpId for the next step
+          // e.g., setOtpIdState(otpId);
+        } else {
+          console.error("Failed to request OTP:", data.error);
+          // Show error message to the user
+        }
+      } catch (error) {
+        console.error("Error requesting OTP:", error);
         // Show error message to the user
       }
-    } catch (error) {
-      console.error('Error requesting OTP:', error);
-      // Show error message to the user
-    }
+    };
+    ```
 
-};
+    ```typescript backend-otp-request.ts [expandable]
+    import { turnkeyServer } from "./turnkey"; // Import initialized Turnkey server client
+    import { findUserByEmail } from "./dbUtils"; // Assume DB utility for finding user/subOrgId
 
-````
+    app.post("/api/auth/otp/request", async (req, res) => {
+      const { email, targetPublicKey } = req.body;
+      if (!email || !targetPublicKey) {
+        return res.status(400).json({
+          error: "Email and targetPublicKey (iframe public key) are required",
+        });
+      }
 
-```typescript backend-otp-request.ts [expandable]
-import { turnkeyServer } from "./turnkey"; // Import initialized Turnkey server client
-import { findUserByEmail } from "./dbUtils"; // Assume DB utility for finding user/subOrgId
+      try {
+        // Find the user and their associated sub-organization in your database
+        const user = await findUserByEmail(email);
+        if (!user || !user.turnkeySubOrgId) {
+          // Handle case where user/sub-org is not found appropriately
+          return res.status(404).json({
+            error: "User or associated sub-organization not found for this email.",
+          });
+        }
+        const subOrgId = user.turnkeySubOrgId;
 
-app.post("/api/auth/otp/request", async (req, res) => {
-const { email, targetPublicKey } = req.body;
-if (!email || !targetPublicKey) {
-  return res.status(400).json({ error: "Email and targetPublicKey (iframe public key) are required" });
-}
+        // Call Turnkey to initiate the OTP flow via email
+        const otpResponse = await turnkeyServer.sendOtp({
+          suborgID: subOrgId,
+          otpType: "EMAIL",
+          contact: email,
+          targetPublicKey: targetPublicKey, // Pass the iframe public key as targetPublicKey
+        });
 
-try {
-  // Find the user and their associated sub-organization in your database
-  const user = await findUserByEmail(email);
-  if (!user || !user.turnkeySubOrgId) {
-    // Handle case where user/sub-org is not found appropriately
-    return res.status(404).json({ error: "User or associated sub-organization not found for this email." });
-  }
-  const subOrgId = user.turnkeySubOrgId;
-
-  // Call Turnkey to initiate the OTP flow via email
-  const otpResponse = await turnkeyServer.sendOtp({
-    suborgID: subOrgId,
-    otpType: "EMAIL",
-    contact: email,
-    targetPublicKey: targetPublicKey, // Pass the iframe public key as targetPublicKey
-  });
-
-  if (otpResponse?.otpId) {
-    // Return the otpId to the frontend; it's needed for verification
-    console.log(`Turnkey sendOtp successful for ${email}, otpId: ${otpResponse.otpId}`);
-    return res.status(200).json({ message: "OTP sent successfully", otpId: otpResponse.otpId });
-  } else {
-    throw new Error("Turnkey sendOtp did not return an otpId.");
-  }
-} catch (error) {
-  console.error("Error requesting Turnkey OTP:", error);
-  // Avoid leaking internal Turnkey errors; log them and return a generic error
-  return res.status(500).json({ error: "Failed to send OTP" });
-}
-});
-````
+        if (otpResponse?.otpId) {
+          // Return the otpId to the frontend; it's needed for verification
+          console.log(
+            `Turnkey sendOtp successful for ${email}, otpId: ${otpResponse.otpId}`
+          );
+          return res
+            .status(200)
+            .json({ message: "OTP sent successfully", otpId: otpResponse.otpId });
+        } else {
+          throw new Error("Turnkey sendOtp did not return an otpId.");
+        }
+      } catch (error) {
+        console.error("Error requesting Turnkey OTP:", error);
+        // Avoid leaking internal Turnkey errors; log them and return a generic error
+        return res.status(500).json({ error: "Failed to send OTP" });
+      }
+    });
+    ```
 
   </CodeGroup>
   </Step>
@@ -683,9 +688,11 @@ Failure to perform this check, especially on read operations, could allow a user
 1. **Client-side**: Include JWT in requests to your backend
 
    ```typescript
-   const signedTurnkeyRequest = await turnkeyClient.signRequest({
+   const signedTurnkeyRequest = await turnkeyClient.stampSignRequest({
      organizationId: subOrgId,
-     // Parameters for the specific Turnkey operation
+     signWith: "private-key-id", // ID of the private key to use for signing
+     type: "TRANSACTION_TYPE_ETHEREUM", // Type of transaction
+     unsignedTransaction: "0x...", // Hex-encoded unsigned transaction
    });
 
    const response = await fetch("/api/proxy/turnkey/sign-transaction", {
