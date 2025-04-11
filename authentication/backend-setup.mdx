@@ -67,43 +67,60 @@ Before you can authenticate a user with Turnkey, you need their sub-organization
    });
    ```
 
-2. **Turnkey API Lookup**: Query Turnkey directly for sub-organizations associated with an email
+2. **Turnkey API Lookup (Alternative)**
+   If you don't have the sub-organization ID stored alongside your user record, you can query Turnkey using the user's email to find associated sub-organization IDs.
 
-<CodeGroup>
-
-```typescript app.ts
-import { turnkeyServer } from "./turnkey";
-
+```typescript
 const { organizationIds } = await turnkeyServer.getSubOrgIds({
-  // The parent organization ID
   organizationId: process.env.TURNKEY_ORGANIZATION_ID,
   filterType: "EMAIL",
   filterValue: userEmail,
 });
 
+// NB: This assumes the user has exactly one sub-org. See notes below!
 const subOrgId = organizationIds[0]; // First matching sub-org
 ```
 
-```typescript turnkey.ts
-import { Turnkey } from "@turnkey/sdk-server";
+<Accordion title="Important Considerations for API Lookup">
 
-// Initialize server-side client
-export const turnkeyServer = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com",
-  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-}).apiClient();
-```
+The example above (`const subOrgId = organizationIds[0];`) simply takes the first ID found. **This approach might not be suitable for all applications.**
 
-</CodeGroup>
+- **Handling No Results:** If `organizationIds` is empty, your application needs a defined behavior. This might involve failing the login/signup attempt or prompting the user differently.
+- **Handling Multiple Results:** If multiple IDs are returned, your application must decide how to proceed. You could:
+  - Prompt the user to select the intended sub-organization.
+  - Enforce a business rule that an email can only map to one sub-organization and treat multiple results as an error state.
+  - Use other contextual information (if available) to disambiguate.
+- **Crucial Verification Step:** Retrieving a `subOrgId` via email lookup **does not grant access**. After obtaining a potential `subOrgId`, your application _must_ proceed with user authentication (e.g., using the passkey flow described next). Only after the user successfully authenticates should you trust the `subOrgId` and verify that the _authenticated user_ is indeed authorized to operate within that specific sub-organization (typically by checking against your application's user database). Blindly trusting the first ID returned without proper authentication and authorization checks is insecure.
+
+</Accordion>
 
 3. **JWT Cookie**: Extract the sub-organization ID from an existing JWT in cookies (for returning users)
 
+   If a user has previously logged in, their JWT might be stored in a cookie. You can verify this token and extract the user ID to confirm their identity.
+
 ```typescript
-const token = req.cookies.authToken;
-const decoded = jwt.verify(token, JWT_SECRET);
-const subOrgId = decoded.subOrgId;
+// Example: Extracting User ID from JWT Cookie
+async function getUserIdFromCookie(req) {
+  const token = req.cookies.authToken;
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    // JWT payload now only contains userId
+    return decoded.userId;
+  } catch (error) {
+    // Invalid or expired token
+    return null;
+  }
+}
+
+// If you need the subOrgId associated with this userId,
+// perform a database lookup after verifying the JWT:
+// const user = await db.users.findUnique({
+//   where: { id: userId },
+//   select: { turnkeySubOrgId: true }
+// });
+// const subOrgId = user?.turnkeySubOrgId;
 ```
 
 #### Login Flow
@@ -180,10 +197,10 @@ const subOrgId = decoded.subOrgId;
           // Lookup or create user in your database
           const user = await findOrCreateUser(turnkeyResponse.organizationId);
 
-          // Generate JWT
+          // Generate JWT containing only the application's user ID
+          // The subOrgId is stored in the database, associated with the userId
           const token = jwt.sign(
             {
-              subOrgId: turnkeyResponse.organizationId,
               userId: user.id,
             },
             JWT_SECRET,
@@ -312,54 +329,345 @@ For new users, the flow is similar but involves creating a new sub-organization:
 
         if (createSubOrgResponse.organizationId) {
           // Store user in your database
-          const user = await db.users.create({
-            data: {
-              email: email,
-              name: username,
-              turnkeySubOrgId: createSubOrgResponse.organizationId,
-            },
-          });
+          const user = await createUser(createSubOrgResponse.organizationId, email);
 
-          // Generate JWT
+          // Generate JWT containing only the application's user ID
           const token = jwt.sign(
             {
-              subOrgId: createSubOrgResponse.organizationId,
-              userId: user.id,
+              userId: user.id, // Only include userId in the JWT payload
             },
             JWT_SECRET,
             { expiresIn: "1h" }
           );
 
           res.cookie("authToken", token, { httpOnly: true, secure: true });
-          return res.status(200).json({ success: true });
+          return res.status(200).json({
+            success: true,
+            message: "Signup successful, user created, and logged in."
+          });
         }
       } catch (error) {
-        return res.status(400).json({ error: "Failed to create account" });
+        // Handle specific errors (e.g., email already exists)
+        console.error("Signup Error:", error);
+        return res.status(500).json({ error: "Signup failed" });
       }
     });
     ```
 
-    ```typescript turnkey.ts
-    import { Turnkey } from "@turnkey/sdk-server";
+```typescript turnkey.ts
+import { Turnkey } from "@turnkey/sdk-server";
 
-    // Initialize server-side client
-    export const turnkeyServer = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    }).apiClient();
+// Initialize server-side client
+export const turnkeyServer = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
 
-    ```
-
-    </CodeGroup>
+</CodeGroup>
 
   </Step>
 </Steps>
 
-### Authenticating Subsequent Requests
+### Email OTP Authentication Flow
 
-Once a user is authenticated and has a valid JWT, you can use it to authenticate subsequent requests to your backend:
+Turnkey allows users to authenticate via email using a secure One-Time Passcode (OTP). Your backend initiates this by calling `sendOtp`. Turnkey emails the code to the user. The user enters the code in the frontend, which sends it (along with identifiers) to your backend. Your backend then calls `verifyOtp`. Upon successful Turnkey verification, your backend issues its own application JWT to manage the proxied session.
+
+**Note:** This flow generally assumes the user and their associated Turnkey Sub-Organization already exist, as it's primarily for authentication rather than initial signup.
+
+#### Architecture Overview
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Turnkey
+
+    %% OTP Request Phase
+    User->>Frontend: Enters email address
+    Frontend->>Frontend: Get iframe targetPublicKey
+    Frontend->>Backend: Request OTP (email, targetPublicKey)
+    Backend->>Backend: Lookup user/subOrgId by email
+    alt User/SubOrg Found
+        Backend->>Turnkey: call sendOtp(subOrgId, email, targetPublicKey)
+        Turnkey->>Backend: Return otpId
+        Turnkey->>User: Sends OTP Email
+        Backend->>Frontend: Return otpId
+    else User/SubOrg Not Found
+        Backend->>Frontend: Return error (user needs signup/different flow)
+    end
+
+    %% OTP Verification & Login Phase
+    User->>Frontend: Enters received OTP code
+    Frontend->>Frontend: Get iframe targetPublicKey (for encryption)
+    Frontend->>Backend: Submit verification (email, otpCode, otpId, targetPublicKey)
+    Backend->>Backend: Lookup user/subOrgId by email
+    Backend->>Turnkey: call verifyOtp(subOrgId, otpId, otpCode, targetPublicKey)
+    alt Turnkey Verification Success
+        Turnkey->>Backend: Success, returns **authSession** (contains token)
+        Backend->>Backend: User is authenticated by Turnkey
+        Backend->>Backend: Generate Backend Application JWT (with userId)
+        Backend->>Frontend: Return Success + Set JWT Cookie + **Return authSession**
+        Frontend->>Frontend: **call authIframeClient.loginWithSession(authSession)**
+        Frontend->>Frontend: Store JWT, User logged in to application
+    else Turnkey Verification Failure
+        Turnkey->>Backend: Failure response
+        Backend->>Frontend: Return error response
+    end
+```
+
+#### Implementation Steps
+
+<Steps>
+  <Step title="Request OTP">
+  The user provides their email. The frontend gets the Turnkey iframe's public key (referred to as `targetPublicKey`) and sends both to the backend. The backend finds the user's sub-organization and asks Turnkey to send the OTP email by calling `sendOtp`, passing the iframe's public key as the `targetPublicKey` parameter (used by Turnkey for credential encryption upon successful verification).
+
+  <CodeGroup>
+  
+  ```typescript frontend.ts [expandable]
+  import { useTurnkey } from "@turnkey/sdk-react"; // Or however you access the client
+
+  // User enters email and clicks 'Send OTP'
+  const handleRequestOtp = async (email: string) => {
+    const { authIframeClient } = useTurnkey();
+    if (!authIframeClient) {
+      console.error("Turnkey iframe client not available");
+      // Handle error: Inform user or disable button
+      return;
+    }
+
+    try {
+      // Get the public key associated with the Turnkey iframe client instance.
+      // This is sent to the backend for the sendOtp request.
+      const targetPublicKey = await authIframeClient.getPublicKey();
+
+      const response = await fetch('/api/auth/otp/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, targetPublicKey }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store otpId returned from backend for the verification step
+        const otpId = data.otpId;
+        console.log('OTP requested successfully, otpId:', otpId);
+        // Show UI for OTP input, store otpId for the next step
+        // e.g., setOtpIdState(otpId);
+      } else {
+        console.error('Failed to request OTP:', data.error);
+        // Show error message to the user
+      }
+    } catch (error) {
+      console.error('Error requesting OTP:', error);
+      // Show error message to the user
+    }
+  };
+  ```
+
+```typescript backend-otp-request.ts [expandable]
+import { turnkeyServer } from "./turnkey"; // Import initialized Turnkey server client
+import { findUserByEmail } from "./dbUtils"; // Assume DB utility for finding user/subOrgId
+
+app.post("/api/auth/otp/request", async (req, res) => {
+  const { email, targetPublicKey } = req.body;
+  if (!email || !targetPublicKey) {
+    return res.status(400).json({ error: "Email and targetPublicKey (iframe public key) are required" });
+  }
+
+  try {
+    // Find the user and their associated sub-organization in your database
+    const user = await findUserByEmail(email);
+    if (!user || !user.turnkeySubOrgId) {
+      // Handle case where user/sub-org is not found appropriately
+      return res.status(404).json({ error: "User or associated sub-organization not found for this email." });
+    }
+    const subOrgId = user.turnkeySubOrgId;
+
+    // Call Turnkey to initiate the OTP flow via email
+    const otpResponse = await turnkeyServer.sendOtp({
+      suborgID: subOrgId,
+      otpType: "EMAIL",
+      contact: email,
+      targetPublicKey: targetPublicKey, // Pass the iframe public key as targetPublicKey
+    });
+
+    if (otpResponse?.otpId) {
+      // Return the otpId to the frontend; it's needed for verification
+      console.log(`Turnkey sendOtp successful for ${email}, otpId: ${otpResponse.otpId}`);
+      return res.status(200).json({ message: "OTP sent successfully", otpId: otpResponse.otpId });
+    } else {
+      throw new Error("Turnkey sendOtp did not return an otpId.");
+    }
+  } catch (error) {
+    console.error("Error requesting Turnkey OTP:", error);
+    // Avoid leaking internal Turnkey errors; log them and return a generic error
+    return res.status(500).json({ error: "Failed to send OTP" });
+  }
+});
+```
+
+  </CodeGroup>
+  </Step>
+
+  <Step title="Verify OTP & Issue Backend JWT">
+  The user submits the received OTP code. The frontend gets the iframe's public key again (as `targetPublicKey` for encryption) and sends the code, email, original `otpId`, and `targetPublicKey` to the backend. The backend asks Turnkey to verify the code using `verifyOtp`. If successful, the backend generates and sets its own application session JWT cookie **and** returns the `authSession` object from Turnkey to the frontend. The frontend then uses this `authSession` to establish the Turnkey session within the iframe via `loginWithSession`.
+
+  <CodeGroup>
+
+```typescript frontend.ts [expandable]
+import { useTurnkey } from "@turnkey/sdk-react";
+
+// User enters OTP and clicks 'Verify'
+// Assumes 'otpId' was stored in state from the previous step
+const handleVerifyOtp = async (email: string, otpCode: string, otpId: string) => {
+  const { authIframeClient } = useTurnkey();
+  if (!authIframeClient) {
+    console.error("Turnkey iframe client not available");
+    return;
+  }
+
+  try {
+    // Get the public key again, this time as the target for credential encryption
+    const targetPublicKey = await authIframeClient.getPublicKey();
+    
+    const response = await fetch("/api/auth/otp/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, otpCode, otpId, targetPublicKey }),
+    });
+
+    if (response.ok) {
+      // Backend successfully verified OTP with Turnkey and issued its JWT (in cookie)
+      console.log("OTP verification successful, backend session established.");
+
+      // Get the authSession from the backend response
+      const data = await response.json();
+      const authSession = data.authSession;
+
+      if (!authSession?.token) {
+        console.error("Backend did not return a valid Turnkey authSession.");
+        // Handle error: inform user authentication might be incomplete
+        return;
+      }
+
+      // Use the session token from the backend to log in the Turnkey iframe
+      console.log("Establishing Turnkey iframe session...");
+      await authIframeClient.loginWithSession(authSession);
+      console.log("Turnkey iframe session established.");
+
+      // Now both backend app session (cookie) and Turnkey iframe session are active.
+      // Redirect user or update UI state (e.g., router.push('/dashboard'))
+    } else {
+      const data = await response.json();
+      console.error("OTP verification failed:", data.error);
+      // Show error message to the user
+    }
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    // Show error message to the user
+  }
+};
+```
+
+```typescript backend-otp-verify.ts [expandable]
+import { turnkeyServer } from "./turnkey"; // Import initialized Turnkey server client
+import { findUserByEmail } from "./dbUtils"; // Assume DB utility
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+app.post("/api/auth/otp/verify", async (req, res) => {
+  const { email, otpCode, otpId, targetPublicKey } = req.body;
+  if (!email || !otpCode || !otpId || !targetPublicKey) {
+    return res.status(400).json({ error: "Email, OTP code, OTP ID, and targetPublicKey are required" });
+  }
+
+  try {
+    // Find the user again to get their subOrgId and application userId
+    const user = await findUserByEmail(email);
+    if (!user || !user.turnkeySubOrgId) {
+      return res.status(404).json({ error: "User not found for this email during verification." });
+    }
+    const subOrgId = user.turnkeySubOrgId;
+    const applicationUserId = user.id; // Your application's internal user ID
+
+    // Call Turnkey to verify the OTP code
+    // If successful, Turnkey generates credentials encrypted for the targetPublicKey.
+    // The backend doesn't necessarily need the returned session details,
+    // but success confirms the user validated via OTP.
+    const verifyResult = await turnkeyServer.verifyOtp({
+      suborgID: subOrgId,
+      otpId: otpId,
+      otpCode: otpCode,
+      targetPubKey: targetPublicKey, // Encrypt credentials for the iframe client
+    });
+
+    // If verifyOtp doesn't throw, verification was successful with Turnkey.
+    console.log(`Turnkey OTP verified successfully for ${email}. Issuing backend JWT.`);
+    // console.log('Turnkey verifyOtp result:', verifyResult); // Optional: log result if needed
+
+    // Generate the application's session JWT
+    const token = jwt.sign({ userId: applicationUserId }, JWT_SECRET, {
+      expiresIn: "1h", // Or your desired session duration
+    });
+
+    // Set JWT as secure, httpOnly cookie for the application session
+    res.cookie('authToken', token, {
+      httpOnly: true,
+      secure: true, // Set to true in production (requires HTTPS)
+      sameSite: 'lax', // Or 'strict'
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Authentication successful",
+      userId: applicationUserId,
+      authSession: verifyResult, // Return the session object to the frontend
+    });
+
+  } catch (error: any) {
+    // Handle specific Turnkey errors if possible, otherwise return generic error
+    console.error("Error verifying Turnkey OTP:", error);
+    let errorMessage = "Failed to verify OTP.";
+    if (error.message?.includes("invalid code")) { 
+        errorMessage = "Invalid or expired OTP code.";
+        return res.status(401).json({ error: errorMessage }); // 401 Unauthorized
+    }
+    // Add more specific error handling based on Turnkey error codes/messages if needed
+    return res.status(500).json({ error: errorMessage });
+  }
+});
+```
+
+  </CodeGroup>
+  </Step>
+
+</Steps>
+
+This provides a secure authentication flow using Turnkey's Email OTP service, integrated with your backend's JWT-based session management **and** Turnkey's frontend iframe session management.
+
+### Subsequent Authenticated Requests
+
+Once the user is logged in (via passkey, OTP, or other methods) and has a valid JWT, subsequent requests from the frontend to your backend should include this JWT.
+
+**Crucial Security Note on Proxied Requests (Read and Write):**
+
+When proxying requests to Turnkey through your backend, it's **critical** to ensure that the authenticated user (identified by `userId` from the JWT) is actually authorized to perform the requested action on the _target_ Turnkey sub-organization (`subOrgId`). This applies to **both write operations (like signing transactions) and read operations (like fetching balances or activities)**.
+
+Simply verifying the JWT authenticates the user, but it doesn't authorize them for a specific sub-organization. Your backend **must**:
+
+1. Verify the JWT to get the authenticated `userId`.
+2. Look up the `subOrgId`(s) associated with that `userId` in your application's database.
+3. Compare the `subOrgId` from the incoming request against the one
+   associated with the authenticated user in your database.
+4. **Only proceed** if the requested `subOrgId` matches the one(s) associated with the authenticated user.
+
+Failure to perform this check, especially on read operations, could allow a user to potentially access information from sub-organizations they do not belong to.
 
 1. **Client-side**: Include JWT in requests to your backend
 
@@ -395,7 +703,8 @@ Once a user is authenticated and has a valid JWT, you can use it to authenticate
 
      try {
        const decoded = jwt.verify(token, JWT_SECRET);
-       req.user = decoded;
+       // Attach only userId to the request object
+       req.user = { userId: decoded.userId };
        next();
      } catch (err) {
        return res.status(401).json({ error: "Invalid token" });
@@ -407,16 +716,40 @@ Once a user is authenticated and has a valid JWT, you can use it to authenticate
      "/api/proxy/turnkey/sign-transaction",
      verifyJwt,
      async (req, res) => {
-       const { signedTurnkeyRequest } = req.body;
-       const { subOrgId } = req.user;
+       const { signedRequest } = req.body;
+       // Extract userId from the request object populated by middleware
+       const { userId } = req.user;
+
+       // --- Database Lookup Required for Authorization ---
+       // Fetch the user's subOrgId from your database.
+       // This lookup is ESSENTIAL for authorizing the user for the target sub-org,
+       // regardless of whether the operation is a read or a write.
+       const user = await db.users.findUnique({
+         where: { id: userId },
+         select: { turnkeySubOrgId: true },
+       });
+       const subOrgId = user?.turnkeySubOrgId;
+
+       if (!subOrgId) {
+         // User exists (JWT verified) but isn't linked to a sub-org in our DB
+         return res.status(403).json({
+           error:
+             "Forbidden: User not associated with a Turnkey sub-organization.",
+         });
+       }
+       // --- End DB Lookup ---
 
        // Validate the request is for the correct sub-organization
-       if (signedTurnkeyRequest.organizationId !== subOrgId) {
-         return res.status(403).json({ error: "Forbidden" });
+       // Compare the subOrgId from the incoming request against the one
+       // associated with the authenticated user in our database.
+       if (signedRequest.organizationId !== subOrgId) {
+         return res
+           .status(403)
+           .json({ error: "Forbidden: Sub-organization ID mismatch" });
        }
 
        // Forward to Turnkey
-       const { url, body, stamp } = signedTurnkeyRequest;
+       const { url, body, stamp } = signedRequest;
 
        const response = await fetch(url, {
          method: "POST",
@@ -428,7 +761,7 @@ Once a user is authenticated and has a valid JWT, you can use it to authenticate
 
        const turnkeyResponse = await response.json();
 
-       // Process and return response
+       // Return the response
        return res.status(200).json(turnkeyResponse);
      }
    );
@@ -445,13 +778,10 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Generate a JWT after successful authentication
-function generateToken(user, subOrgId) {
+function generateToken(user) {
   return jwt.sign(
     {
       userId: user.id,
-      email: user.email,
-      subOrgId: subOrgId,
-      // Add other claims as needed
     },
     JWT_SECRET,
     {
@@ -522,44 +852,54 @@ When processing a proxied Turnkey request:
 
 Next.js Server Actions provide a convenient way to implement secure backend operations:
 
-```typescript [expandable]
+<CodeGroup>
+
+```typescript actions.ts [expandable]
 "use server";
 
-import { Turnkey } from "@turnkey/sdk-server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import { db } from "@/lib/db";
-
-// Initialize the server-side Turnkey client
-const turnkeyServer = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com",
-  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-}).apiClient();
+import { db } from "@/lib/db"; // Assuming db setup
+import { turnkeyServer } from "./turnkey"; // Import the initialized client
 
 // Proxy a signing request to Turnkey
-export async function proxySignTransaction(request) {
-  // Get the auth token from the cookie
-  const cookieStore = cookies();
-  const token = cookieStore.get("authToken")?.value;
+export async function proxySignTransaction(signedRequest) {
+  const token = cookies().get("authToken")?.value;
 
   if (!token) {
-    throw new Error("Unauthorized");
+    throw new Error("Unauthorized: No token provided");
+  }
+
+  let userId;
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    throw new Error("Unauthorized: Invalid token");
+  }
+
+  // --- Database Lookup Required for Authorization ---
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { turnkeySubOrgId: true },
+  });
+  const subOrgId = user?.turnkeySubOrgId;
+
+  if (!subOrgId) {
+    throw new Error(
+      "Forbidden: User not associated with a Turnkey sub-organization."
+    );
+  }
+  // --- End DB Lookup ---
+
+  // Validate the request is for the correct sub-organization
+  if (signedRequest.organizationId !== subOrgId) {
+    throw new Error("Forbidden: Sub-organization ID mismatch");
   }
 
   try {
-    // Verify the token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { userId, subOrgId } = decoded;
-
-    // Ensure the request is for the correct organization
-    if (request.organizationId !== subOrgId) {
-      throw new Error("Forbidden: Organization ID mismatch");
-    }
-
-    // Proxy the request to Turnkey
-    const { url, body, stamp } = request;
+    // Forward to Turnkey
+    const { url, body, stamp } = signedRequest;
 
     const response = await fetch(url, {
       method: "POST",
@@ -569,29 +909,32 @@ export async function proxySignTransaction(request) {
       },
     });
 
-    const result = await response.json();
-
-    // Log the activity
-    await db.activity.create({
-      data: {
-        userId,
-        type: "SIGN_TRANSACTION",
-        status: "SUCCESS",
-        metadata: { txHash: result.hash },
-      },
-    });
-
-    return result;
+    const turnkeyResponse = await response.json();
+    return turnkeyResponse;
   } catch (error) {
-    console.error("Error proxying request:", error);
-    throw new Error("Failed to process request");
+    console.error("Error proxying to Turnkey:", error);
+    throw new Error("Failed to proxy request to Turnkey");
   }
 }
 ```
 
-### Standalone API Endpoint
+```typescript turnkey.ts
+import { Turnkey } from "@turnkey/sdk-server";
 
-For applications using a traditional API backend:
+// Initialize the server-side Turnkey client
+export const turnkeyServer = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+
+</CodeGroup>
+
+### Express.js Example
+
+For standard Node.js applications using Express:
 
 ```typescript [expandable]
 import express from "express";
@@ -622,7 +965,8 @@ const verifyJwt = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    // Attach only userId to the request object
+    req.user = { userId: decoded.userId };
     next();
   } catch (err) {
     return res.status(401).json({ error: "Invalid token" });
@@ -632,11 +976,31 @@ const verifyJwt = (req, res, next) => {
 // Proxy endpoint for Turnkey transaction signing
 app.post("/api/proxy/turnkey/sign-transaction", verifyJwt, async (req, res) => {
   const { signedRequest } = req.body;
-  const { subOrgId, userId } = req.user;
+  // Extract userId from the request object populated by middleware
+  const { userId } = req.user;
+
+  // --- Database Lookup Required for Authorization ---
+  // Fetch the user's subOrgId from your database
+  const user = await db.users.findUnique({
+    where: { id: userId },
+    select: { turnkeySubOrgId: true },
+  });
+  const subOrgId = user?.turnkeySubOrgId;
+
+  if (!subOrgId) {
+    // User exists (JWT verified) but isn't linked to a sub-org in our DB
+    return res.status(403).json({
+      error: "Forbidden: User not associated with a Turnkey sub-organization.",
+    });
+  }
+  // --- End DB Lookup ---
 
   // Validate the request is for the correct sub-organization
+  // Compare against the subOrgId retrieved from the database
   if (signedRequest.organizationId !== subOrgId) {
-    return res.status(403).json({ error: "Forbidden" });
+    return res
+      .status(403)
+      .json({ error: "Forbidden: Sub-organization ID mismatch" });
   }
 
   try {
@@ -683,299 +1047,6 @@ When implementing this pattern, keep these security considerations in mind:
 
 ## Advanced Topics
 
-### Co-signing Transactions
-
-To implement a true multi-signature arrangement with Turnkey,
-you need to create a sub-organization with multiple root users and set a quorum threshold.
-Here's how to set up and use a 2/2 multi-sig wallet:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Backend
-    participant Turnkey
-
-    %% Setup Phase
-    Note over User,Turnkey: Setup Phase
-    User->>Frontend: Sign up / Create wallet
-    Frontend->>User: Request passkey creation
-    User->>Frontend: Create passkey (attestation)
-    Frontend->>Backend: Send user info & attestation
-    Backend->>Turnkey: Create sub-org with 2 root users:<br/>1. User (passkey)<br/>2. Backend (API key)
-    Backend->>Turnkey: Set root quorum threshold = 2
-    Turnkey->>Backend: Return sub-org ID & wallet info
-    Backend->>Backend: Store sub-org ID in user record
-    Backend->>Frontend: Return wallet info
-    Frontend->>User: Display wallet address
-
-    %% Transaction Phase
-    Note over User,Turnkey: Transaction Phase
-    User->>Frontend: Initiate transaction
-    Frontend->>User: Request passkey authentication
-    User->>Frontend: Authenticate with passkey
-    Frontend->>Turnkey: Submit transaction signing request
-    Turnkey->>Turnkey: Verify user passkey signature
-    Turnkey->>Frontend: Return activity fingerprint
-    Frontend->>Backend: Send activity fingerprint for approval
-    Backend->>Turnkey: Verify & validate activity details
-    Backend->>Turnkey: Approve activity (using backend API key)
-    Turnkey->>Turnkey: Sign transaction (requires both approvals)
-    Turnkey->>Backend: Return signed transaction
-    Backend->>Frontend: Return signed transaction
-    Frontend->>User: Show transaction success
-```
-
-<Steps>
-  <Step title="Create a Sub-Organization with Multiple Root Users">
-    To set up a multi-sig wallet in Turnkey, you first need to create a sub-organization with two root users. 
-    This sub-organization will function as a separate entity with its own wallet and security settings.
-    
-    The key configuration here is setting up:
-    - A root user for the end-user, authenticated with their passkey
-    - A root user for your application service, authenticated with an API key
-    - A root quorum threshold of 2, requiring both users to approve critical operations
-    
-    This creates a true multi-sig arrangement where neither party can unilaterally control the wallet.
-    The following code shows how to implement this setup on your backend:
-
-    <CodeGroup>
-
-    ```typescript app.ts [expandable] {43}
-    import { turnkeyServer } from "./turnkey";
-    import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
-
-    async function createMultiSigWallet(
-      userId,
-      userEmail,
-      userPasskeyChallenge,
-      userPasskeyAttestation
-    ) {
-      // Create a sub-organization with two root users and a threshold of 2
-      const subOrg = await turnkeyServer.createSubOrganization({
-        organizationId: process.env.TURNKEY_ORGANIZATION_ID,
-        subOrganizationName: `Multi-Sig Wallet for ${userEmail}`,
-        rootUsers: [
-          // First root user - the end user with their passkey
-          {
-            userName: "End User",
-            userEmail: userEmail,
-            apiKeys: [],
-            authenticators: [
-              {
-                authenticatorName: "User Passkey",
-                challenge: userPasskeyChallenge,
-                attestation: userPasskeyAttestation,
-              },
-            ],
-          },
-          // Second root user - your application's service account
-          {
-            userName: "Application Service",
-            userEmail: "service@yourapp.com",
-            apiKeys: [
-              {
-                apiKeyName: "Service API Key",
-                publicKey: process.env.SERVICE_API_PUBLIC_KEY,
-                curveType: "API_KEY_CURVE_SECP256K1",
-              },
-            ],
-            authenticators: [],
-          },
-        ],
-        // This is the key setting - requiring both users to approve
-        rootQuorumThreshold: 2,
-        wallet: {
-          walletName: "Shared Wallet",
-          accounts: DEFAULT_ETHEREUM_ACCOUNTS,
-        },
-      });
-
-      // Save the sub-organization ID in your database
-      await db.users.update({
-        where: { id: userId },
-        data: { turnkeySubOrgId: subOrg.organizationId },
-      });
-
-      return subOrg;
-    }
-    ```
-
-    ```typescript turnkey.ts
-    import { Turnkey } from "@turnkey/sdk-server";
-
-    // Initialize server-side client
-    export const turnkeyServer = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    }).apiClient();
-
-    ```
-
-    </CodeGroup>
-
-  </Step>
-
-  <Step title="Client-Side Transaction Initiation">
-    When the user wants to sign a transaction using their multi-sig wallet, they need to initiate the process from your frontend application.
-    This step involves:
-    
-    - Authenticating the user with their passkey (handled automatically by Turnkey)
-    - Creating a transaction signing request to Turnkey
-    - Receiving an activity fingerprint that needs further approval
-    - Forwarding this fingerprint to your backend for the second signature
-    
-    The transaction won't be fully signed yet - it will be in a "requires consensus" state until your backend approves it.
-    Here's how to implement this flow in your frontend:
-
-    <CodeGroup>
-
-    ```typescript app.ts [expandable]
-    import { turnkeyPasskeyClient } from "./turnkey";
-
-
-    // User initiates a transaction signing
-    async function initiateTransaction(txData, walletAddress) {
-      // This will trigger the user's passkey authentication
-      const signActivity = await turnkeyPasskeyClient.signTransaction({
-        organizationId: subOrgId,
-        parameters: {
-          type: "TRANSACTION_TYPE_ETHEREUM",
-          signWith: walletAddress,
-          unsignedTransaction: txData,
-        },
-      });
-
-      // The activity needs approval from the backend service
-      // Send the activity fingerprint to your backend
-      const response = await fetch("/api/proxy/turnkey/approve-transaction", {
-        method: "POST",
-        body: JSON.stringify({
-          activityFingerprint: signActivity.fingerprint,
-          subOrgId: subOrgId,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Include cookies for JWT authentication
-      });
-
-      const result = await response.json();
-      return result;
-    }
-      ```
-
-    ```typescript turnkey.ts
-    import { Turnkey } from "@turnkey/sdk-browser";
-
-    // Initialize server-side client
-    export const turnkeyPasskeyClient = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-      rpid: process.env.RPID || 'localhost',
-    }).passkeyClient();
-
-    ```
-
-    </CodeGroup>
-
-  </Step>
-
-  <Step title="Backend Approval">
-    The final step in the multi-sig flow is having your backend service approve the transaction.
-    This is where the second signature required by the root quorum is applied. Your backend should:
-    
-    - Validate the incoming request to ensure it's legitimate
-    - Verify the user has permission to use the specified sub-organization
-    - Optionally retrieve and validate the activity details (e.g., checking transaction amount, recipient)
-    - Approve the activity using your service's API key
-    
-    Only after both the user and your backend have approved will Turnkey complete the signing process.
-    This provides strong security guarantees as it requires compromise of both authentication mechanisms to execute unauthorized transactions.
-
-    ```typescript [expandable] {22-26}
-    // API endpoint for approving transaction signing activities
-    app.post(
-      "/api/proxy/turnkey/approve-transaction",
-      async (req, res) => {
-        const { activityFingerprint, subOrgId } = req.body;
-        const { userId } = req.user;
-
-        try {
-          // Retrieve the user's associated sub-organization ID for verification
-          const user = await db.users.findUnique({
-            where: { id: userId },
-            select: { turnkeySubOrgId: true },
-          });
-
-          if (!user || user.turnkeySubOrgId !== subOrgId) {
-            return res
-              .status(403)
-              .json({ error: "Unauthorized: Organization ID mismatch" });
-          }
-
-          // Approve the activity
-          const approvalResult = await turnkeyServer.approveActivity({
-            organizationId: subOrgId,
-            fingerprint: activityFingerprint,
-          });
-
-          // Log the approval - Can be replaced with your own logging/metrics
-          console.log("Transaction approved:", approvalResult);
-
-          // Return the result to the client
-          return res.status(200).json(approvalResult);
-        } catch (error) {
-          console.error("Error approving transaction:", error);
-          return res.status(500).json({
-            error: "Failed to approve transaction",
-            message: error.message,
-          });
-        }
-      }
-    );
-    ```
-
-  </Step>
-</Steps>
-
-#### Security Considerations and Best Practices
-
-- **Validation Before Approval**: Always validate transaction details (recipient, amount, etc.) before approving activities.
-
-- **Initial Setup Flexibility**: For a better user experience during setup, you can:
-
-  - Create the sub-organization initially with a root quorum threshold of 1
-  - Complete initial setup tasks (like adding wallet accounts)
-  - Update the root quorum threshold to 2 when ready for production use
-
-  ```typescript
-  // Update the root quorum threshold after initial setup
-  await turnkeyServer.updateRootQuorum({
-    organizationId: subOrgId,
-    threshold: 2,
-    userIds: [endUserId, serviceUserId],
-  });
-  ```
-
-- **Policy-Based Controls**: For more granular control, you can create policies specifying which transactions require multi-sig approval:
-
-  ```typescript
-  await turnkeyServer.createPolicy({
-    organizationId: subOrgId,
-    policy: {
-      policyName: "High-value transaction multi-sig",
-      effect: "EFFECT_ALLOW",
-      consensus: "approvers.count() >= 2",
-      condition: "eth.tx.value >= 1000000000000000000", // 1 ETH
-    },
-  });
-  ```
-
-- **Monitoring**: Track all multi-sig activities for audit purposes, especially approvals and rejections.
-
-- **Recovery Mechanisms**: Document and test recovery procedures in case one of the signers loses access.
-
-This approach provides true multi-signature security, requiring explicit approval from both parties before any transaction can be executed.
+<Card title="Co-signing Transactions" icon="file-signature" href="../signing-automation/co-signing-transactions.mdx">
+  Learn about advanced patterns like multi-signature setups requiring approvals from both the user and the backend.
+</Card>
