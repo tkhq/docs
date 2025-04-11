@@ -81,20 +81,20 @@ const { organizationIds } = await turnkeyServer.getSubOrgIds({
 const subOrgId = organizationIds[0]; // First matching sub-org
 ```
 
-<Accordion title="Important Considerations for API Lookup">
+<Accordion title="Handling API Lookup Results">
 
 The example above (`const subOrgId = organizationIds[0];`) simply takes the first ID found. **This approach might not be suitable for all applications.**
 
-- **Handling No Results:** If `organizationIds` is empty, your application needs a defined behavior. This might involve failing the login/signup attempt or prompting the user differently.
+- **Crucial Verification Step:** Retrieving a `subOrgId` via email lookup is only the first step and **does not grant access**. Your application _must_ authenticate the user (e.g., via passkey) _after_ the lookup. Only then should you verify if the authenticated user is authorized for that `subOrgId`, typically by checking your user database. Blindly trusting the lookup result is insecure.
+- **Handling No Results:** If `organizationIds` is empty, it might indicate the user doesn't have an existing sub-organization. Your application should handle this, potentially by initiating a signup flow or failing the login.
 - **Handling Multiple Results:** If multiple IDs are returned, your application must decide how to proceed. You could:
   - Prompt the user to select the intended sub-organization.
   - Enforce a business rule that an email can only map to one sub-organization and treat multiple results as an error state.
   - Use other contextual information (if available) to disambiguate.
-- **Crucial Verification Step:** Retrieving a `subOrgId` via email lookup **does not grant access**. After obtaining a potential `subOrgId`, your application _must_ proceed with user authentication (e.g., using the passkey flow described next). Only after the user successfully authenticates should you trust the `subOrgId` and verify that the _authenticated user_ is indeed authorized to operate within that specific sub-organization (typically by checking against your application's user database). Blindly trusting the first ID returned without proper authentication and authorization checks is insecure.
 
 </Accordion>
 
-3. **JWT Cookie**: Extract the sub-organization ID from an existing JWT in cookies (for returning users)
+3. **JWT Cookie**: Extract the user ID from an existing JWT in cookies (for returning users)
 
    If a user has previously logged in, their JWT might be stored in a cookie. You can verify this token and extract the user ID to confirm their identity.
 
@@ -430,14 +430,14 @@ sequenceDiagram
   ```typescript frontend.ts [expandable]
   import { useTurnkey } from "@turnkey/sdk-react"; // Or however you access the client
 
-  // User enters email and clicks 'Send OTP'
-  const handleRequestOtp = async (email: string) => {
-    const { authIframeClient } = useTurnkey();
-    if (!authIframeClient) {
-      console.error("Turnkey iframe client not available");
-      // Handle error: Inform user or disable button
-      return;
-    }
+// User enters email and clicks 'Send OTP'
+const handleRequestOtp = async (email: string) => {
+const { authIframeClient } = useTurnkey();
+if (!authIframeClient) {
+console.error("Turnkey iframe client not available");
+// Handle error: Inform user or disable button
+return;
+}
 
     try {
       // Get the public key associated with the Turnkey iframe client instance.
@@ -466,50 +466,52 @@ sequenceDiagram
       console.error('Error requesting OTP:', error);
       // Show error message to the user
     }
-  };
-  ```
+
+};
+
+````
 
 ```typescript backend-otp-request.ts [expandable]
 import { turnkeyServer } from "./turnkey"; // Import initialized Turnkey server client
 import { findUserByEmail } from "./dbUtils"; // Assume DB utility for finding user/subOrgId
 
 app.post("/api/auth/otp/request", async (req, res) => {
-  const { email, targetPublicKey } = req.body;
-  if (!email || !targetPublicKey) {
-    return res.status(400).json({ error: "Email and targetPublicKey (iframe public key) are required" });
+const { email, targetPublicKey } = req.body;
+if (!email || !targetPublicKey) {
+  return res.status(400).json({ error: "Email and targetPublicKey (iframe public key) are required" });
+}
+
+try {
+  // Find the user and their associated sub-organization in your database
+  const user = await findUserByEmail(email);
+  if (!user || !user.turnkeySubOrgId) {
+    // Handle case where user/sub-org is not found appropriately
+    return res.status(404).json({ error: "User or associated sub-organization not found for this email." });
   }
+  const subOrgId = user.turnkeySubOrgId;
 
-  try {
-    // Find the user and their associated sub-organization in your database
-    const user = await findUserByEmail(email);
-    if (!user || !user.turnkeySubOrgId) {
-      // Handle case where user/sub-org is not found appropriately
-      return res.status(404).json({ error: "User or associated sub-organization not found for this email." });
-    }
-    const subOrgId = user.turnkeySubOrgId;
+  // Call Turnkey to initiate the OTP flow via email
+  const otpResponse = await turnkeyServer.sendOtp({
+    suborgID: subOrgId,
+    otpType: "EMAIL",
+    contact: email,
+    targetPublicKey: targetPublicKey, // Pass the iframe public key as targetPublicKey
+  });
 
-    // Call Turnkey to initiate the OTP flow via email
-    const otpResponse = await turnkeyServer.sendOtp({
-      suborgID: subOrgId,
-      otpType: "EMAIL",
-      contact: email,
-      targetPublicKey: targetPublicKey, // Pass the iframe public key as targetPublicKey
-    });
-
-    if (otpResponse?.otpId) {
-      // Return the otpId to the frontend; it's needed for verification
-      console.log(`Turnkey sendOtp successful for ${email}, otpId: ${otpResponse.otpId}`);
-      return res.status(200).json({ message: "OTP sent successfully", otpId: otpResponse.otpId });
-    } else {
-      throw new Error("Turnkey sendOtp did not return an otpId.");
-    }
-  } catch (error) {
-    console.error("Error requesting Turnkey OTP:", error);
-    // Avoid leaking internal Turnkey errors; log them and return a generic error
-    return res.status(500).json({ error: "Failed to send OTP" });
+  if (otpResponse?.otpId) {
+    // Return the otpId to the frontend; it's needed for verification
+    console.log(`Turnkey sendOtp successful for ${email}, otpId: ${otpResponse.otpId}`);
+    return res.status(200).json({ message: "OTP sent successfully", otpId: otpResponse.otpId });
+  } else {
+    throw new Error("Turnkey sendOtp did not return an otpId.");
   }
+} catch (error) {
+  console.error("Error requesting Turnkey OTP:", error);
+  // Avoid leaking internal Turnkey errors; log them and return a generic error
+  return res.status(500).json({ error: "Failed to send OTP" });
+}
 });
-```
+````
 
   </CodeGroup>
   </Step>
@@ -524,7 +526,11 @@ import { useTurnkey } from "@turnkey/sdk-react";
 
 // User enters OTP and clicks 'Verify'
 // Assumes 'otpId' was stored in state from the previous step
-const handleVerifyOtp = async (email: string, otpCode: string, otpId: string) => {
+const handleVerifyOtp = async (
+  email: string,
+  otpCode: string,
+  otpId: string
+) => {
   const { authIframeClient } = useTurnkey();
   if (!authIframeClient) {
     console.error("Turnkey iframe client not available");
@@ -534,7 +540,7 @@ const handleVerifyOtp = async (email: string, otpCode: string, otpId: string) =>
   try {
     // Get the public key again, this time as the target for credential encryption
     const targetPublicKey = await authIframeClient.getPublicKey();
-    
+
     const response = await fetch("/api/auth/otp/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -584,14 +590,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 app.post("/api/auth/otp/verify", async (req, res) => {
   const { email, otpCode, otpId, targetPublicKey } = req.body;
   if (!email || !otpCode || !otpId || !targetPublicKey) {
-    return res.status(400).json({ error: "Email, OTP code, OTP ID, and targetPublicKey are required" });
+    return res.status(400).json({
+      error: "Email, OTP code, OTP ID, and targetPublicKey are required",
+    });
   }
 
   try {
     // Find the user again to get their subOrgId and application userId
     const user = await findUserByEmail(email);
     if (!user || !user.turnkeySubOrgId) {
-      return res.status(404).json({ error: "User not found for this email during verification." });
+      return res
+        .status(404)
+        .json({ error: "User not found for this email during verification." });
     }
     const subOrgId = user.turnkeySubOrgId;
     const applicationUserId = user.id; // Your application's internal user ID
@@ -608,7 +618,9 @@ app.post("/api/auth/otp/verify", async (req, res) => {
     });
 
     // If verifyOtp doesn't throw, verification was successful with Turnkey.
-    console.log(`Turnkey OTP verified successfully for ${email}. Issuing backend JWT.`);
+    console.log(
+      `Turnkey OTP verified successfully for ${email}. Issuing backend JWT.`
+    );
     // console.log('Turnkey verifyOtp result:', verifyResult); // Optional: log result if needed
 
     // Generate the application's session JWT
@@ -617,10 +629,10 @@ app.post("/api/auth/otp/verify", async (req, res) => {
     });
 
     // Set JWT as secure, httpOnly cookie for the application session
-    res.cookie('authToken', token, {
+    res.cookie("authToken", token, {
       httpOnly: true,
       secure: true, // Set to true in production (requires HTTPS)
-      sameSite: 'lax', // Or 'strict'
+      sameSite: "lax", // Or 'strict'
     });
 
     return res.status(200).json({
@@ -629,14 +641,13 @@ app.post("/api/auth/otp/verify", async (req, res) => {
       userId: applicationUserId,
       authSession: verifyResult, // Return the session object to the frontend
     });
-
   } catch (error: any) {
     // Handle specific Turnkey errors if possible, otherwise return generic error
     console.error("Error verifying Turnkey OTP:", error);
     let errorMessage = "Failed to verify OTP.";
-    if (error.message?.includes("invalid code")) { 
-        errorMessage = "Invalid or expired OTP code.";
-        return res.status(401).json({ error: errorMessage }); // 401 Unauthorized
+    if (error.message?.includes("invalid code")) {
+      errorMessage = "Invalid or expired OTP code.";
+      return res.status(401).json({ error: errorMessage }); // 401 Unauthorized
     }
     // Add more specific error handling based on Turnkey error codes/messages if needed
     return res.status(500).json({ error: errorMessage });
@@ -1047,6 +1058,11 @@ When implementing this pattern, keep these security considerations in mind:
 
 ## Advanced Topics
 
-<Card title="Co-signing Transactions" icon="file-signature" href="../signing-automation/co-signing-transactions.mdx">
-  Learn about advanced patterns like multi-signature setups requiring approvals from both the user and the backend.
+<Card
+  title="Co-signing Transactions"
+  icon="file-signature"
+  href="../signing-automation/co-signing-transactions.mdx"
+>
+  Learn about advanced patterns like multi-signature setups requiring approvals
+  from both the user and the backend.
 </Card>
