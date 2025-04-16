@@ -7,6 +7,20 @@
 import { Command } from "commander";
 
 /**
+ * Command line argument options interface
+ */
+export interface CliOptions {
+  file: string;
+  path?: string;
+  output?: string;
+  format?: 'json' | 'yaml' | 'typescript';
+  endpoints?: boolean;
+  requiredOnly?: boolean;
+  generateMdx?: boolean; 
+  mdxOutputDir?: string; 
+}
+
+/**
  * Configure the command-line interface
  */
 export function configureCLI(): Command {
@@ -43,6 +57,15 @@ export function configureCLI(): Command {
       "--required-only",
       "Include only required properties in the generated API Endpoint objects",
       true
+    )
+    .option(
+        "--generate-mdx",
+        "Generate MDX files for each API endpoint"
+    )
+    .option(
+        "--mdx-output-dir <path>",
+        "Base directory for generated MDX files",
+        "api-reference-v2" 
     );
 
   return program;
@@ -51,8 +74,8 @@ export function configureCLI(): Command {
 /**
  * Parse and validate command line arguments
  */
-export function parseArguments(argv: string[]): Record<string, any> {
+export function parseArguments(argv: string[]): CliOptions {
   const program = configureCLI();
   program.parse(argv);
-  return program.opts();
+  return program.opts() as CliOptions;
 }

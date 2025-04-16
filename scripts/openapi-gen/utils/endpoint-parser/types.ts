@@ -124,7 +124,7 @@ export interface ApiExample {
  * - if the path contains `submit`, it is a mutation
  * - if the path contains `query` it is a query
  */
-export type EndpointType = "mutation" | "query";
+export type EndpointType = "activity" | "query";
 
 /**
  * Represents the full specification of an API endpoint in your documentation.

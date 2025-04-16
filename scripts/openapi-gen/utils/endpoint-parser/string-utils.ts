@@ -2,6 +2,8 @@
  * String utility functions for endpoint processing
  */
 
+import { EndpointType } from "./types";
+
 /**
  * Converts a snake_case string to camelCase
  * Example: "create_private_keys" -> "createPrivateKeys"
@@ -29,19 +31,19 @@ export function extractEndpointName(path: string): string {
 }
 
 /**
- * Determines if a path is a mutation or query endpoint
- * - If path contains "submit", it's a mutation
+ * Determines if a path is a activity or query endpoint
+ * - If path contains "submit", it's a activity
  * - If path contains "query", it's a query
  */
-export function determineEndpointType(path: string): "mutation" | "query" {
+export function determineEndpointType(path: string): EndpointType {
   if (path.includes("/submit/")) {
-    return "mutation";
+    return "activity";
   } else if (path.includes("/query/")) {
     return "query";
   }
 
-  // Default to mutation if we can't determine from path
-  return "mutation";
+  // Default to activity if we can't determine from path
+  return "activity";
 }
 
 /**
