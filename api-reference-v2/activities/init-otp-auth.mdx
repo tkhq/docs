@@ -1,0 +1,91 @@
+---
+title: "Init OTP auth"
+description: "Initiate an OTP auth activity"
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}><p>type field</p><p>Available Options: \`ACTIVITY_TYPE_INIT_OTP_AUTH\`</p></ParamField>
+<ParamField body="timestampMs" type="string" required={true}><p>Timestamp (in milliseconds) of the request, used to verify liveness of user requests.</p></ParamField>
+<ParamField body="organizationId" type="string" required={true}><p>Unique identifier for a given Organization.</p></ParamField>
+<ParamField body="parameters" type="object" required={true}>
+  <p>parameters field</p>
+  <Expandable title="parameters details">
+    <NestedParam parentKey="parameters" childKey="otpType" type="string" required={true}><p>Enum to specifiy whether to send OTP via SMS or email</p></NestedParam>
+    <NestedParam parentKey="parameters" childKey="contact" type="string" required={true}><p>Email or phone number to send the OTP code to</p></NestedParam>
+    <NestedParam parentKey="parameters" childKey="emailCustomization" type="object" required={false}>
+      <Expandable title="emailCustomization details">
+        <NestedParam parentKey="parameters.emailCustomization" childKey="appName" type="string" required={false}><p>The name of the application.</p></NestedParam>
+        <NestedParam parentKey="parameters.emailCustomization" childKey="logoUrl" type="string" required={false}><p>A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px.</p></NestedParam>
+        <NestedParam parentKey="parameters.emailCustomization" childKey="magicLinkTemplate" type="string" required={false}><p>A template for the URL to be used in a magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`.</p></NestedParam>
+        <NestedParam parentKey="parameters.emailCustomization" childKey="templateVariables" type="string" required={false}><p>JSON object containing key/value pairs to be used with custom templates.</p></NestedParam>
+        <NestedParam parentKey="parameters.emailCustomization" childKey="templateId" type="string" required={false}><p>Unique identifier for a given Email Template. If not specified, the default is the most recent Email Template.</p></NestedParam>
+      </Expandable>
+    </NestedParam>
+    <NestedParam parentKey="parameters" childKey="smsCustomization" type="object" required={false}>
+      <Expandable title="smsCustomization details">
+        <NestedParam parentKey="parameters.smsCustomization" childKey="template" type="string" required={false}><p>Template containing references to .OtpCode i.e Your OTP is {{.OtpCode}}</p></NestedParam>
+      </Expandable>
+    </NestedParam>
+    <NestedParam parentKey="parameters" childKey="userIdentifier" type="string" required={false}><p>Optional client-generated user identifier to enable per-user rate limiting for SMS auth. We recommend using a hash of the client-side IP address.</p></NestedParam>
+    <NestedParam parentKey="parameters" childKey="sendFromEmailAddress" type="string" required={false}><p>Optional custom email address from which to send the OTP email</p></NestedParam>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+
+```bash cURL
+curl --request POST 
+  --url https://api.turnkey.com/public/v1/submit//public/v1/submit/init_otp_auth 
+  --header 'Accept: application/json' 
+  --header 'Content-Type: application/json' 
+  --header "X-Stamp: <YOUR_API_KEY>" 
+  --data '{
+    "type": "ACTIVITY_TYPE_INIT_OTP_AUTH",
+    "timestampMs": "<string> (e.g., 1744912860856)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "otpType": "<string>",
+        "contact": "<string>",
+        "emailCustomization": {
+            "appName": "<string>",
+            "logoUrl": "<string>",
+            "magicLinkTemplate": "<string>",
+            "templateVariables": "<string>",
+            "templateId": "<string>"
+        },
+        "smsCustomization": {
+            "template": "<string>"
+        },
+        "userIdentifier": "<string>",
+        "sendFromEmailAddress": "<string>"
+    }
+}'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_INIT_OTP_AUTH",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g., 1744912860856)",
+    "result": {
+      "<result_key>": "<result_value>"
+    }
+  }
+}
+```
+
+</ResponseExample>
