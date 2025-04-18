@@ -52,7 +52,7 @@ async function main() {
       const projectRoot = path.resolve(__dirname, "..", "..");
 
       // Resolve output dir relative to project root
-      const mdxOutputDirName = options.mdxOutputDir || "api-reference-v2";
+      const mdxOutputDirName = options.mdxOutputDir || "api-reference";
       const absoluteMdxOutputDir = path.resolve(projectRoot, mdxOutputDirName);
       const relativeMdxBaseDir = path.relative(
         projectRoot,
@@ -76,10 +76,13 @@ async function main() {
         );
 
         if (generatedPath) {
+          // Construct the full path needed for docs.json
+          const fullDocsPath = path.join("api-reference", generatedPath);
+
           if (endpoint.type === "activity") {
-            activityPaths.push(generatedPath);
+            activityPaths.push(fullDocsPath);
           } else if (endpoint.type === "query") {
-            queryPaths.push(generatedPath);
+            queryPaths.push(fullDocsPath);
           }
         }
       }
@@ -134,7 +137,10 @@ async function main() {
               typeof item === "object" && item.group === "Activities"
           );
           if (activitiesGroup) {
-            activitiesGroup.pages = [activityOverviewPath, ...uniqueActivityPaths];
+            activitiesGroup.pages = [
+              activityOverviewPath,
+              ...uniqueActivityPaths,
+            ];
             console.log(`Updated Activities paths in docs.json`);
           } else {
             console.warn(

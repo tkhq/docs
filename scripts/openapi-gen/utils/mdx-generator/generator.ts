@@ -2,86 +2,214 @@ import fs from "fs";
 import path from "path";
 import { ApiEndpoint, ApiField, EnumOption } from "../endpoint-parser/types";
 
+// --- Helper: Escape HTML Chars ---
+function escapeHtmlChars(text: string): string {
+  if (!text) return "";
+  return text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // --- Helper: Get Enum Details ---
 function getEnumDetails(field: ApiField): {
   isEnum: boolean;
   displayType: string;
-  options?: EnumOption[];
+  options: EnumOption[]; // Always return an array, even if empty
 } {
-  if (field.type === "enum") {
+  if (field.type === "enum" && field.enumOptions) {
     return {
       isEnum: true,
-      displayType: "enum<string>",
+      displayType: "enum<string>", // Typically enums are strings
       options: field.enumOptions,
     };
   }
-  if (field.type === "array" && field.childFields?.[0]?.type === "enum") {
+  // Check for array of enums
+  if (
+    field.type === "array" &&
+    field.childFields?.[0]?.type === "enum" &&
+    field.childFields?.[0]?.enumOptions
+  ) {
     return {
-      isEnum: true,
-      displayType: "enum<string[]>",
-      options: field.childFields[0].enumOptions,
+      isEnum: true, // Treat as enum context for display
+      displayType: "enum<string[]>", // Indicate it's an array of enums
+      options: field.childFields[0].enumOptions, // Get options from the item definition
     };
   }
-  return { isEnum: false, displayType: field.type, options: undefined };
+  // Default case: not an enum or empty options
+  return { isEnum: false, displayType: field.type, options: [] };
 }
 
-// --- Helper: Format Enum Options for Descriptions ---
-function formatEnumOptions(options: EnumOption[] | undefined): string {
-  if (!options || options.length === 0) return "";
-  const optionValues = options.map((opt) => `\\\`${opt.value}\\\``).join(", "); // Escaped backticks
-  return `Available Options: ${optionValues}`;
+// --- Helper: Generate Enum Options MDX ---
+function generateEnumOptionsMdx(options: EnumOption[]): string {
+  if (!options || options.length === 0) {
+    return "";
+  }
+  // Escape backticks for MDX code formatting, join with ', '
+  const optionValues = options.map(opt => `\`${escapeHtmlChars(opt.value)}\``).join(", ");
+  // Return formatted string
+  return `\nEnum options: ${optionValues}\n`;
 }
 
-// --- Helper: Generate Parameter MDX Recursively ---
+// --- Helper: Generate Request Parameter MDX Recursive ---
 function generateParamMdxRecursive(
-  paramName: string,
-  paramDetails: ApiField,
+  fieldName: string,
+  field: ApiField,
   parentPath: string
 ): string {
-  const isRequired = paramDetails.required ?? false;
-  const description =
-    paramDetails.description.replace(/</g, "&lt;").replace(/>/g, "&gt;") || "";
-  const childFields = paramDetails.childFields;
-  const { isEnum, displayType, options } = getEnumDetails(paramDetails);
   let mdx = "";
+  const fieldRequired = field.required ?? false;
+  const fieldDescription = escapeHtmlChars(field.description || ""); // Use helper
+  const fieldChildren = field.childFields;
+  const { isEnum, displayType, options } = getEnumDetails(field);
+  const currentPath = parentPath ? `${parentPath}.${fieldName}` : fieldName;
 
-  if (isEnum) {
-    const formattedOptions = formatEnumOptions(options);
-    const combinedDescription = description
-      ? `<p>${description}</p><p>${formattedOptions}</p>`
-      : `<p>${formattedOptions}</p>`;
-    mdx = `<NestedParam parentKey="${parentPath}" childKey="${paramName}" type="${displayType}" required={${isRequired}}>${combinedDescription}</NestedParam>\n`;
-  } else if (childFields && childFields.length > 0) {
-    mdx += `<NestedParam parentKey="${parentPath}" childKey="${paramName}" type="${paramDetails.type}" required={${isRequired}}>\n`;
-    // if (description) mdx += `  <p>${description}</p>\n`; // Add description for container if present
-    mdx += `  <Expandable title="${paramName} details">\n`;
-    let nestedMdx = "";
-    const newParentPath = `${parentPath}.${paramName}`;
-    for (const nestedField of childFields) {
-      nestedMdx += generateParamMdxRecursive(
-        nestedField.name,
-        nestedField,
-        newParentPath
-      );
+  // Exclude simple enum arrays from needing outer Expandable for item structure
+  const treatAsComplex =
+    (field.type === "object" || field.type === "array") &&
+    fieldChildren &&
+    fieldChildren.length > 0 &&
+    !(
+      field.type === "array" &&
+      fieldChildren[0]?.name === "item" &&
+      getEnumDetails(fieldChildren[0]).isEnum
+    );
+
+  if (treatAsComplex) {
+    // Build default attribute string conditionally for ParamField
+    const defaultAttr = field.defaultValue
+      ? ` default="${field.defaultValue}"`
+      : "";
+
+    // Object or Array of Objects/Simple Types: Use ParamField > Expandable
+    mdx += `<ParamField body="${fieldName}" type="${displayType}" required={${fieldRequired}} path="${currentPath}"${defaultAttr}>
+`;
+    // Add description for container ONLY if present AND NOT an enum
+    if (fieldDescription && !isEnum) mdx += `  <p>${fieldDescription}</p>\n`; // fieldDescription is already escaped
+    // Use helper for enum options
+    if (isEnum) {
+      mdx += `  ${generateEnumOptionsMdx(options)}`; // Add indentation
     }
+    mdx += `  <Expandable title="${
+      field.type === "array" ? "item details" : "details"
+    }">\n`;
+    let nestedMdx = "";
+    const childParentPath = currentPath;
+
+    if (field.type === "array") {
+      const firstChild = fieldChildren[0];
+      if (firstChild.name === "item") {
+        // Array of simple types (non-enum) - describe the item type
+        const itemField = firstChild;
+        const { displayType: itemDisplayType } = getEnumDetails(itemField);
+        nestedMdx += `    <p>Array item type: <code>${itemDisplayType}</code></p>\n`;
+        if (itemField.description)
+          nestedMdx += `    <p>${escapeHtmlChars(itemField.description)}</p>\n`; // Use helper
+      } else {
+        // Array of objects - generate structure for one item
+        for (const nestedField of fieldChildren) {
+          nestedMdx += generateParamMdxRecursive(
+            nestedField.name,
+            nestedField,
+            childParentPath // Pass the *same* parent path for array items
+          );
+        }
+      }
+    } else {
+      // Object - generate structure for properties
+      for (const nestedField of fieldChildren) {
+        nestedMdx += generateParamMdxRecursive(
+          nestedField.name,
+          nestedField,
+          childParentPath // Pass the *current* path as parent for object properties
+        );
+      }
+    }
+
     mdx += nestedMdx
       .split("\n")
       .map((line) => `    ${line}`)
       .join("\n")
       .trimEnd();
     mdx += `\n  </Expandable>\n`;
-    mdx += `</NestedParam>\n`;
+    mdx += `</ParamField>\n`;
   } else {
-    mdx = `<NestedParam parentKey="${parentPath}" childKey="${paramName}" type="${
-      paramDetails.type
-    }" required={${isRequired}}>${
-      description ? `<p>${description}</p>` : ""
-    }</NestedParam>\n`;
+    // Simple Type or Enum: Determine if top-level or nested
+
+    // Calculate content needed for both cases first
+    const descriptionContent =
+      !isEnum && fieldDescription ? `\n${fieldDescription}\n` : ""; // fieldDescription is already escaped
+    const enumOptionsContent = isEnum ? generateEnumOptionsMdx(options) : ""; // Use helper
+
+    if (parentPath === "") {
+      // TOP-LEVEL Simple Type/Enum: Use ParamField
+      const defaultAttr = field.defaultValue
+        ? ` default="${field.defaultValue}"`
+        : "";
+      mdx += `<ParamField body="${fieldName}" type="${displayType}" required={${fieldRequired}}${defaultAttr}>\n`;
+      mdx += `${descriptionContent}${enumOptionsContent}`; // Combine description (if not enum) and enum options
+      mdx += `</ParamField>\n\n`;
+    } else {
+      // NESTED Simple Type/Enum: Use NestedParam
+      mdx += `<NestedParam parentPath="${parentPath}" body="${fieldName}" type="${displayType}" required={${fieldRequired}} default="${
+        field.defaultValue || ""
+      }">\n`;
+      mdx += `${descriptionContent}${enumOptionsContent}`; // Combine description (if not enum) and enum options
+      mdx += `</NestedParam>\n\n`;
+    }
   }
+
   return mdx;
 }
 
-// --- Helper: Generate JSON Payload Object (Refactored) ---
+// --- Helper: Generate Response Field MDX Recursively ---
+// Uses built-in <ResponseField> for top-level, imported <NestedParam> for nested.
+function generateResponseFieldMdxRecursive(
+  field: ApiField,
+  parentKey: string = ""
+): string {
+  let mdx = "";
+  const fieldName = field.name;
+  // Construct the full key for the current field, used as parentKey for children
+  const fullKey = parentKey ? `${parentKey}.${fieldName}` : fieldName;
+  const description = field.description
+    ? `${escapeHtmlChars(field.description)}\n`
+    : ""; // Use helper
+  const required = field.required ?? false; // Assume false if undefined for responses
+  const fieldType = field.type; // Assuming ApiField already formats type like 'object', 'string', 'array', 'enum<string>'
+  const enumDetails = getEnumDetails(field);
+
+  if (field.childFields && field.childFields.length > 0) {
+    // Object or Array with children
+    let childMdx = "";
+    for (const childField of field.childFields) {
+      // Recursive call: Pass the *current* field's full key as the parentKey for the next level
+      childMdx += generateResponseFieldMdxRecursive(childField, fullKey);
+    }
+
+    if (parentKey === "") {
+      // ABSOLUTE TOP-LEVEL Object/Array: Use <ResponseField>
+      mdx += `<ResponseField name="${fieldName}" type="${fieldType}"${
+        required ? " required" : ""
+      }>\n  ${description}\n  <Expandable title="${fieldName} details">\n    ${childMdx}\n  </Expandable>\n</ResponseField>\n`;
+    } else {
+      // ANY NESTED Object/Array: Use <NestedParam>
+      mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>\n      ${description}\n      <Expandable title="${fieldName} details">\n        ${childMdx}\n      </Expandable>\n    </NestedParam>\n`;
+    }
+  } else {
+    // Primitive field or array of primitives (no children)
+    if (parentKey === "") {
+      // ABSOLUTE TOP-LEVEL Primitive: Use <ResponseField>
+      mdx += `<ResponseField name="${fieldName}" type="${fieldType}"${
+        required ? " required" : ""
+      }>${description}${enumDetails}</ResponseField>\n`;
+    } else {
+      // ANY NESTED Primitive: Use <NestedParam>
+      mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>${description}${enumDetails}</NestedParam>\n`;
+    }
+  }
+
+  return mdx;
+}
+
+// --- Helper: Generate JSON Payload Object ---
 function generateJsonPayloadRecursive(
   fields: ApiField[] | undefined
 ): Record<string, any> {
@@ -97,7 +225,11 @@ function generateJsonPayloadRecursive(
     if (field.type === "object" && field.childFields) {
       // Recursive call for nested objects
       value = generateJsonPayloadRecursive(field.childFields);
-    } else if (field.type === "array" && field.childFields && field.childFields.length > 0) {
+    } else if (
+      field.type === "array" &&
+      field.childFields &&
+      field.childFields.length > 0
+    ) {
       // Handle arrays
       let itemValue: any;
       const firstChild = field.childFields[0];
@@ -106,9 +238,10 @@ function generateJsonPayloadRecursive(
       if (firstChild.name === "item") {
         // Items are simple (string, number, boolean, enum)
         const itemField = firstChild; // Use the single 'item' field definition
-        if (itemField.enumOptions?.[0]?.value) {
+        const itemDetails = getEnumDetails(itemField);
+        if (itemDetails.isEnum && itemDetails.options.length > 0) {
           // Array of enums
-          itemValue = `<${itemField.enumOptions[0].value}>`;
+          itemValue = `<${itemDetails.options[0].value}>`;
         } else {
           // Array of simple types
           switch (itemField.type) {
@@ -127,31 +260,31 @@ function generateJsonPayloadRecursive(
         }
       } else {
         // Items are objects: recursively generate structure using all childFields
+        // Pass the *whole* childFields array, representing the structure of ONE item.
         itemValue = generateJsonPayloadRecursive(field.childFields);
       }
       value = [itemValue]; // Create an array with one example element
     } else {
       // Handle simple types (non-array, non-object)
-      switch (field.type) {
-        case "string":
-          // Use enum default if available for top-level string enums
-          if (field.enumOptions?.[0]?.value) {
-            value = field.enumOptions[0].value;
-          } else {
+      const fieldDetails = getEnumDetails(field);
+      if (fieldDetails.isEnum && fieldDetails.options.length > 0) {
+        // Simple Enum
+        value = `<${fieldDetails.options[0].value}>`;
+      } else {
+        // Simple Type (non-enum)
+        switch (field.type) {
+          case "string":
             value = "<string>";
-          }
-          break;
-        case "number":
-          value = 123;
-          break; // Example number
-        case "boolean":
-          value = true;
-          break; // Example boolean
-        case "enum":
-          value = `<${field.enumOptions?.[0]?.value || "enum"}>`; // Use first enum value or placeholder
-          break;
-        default:
-          value = `<${field.type || "unknown"}>`; // Use type as placeholder if known
+            break;
+          case "number":
+            value = 123;
+            break;
+          case "boolean":
+            value = true;
+            break;
+          default:
+            value = `<${field.type || "unknown"}>`; // Use type as placeholder if known
+        }
       }
     }
     result[field.name] = value;
@@ -165,171 +298,187 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const path = endpoint.path || "unknown_path";
   const url = `https://api.turnkey.com/public/v1/submit/${path}`;
 
+  // Find the 'type' field, often indicates the specific activity type
   const typeField = endpoint.requestBody?.fields?.find(
     (f) => f.name === "type"
   );
+  const typeFieldDetails = typeField
+    ? getEnumDetails(typeField)
+    : { options: [] };
+  const activityType =
+    typeFieldDetails.options.length > 0
+      ? typeFieldDetails.options[0].value
+      : "ACTIVITY_TYPE_UNKNOWN_V1";
 
-  const type = typeField?.enumOptions?.[0]?.value || "ACTIVITY_TYPE_UNKNOWN_V1"; // Use defaultValue or fallback
-
-  // 1. Generate the parameters as a JavaScript object
-  // This part should already be correct if Step 27 change was intentional
+  // Find the 'parameters' field which contains the main payload
+  const parametersField = endpoint.requestBody?.fields?.find(
+    (f) => f.name === "parameters"
+  );
   const parametersObject = generateJsonPayloadRecursive(
-    endpoint.requestBody?.fields?.find((f) => f.name === "parameters")
-      ?.childFields // Pass the *fields* of the 'parameters' object
+    parametersField?.childFields
   );
 
-  // 2. Construct the full data payload *object*
   const dataPayloadObject = {
-    type,
-    timestampMs: "<string> (e.g., " + Date.now() + ")", // Add example timestamp
-    organizationId: "<string> (Your Organization ID)", // Add context
-    parameters: parametersObject, // Embed the generated parameters object
+    type: activityType,
+    timestampMs: "<string> (e.g., " + Date.now() + ")",
+    organizationId: "<string> (Your Organization ID)",
+    parameters: parametersObject,
   };
 
-  // ... rest of the function remains the same ...
+  // Stringify carefully, handle potential BigInts if they arise
+  const dataPayloadString = JSON.stringify(
+    dataPayloadObject,
+    (key, value) => (typeof value === "bigint" ? value.toString() : value),
+    4
+  ); // Pretty print with 4 spaces
 
-  // 3. Stringify the entire payload object for the cURL command's data field
-  const dataPayloadString = JSON.stringify(dataPayloadObject, null, 4); // Pretty print (using 4 spaces as per Step 27)
-
-  // 4. Escape single quotes ...
+  // Escape single quotes for bash compatibility within single-quoted string
   const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''");
 
-  // 5. Construct the curl command ...
   const curlCommand =
     "```bash cURL\n" +
-    "curl --request POST \\\n" + // Use backslash for line continuation
+    "curl --request POST \\\n" +
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
     "  --header 'Content-Type: application/json' \\\n" +
-    '  --header "X-Stamp: <YOUR_API_KEY>" \\\n' + // Example API Key header
+    '  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \\\n' + // Added reminder for secret
     `  --data '${escapedDataPayloadString}'\n` +
     "```";
 
-  // 6. Return the final MDX component string
   return `<RequestExample>\n\n${curlCommand}\n\n</RequestExample>`;
 }
 
-// --- Helper: Generate Response Example MDX (Updated) ---
+// --- Helper: Generate Response Example MDX ---
 function generateResponseExample(endpoint: ApiEndpoint): string {
-  const typeField = endpoint.requestBody?.fields?.find(
+  // Find the 'type' field from the request to potentially echo in response (common pattern)
+  const reqTypeField = endpoint.requestBody?.fields?.find(
     (f) => f.name === "type"
   );
-
+  const reqTypeDetails = reqTypeField
+    ? getEnumDetails(reqTypeField)
+    : { options: [] };
   const activityType =
-    typeField?.enumOptions?.[0]?.value || "ACTIVITY_TYPE_UNKNOWN_V1"; // Use defaultValue or fallback
+    reqTypeDetails.options.length > 0
+      ? reqTypeDetails.options[0].value
+      : "ACTIVITY_TYPE_UNKNOWN_V1";
 
-  // 1. Construct the example response payload as a JavaScript object
+  // Attempt to find the 200 OK response schema
+  const successResponse = endpoint.responses?.find(
+    (res) => res.statusCode === 200
+  );
+
+  // Generate payload based on response schema if available, otherwise fallback
+  let activityResultPayload: Record<string, any>;
+  if (successResponse?.fields) {
+    // Assuming the success response structure is directly the content of 'activity.result'
+    // Adjust this logic if the actual response schema nests the result differently
+    activityResultPayload = generateJsonPayloadRecursive(
+      successResponse.fields
+    );
+  } else {
+    // Fallback if no 200 response schema is defined
+    activityResultPayload = { "<result_key>": "<result_value>" };
+  }
+
   const responsePayloadObject = {
     activity: {
       id: "<activity-id>",
       status: "ACTIVITY_STATUS_COMPLETED", // Example status
-      type: activityType, // Use derived or placeholder type
+      type: activityType, // Echo derived or placeholder type from request
       organizationId: "<organization-id>",
-      timestampMs: "<timestamp> (e.g., " + Date.now() + ")", // Add example
-      result: {
-        // Placeholder for the result object.
-        // Ideally, this would be populated based on the endpoint's response schema if available.
-        // For now, leaving it as a generic placeholder.
-        "<result_key>": "<result_value>",
-        // ... other potential result fields
-      },
+      timestampMs: "<timestamp> (e.g., " + Date.now() + ")",
+      result: activityResultPayload, // Use generated or fallback result
     },
   };
 
-  // 2. Stringify the object with indentation
-  const responseJsonString = JSON.stringify(responsePayloadObject, null, 2); // 2-space indent
+  const responseJsonString = JSON.stringify(
+    responsePayloadObject,
+    (key, value) => (typeof value === "bigint" ? value.toString() : value),
+    2
+  ); // 2-space indent
 
-  // 3. Construct the markdown code block
   const responseJsonBlock = `\`\`\`json 200\n${responseJsonString}\n\`\`\``;
 
-  // 4. Return the final MDX component string
   return `<ResponseExample>\n\n${responseJsonBlock}\n\n</ResponseExample>`;
 }
 
-// --- Helper: Title to Kebab Case ---
-function titleToKebabCase(title: string): string {
-  // ... (same implementation as before) ...
-  if (!title) return "";
-  let result = "";
-  for (let i = 0; i < title.length; i++) {
-    const char = title[i];
-    const lowerChar = char.toLowerCase();
-    const upperChar = char.toUpperCase();
-    if (char === " " || char === "_") {
-      if (result.length > 0 && result[result.length - 1] !== "-") {
-        result += "-";
-      }
-    } else if (char === upperChar && char !== lowerChar) {
-      const prevChar = i > 0 ? title[i - 1] : "";
-      const nextChar = i < title.length - 1 ? title[i + 1] : "";
-      const isPrevLower =
-        prevChar &&
-        prevChar.toLowerCase() === prevChar &&
-        prevChar.toUpperCase() !== prevChar;
-      const isPrevUpper =
-        prevChar &&
-        prevChar.toUpperCase() === prevChar &&
-        prevChar.toLowerCase() !== prevChar;
-      const isNextLower =
-        nextChar &&
-        nextChar.toLowerCase() === nextChar &&
-        nextChar.toUpperCase() !== nextChar;
-      if (
-        result.length > 0 &&
-        result[result.length - 1] !== "-" &&
-        (isPrevLower || (isPrevUpper && isNextLower))
-      ) {
-        result += "-";
-      }
-      result += lowerChar;
-    } else {
-      result += lowerChar;
-    }
+// --- Helper: Determine Subdirectory ---
+function determineSubdirectory(endpointPath: string): string {
+  if (endpointPath.includes("/public/v1/query/")) {
+    return "queries";
+  } else if (endpointPath.includes("/public/v1/submit/")) {
+    return "activities";
+  } else {
+    // Default fallback
+    return "other";
   }
-  result = result.replace(/-+/g, "-");
-  return result;
 }
 
-// --- Main MDX Generation Function ---
+// --- Main MDX File Generation Function ---
+// This function uses generateMdxContent internally
 export function generateMdxFile(
   endpoint: ApiEndpoint,
   baseOutputDir: string,
   addOnly: boolean = false
 ): string | null {
   if (!endpoint.title || !endpoint.path) {
-    // Ensure path exists for examples
     console.warn(
       `Skipping MDX generation for endpoint (Title: ${endpoint.title}, Path: ${endpoint.path}) due to missing title or path.`
     );
     return null;
   }
 
-  let kebabCaseTitle = titleToKebabCase(endpoint.title);
-  kebabCaseTitle = kebabCaseTitle.replace(/\?/g, ""); // Remove invalid chars
+  let kebabCaseTitle = endpoint.title
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-") // Collapse multiple hyphens
+    .replace(/^-+|-+$/g, ""); // Trim leading/trailing hyphens
 
   const filename = `${kebabCaseTitle}.mdx`;
-  const subDir = endpoint.type === "query" ? "queries" : "activities";
-  const outputDir = path.resolve(baseOutputDir, subDir);
-  const outputPath = path.join(outputDir, filename);
-  const relativePathBase = path.relative(
-    path.resolve(baseOutputDir, ".."),
-    outputDir
-  );
-  const relativeOutputPathWithoutExt = path.join(
-    relativePathBase,
-    path.basename(filename, ".mdx")
-  );
+
+  // *** Determine the correct subdirectory ***
+  const subdirectory = determineSubdirectory(endpoint.path); // Use the helper function
+
+  // Construct the full output path including the determined subdirectory
+  const outputPath = path.join(baseOutputDir, subdirectory, filename); // Use dynamic subdirectory
+  const relativeOutputPathWithoutExt = path.join(subdirectory, kebabCaseTitle); // Relative path for index
+
+  // Ensure the subdirectory exists
+  const outputDir = path.dirname(outputPath);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`Created directory: ${outputDir}`);
+  }
+
+  // Check if file exists and if we should skip (addOnly mode)
+  if (addOnly && fs.existsSync(outputPath)) {
+    console.log(`Skipping existing file (addOnly=true): ${outputPath}`);
+    return relativeOutputPathWithoutExt; // Return path even if skipped
+  }
 
   try {
-    if (addOnly && fs.existsSync(outputPath)) {
-      return relativeOutputPathWithoutExt;
-    }
+    // Generate the actual MDX content using the dedicated function
+    const mdxContent = generateMdxContent(endpoint);
 
-    fs.mkdirSync(outputDir, { recursive: true });
+    // Write the generated content to the file
+    fs.writeFileSync(outputPath, mdxContent);
+    console.log(`Generated MDX file: ${outputPath}`);
+    return relativeOutputPathWithoutExt; // Return the relative path for index generation
+  } catch (error: any) {
+    console.error(
+      `Error generating MDX file for endpoint "${endpoint.title}": ${error.message}`
+    );
+    if (error.stack) console.error(error.stack);
+    return null; // Indicate failure
+  }
+}
 
-    // 1. Frontmatter & Imports
-    let mdxContent = `---
-title: "${endpoint.title}"
+// --- Main MDX Content Generation ---
+export function generateMdxContent(endpoint: ApiEndpoint): string {
+  // 1. Frontmatter and Imports
+  let mdxContent = `---
+title: "${endpoint.title || "API Endpoint"}"
 description: "${endpoint.description || "API endpoint documentation"}"
 ---
 
@@ -341,82 +490,44 @@ import { NestedParam } from "/snippets/nested-param.mdx";
 
 `;
 
-    // 2. Request Body Parameters Section
-    if (
-      endpoint.requestBody?.fields &&
-      endpoint.requestBody.fields.length > 0
-    ) {
-      mdxContent += `<H3Bordered text="Body" />\n\n`;
-      const topLevelFields = endpoint.requestBody.fields;
+  // 2. Request Body Parameters Section
+  if (endpoint.requestBody?.fields && endpoint.requestBody.fields.length > 0) {
+    mdxContent += `<H3Bordered text="Body" />\n\n`;
+    const topLevelFields = endpoint.requestBody.fields;
 
-      for (const field of topLevelFields) {
-        const fieldName = field.name;
-        const fieldRequired = field.required ?? false;
-        const fieldDescription = field.description || "";
-        const fieldChildren = field.childFields;
-        const { isEnum, displayType, options } = getEnumDetails(field);
-
-        if (
-          fieldChildren &&
-          fieldChildren.length > 0 &&
-          !(field.type === "array" && isEnum)
-        ) {
-          // Top-level Object/Array (Non-Enum): Use ParamField > Expandable
-          mdxContent += `<ParamField body="${fieldName}" type="${field.type}" required={${fieldRequired}}>\n`;
-          // Add description for container if present
-          if (fieldDescription) mdxContent += `  <p>${fieldDescription}</p>\n`;
-          mdxContent += `  <Expandable title="${fieldName} details">\n`;
-          let nestedMdx = "";
-          const childParentPath = fieldName;
-          for (const nestedField of fieldChildren) {
-            nestedMdx += generateParamMdxRecursive(
-              nestedField.name,
-              nestedField,
-              childParentPath
-            );
-          }
-          mdxContent += nestedMdx
-            .split("\n")
-            .map((line) => `    ${line}`)
-            .join("\n")
-            .trimEnd();
-          mdxContent += `\n  </Expandable>\n`;
-          mdxContent += `</ParamField>\n`;
-        } else {
-          // Top-level Simple Type OR Enum (string/array)
-          let finalDescription = "";
-          if (isEnum) {
-            const formattedOptions = formatEnumOptions(options);
-            finalDescription = fieldDescription
-              ? `<p>${fieldDescription}</p><p>${formattedOptions}</p>`
-              : `<p>${formattedOptions}</p>`;
-          } else {
-            finalDescription = fieldDescription
-              ? `<p>${fieldDescription}</p>`
-              : "";
-          }
-          mdxContent += `<ParamField body="${fieldName}" type="${displayType}" required={${fieldRequired}}>${finalDescription}</ParamField>\n`;
-        }
-      }
-    } else {
-      mdxContent += `\n{/* No request body parameters defined for this endpoint. */}\n`;
+    for (const field of topLevelFields) {
+      // Pass empty string for field name initially, it's handled inside recursion
+      mdxContent += generateParamMdxRecursive(field.name, field, "");
     }
-
-    // 3. Add Request Example Section
-    mdxContent += `\n${generateRequestExample(endpoint)}\n`;
-
-    // 4. Add Response Example Section
-    mdxContent += `\n${generateResponseExample(endpoint)}\n`;
-
-    // Write the file
-    fs.writeFileSync(outputPath, mdxContent);
-    console.log(`Generated MDX file: ${outputPath}`);
-    return relativeOutputPathWithoutExt;
-  } catch (error: any) {
-    console.error(
-      `Error generating MDX file for endpoint "${endpoint.title}": ${error.message}`
-    );
-    if (error.stack) console.error(error.stack);
-    return null;
   }
+
+  // 3. Response Body Parameters Section (Assuming 200 OK)
+  const successResponse = endpoint.responses?.find(
+    (res) => res.statusCode === 200
+  );
+
+  if (successResponse?.fields && successResponse.fields.length > 0) {
+    mdxContent += `\n<H3Bordered text="Response" />\n`;
+    mdxContent += `A successful response returns the following fields:\n\n`; // Add context
+
+    for (const field of successResponse.fields) {
+      mdxContent += generateResponseFieldMdxRecursive(field); // Use NEW recursive function
+    }
+  } else {
+    mdxContent += `\n{/* No explicit 200 response schema defined. */}\n`;
+  }
+
+  // 4. Request Example Section
+  const requestExample = generateRequestExample(endpoint);
+  if (requestExample) {
+    mdxContent += `\n${requestExample}\n`;
+  }
+
+  // 5. Response Example Section
+  const responseExample = generateResponseExample(endpoint);
+  if (responseExample) {
+    mdxContent += `\n${responseExample}\n`;
+  }
+
+  return mdxContent;
 }

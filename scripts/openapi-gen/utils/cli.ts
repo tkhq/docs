@@ -13,11 +13,11 @@ export interface CliOptions {
   file: string;
   path?: string;
   output?: string;
-  format?: 'json' | 'yaml' | 'typescript';
+  format?: "json" | "yaml" | "typescript";
   endpoints?: boolean;
   requiredOnly?: boolean;
-  generateMdx?: boolean; 
-  mdxOutputDir?: string; 
+  generateMdx?: boolean;
+  mdxOutputDir?: string;
   mdxAddOnly?: boolean; // Add the new option
 }
 
@@ -59,19 +59,16 @@ export function configureCLI(): Command {
       "Include only required properties in the generated API Endpoint objects",
       true
     )
+    .option("--generate-mdx", "Generate MDX files for each API endpoint")
     .option(
-        "--generate-mdx",
-        "Generate MDX files for each API endpoint"
+      "--mdx-output-dir <path>",
+      "Base directory for generated MDX files",
+      "api-reference"
     )
     .option(
-        "--mdx-output-dir <path>",
-        "Base directory for generated MDX files",
-        "api-reference-v2" 
-    )
-    .option(
-        "--mdx-add-only",
-        "Only add new MDX files, do not overwrite existing ones",
-        false
+      "--mdx-add-only",
+      "Only add new MDX files, do not overwrite existing ones",
+      false
     );
 
   return program;
