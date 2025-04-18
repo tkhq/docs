@@ -5,7 +5,11 @@ import { ApiEndpoint, ApiField, EnumOption } from "../endpoint-parser/types";
 // --- Helper: Escape HTML Chars ---
 function escapeHtmlChars(text: string): string {
   if (!text) return "";
-  return text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return text
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/{/g, "\\{")
+    .replace(/}/g, "\\}");
 }
 
 // --- Helper: Get Enum Details ---
@@ -43,7 +47,9 @@ function generateEnumOptionsMdx(options: EnumOption[]): string {
     return "";
   }
   // Escape backticks for MDX code formatting, join with ', '
-  const optionValues = options.map(opt => `\`${escapeHtmlChars(opt.value)}\``).join(", ");
+  const optionValues = options
+    .map((opt) => `\`${escapeHtmlChars(opt.value)}\``)
+    .join(", ");
   // Return formatted string
   return `\nEnum options: ${optionValues}\n`;
 }
@@ -148,9 +154,9 @@ function generateParamMdxRecursive(
       mdx += `</ParamField>\n\n`;
     } else {
       // NESTED Simple Type/Enum: Use NestedParam
-      mdx += `<NestedParam parentPath="${parentPath}" body="${fieldName}" type="${displayType}" required={${fieldRequired}} default="${
+      mdx += `<NestedParam parentKey="${parentPath}" childKey="${fieldName}" type="${displayType}" required={${fieldRequired}} default="${
         field.defaultValue || ""
-      }">\n`;
+      }">`; // Changed parentPath->parentKey, body->childKey
       mdx += `${descriptionContent}${enumOptionsContent}`; // Combine description (if not enum) and enum options
       mdx += `</NestedParam>\n\n`;
     }
@@ -169,12 +175,12 @@ function generateResponseFieldMdxRecursive(
   const fieldName = field.name;
   // Construct the full key for the current field, used as parentKey for children
   const fullKey = parentKey ? `${parentKey}.${fieldName}` : fieldName;
-  const description = field.description
-    ? `${escapeHtmlChars(field.description)}\n`
-    : ""; // Use helper
+  let description = field.description
+    ? escapeHtmlChars(field.description) // Escape HTML first
+    : "";
+
   const required = field.required ?? false; // Assume false if undefined for responses
   const fieldType = field.type; // Assuming ApiField already formats type like 'object', 'string', 'array', 'enum<string>'
-  const enumDetails = getEnumDetails(field);
 
   if (field.childFields && field.childFields.length > 0) {
     // Object or Array with children
@@ -184,25 +190,47 @@ function generateResponseFieldMdxRecursive(
       childMdx += generateResponseFieldMdxRecursive(childField, fullKey);
     }
 
-    if (parentKey === "") {
-      // ABSOLUTE TOP-LEVEL Object/Array: Use <ResponseField>
-      mdx += `<ResponseField name="${fieldName}" type="${fieldType}"${
-        required ? " required" : ""
-      }>\n  ${description}\n  <Expandable title="${fieldName} details">\n    ${childMdx}\n  </Expandable>\n</ResponseField>\n`;
+    // Top-level Object/Array: Use <ResponseField>
+    if (!parentKey) {
+      mdx += `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>
+  ${description.trim()}
+  <Expandable title="${fieldName} details">
+    ${childMdx}
+  </Expandable>
+</ResponseField>
+`;
     } else {
       // ANY NESTED Object/Array: Use <NestedParam>
-      mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>\n      ${description}\n      <Expandable title="${fieldName} details">\n        ${childMdx}\n      </Expandable>\n    </NestedParam>\n`;
+      mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>
+      ${description.trim()}
+      <Expandable title="${fieldName} details">
+        ${childMdx}
+      </Expandable>
+    </NestedParam>
+`;
     }
   } else {
     // Primitive field or array of primitives (no children)
-    if (parentKey === "") {
-      // ABSOLUTE TOP-LEVEL Primitive: Use <ResponseField>
-      mdx += `<ResponseField name="${fieldName}" type="${fieldType}"${
-        required ? " required" : ""
-      }>${description}${enumDetails}</ResponseField>\n`;
+    const { isEnum, options } = getEnumDetails(field);
+
+    // Top-level Primitive: Use <ResponseField>
+    if (!parentKey) {
+      mdx += `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>${description.trim()}${
+        isEnum
+          ? `
+  ${generateEnumOptionsMdx(options)}`
+          : ""
+      }</ResponseField>
+`; // Removed newline before closing tag
     } else {
       // ANY NESTED Primitive: Use <NestedParam>
-      mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>${description}${enumDetails}</NestedParam>\n`;
+      mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>\n${description.trim()}${
+        isEnum
+          ? `
+  ${generateEnumOptionsMdx(options)}`
+          : ""
+      }\n</NestedParam>
+`; // Removed newline before closing tag
     }
   }
 

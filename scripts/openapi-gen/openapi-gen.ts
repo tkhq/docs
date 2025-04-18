@@ -125,14 +125,14 @@ async function main() {
           throw new Error("'docs.json' structure is not as expected."); // Or handle more gracefully
         }
 
-        // Find the API Reference V2 tab
-        const apiRefV2Tab = docsConfig.navigation.tabs.find(
-          (item: any) => item.tab === "API Reference - V2"
+        // Find the API Reference tab
+        const apiRefTab = docsConfig.navigation.tabs.find(
+          (item: any) => item.tab === "API Reference"
         );
 
-        if (apiRefV2Tab && Array.isArray(apiRefV2Tab.pages)) {
+        if (apiRefTab && Array.isArray(apiRefTab.pages)) {
           // Find and update Activities group
-          const activitiesGroup = apiRefV2Tab.pages.find(
+          const activitiesGroup = apiRefTab.pages.find(
             (item: any) =>
               typeof item === "object" && item.group === "Activities"
           );
@@ -144,12 +144,12 @@ async function main() {
             console.log(`Updated Activities paths in docs.json`);
           } else {
             console.warn(
-              `Could not find 'Activities' group in docs.json under 'API Reference - V2'`
+              `Could not find 'Activities' group in docs.json under 'API Reference'`
             );
           }
 
           // Find and update Queries group
-          const queriesGroup = apiRefV2Tab.pages.find(
+          const queriesGroup = apiRefTab.pages.find(
             (item: any) => typeof item === "object" && item.group === "Queries"
           );
           if (queriesGroup) {

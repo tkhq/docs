@@ -1,39 +1,9 @@
-.PHONY: gen validate-redirects validate-docs-redirects validate-redirect-destinations validate-redirect-consistency fix-redirects openapi-gen
+.PHONY: openapi-gen gen # Add gen here
 
-# Default configuration values
-CHECK_DESTINATIONS ?= false
-BASE_URL ?= https://docs.turnkey.com
-
-# Run the generator script
+# Default MDX generation target
 gen:
-	npx ts-node scripts/gen.ts 
+	cd scripts/openapi-gen && npx ts-node openapi-gen.ts --file=openapi.json --generate-mdx
 
-# Run the redirect validation utility
-# Usage: make validate-redirects [CHECK_DESTINATIONS=true] [BASE_URL=https://example.com]
-validate-redirects:
-	npx ts-node scripts/redirect-validator/redirect-validator.ts \
-		--check-destinations=$(CHECK_DESTINATIONS) \
-		--base-url=$(BASE_URL)
-
-# Run the docs redirect validation utility
-# This validates redirects between vercel.json and docs.json,
-# and checks that all destinations exist in the navigation structure
-validate-docs-redirects:
-	npx ts-node scripts/redirect-validator/docs-redirect-validator.ts
-
-# Validate only that redirect destinations exist in the navigation structure
-validate-redirect-destinations:
-	npx ts-node scripts/redirect-validator/docs-redirect-validator.ts --no-consistency
-
-# Validate only that redirects are consistent between vercel.json and docs.json
-validate-redirect-consistency:
-	npx ts-node scripts/redirect-validator/docs-redirect-validator.ts --no-destinations
-
-# Run in fix mode (experimental)
-fix-redirects:
-	npx ts-node scripts/redirect-validator/docs-redirect-validator.ts --fix 
-
-# Run the OpenAPI generator
-# Usage: make openapi-gen ARGS="--file=path/to/openapi.json --path=components.schemas"
+# Run the OpenAPI generator (allows custom ARGS)
 openapi-gen:
-	cd scripts/openapi-gen && npx ts-node openapi-gen.ts $(ARGS) 
+	cd scripts/openapi-gen && npx ts-node openapi-gen.ts $(ARGS)
