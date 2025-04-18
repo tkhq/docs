@@ -324,7 +324,7 @@ function generateJsonPayloadRecursive(
 // --- Helper: Generate Request Example MDX ---
 function generateRequestExample(endpoint: ApiEndpoint): string {
   const path = endpoint.path || "unknown_path";
-  const url = `https://api.turnkey.com/public/v1/submit/${path}`;
+  const url = `https://api.turnkey.com${path}`;
 
   // Find the 'type' field, often indicates the specific activity type
   const typeField = endpoint.requestBody?.fields?.find(
