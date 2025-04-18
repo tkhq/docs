@@ -504,6 +504,8 @@ export function generateMdxFile(
 
 // --- Main MDX Content Generation ---
 export function generateMdxContent(endpoint: ApiEndpoint): string {
+  const rootEndpointPath = endpoint.path.split("/").filter(Boolean).pop();
+
   // 1. Frontmatter and Imports
   let mdxContent = `---
 title: "${endpoint.title || "API Endpoint"}"
@@ -513,6 +515,11 @@ description: "${endpoint.description || "API endpoint documentation"}"
 import { Authorizations } from "/snippets/api/authorizations.mdx";
 import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="${
+    endpoint.type === "activity" ? "submit" : "query"
+  }" path="${rootEndpointPath}" />
 
 <Authorizations />
 
