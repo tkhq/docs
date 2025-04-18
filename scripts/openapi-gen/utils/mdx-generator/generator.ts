@@ -97,27 +97,49 @@ function generateJsonPayloadRecursive(
     if (field.type === "object" && field.childFields) {
       // Recursive call for nested objects
       value = generateJsonPayloadRecursive(field.childFields);
-    } else if (field.type === "array" && field.childFields?.[0]) {
-      // Handle arrays - generate one example item
-      const itemField = field.childFields[0];
+    } else if (field.type === "array" && field.childFields && field.childFields.length > 0) {
+      // Handle arrays
       let itemValue: any;
-      if (itemField.type === "object" && itemField.childFields) {
-        itemValue = generateJsonPayloadRecursive(itemField.childFields);
-      } else if (itemField.type === "string") {
-        itemValue = "<string_element>";
-      } else if (itemField.type === "number") {
-        itemValue = 456; // Example number for array element
-      } else if (itemField.type === "boolean") {
-        itemValue = false; // Example boolean for array element
+      const firstChild = field.childFields[0];
+
+      // Check if items are simple types (parser sets name to 'item') or objects
+      if (firstChild.name === "item") {
+        // Items are simple (string, number, boolean, enum)
+        const itemField = firstChild; // Use the single 'item' field definition
+        if (itemField.enumOptions?.[0]?.value) {
+          // Array of enums
+          itemValue = `<${itemField.enumOptions[0].value}>`;
+        } else {
+          // Array of simple types
+          switch (itemField.type) {
+            case "string":
+              itemValue = "<string_element>";
+              break;
+            case "number":
+              itemValue = 456;
+              break;
+            case "boolean":
+              itemValue = false;
+              break;
+            default:
+              itemValue = `<${itemField.type || "unknown"}_element>`;
+          }
+        }
       } else {
-        itemValue = `<${itemField.type || "unknown"}_element>`;
+        // Items are objects: recursively generate structure using all childFields
+        itemValue = generateJsonPayloadRecursive(field.childFields);
       }
       value = [itemValue]; // Create an array with one example element
     } else {
-      // Handle simple types
+      // Handle simple types (non-array, non-object)
       switch (field.type) {
         case "string":
-          value = "<string>";
+          // Use enum default if available for top-level string enums
+          if (field.enumOptions?.[0]?.value) {
+            value = field.enumOptions[0].value;
+          } else {
+            value = "<string>";
+          }
           break;
         case "number":
           value = 123;
@@ -125,6 +147,9 @@ function generateJsonPayloadRecursive(
         case "boolean":
           value = true;
           break; // Example boolean
+        case "enum":
+          value = `<${field.enumOptions?.[0]?.value || "enum"}>`; // Use first enum value or placeholder
+          break;
         default:
           value = `<${field.type || "unknown"}>`; // Use type as placeholder if known
       }
@@ -140,7 +165,6 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const path = endpoint.path || "unknown_path";
   const url = `https://api.turnkey.com/public/v1/submit/${path}`;
 
-  // Generate Activity Type Name (using only path as operationId is not available)
   const typeField = endpoint.requestBody?.fields?.find(
     (f) => f.name === "type"
   );
@@ -148,8 +172,10 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const type = typeField?.enumOptions?.[0]?.value || "ACTIVITY_TYPE_UNKNOWN_V1"; // Use defaultValue or fallback
 
   // 1. Generate the parameters as a JavaScript object
-  const { parameters } = generateJsonPayloadRecursive(
-    endpoint.requestBody?.fields
+  // This part should already be correct if Step 27 change was intentional
+  const parametersObject = generateJsonPayloadRecursive(
+    endpoint.requestBody?.fields?.find((f) => f.name === "parameters")
+      ?.childFields // Pass the *fields* of the 'parameters' object
   );
 
   // 2. Construct the full data payload *object*
@@ -157,25 +183,27 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     type,
     timestampMs: "<string> (e.g., " + Date.now() + ")", // Add example timestamp
     organizationId: "<string> (Your Organization ID)", // Add context
-    parameters,
+    parameters: parametersObject, // Embed the generated parameters object
   };
 
+  // ... rest of the function remains the same ...
+
   // 3. Stringify the entire payload object for the cURL command's data field
-  const dataPayloadString = JSON.stringify(dataPayloadObject, null, 4); // Pretty print
+  const dataPayloadString = JSON.stringify(dataPayloadObject, null, 4); // Pretty print (using 4 spaces as per Step 27)
 
-  // 4. Escape single quotes in the JSON string for the shell command
-  const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''"); // Escape single quotes for shell
+  // 4. Escape single quotes ...
+  const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''");
 
-  // 5. Construct the curl command string using concatenation to avoid backtick issues
+  // 5. Construct the curl command ...
   const curlCommand =
-    "```bash cURL\n" + // Start code block
-    "curl --request POST \n" + // Command parts, escape newline for shell, escape backslash for JS string
-    `  --url ${url} \n` +
-    "  --header 'Accept: application/json' \n" +
-    "  --header 'Content-Type: application/json' \n" +
-    '  --header "X-Stamp: <YOUR_API_KEY>" \n' + // Use double quotes for header value
-    `  --data '${escapedDataPayloadString}'\n` + // Embed escaped data
-    "```"; // End code block
+    "```bash cURL\n" +
+    "curl --request POST \\\n" + // Use backslash for line continuation
+    `  --url ${url} \\\n` +
+    "  --header 'Accept: application/json' \\\n" +
+    "  --header 'Content-Type: application/json' \\\n" +
+    '  --header "X-Stamp: <YOUR_API_KEY>" \\\n' + // Example API Key header
+    `  --data '${escapedDataPayloadString}'\n` +
+    "```";
 
   // 6. Return the final MDX component string
   return `<RequestExample>\n\n${curlCommand}\n\n</RequestExample>`;
