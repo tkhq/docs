@@ -98,11 +98,8 @@ export interface ApiRequestBody {
  */
 export interface ApiResponse {
   statusCode: number;
-  contentType: "application/json" | "text/plain" | "application/xml";
-
-  /**
-   * Fields that describe the structure of this response, if any.
-   */
+  description?: string;
+  contentType?: "application/json" | "text/plain" | "application/xml";
   fields?: ApiField[];
 
   /**

@@ -18,6 +18,7 @@ export interface CliOptions {
   requiredOnly?: boolean;
   generateMdx?: boolean; 
   mdxOutputDir?: string; 
+  mdxAddOnly?: boolean; // Add the new option
 }
 
 /**
@@ -66,6 +67,11 @@ export function configureCLI(): Command {
         "--mdx-output-dir <path>",
         "Base directory for generated MDX files",
         "api-reference-v2" 
+    )
+    .option(
+        "--mdx-add-only",
+        "Only add new MDX files, do not overwrite existing ones",
+        false
     );
 
   return program;

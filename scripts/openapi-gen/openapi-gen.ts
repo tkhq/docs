@@ -42,71 +42,203 @@ async function main() {
     if (options.generateMdx) {
       // --- MDX Generation Mode ---
       if (!endpointResult) {
-        // This should theoretically not happen based on the check above, but safety first.
         throw new Error(
           "Endpoint data is required for MDX generation (--endpoints flag might be needed)."
         );
       }
       console.log(`--- Starting MDX Generation ---`);
-      const absoluteMdxOutputDir = path.resolve(
-        options.mdxOutputDir || "api-reference-v2"
+
+      // Calculate project root (assuming script is in <project_root>/scripts/openapi-gen)
+      const projectRoot = path.resolve(__dirname, "..", "..");
+
+      // Resolve output dir relative to project root
+      const mdxOutputDirName = options.mdxOutputDir || "api-reference-v2";
+      const absoluteMdxOutputDir = path.resolve(projectRoot, mdxOutputDirName);
+      const relativeMdxBaseDir = path.relative(
+        projectRoot,
+        absoluteMdxOutputDir
       );
+
       console.log(`Output directory: ${absoluteMdxOutputDir}`);
       fs.mkdirSync(absoluteMdxOutputDir, { recursive: true });
       console.log(`Endpoint count: ${endpointResult.endpoints.length}`);
+
+      // Collect generated MDX paths for docs.json update
+      const activityPaths: string[] = [];
+      const queryPaths: string[] = [];
+
       for (const endpoint of endpointResult.endpoints) {
-        generateMdxFile(endpoint, absoluteMdxOutputDir);
+        // Pass the mdxAddOnly flag and capture the generated path
+        const generatedPath = generateMdxFile(
+          endpoint,
+          absoluteMdxOutputDir,
+          options.mdxAddOnly
+        );
+
+        if (generatedPath) {
+          if (endpoint.type === "activity") {
+            activityPaths.push(generatedPath);
+          } else if (endpoint.type === "query") {
+            queryPaths.push(generatedPath);
+          }
+        }
       }
       console.log(`--- Finished MDX Generation ---`);
 
+      // --- Update docs.json ---
+      console.log(`--- Updating docs.json ---`);
+      const docsJsonPath = path.resolve(projectRoot, "docs.json");
+      try {
+        const docsJsonContent = fs.readFileSync(docsJsonPath, "utf-8");
+
+        const docsConfig = JSON.parse(docsJsonContent);
+        // console.log("docsConfig", docsConfig.navigation);
+        // Define overview paths
+        const activityOverviewPath = path.join(
+          relativeMdxBaseDir,
+          "activities",
+          "overview"
+        );
+        const queryOverviewPath = path.join(
+          relativeMdxBaseDir,
+          "queries",
+          "overview"
+        );
+
+        // Remove duplicates before sorting
+        const uniqueActivityPaths = [...new Set(activityPaths)];
+        const uniqueQueryPaths = [...new Set(queryPaths)];
+
+        // Sort generated paths alphabetically
+        uniqueActivityPaths.sort();
+        uniqueQueryPaths.sort();
+
+        // --- Find and Update Navigation ---
+        // Check if docsConfig.navigation is an array before proceeding
+        if (!docsConfig || !docsConfig.navigation) {
+          console.error(
+            `Error: Expected 'docs.json' to have a top-level 'navigation' array.`
+          );
+          throw new Error("'docs.json' structure is not as expected."); // Or handle more gracefully
+        }
+
+        // Find the API Reference V2 tab
+        const apiRefV2Tab = docsConfig.navigation.tabs.find(
+          (item: any) => item.tab === "API Reference - V2"
+        );
+
+        if (apiRefV2Tab && Array.isArray(apiRefV2Tab.pages)) {
+          // Find and update Activities group
+          const activitiesGroup = apiRefV2Tab.pages.find(
+            (item: any) =>
+              typeof item === "object" && item.group === "Activities"
+          );
+          if (activitiesGroup) {
+            activitiesGroup.pages = [activityOverviewPath, ...uniqueActivityPaths];
+            console.log(`Updated Activities paths in docs.json`);
+          } else {
+            console.warn(
+              `Could not find 'Activities' group in docs.json under 'API Reference - V2'`
+            );
+          }
+
+          // Find and update Queries group
+          const queriesGroup = apiRefV2Tab.pages.find(
+            (item: any) => typeof item === "object" && item.group === "Queries"
+          );
+          if (queriesGroup) {
+            queriesGroup.pages = [queryOverviewPath, ...uniqueQueryPaths];
+            console.log(`Updated Queries paths in docs.json`);
+          } else {
+            console.warn(
+              `Could not find 'Queries' group in docs.json under 'API Reference - V2'`
+            );
+          }
+        } else {
+          console.warn(
+            `Could not find 'API Reference - V2' tab in docs.json navigation`
+          );
+        }
+
+        // Write updated config back to docs.json
+        fs.writeFileSync(
+          docsJsonPath,
+          JSON.stringify(docsConfig, null, 2) + "\n"
+        );
+        console.log(`Successfully updated ${docsJsonPath}`);
+      } catch (error: any) {
+        console.error(
+          `Error processing or updating docs.json: ${error.message}`
+        );
+      }
+      console.log(`--- Finished updating docs.json ---`);
+
       // If --output is ALSO specified, write the formatted endpoints to that file.
+      // Resolve this output path relative to the project root as well.
       if (options.output) {
+        const absoluteFormattedOutputPath = path.resolve(
+          projectRoot,
+          options.output
+        );
         console.log(
-          `Additionally writing formatted endpoints to ${options.output}`
+          `Additionally writing formatted endpoints to ${absoluteFormattedOutputPath}`
         );
         const endpointFormat =
           options.format === "yaml" ? "json" : options.format; // Default to json if yaml requested
-        // formatApiEndpoints handles writing to the file and logging
+
         formatApiEndpoints(endpointResult, {
           format: endpointFormat,
-          outputFile: options.output,
+          outputFile: absoluteFormattedOutputPath, // Use absolute path
           prettyPrint: true,
         });
       }
     } else if (options.endpoints) {
       // --- Formatted Endpoints Mode (JSON/TypeScript) ---
       if (!endpointResult) {
-        // Should not happen
         throw new Error("Endpoint data parsing failed.");
       }
       const endpointFormat =
         options.format === "yaml" ? "json" : options.format; // Default to json if yaml requested
 
-      // formatApiEndpoints handles writing to file (and logging) or returns string for stdout
+      // Resolve output path relative to project root if specified
+      const absoluteFormattedOutputPath = options.output
+        ? path.resolve(path.resolve(__dirname, "..", ".."), options.output)
+        : undefined;
+
       const formattedOutput = formatApiEndpoints(endpointResult, {
         format: endpointFormat,
-        outputFile: options.output, // Pass output file path if provided
+        outputFile: absoluteFormattedOutputPath, // Pass absolute path if provided
         prettyPrint: true,
       });
 
       // Only write to stdout if no output file was specified
-      if (!options.output) {
+      if (!absoluteFormattedOutputPath) {
         process.stdout.write(formattedOutput);
+      } else {
+        // Log the absolute path if writing to file
+        console.log(`Output written to ${absoluteFormattedOutputPath}`);
       }
     } else {
       // --- Raw OpenAPI Spec Mode (JSON/YAML) ---
       if (options.format === "typescript") {
-        // Ensure compatible format
         throw new Error(
           "TypeScript format is only supported when using the --endpoints or --generate-mdx flags."
         );
       }
-      // outputResults handles writing to file (and logging) or stdout
+      // Resolve output path relative to project root if specified
+      const absoluteRawOutputPath = options.output
+        ? path.resolve(path.resolve(__dirname, "..", ".."), options.output)
+        : undefined;
+
       outputResults(api, {
-        outputFile: options.output,
+        outputFile: absoluteRawOutputPath, // Use absolute path if provided
         jsonPath: options.path,
         format: options.format,
       });
+      // Log if written to file
+      if (absoluteRawOutputPath) {
+        console.log(`Output written to ${absoluteRawOutputPath}`);
+      }
     }
   } catch (error) {
     handleError(error);
