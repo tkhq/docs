@@ -37,6 +37,72 @@ async function main() {
       });
     }
 
+    // --- Handle Endpoint Name/Tags Listing Mode ---
+    if (options.listEndpointsTags) {
+      // Parse endpoints if not already done
+      if (!endpointResult) {
+        endpointResult = parseApiEndpoints(api, {
+          requiredPropertiesOnly: options.requiredOnly,
+        });
+      }
+
+      // Helper to kebab-case strings and remove '?'
+      const kebabCase = (str: string) =>
+        str.replace(/\?/g, '').trim().toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Build raw list with name, id, type, tags
+      const rawList = endpointResult.endpoints.map(ep => {
+        const name = ep.title.replace(/\?/g, '').trim();
+        const id = kebabCase(name);
+        const type = ep.type;
+        const tags = (ep.tags || []).map(t => ({
+          id: kebabCase(t),
+          label: t,
+        }));
+        return { name, id, type, tags };
+      });
+
+      // Deduplicate by id + tag ids
+      const uniqueList: { name: string; id: string; type: string; tags: { id: string; label: string }[] }[] = [];
+      const seen = new Set<string>();
+      for (const item of rawList) {
+        const key = `${item.id}|${item.tags.map(t => t.id).join(',')}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueList.push(item);
+        }
+      }
+
+      const outPath = options.listEndpointsTags;
+      // Ensure target directories exist
+      const outDir = path.dirname(outPath);
+      fs.mkdirSync(outDir, { recursive: true });
+      if (path.extname(outPath).toLowerCase() === ".mdx") {
+        // Build endpoints export
+        const endpointsStr = JSON.stringify(uniqueList, null, 2);
+        // Collect unique tags
+        const tagMap = new Map<string, string>();
+        uniqueList.forEach(item =>
+          item.tags.forEach(tag => tagMap.set(tag.id, tag.label))
+        );
+        const uniqueTagsArray = Array.from(tagMap.entries()).map(
+          ([id, label]) => ({ id, label })
+        );
+        const tagsStr = JSON.stringify(uniqueTagsArray, null, 2);
+        // Construct MDX content with endpoints and tags
+        const mdxContent = `export const endpoints = ${endpointsStr};
+
+export const tags = ${tagsStr};`;
+        fs.writeFileSync(outPath, mdxContent, "utf-8");
+      } else {
+        // Default JSON output
+        fs.writeFileSync(outPath, JSON.stringify(uniqueList, null, 2), "utf-8");
+      }
+      console.log(`Endpoint names and tags written to ${outPath}`);
+      return;
+    }
+
     // --- Determine Output Mode ---
 
     if (options.generateMdx) {

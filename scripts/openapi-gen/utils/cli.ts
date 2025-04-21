@@ -10,6 +10,10 @@ import { Command } from "commander";
  * Command line argument options interface
  */
 export interface CliOptions {
+  /**
+   * If set, output a list of endpoint names and tags to the specified file
+   */
+  listEndpointsTags?: string;
   file: string;
   path?: string;
   output?: string;
@@ -53,6 +57,10 @@ export function configureCLI(): Command {
     .option(
       "--endpoints",
       "Generate API Endpoint objects instead of raw OpenAPI spec"
+    )
+    .option(
+      "--list-endpoints-tags <outputFile>",
+      "Output a JSON list of endpoint names and tags to the given file"
     )
     .option(
       "--required-only",

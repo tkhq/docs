@@ -1,0 +1,93 @@
+export const EndpointFilter = ({ endpoints, tags }) => {
+
+const filterId = `endpoint-filter-${Math.random().toString(36).slice(2, 9)}`;
+
+const tagClasses = {
+    selected: ['bg-primary', 'dark:bg-primary-light', 'text-white', 'dark:text-white'],
+    unselected: ['bg-gray-100/50', 'dark:bg-white/10', 'text-gray-600', 'dark:text-gray-200']
+}
+
+const handleTagClick = (tag) => {
+  const rootEl = document.getElementById(filterId);
+  if (!rootEl) return;
+  const filterTags = rootEl.getAttribute('data-filter-tags') || '';
+  const filterTagsArray = filterTags.split(',').filter(Boolean);
+  if (filterTagsArray.includes(tag)) {
+    filterTagsArray.splice(filterTagsArray.indexOf(tag), 1);
+  } else {
+    filterTagsArray.push(tag);
+  }
+  rootEl.setAttribute('data-filter-tags', filterTagsArray.join(','));
+  const rows = rootEl?.querySelectorAll('.endpoint-row') || [];
+  rows.forEach((r) => {
+      const tagsAttr = r.getAttribute('data-tags') || '';
+      const tags = tagsAttr.split(',');
+
+      if (!filterTagsArray.length) {
+        r.style.display = 'block';
+      } else {
+        const shouldShow = filterTagsArray.some((f) => tags.includes(f));
+        r.style.display = shouldShow ? 'block' : 'none';
+      }
+    });
+
+    const pills = rootEl?.querySelectorAll('.endpoint-tag') || [];
+    pills.forEach((p) => {
+      const tagId = p.getAttribute('data-tag');
+      if (filterTagsArray.includes(tagId)) {
+        p.classList.remove(...tagClasses.unselected);
+        p.classList.add(...tagClasses.selected);
+      } else {
+        p.classList.remove(...tagClasses.selected);
+        p.classList.add(...tagClasses.unselected);
+      }
+    });
+  };
+
+  return (
+
+<div>
+  <div className="flex flex-col gap-4" id={filterId} data-filter-tags="">
+    <div className="flex flex-row gap-2 flex-wrap items-center">
+      {tags.map((tag) => (
+        <span
+          data-tag={tag.id}
+          onClick={() => handleTagClick(tag.id)}
+          className="endpoint-tag select-none h-8 text-xs px-2 cursor-pointer bg-gray-100/50 dark:bg-white/10 inline-flex items-center justify-center rounded-full text-gray-600 dark:text-gray-200 font-medium"
+        >
+          {tag.label}
+        </span>
+      ))}
+    </div>
+    <div className="flex flex-col pb-12 min-h-dvh">
+      {endpoints.map((endpoint) => (
+        <div
+          className="endpoint-row"
+          data-tags={endpoint.tags.map((t) => t.id).join(",")}
+        >
+          <a
+            target="_self"
+            className="py-2 font-normal border-b border-gray-100 dark:border-gray-700 group flex flex-row justify-between items-start md:items-center"
+            href={`${endpoint.type === 'query' ? 'queries' : 'activites'}/${endpoint.id}`}
+          >
+            <div className="flex flex-row gap-2 items-start md:items-center font-normal">
+              <div className="">{endpoint.name}</div>
+            </div>
+            <div className="flex flex-row gap-2">
+              {endpoint.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  style={{ padding: "0 10px", letterSpacing: "0.025rem" }}
+                  className="inline-flex h-6 items-center text-xs rounded-full bg-gray-100/50 dark:bg-white/5 text-gray-600 dark:text-gray-200 font-medium break-all"
+                >
+                  <span className="tracking-wide">{tag.label}</span>
+                </span>
+              ))}
+            </div>
+          </a>
+        </div>
+      ))}
+    </div>
+  </div>
+</div>
+); };

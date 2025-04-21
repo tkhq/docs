@@ -64,13 +64,13 @@ export function parseApiEndpoints(
         const endpointName = extractEndpointName(path);
         const endpointType = determineEndpointType(path);
 
-        // --- Common Endpoint Properties --- 
+        // --- Common Endpoint Properties ---
         const baseEndpointInfo = {
-            title: operation.summary || "",
-            path,
-            method: method as HttpMethod,
-            description: operation.description || "",
-            type: endpointType,
+          title: operation.summary || "",
+          path,
+          method: method as HttpMethod,
+          description: operation.description || "",
+          type: endpointType,
         };
 
         let requestBody: ApiRequestBody | undefined = undefined;
@@ -96,125 +96,127 @@ export function parseApiEndpoints(
           }
         }
 
-        // --- Type-Specific Logic --- 
+        // --- Type-Specific Logic ---
         if (endpointType === "query") {
-            // --- Handle Query Endpoints --- 
+          // --- Handle Query Endpoints ---
+          const endpoint: ApiEndpoint = {
+            ...baseEndpointInfo,
+            requestBody, // Add parsed request body
+            tags: operation.tags || [],
+            pathParams: pathParams.length > 0 ? pathParams : undefined,
+            queryParams: queryParams.length > 0 ? queryParams : undefined,
+            responses: parseResponsesFromOperation(operation.responses), // Use helper for responses
+            version: undefined, // Queries might not have explicit versions in the same way
+          };
+          endpoints.push(endpoint);
+        } else {
+          // --- Handle Activity Endpoints (Existing Logic) ---
+          // Find versioned components
+          const intentBaseName = createIntentBaseName(endpointName);
+          const resultBaseName = createResultBaseName(endpointName);
+          const activityTypeBase = createActivityType(endpointName);
+          const typeEnum = findActivityTypeEnum(openApiSpec, activityTypeBase);
+          const intents = findVersionedComponents(
+            openApiSpec,
+            "intent",
+            intentBaseName
+          );
+          const results = findVersionedComponents(
+            openApiSpec,
+            "result",
+            resultBaseName
+          );
+          const versionedComponents = matchVersionedComponents(
+            typeEnum,
+            intents,
+            results
+          );
+
+          // Create ApiEndpoint for each matched version
+          for (const component of versionedComponents) {
+            const intentSchema = getComponentSchema(
+              openApiSpec,
+              "Intent",
+              component.intentName
+            );
+            const resultSchema = getComponentSchema(
+              openApiSpec,
+              "Result",
+              component.resultName
+            );
+
+            // Create basic endpoint structure for this version
             const endpoint: ApiEndpoint = {
-                ...baseEndpointInfo,
-                requestBody, // Add parsed request body
-                pathParams: pathParams.length > 0 ? pathParams : undefined,
-                queryParams: queryParams.length > 0 ? queryParams : undefined,
-                responses: parseResponsesFromOperation(operation.responses), // Use helper for responses
-                version: undefined, // Queries might not have explicit versions in the same way
+              ...baseEndpointInfo,
+              tags: operation.tags || [],
+              description: operation.description || "",
+              version: component.version,
+              requestBody, // Add parsed request body
+              pathParams: pathParams.length > 0 ? pathParams : undefined,
+              queryParams: queryParams.length > 0 ? queryParams : undefined,
+              responses: [
+                {
+                  statusCode: 200,
+                  contentType: "application/json",
+                  description: "Successful activity response", // Add description
+                  fields: [
+                    {
+                      name: "activity",
+                      type: "object",
+                      required: true,
+                      description:
+                        "The activity object containing type, intent, and result",
+                      childFields: [
+                        {
+                          name: "type",
+                          type: "string",
+                          required: true,
+                          description: "The activity type",
+                          defaultValue: component.activityType,
+                        },
+                        {
+                          name: "intent",
+                          type: "object",
+                          required: true,
+                          description: "The intent of the activity",
+                          childFields: [
+                            {
+                              name: component.intentName,
+                              type: "object",
+                              required: true,
+                              description: `The ${component.intentName} object`,
+                              childFields: intentSchema
+                                ? parseSchemaProperties(intentSchema)
+                                : [],
+                            },
+                          ],
+                        },
+                        {
+                          name: "result",
+                          type: "object",
+                          required: true,
+                          description: "The result of the activity",
+                          childFields: [
+                            {
+                              name: component.resultName,
+                              type: "object",
+                              required: true,
+                              description: `The ${component.resultName} object`,
+                              childFields: resultSchema
+                                ? parseSchemaProperties(resultSchema)
+                                : [],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+                // Potentially add other standard responses (e.g., 4xx, 5xx) if defined elsewhere
+              ],
             };
             endpoints.push(endpoint);
-
-        } else {
-            // --- Handle Activity Endpoints (Existing Logic) --- 
-            // Find versioned components
-            const intentBaseName = createIntentBaseName(endpointName);
-            const resultBaseName = createResultBaseName(endpointName);
-            const activityTypeBase = createActivityType(endpointName);
-            const typeEnum = findActivityTypeEnum(openApiSpec, activityTypeBase);
-            const intents = findVersionedComponents(
-              openApiSpec,
-              "intent",
-              intentBaseName
-            );
-            const results = findVersionedComponents(
-              openApiSpec,
-              "result",
-              resultBaseName
-            );
-            const versionedComponents = matchVersionedComponents(
-              typeEnum,
-              intents,
-              results
-            );
-
-            // Create ApiEndpoint for each matched version
-            for (const component of versionedComponents) {
-              const intentSchema = getComponentSchema(
-                openApiSpec,
-                "Intent",
-                component.intentName
-              );
-              const resultSchema = getComponentSchema(
-                openApiSpec,
-                "Result",
-                component.resultName
-              );
-
-              // Create basic endpoint structure for this version
-              const endpoint: ApiEndpoint = {
-                ...baseEndpointInfo,
-                version: component.version,
-                requestBody, // Add parsed request body
-                pathParams: pathParams.length > 0 ? pathParams : undefined,
-                queryParams: queryParams.length > 0 ? queryParams : undefined,
-                responses: [
-                  {
-                    statusCode: 200,
-                    contentType: "application/json",
-                    description: "Successful activity response", // Add description
-                    fields: [
-                      {
-                        name: "activity",
-                        type: "object",
-                        required: true,
-                        description:
-                          "The activity object containing type, intent, and result",
-                        childFields: [
-                          {
-                            name: "type",
-                            type: "string",
-                            required: true,
-                            description: "The activity type",
-                            defaultValue: component.activityType,
-                          },
-                          {
-                            name: "intent",
-                            type: "object",
-                            required: true,
-                            description: "The intent of the activity",
-                            childFields: [
-                              {
-                                name: component.intentName,
-                                type: "object",
-                                required: true,
-                                description: `The ${component.intentName} object`,
-                                childFields: intentSchema
-                                  ? parseSchemaProperties(intentSchema)
-                                  : [],
-                              },
-                            ],
-                          },
-                          {
-                            name: "result",
-                            type: "object",
-                            required: true,
-                            description: "The result of the activity",
-                            childFields: [
-                              {
-                                name: component.resultName,
-                                type: "object",
-                                required: true,
-                                description: `The ${component.resultName} object`,
-                                childFields: resultSchema
-                                  ? parseSchemaProperties(resultSchema)
-                                  : [],
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                  // Potentially add other standard responses (e.g., 4xx, 5xx) if defined elsewhere
-                ],
-              };
-              endpoints.push(endpoint);
-            }
+          }
         }
       }
     }
@@ -272,9 +274,7 @@ function parseSchemaProperties(schema: any): ApiField[] {
   const requiredFields = new Set(schema.required || []);
 
   for (const [name, propSchema] of Object.entries(schema.properties)) {
-    fields.push(
-      schemaToApiField(name, propSchema, requiredFields.has(name))
-    );
+    fields.push(schemaToApiField(name, propSchema, requiredFields.has(name)));
   }
   return fields;
 }
@@ -519,7 +519,11 @@ function matchVersionedComponents(
 
   // Create final components where all parts are found
   for (const [version, component] of versionMap.entries()) {
-    if (component.activityType && component.intentName && component.resultName) {
+    if (
+      component.activityType &&
+      component.intentName &&
+      component.resultName
+    ) {
       components.push({
         version,
         activityType: component.activityType,

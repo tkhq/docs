@@ -35,6 +35,10 @@ export interface ApiHeader {
   type: DataType;
   required: boolean;
   description: string;
+  /**
+   * Tags assigned to this endpoint (from OpenAPI spec)
+   */
+  tags?: string[];
   example?: string;
 }
 
@@ -47,6 +51,10 @@ export interface ApiParameter {
   type: DataType;
   required: boolean;
   description: string;
+  /**
+   * Tags assigned to this endpoint (from OpenAPI spec)
+   */
+  tags?: string[];
   example?: string;
 }
 
@@ -58,6 +66,10 @@ export interface ApiField {
   type: DataType;
   required: boolean;
   description: string;
+  /**
+   * Tags assigned to this endpoint (from OpenAPI spec)
+   */
+  tags?: string[];
 
   /**
    * Default value for this field, if any.
@@ -133,6 +145,10 @@ export interface ApiEndpoint {
   method: HttpMethod;
   // paths.[path].[method].description
   description: string;
+  /**
+   * Tags assigned to this endpoint (from OpenAPI spec)
+   */
+  tags?: string[];
   // Version extracted from intent name
   // createPrivateKeysIntent => version = "1"
   // createPrivateKeysIntentV2 => version = "2"
