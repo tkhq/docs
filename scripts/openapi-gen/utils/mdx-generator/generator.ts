@@ -338,20 +338,25 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
       ? typeFieldDetails.options[0].value
       : "ACTIVITY_TYPE_UNKNOWN_V1";
 
-  // Find the 'parameters' field which contains the main payload
-  const parametersField = endpoint.requestBody?.fields?.find(
-    (f) => f.name === "parameters"
-  );
-  const parametersObject = generateJsonPayloadRecursive(
-    parametersField?.childFields
-  );
-
-  const dataPayloadObject = {
-    type: activityType,
-    timestampMs: "<string> (e.g., " + Date.now() + ")",
-    organizationId: "<string> (Your Organization ID)",
-    parameters: parametersObject,
-  };
+  // Determine payload: if there's a `parameters` wrapper, use it, otherwise serialize all root-level fields
+  const fields = endpoint.requestBody?.fields || [];
+  const parametersWrapper = fields.find((f) => f.name === "parameters");
+  let dataPayloadObject: Record<string, any>;
+  if (parametersWrapper) {
+    // activity-style endpoint
+    const parametersObject = generateJsonPayloadRecursive(
+      parametersWrapper.childFields
+    );
+    dataPayloadObject = {
+      type: activityType,
+      timestampMs: "<string> (e.g., " + Date.now() + ")",
+      organizationId: "<string> (Your Organization ID)",
+      parameters: parametersObject,
+    };
+  } else {
+    // query-style endpoint: flatten all top-level fields
+    dataPayloadObject = generateJsonPayloadRecursive(fields);
+  }
 
   // Stringify carefully, handle potential BigInts if they arise
   const dataPayloadString = JSON.stringify(
