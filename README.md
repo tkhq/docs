@@ -96,3 +96,13 @@ You can build a docker image running nginx and only a static build of the HTML/C
 ```sh
 $ make image
 ```
+
+## Build & Code Generation
+
+We provide the following Make targets to generate API reference content:
+
+- `make openapi-gen`: Run the OpenAPI generator CLI with custom arguments. See [scripts/openapi-gen/README.md](scripts/openapi-gen/README.md) for details.
+- `make gen`: Default MDX generation for API reference under `api-reference/`.
+- `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
+
+These commands require Node.js and `ts-node`.
