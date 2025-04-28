@@ -11,14 +11,57 @@ Turnkey supports EVM address derivation with `ADDRESS_TYPE_ETHEREUM`. This addre
 
 To construct and sign an EVM transaction with Turnkey, we offer:
 
-- : contains a `createAccount` method to create a Turnkey-powered [custom account](https://viem.sh/docs/accounts/local) which [Viem](https://viem.sh/) can use seamlessly.
-- : contains a `TurnkeySigner` which implements Ethers' `AbstractSigner` interface. See [Ethers docs](https://docs.ethers.org/v6/api/providers/abstract-signer/#AbstractSigner).
+- [@turnkey/viem](https://github.com/tkhq/sdk/tree/main/packages/viem): contains a `createAccount` method to create a Turnkey-powered [custom account](https://viem.sh/docs/accounts/local) which [Viem](https://viem.sh/) can use seamlessly.
+- [@turnkey/ethers](https://github.com/tkhq/sdk/tree/main/packages/ethers): contains a `TurnkeySigner` which implements Ethers' `AbstractSigner` interface. See [Ethers docs](https://docs.ethers.org/v6/api/providers/abstract-signer/#AbstractSigner).
 
 ## Transaction parsing, policies, and signing
 
 Turnkey has built an EVM parser which runs in a secure enclave, to parse unsigned EVM transactions and extract useful metadata: transaction source, destination, amount, chain ID, and more. See the `EthereumTransaction` struct in our [policy language](/concepts/policies/language) page for a full list.
 
 As a bonus, Turnkey also takes care of combining the signature with the original payload if you use the `SIGN_TRANSACTION` activity types: the input is the unsigned payload (RLP encoded), and the output is the signed RLP encoded transaction, ready to be broadcast\!
+
+### What transaction types does Turnkey support?
+
+Turnkey supports the following transaction types: `legacy, EIP-2930 (Type 1), EIP-1559 (Type 2), EIP-4844 (Type 3), EIP-7702 (Type 4)`. These transactions will get parsed by our transaction parser, and are compatible with our [policy engine](https://docs.turnkey.com/concepts/policies/overview).
+
+### EIP-4844 (Type 3) support
+
+You can use Turnkey’s `SignTransaction` endpoint to parse and sign Type 3 transactions, which conform to the [EIP-4844 standard](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md).
+
+We’ve also added Type 3 support to our policy engine by including the parameter `max_fee_per_blob_gas`. More details about our policy engine language can be found [here](https://docs.turnkey.com/concepts/policies/language#struct), and an example demonstrating how to use `@turnkey/viem` to sign Type 3 transactions can be found [here](https://github.com/tkhq/sdk/blob/main/examples/with-viem/src/eip4844/signTransaction.ts).
+
+Note: for Type 3 transactions, we are specifically handling parsing for payloads containing only the transaction payload body, without any wrappers around blobs, commitments, or proofs.
+
+Accepted: `tx_payload_body`, defined as: `rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value, data, access_list, max_fee_per_blob_gas, blob_versioned_hashes, y_parity, r, s])`
+
+Rejected: `rlp([tx_payload_body, blobs, commitments, proofs])`
+
+- See that this is effectively wrapping the same tx_payload_body shape (defined above) alongside other blob-specific data
+- We do not sign payloads that conform to this format. Payloads that consists of `rlp([tx_payload_body, blobs, commitments, proofs])` are not transactions, they're messages which are part of the gossip protocol to persist blobs on the beacon chain. In other words, they're not meant to be signed: the signatures / integrity is taken care of with the signed commitments & proofs inside of these messages.
+
+See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md#blob-transaction and https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md#networking, respectively, for more.
+
+### EIP-7702 (Type 4) support
+
+In addition to adding support for Type 3 transactions, Turnkey now also supports Type 4 transactions, which conform to the [EIP-7702 standard](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7702.md). From https://eip7702.io/:
+
+```
+EIP-7702 gives superpowers to EOAs.
+
+Specifically, it allows any EOA to set its code based on any existing smart contract. To do so, an EOA owner would sign an authorization that could then be submitted by anyone as part of the new transaction type. The code will be valid until replaced by another authorization. The authorization could be given for a single chain, or all chains at once.
+
+This setup allows an EOA to mimic a smart contract account, particularly allowing transaction bundling, gas sponsorships, and custom permissioning schemes.
+```
+
+You can take advantage of Type 4 transaction support on Turnkey to:
+
+1. Enable gasless transaction experiences: Design applications where transactions can be sponsored by third parties, removing the ETH requirement barrier for new users and simplifying onboarding.
+
+2. Create seamless applications with transaction batching: Bundle multiple operations into single transactions, significantly reducing gas costs and improving UX for complex DeFi or high-frequency trading.
+
+3. Implement flexible authentication systems: Build applications that can leverage passkeys and biometrics while maintaining compatibility with existing EOA infrastructure and reputation systems.
+
+Type 4 transaction support is also live for our policy engine. Details about our engine language can be found [here](https://docs.turnkey.com/concepts/policies/language#struct), and an example demonstrating how to use @turnkey/viem to sign Type 4 transactions can be found [here](https://github.com/tkhq/sdk/blob/main/examples/with-viem/src/eip7702/signTransaction.ts).
 
 ## Account abstraction
 
@@ -28,11 +71,11 @@ This is so common that AA wallet providers have integrated Turnkey as a default 
 
 ## EIP-1193 provider
 
-We've published an experimental  package, which adheres to the [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193) standard. It's built to integrate seamlessly with a broad spectrum of EVM-compatible chains, offering capabilities like account management, transaction signing, and blockchain interaction.
+We've published an experimental package, which adheres to the [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193) standard. It's built to integrate seamlessly with a broad spectrum of EVM-compatible chains, offering capabilities like account management, transaction signing, and blockchain interaction.
 
 ## Wallet signer
 
-Did you know? Turnkey activities can be signed with an API key, a passkey...or any Ethereum wallet if you use our  package\!
+Did you know? Turnkey activities can be signed with an API key, a passkey...or any Ethereum wallet if you use our package\!
 
 ## Examples and demos
 
@@ -44,10 +87,14 @@ The code behind this demo is open-source, available at https://github.com/tkhq/d
 
 If you're looking for shorter, more focused examples, here are a few worth checking out:
 
-- : shows both Ethers and Viem integrations.
-- : shows how to use Turnkey with [Gnosis (Safe)](https://safe.global/).
-- : shows how to use Turnkey with Uniswap, using Ethers.
-- : short example focused on EIP-1193 provider usage.
+- [with-ethers](https://github.com/tkhq/sdk/tree/main/examples/with-ethers): demonstrates how to use Turnkey with Ethers
+- [with-viem](https://github.com/tkhq/sdk/tree/main/examples/with-viem): demonstrates how to use Turnkey with Viem
+- [with-zerodev-aa](https://github.com/tkhq/sdk/tree/main/examples/with-zerodev-aa): demonstrates how to use Turnkey with Zerodev + Viem to create sponsored transactions, and also EIP-7702 (Type 4) transactions
+- [with-biconomy-aa](https://github.com/tkhq/sdk/tree/main/examples/with-biconomy-aa): demonstrates how to use Turnkey with Biconomy + Ethers / Viem to create sponsored transactions, including an example using Biconomy's Nexus Client
+- [with-eth-passkeys-signer](https://github.com/tkhq/sdk/tree/main/examples/with-eth-passkeys-galore): demonstrates both Ethers and Viem integrations, with an optional Biconomy account abstraction integration.
+- [with-gnosis](https://github.com/tkhq/sdk/tree/main/examples/with-gnosis): shows how to use Turnkey with [Gnosis (Safe)](https://safe.global/).
+- [with-uniswap](https://github.com/tkhq/sdk/tree/main/examples/with-uniswap): shows how to use Turnkey with Uniswap, using Ethers.
+- [with-eip-1193-provider](https://github.com/tkhq/sdk/tree/main/examples/with-eip-1193-provider): short example focused on EIP-1193 provider usage.
 
 ## Which EVM chains does Turnkey support?
 
