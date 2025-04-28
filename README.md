@@ -41,9 +41,19 @@ Changes to the documentation are automatically deployed when merged to the main 
 You can access the Mintlify dashboard for this project at:
 [dashboard.mintlify.com](https://dashboard.mintlify.com/turnkey-0e7c1f5b/turnkey-0e7c1f5b)
 
-## The dashboard provides analytics, deployment status, and other management features for our documentation.
+The dashboard provides analytics, deployment status, and other management features for our documentation.
 
-## Legacy Documentation
+## Build & Code Generation
+
+We provide the following Make targets to generate API reference content:
+
+- `make openapi-gen`: Run the OpenAPI generator CLI with custom arguments. See [scripts/openapi-gen/README.md](scripts/openapi-gen/README.md) for details.
+- `make gen`: Default MDX generation for API reference under `api-reference/`.
+- `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
+
+These commands require Node.js and `ts-node`.
+
+## ⚠️ Legacy Documentation ⚠️
 
 The following information pertains to the previous Docusaurus-based documentation setup.
 
@@ -57,15 +67,11 @@ Our crawler settings can be found at https://crawler.algolia.com/admin/crawlers/
 
 In order to manually trigger a new crawl, use the `Restart crawling` button:
 
-<img src="./static/algolia-crawler.png" />
-
 Our docs site is small, so each crawl is quick (~30-60s).
 
 ### Vercel
 
 Each push to Github will trigger a Vercel build:
-
-<img src="./static/vercel.png" />
 
 This is a convenient way to view changes, add feedback, and collaborate overall. Any build can also be promoted to production, if need be.
 
@@ -96,13 +102,3 @@ You can build a docker image running nginx and only a static build of the HTML/C
 ```sh
 $ make image
 ```
-
-## Build & Code Generation
-
-We provide the following Make targets to generate API reference content:
-
-- `make openapi-gen`: Run the OpenAPI generator CLI with custom arguments. See [scripts/openapi-gen/README.md](scripts/openapi-gen/README.md) for details.
-- `make gen`: Default MDX generation for API reference under `api-reference/`.
-- `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
-
-These commands require Node.js and `ts-node`.
