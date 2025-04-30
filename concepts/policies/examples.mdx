@@ -75,9 +75,9 @@ Note: The `activity.resource` portion determines which activities can be perform
 
 #### Allow a specific user to perform a specific activity type (full list [here](/concepts/policies/language#activity-breakdown))
 
-Note: Activities may be upgraded over time, and thus new versions may be introduced. 
-These policies will NOT be valid if an activity type is upgraded and requests are made on the new activity type. 
-For example, if Turnkey introduces `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` (upgraded from `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2`) 
+Note: Activities may be upgraded over time, and thus new versions may be introduced.
+These policies will NOT be valid if an activity type is upgraded and requests are made on the new activity type.
+For example, if Turnkey introduces `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` (upgraded from `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2`)
 and a request is made with the newer `V3` version, this policy with not allow that user to perform `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` activities.
 
 ```json JSON
@@ -243,7 +243,10 @@ Some important context for using SPL token policies with Turnkey:
 For further context on associated token addresses check out Solana’s documentation on it: [https://spl.solana.com/associated-token-account](https://spl.solana.com/associated-token-account)
 
 <Note>
-  An example implementation of using a policy to allow transfers to the associated token address of the intended recipient wallet address can be found in our SDK examples [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana#6-running-the-create-spl-token-transfer-with-policy-example).
+  An example implementation of using a policy to allow transfers to the
+  associated token address of the intended recipient wallet address can be found
+  in our SDK examples
+  [here](https://github.com/tkhq/sdk/tree/main/examples/with-solana#6-running-the-create-spl-token-transfer-with-policy-example).
 </Note>
 
 **Mint Address Accessibility** The mint account address of the token will only be accessible when the transaction is constructed using instructions that specify the mint address – `TransferChecked` and `TransferCheckedWithFee`. For transactions constructed using the simple `Transfer` method, the mint account will be considered empty.
@@ -257,7 +260,8 @@ Here are some example policies for SPL transfers:
   "policyName": "Allow user <USER_ID> to sign Solana transactions that include only a single SPL Transfer FROM <TOKEN_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.from == '<TOKEN_ADDRESS>')"}
+  "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.from == '<TOKEN_ADDRESS>')"
+}
 ```
 
 #### Allow a user to sign Solana transactions only if ALL of the instructions are SPL transfers TO a particular token address
@@ -267,7 +271,8 @@ Here are some example policies for SPL transfers:
   "policyName": "Allow user <USER_ID> to sign Solana transactions only if ALL of the instructions are SPL transfers TO <TOKEN_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.to == '<TOKEN_ADDRESS>')"}
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.to == '<TOKEN_ADDRESS>')"
+}
 ```
 
 #### Allow users with a specific tag to sign Solana transactions only if ALL of the instructions are SPL token transfers with a specific address as the owner of the sending token address
@@ -277,7 +282,8 @@ Here are some example policies for SPL transfers:
   "policyName": "Allow users with <USER_TAG> to sign Solana transactions only if ALL of the instructions are SPL token transfers with <OWNER_ADDRESS> as the owner of the sending token address",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID'))",
-  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.owner == '<OWNER_ADDRESS>')"}
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.owner == '<OWNER_ADDRESS>')"
+}
 ```
 
 #### Allow a user to sign Solana transactions that include a single instruction which is an SPL token transfer where the atomic units of the transfer are less than a threshold amount
@@ -298,7 +304,8 @@ Here are some example policies for SPL transfers:
   "policyName": "Allow <USER_ID> to sign a Solana transaction only if ALL of the instructions are SPL token transfers where the token mint address is <TOKEN_MINT_ADDRESS>",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.token_mint == '<TOKEN_MINT_ADDRESS>')"}
+  "condition": "solana.tx.instructions.count() == solana.tx.spl_transfers.count() && solana.tx.spl_transfers.all(transfer, transfer.token_mint == '<TOKEN_MINT_ADDRESS>')"
+}
 ```
 
 #### Allow a user to sign Solana transactions that includes a single instruction which is an SPL token transfer where one of the multisig signers of the owner is a particular address
@@ -309,5 +316,42 @@ Here are some example policies for SPL transfers:
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "solana.tx.instructions.count() == 1 && solana.tx.spl_transfers.count() == 1 && solana.tx.spl_transfers.all(transfer, transfer.signers.any(s, s == '<SIGNER_ADDRESS>'))"
+}
+```
+
+### Tron
+
+Note: see the [language section](/concepts/policies/language#appendix) for more details.
+
+#### Allow Tether TRC-20 transfers on the Nile Testnet
+
+This policy allows for all transfer calls on the Tether smart contract on the Nile testnet. The contract addresses on Nile testnet and Tron mainnet for Tether are different!
+```json
+{
+  "policyName": "Enable Tether TRC-20 transfers on the Nile Testnet for the Tether contract address: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tron.tx.contract[0].contract_address == 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' && tron.tx.contract[0].data[0..8] == 'a9059cbb'"
+}
+```
+
+#### Allow TRX transfers under 10,000,000 SUN (10 TRX)
+
+The amount field is denoted in SUN, the lowest denomination of TRX.
+```json
+{
+  "policyName": "Allow TRX transfers under 10 TRX",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tron.tx.contract[0].amount < 10000000"
+}
+```
+
+#### Allow all TransferContract transactions
+
+This policy allows for any TRX Transfer 
+```json
+{
+  "policyName": "Allow all TRX transfers",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tron.tx.contract[0].type == 'TransferContract'"
 }
 ```
