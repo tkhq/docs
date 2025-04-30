@@ -79,3 +79,8 @@ We provide the following Make targets to generate API reference content:
 - `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
 
 These commands require Node.js and `ts-node`.
+
+---
+
+**Note for Maintainers:**
+When using the snippets/shared feature, duplicate pages must reside in separate file paths (e.g., `concepts/policies/overview.mdx` and `products/embedded-wallets/features/policy-engine.mdx`) to meet the requirements of `docs.json`. Mintlify restricts multiple pages with identical content from sharing the same path, as this would cause both pages to be highlighted in the sidebar simultaneously. To update the shared content, please modify the file at `/snippets/shared/policy-engine.mdx`.
