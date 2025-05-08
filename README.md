@@ -69,38 +69,11 @@ Each push to Github will trigger a Vercel build:
 
 This is a convenient way to view changes, add feedback, and collaborate overall. Any build can also be promoted to production, if need be.
 
-### Legacy Local Development
-
-#### With yarn
-
-```sh
-# Compiles
-yarn build
-
-# Starts the dev server on port 3000
-yarn start
-```
-
-#### With docker
-
-```sh
-$ docker buildx create --use # This is only required on MacOS
-$ make run-dev
-```
-
-This will build an docker image using the Dockerfile with the `development` target and then run it and port forward.
-You can view the website at `http://localhost:3000/`
-
-You can build a docker image running nginx and only a static build of the HTML/CSS and JS with:
-
-```sh
-$ make image
-```
-
 ## Build & Code Generation
 
 We provide the following Make targets to generate API reference content:
 
+- `make install`: Install dependencies needed to run OpenAPI commands
 - `make openapi-gen`: Run the OpenAPI generator CLI with custom arguments. See [scripts/openapi-gen/README.md](scripts/openapi-gen/README.md) for details.
 - `make gen`: Default MDX generation for API reference under `api-reference/`.
 - `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.

@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_CREATE_USERS_V2`
+Enum options: `ACTIVITY_TYPE_CREATE_USERS_V3`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -43,6 +43,10 @@ Unique identifier for a given Organization.
         The user's email address.
         </NestedParam>
         
+        <NestedParam parentKey="parameters.users" childKey="userPhoneNumber" type="string" required={false} default="">
+        The user's phone number in E.164 format e.g. +13214567890
+        </NestedParam>
+        
         <ParamField body="apiKeys" type="array" required={true} path="parameters.users.apiKeys">
           <p>A list of API Key parameters. This field, if not needed, should be an empty array in your request body.</p>
           <Expandable title="item details">
@@ -52,6 +56,10 @@ Unique identifier for a given Organization.
             
             <NestedParam parentKey="parameters.users.apiKeys" childKey="publicKey" type="string" required={true} default="">
             The public component of a cryptographic key pair used to sign messages and transactions.
+            </NestedParam>
+            
+            <NestedParam parentKey="parameters.users.apiKeys" childKey="curveType" type="enum<string>" required={true} default="">
+            Enum options: `API_KEY_CURVE_P256`, `API_KEY_CURVE_SECP256K1`, `API_KEY_CURVE_ED25519`
             </NestedParam>
             
             <NestedParam parentKey="parameters.users.apiKeys" childKey="expirationSeconds" type="string" required={false} default="">
@@ -90,6 +98,18 @@ Unique identifier for a given Organization.
                 </NestedParam>
               </Expandable>
             </ParamField>
+          </Expandable>
+        </ParamField>
+        <ParamField body="oauthProviders" type="array" required={true} path="parameters.users.oauthProviders">
+          <p>A list of Oauth providers. This field, if not needed, should be an empty array in your request body.</p>
+          <Expandable title="item details">
+            <NestedParam parentKey="parameters.users.oauthProviders" childKey="providerName" type="string" required={true} default="">
+            Human-readable name to identify a Provider.
+            </NestedParam>
+            
+            <NestedParam parentKey="parameters.users.oauthProviders" childKey="oidcToken" type="string" required={true} default="">
+            Base64 encoded OIDC token
+            </NestedParam>
           </Expandable>
         </ParamField>
         <ParamField body="userTags" type="array" required={true} path="parameters.users.userTags">
@@ -291,18 +311,20 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_USERS_V2",
-    "timestampMs": "<string> (e.g., 1745474677468)",
+    "type": "ACTIVITY_TYPE_CREATE_USERS_V3",
+    "timestampMs": "<string> (e.g., 1746736509958)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
         "users": [
             {
                 "userName": "<string>",
                 "userEmail": "<string>",
+                "userPhoneNumber": "<string>",
                 "apiKeys": [
                     {
                         "apiKeyName": "<string>",
                         "publicKey": "<string>",
+                        "curveType": "<API_KEY_CURVE_P256>",
                         "expirationSeconds": "<string>"
                     }
                 ],
@@ -318,6 +340,12 @@ curl --request POST \
                                 "<AUTHENTICATOR_TRANSPORT_BLE>"
                             ]
                         }
+                    }
+                ],
+                "oauthProviders": [
+                    {
+                        "providerName": "<string>",
+                        "oidcToken": "<string>"
                     }
                 ],
                 "userTags": [
@@ -338,9 +366,9 @@ curl --request POST \
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_USERS_V2",
+    "type": "ACTIVITY_TYPE_CREATE_USERS_V3",
     "organizationId": "<organization-id>",
-    "timestampMs": "<timestamp> (e.g., 1745474677468)",
+    "timestampMs": "<timestamp> (e.g., 1746736509958)",
     "result": {
       "activity": {
         "type": "<string>",
