@@ -349,7 +349,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     );
     dataPayloadObject = {
       type: activityType,
-      timestampMs: "<string> (e.g., " + Date.now() + ")",
+      timestampMs: "<string> (e.g. 1746736509954)",
       organizationId: "<string> (Your Organization ID)",
       parameters: parametersObject,
     };
@@ -419,7 +419,7 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
       status: "ACTIVITY_STATUS_COMPLETED", // Example status
       type: activityType, // Echo derived or placeholder type from request
       organizationId: "<organization-id>",
-      timestampMs: "<timestamp> (e.g., " + Date.now() + ")",
+      timestampMs: "<timestamp> (e.g. 1746736509954)",
       result: activityResultPayload, // Use generated or fallback result
     },
   };
