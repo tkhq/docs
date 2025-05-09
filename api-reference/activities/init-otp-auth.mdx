@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_INIT_OTP_AUTH`
+Enum options: `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -38,6 +38,10 @@ Unique identifier for a given Organization.
     
     <NestedParam parentKey="parameters" childKey="contact" type="string" required={true} default="">
     Email or phone number to send the OTP code to
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="otpLength" type="number" required={false} default="">
+    Optional length of the OTP code. Default = 9
     </NestedParam>
     
     <ParamField body="emailCustomization" type="object" required={false} path="parameters.emailCustomization">
@@ -79,6 +83,18 @@ Unique identifier for a given Organization.
     <NestedParam parentKey="parameters" childKey="sendFromEmailAddress" type="string" required={false} default="">
     Optional custom email address from which to send the OTP email
     </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="alphanumeric" type="boolean" required={false} default="">
+    Optional flag to specify if the OTP code should be alphanumeric (Crockford’s Base32). Default = true
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="sendFromEmailSenderName" type="string" required={false} default="">
+    Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="replyToEmailAddress" type="string" required={false} default="">
+    Optional custom email address to use as reply-to
+    </NestedParam>
   </Expandable>
 </ParamField>
 
@@ -94,50 +110,62 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="initOtpAuthIntent" type="object" required={true}>
-      The initOtpAuthIntent object
-      <Expandable title="initOtpAuthIntent details">
-        <NestedParam parentKey="activity.intent.initOtpAuthIntent" childKey="otpType" type="string" required={true}>
+        <NestedParam parentKey="activity.intent" childKey="initOtpAuthIntentV2" type="object" required={true}>
+      The initOtpAuthIntentV2 object
+      <Expandable title="initOtpAuthIntentV2 details">
+        <NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="otpType" type="string" required={true}>
 Enum to specifiy whether to send OTP via SMS or email
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent" childKey="contact" type="string" required={true}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="contact" type="string" required={true}>
 Email or phone number to send the OTP code to
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent" childKey="emailCustomization" type="object" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="otpLength" type="number" required={false}>
+Optional length of the OTP code. Default = 9
+</NestedParam>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="emailCustomization" type="object" required={false}>
       emailCustomization field
       <Expandable title="emailCustomization details">
-        <NestedParam parentKey="activity.intent.initOtpAuthIntent.emailCustomization" childKey="appName" type="string" required={false}>
+        <NestedParam parentKey="activity.intent.initOtpAuthIntentV2.emailCustomization" childKey="appName" type="string" required={false}>
 The name of the application.
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent.emailCustomization" childKey="logoUrl" type="string" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2.emailCustomization" childKey="logoUrl" type="string" required={false}>
 A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px.
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent.emailCustomization" childKey="magicLinkTemplate" type="string" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2.emailCustomization" childKey="magicLinkTemplate" type="string" required={false}>
 A template for the URL to be used in a magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`.
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent.emailCustomization" childKey="templateVariables" type="string" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2.emailCustomization" childKey="templateVariables" type="string" required={false}>
 JSON object containing key/value pairs to be used with custom templates.
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent.emailCustomization" childKey="templateId" type="string" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2.emailCustomization" childKey="templateId" type="string" required={false}>
 Unique identifier for a given Email Template. If not specified, the default is the most recent Email Template.
 </NestedParam>
 
       </Expandable>
     </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent" childKey="smsCustomization" type="object" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="smsCustomization" type="object" required={false}>
       smsCustomization field
       <Expandable title="smsCustomization details">
-        <NestedParam parentKey="activity.intent.initOtpAuthIntent.smsCustomization" childKey="template" type="string" required={false}>
+        <NestedParam parentKey="activity.intent.initOtpAuthIntentV2.smsCustomization" childKey="template" type="string" required={false}>
 Template containing references to .OtpCode i.e Your OTP is \{\{.OtpCode\}\}
 </NestedParam>
 
       </Expandable>
     </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent" childKey="userIdentifier" type="string" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="userIdentifier" type="string" required={false}>
 Optional client-generated user identifier to enable per-user rate limiting for SMS auth. We recommend using a hash of the client-side IP address.
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntent" childKey="sendFromEmailAddress" type="string" required={false}>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="sendFromEmailAddress" type="string" required={false}>
 Optional custom email address from which to send the OTP email
+</NestedParam>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="alphanumeric" type="boolean" required={false}>
+Optional flag to specify if the OTP code should be alphanumeric (Crockford’s Base32). Default = true
+</NestedParam>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="sendFromEmailSenderName" type="string" required={false}>
+Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'
+</NestedParam>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV2" childKey="replyToEmailAddress" type="string" required={false}>
+Optional custom email address to use as reply-to
 </NestedParam>
 
       </Expandable>
@@ -148,10 +176,10 @@ Optional custom email address from which to send the OTP email
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="initOtpAuthResult" type="object" required={true}>
-      The initOtpAuthResult object
-      <Expandable title="initOtpAuthResult details">
-        <NestedParam parentKey="activity.result.initOtpAuthResult" childKey="otpId" type="string" required={true}>
+        <NestedParam parentKey="activity.result" childKey="initOtpAuthResultV2" type="object" required={true}>
+      The initOtpAuthResultV2 object
+      <Expandable title="initOtpAuthResultV2 details">
+        <NestedParam parentKey="activity.result.initOtpAuthResultV2" childKey="otpId" type="string" required={true}>
 Unique identifier for an OTP authentication
 </NestedParam>
 
@@ -173,12 +201,13 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
   --data '{
-    "type": "ACTIVITY_TYPE_INIT_OTP_AUTH",
-    "timestampMs": "<string> (e.g., 1745474677471)",
+    "type": "ACTIVITY_TYPE_INIT_OTP_AUTH_V2",
+    "timestampMs": "<string> (e.g., 1746736509961)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
         "otpType": "<string>",
         "contact": "<string>",
+        "otpLength": 123,
         "emailCustomization": {
             "appName": "<string>",
             "logoUrl": "<string>",
@@ -190,7 +219,10 @@ curl --request POST \
             "template": "<string>"
         },
         "userIdentifier": "<string>",
-        "sendFromEmailAddress": "<string>"
+        "sendFromEmailAddress": "<string>",
+        "alphanumeric": true,
+        "sendFromEmailSenderName": "<string>",
+        "replyToEmailAddress": "<string>"
     }
 }'
 ```
@@ -204,16 +236,17 @@ curl --request POST \
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_INIT_OTP_AUTH",
+    "type": "ACTIVITY_TYPE_INIT_OTP_AUTH_V2",
     "organizationId": "<organization-id>",
-    "timestampMs": "<timestamp> (e.g., 1745474677471)",
+    "timestampMs": "<timestamp> (e.g., 1746736509961)",
     "result": {
       "activity": {
         "type": "<string>",
         "intent": {
-          "initOtpAuthIntent": {
+          "initOtpAuthIntentV2": {
             "otpType": "<string>",
             "contact": "<string>",
+            "otpLength": 123,
             "emailCustomization": {
               "appName": "<string>",
               "logoUrl": "<string>",
@@ -225,11 +258,14 @@ curl --request POST \
               "template": "<string>"
             },
             "userIdentifier": "<string>",
-            "sendFromEmailAddress": "<string>"
+            "sendFromEmailAddress": "<string>",
+            "alphanumeric": true,
+            "sendFromEmailSenderName": "<string>",
+            "replyToEmailAddress": "<string>"
           }
         },
         "result": {
-          "initOtpAuthResult": {
+          "initOtpAuthResultV2": {
             "otpId": "<string>"
           }
         }
