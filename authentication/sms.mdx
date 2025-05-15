@@ -1,6 +1,6 @@
 ---
 title: "SMS Authentication"
-description: "SMS authentication enables users to authenticate their Turnkey account using their phone number via a 6-digit one-time password (OTP). When authenticated, users receive an expiring API key stored in memory within an iframe, which functions like a session key to access their wallet."
+description: "SMS authentication enables users to authenticate their Turnkey account using their phone number via a 6-9 digit or bech32 alphanumeric one-time password (OTP). When authenticated, users receive an expiring API key stored in memory within an iframe, which functions like a session key to access their wallet."
 sidebarTitle: "SMS"
 ---
 
@@ -14,7 +14,7 @@ SMS pricing is usage-based and varies depending on the country of the destinatio
 
 SMS authentication uses two activities:
 
-1. `INIT_OTP_AUTH` - sends a 6-digit OTP code to the specified phone number
+1. `INIT_OTP_AUTH` - sends a 6-9 digit or bech32 alphanumeric OTP code to the specified phone number
 2. `OTP_AUTH` - verifies the code and returns an encrypted API key credential
 
 ## Implementation
@@ -28,13 +28,16 @@ To start SMS authentication, create an activity with `ACTIVITY_TYPE_INIT_OTP_AUT
 - `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user.
   We recommend generating this server-side based on the user's IP address or public key.
   See the [OTP Rate Limits](#otp-rate-limits) section below for more details.
+- `smsCustomizationParams`: optional parameters for customizing sms.
+- `alphanumeric`: optional parameter for making this code bech32 alphanumeric or not. default: true
+- `otpLength`: optional parameter for selecting the length of the OTP. default: 9
 
 ### Verifying the OTP
 
 Once the user receives their code, use `ACTIVITY_TYPE_OTP_AUTH` with these parameters:
 
 - `otpId`: ID from the `INIT_OTP_AUTH` response
-- `otpCode`: the 6-digit code received via SMS
+- `otpCode`: the 6-9 digit or bech32 alphanumeric code received via SMS
 - `targetPublicKey`: public key for credential encryption
 - `apiKeyName`: optional name for the API Key (defaults to `OTP Auth - <Timestamp>`)
 - `expirationSeconds`: optional duration in seconds (defaults to 15 minutes)
@@ -44,7 +47,9 @@ Once the user receives their code, use `ACTIVITY_TYPE_OTP_AUTH` with these param
 
 SMS authentication requires proper permissions through policies or parent organization status.
 
-<Info>Non-paying accounts are limited to **50 SMS messages** per month.</Info>
+<Info>
+  Non-paying accounts are limited to **50 SMS messages** per month.
+</Info>
 
 ## Enabling/Disabling SMS Auth
 
