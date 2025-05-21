@@ -704,7 +704,73 @@ Common causes:
 Troubleshooting tips:
 
 - Try to decode the payload independently and see if it returns the expected result.
-- We've noticed that for EIP1559 transaction types, the go-ethereum [MarshalBinary()](https://pkg.go.dev/github.com/ethereum/go-ethereum/core/types#Transaction.MarshalBinary) function will include the R, S, V values which should not be present within the serialized payload. Try to reconstruct the RLP payload manually without the R, S, V values.
+- We've noticed that for EIP1559 transaction types, the go-ethereum [MarshalBinary()](https://pkg.go.dev/github.com/ethereum/go-ethereum/core/types#Transaction.MarshalBinary) function will include the R, S, V values which should not be present within the serialized payload. Try to reconstruct the RLP payload manually without the R, S, V values, see the example below:
+```go [expandable]
+package main
+
+import (
+	"encoding/hex"
+	"fmt"
+	"log"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
+)
+
+func main() {
+	to := common.HexToAddress("0x...")
+
+	txData := &types.DynamicFeeTx{
+		ChainID:    big.NewInt(1),
+		Nonce:      0,
+		GasTipCap:  big.NewInt(12344),
+		GasFeeCap:  big.NewInt(10010000000),
+		Gas:        100000,
+		To:         &to,
+		Value:      big.NewInt(1),
+		Data:       hexDecode("<tx_data>"),
+		AccessList: types.AccessList{}, // Optional
+	}
+
+	// RLP-encode only the fields included in the unsigned tx
+	unsignedRLP := encodeUnsignedDynamicFeeTx(txData)
+
+	// Prepend EIP-1559 type byte (0x02)
+	serializedUnsigned := append([]byte{types.DynamicFeeTxType}, unsignedRLP...)
+
+	fmt.Printf("Unsigned serialized tx: 0x%x\n", serializedUnsigned)
+
+}
+
+func encodeUnsignedDynamicFeeTx(tx *types.DynamicFeeTx) []byte {
+	rlpInput := []interface{}{
+		tx.ChainID,
+		tx.Nonce,
+		tx.GasTipCap,
+		tx.GasFeeCap,
+		tx.Gas,
+		tx.To,
+		tx.Value,
+		tx.Data,
+		tx.AccessList,
+	}
+	out, err := rlp.EncodeToBytes(rlpInput)
+	if err != nil {
+		log.Fatalf("failed to encode RLP: %v", err)
+	}
+	return out
+}
+
+func hexDecode(input string) []byte {
+	b, err := hex.DecodeString(input)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return b
+}
+```
 
 ### No activity found with fingerprint. Consensus activities must target an existing activity by fingerprint
 
