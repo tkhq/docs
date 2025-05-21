@@ -141,29 +141,38 @@ Initiate an OTP authentication flow for either an `EMAIL` or `SMS`.
 
 ```typescript
 import { server } from "@turnkey/sdk-server";
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+});
+
+const indexedDbClient = turnkey.indexedDbClient();
 
 const initAuthResponse = await server.sendOtp({
   suborgID: suborgId!,
   otpType,
   contact: value,
+  userIdentifier: await indexedDbClient.getPublicKey(),
   ...(emailCustomization && { emailCustomization }),
   ...(sendFromEmailAddress && { sendFromEmailAddress }),
   ...(customSmsMessage && { customSmsMessage }),
-  userIdentifier: authIframeClient?.iframePublicKey!,
+  otpLength: 6,
+  alphanumeric: true,
 });
 
-if (initAuthResponse && initAuthResponse.otpId) {
-  // proceed to verifyOtp
+if (initAuthResponse?.otpId) {
+  // Proceed to verifyOtp
 } else {
-  // error handling
+  // Handle error
 }
 ```
 
 #### Parameters
 
 <ParamField body="request" type="SendOtpRequest" required>
-  An object containing the parameters to initiate an `EMAIL` or `SMS` OTP
-  authentication flow.
+  An object containing the parameters to initiate an `EMAIL` or `SMS` OTP authentication flow.
 </ParamField>
 
 <ParamField body="suborgID" type="string" required>
@@ -178,37 +187,68 @@ if (initAuthResponse && initAuthResponse.otpId) {
   The contact information (email or phone number) where the OTP will be sent.
 </ParamField>
 
+<ParamField body="userIdentifier" type="string" required>
+  The public key or other identifier used for rate limiting and logging.
+</ParamField>
+
 <ParamField body="customSmsMessage" type="string">
   Use to customize the SMS message.
 </ParamField>
 
-<ParamField body="userIdentifier" type="string">
-  IP Address, iframePublicKey, or other unique identifier used for rate
-  limiting.
+<ParamField body="emailCustomization" type="EmailCustomization">
+  Use to customize the OTP email content.
 </ParamField>
+
+<ParamField body="sendFromEmailAddress" type="string">
+  Provide a custom email address which will be used as the sender.
+</ParamField>
+
+<ParamField body="otpLength" type="number">
+  Optionally specify the OTP length.
+</ParamField>
+
+<ParamField body="alphanumeric" type="boolean">
+  Optionally specify whether to use alphanumeric codes. Defaults to true.
+</ParamField>
+
 
 ### `verifyOtp()`
 
-Verify the OTP Code sent to the user via `EMAIL` or `SMS`. If verification is successful, a Session is returned which is used to log in with.
+Verify the OTP Code sent to the user via `EMAIL` or `SMS`.
 
 ```typescript
 import { server } from "@turnkey/sdk-server";
+import { Turnkey } from "@turnkey/sdk-browser";
 
-const authSession = await server.verifyOtp({
-  suborgID: suborgId,
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+});
+
+const indexedDbClient = turnkey.indexedDbClient();
+
+const verifyResponse = await server.verifyOtp({
   otpId,
-  otpCode: otp,
-  targetPublicKey: authIframeClient!.iframePublicKey!,
+  otpCode,
   sessionLengthSeconds,
 });
 
-if (authSession?.token) {
-  // log in with Session
-  await authIframeClient!.loginWithSession(authSession);
-  // call onValidateSuccess callback
-  await onValidateSuccess();
+if (verifyResponse?.verificationToken) {
+  const sessionResponse = await server.createOtpSession({
+    suborgID: suborgId,
+    verificationToken: verifyResponse.verificationToken,
+    publicKey: await indexedDbClient.getPublicKey(),
+    sessionLengthSeconds,
+  });
+
+  if (sessionResponse?.token) {
+    await indexedDbClient.loginWithSession(sessionResponse);
+    await onValidateSuccess();
+  } else {
+    // Handle session creation error
+  }
 } else {
-  // error handling
+  // Handle verification failure
 }
 ```
 
@@ -218,74 +258,69 @@ if (authSession?.token) {
   An object containing the parameters to verify an OTP authentication attempt.
 </ParamField>
 
-<ParamField body="suborgID" type="string" required>
-  The ID of the sub organization for the given request.
-</ParamField>
-
 <ParamField body="otpId" type="string" required>
-  The ID for the given OTP request. This ID is returned in the `SendOtpResponse`
-  from `sendOtp()`.
+  The ID returned by `sendOtp()` representing the OTP attempt.
 </ParamField>
 
 <ParamField body="otpCode" type="string" required>
-  The OTP Code sent to the user.
-</ParamField>
-
-<ParamField body="targetPublicKey" type="string" required>
-  The public key of the target user.
+  The OTP code entered by the user.
 </ParamField>
 
 <ParamField body="sessionLengthSeconds" type="number">
-  Specify the length of the session in seconds. Defaults to 900 seconds or 15
-  minutes.
+  Optional. The session lifetime in seconds. Defaults to 900 seconds (15 minutes).
 </ParamField>
 
-### `oauth()`
 
-Complete an OAuth authentication flow once the OIDC Token has been obtained from the OAuth provider.
+### `createOauthSession()`
+
+Complete an OAuth authentication flow after obtaining an OIDC token from the OAuth provider. This creates a Turnkey session bound to the provided public key.
 
 ```typescript
 import { server } from "@turnkey/sdk-server";
+import { Turnkey } from "@turnkey/sdk-browser";
 
-const oauthSession = await server.oauth({
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+});
+
+const indexedDbClient = turnkey.indexedDbClient();
+
+const oauthSession = await server.createOauthSession({
   suborgID: suborgId!,
   oidcToken: credential,
-  targetPublicKey: authIframeClient?.iframePublicKey!,
+  publicKey: await indexedDbClient.getPublicKey(),
   sessionLengthSeconds: authConfig.sessionLengthSeconds,
 });
 
-if (oauthSession && oauthSession.token) {
-  // log in with Session
-  await authIframeClient!.loginWithSession(oauthSession);
-  // call onAuthSuccess callback
+if (oauthSession?.session) {
+  await indexedDbClient.loginWithSession(oauthSession);
   await onAuthSuccess();
 } else {
-  // error handling
+  // Handle failure
 }
 ```
 
 #### Parameters
 
-<ParamField body="request" type="OauthRequest" required>
-  An object containing the parameters to complete an OAuth authentication flow.
+<ParamField body="request" type="CreateOauthSessionRequest" required>
+  An object containing the parameters to create a Turnkey session via OIDC.
 </ParamField>
 
 <ParamField body="suborgID" type="string" required>
-  The ID of the sub organization for the given request.
+  The ID of the sub organization for the authenticated user.
 </ParamField>
 
 <ParamField body="oidcToken" type="string" required>
-  The OIDC (OpenID Connect) Token issued by the OAuth provider which contains
-  basic profile information about the user.
+  The OIDC token received from the third-party provider.
 </ParamField>
 
-<ParamField body="targetPublicKey" type="string" required>
-  The public key of the target user.
+<ParamField body="publicKey" type="string" required>
+  The public key to bind the session to (used for stamping requests).
 </ParamField>
 
 <ParamField body="sessionLengthSeconds" type="number">
-  Specify the length of the session in seconds. Defaults to 900 seconds or 15
-  minutes.
+  Optional. Session lifetime in seconds. Defaults to 900 seconds (15 minutes).
 </ParamField>
 
 ### `sendCredential()`

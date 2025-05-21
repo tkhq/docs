@@ -78,29 +78,35 @@ The URL to send requests that need to be signed from a backend codebase by the r
 
 The [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) is a package that provides abstractions on top of the [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser) package, for usage in React-based applications.
 
-In any React component nested under the `TurnkeyProvider`, you'll be able to call `useTurnkey()` as in the following example. You can also instantiate clients like `passkeyClient` and `authIframeClient` by pulling them out of the provider directly as [such](/sdks/migration-path#turnkey-on-the-client-1).
+In any React component nested under the `TurnkeyProvider`, you'll be able to call `useTurnkey()` as in the following example. You can also instantiate clients like `passkeyClient` and `indexedDbClient` by pulling them out of the provider directly as [such](/sdks/migration-path#turnkey-on-the-client-1).
 
 ```ts
 import { useTurnkey } from "@turnkey/sdk-react";
-const { turnkey, passkeyClient, authIframeClient } = useTurnkey();
+
+const { passkeyClient, indexedDbClient } = useTurnkey();
 
 const loginWithPasskey = async () => {
   await passkeyClient?.login();
 };
 
-const initEmailAuth = async () => {
-  await turnkey?.serverSign("emailAuth", [
-    {
-      email: "<target user email>",
-      targetPublicKey: authIframeClient.iframePublicKey,
-      organizationId: "<target user suborg-id>",
-    },
-  ]);
-};
+const loginWithOauth = async (oidcToken: string, suborgID: string) => {
+  const publicKey = await indexedDbClient?.getPublicKey();
 
-const loginWithIframe = async (credentialBundle: string) => {
-  await authIframeClient?.injectCredentialBundle(credentialBundle);
-  await authIframeClient?.login();
+  const response = await fetch("/api/auth/oauth", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      suborgID,
+      oidcToken,
+      publicKey,
+    }),
+  });
+
+  const session = await response.json();
+
+  if (session?.session) {
+    await indexedDbClient?.loginWithSession(session);
+  }
 };
 ```
 
