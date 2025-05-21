@@ -610,12 +610,11 @@ export const login = async (publicKey: string) => {
 
 ### Read-write Session
 
-It is also possible to create a read-write session for the user by calling the `loginWithReadWriteSession` method on the `WalletClient` instance. This will save a read-write session token to the `localStorage` to authenticate future read/write requests. This session can be used with the `TurnkeyIframeClient` to make read/write requests to the Turnkey API.
+It is also possible to create a read-write session for the user by calling the `loginWithWallet` method on the `WalletClient` instance. This will save a read-write session token to the `localStorage` to authenticate future read/write requests. This session can be used with the `TurnkeyIndexedDbClient` to make read/write requests to the Turnkey API.
 
 <Tabs>
   <Tab title="Next.js">
 
-Most of the code is the same as the read-only session example. The only difference is that we replace `login` with `loginWithReadWriteSession` and use the `getActiveClient` method to get the `IframeClient` instance and using it to create a new wallet.
 
 ```tsx app/page.tsx
 "use client";
@@ -623,24 +622,25 @@ Most of the code is the same as the read-only session example. The only differen
 // ...
 
 export default function WalletAuth() {
-  const { walletClient, getActiveClient } = useTurnkey();
+  const { walletClient, indexedDbClient } = useTurnkey();
   // State to hold the read-write client
-  const [readWriteClient, setReadWriteClient] = useState<IframeClient | null>(
+  const [readWriteClient, setReadWriteClient] = useState<IndexedDbClient | null>(
     null,
   );
 
   const login = async () => {
     // ...
     if (subOrg) {
-      // Create a read-write session by calling the loginWithReadWriteSession method
-      const readWriteResponse = await walletClient.loginWithReadWriteSession({
-        organizationId: subOrgId,
+      // Create a read-write session by calling the loginWithWallet method
+      const readWriteResponse = await walletClient.loginWithWallet({
+        sessionType: "SESSION_TYPE_READ_WRITE",
+        publicKey: indexedDbClient.getPublicKey(),
+
       });
 
       // If the login was successful, get the active client and set it to the state
       if (readWriteResponse) {
-        const readWriteClient = await getActiveClient();
-        setReadWriteClient(readWriteClient);
+        setReadWriteClient(indexedDbClient)
       }
     } else {
       // ...
@@ -659,9 +659,9 @@ Define a new function `addWallet` which will create a new wallet using the read-
 // ...
 
 export default function WalletAuth() {
-  const { walletClient, getActiveClient } = useTurnkey();
+  const { walletClient, indexedDbClient } = useTurnkey();
   // State to hold the read-write client
-  const [readWriteClient, setReadWriteClient] = useState<IframeClient | null>(
+  const [readWriteClient, setReadWriteClient] = useState<IndexedDbClient | null>(
     null,
   );
 
@@ -698,73 +698,11 @@ export default function WalletAuth() {
   );
 }
 ```
-</Tab>
-<Tab title="TypeScript">
-
-Define a helper function to initialize the the iframe client and inject the credential bundle. This will return an `IframeClient` instance that can be used to make read/write requests to the Turnkey API.
-
-```ts src/wallet-auth.ts
-
-// ...
-
-const getReadWriteClient = async (credentialBundle: string) => {
-  // The iframe container ID is used to render the iframe in the DOM
-  // Ensure this element is present in the DOM when the iframe is mounted
-  const iframeContainerId = "turnkey-auth-iframe-container-id";
-
-  const authIframeClient = await turnkey.iframeClient(
-    document.getElementById(iframeContainerId),
-  );
-
-  const authenticationResponse =
-    await authIframeClient.injectCredentialBundle(credentialBundle);
-
-  if (!authenticationResponse) {
-    throw new Error("Failed to create read-write session");
-  }
-
-  return authIframeClient;
-};
-
-export const login = async (publicKey: string) => {
-  /* .... */
-};
-```
-Use this `getReadWriteClient` function in the `login` method:
-
-```ts src/wallet-auth.ts
-// ...
-export const login = async (publicKey: string) => {
-  //...
-  const subOrg = await getSubOrg(publicKey);
-  if (subOrg) {
-    const readSessionResponse = await walletClient.loginWithReadWriteSession({
-      organizationId: subOrgId,
-    });
-
-    // If the login was successful, initialize the read-write client
-    if (readSessionResponse) {
-      const readWriteClient = await getReadWriteClient(
-        readSessionResponse.credentialBundle,
-      );
-
-      // We can use the read-write client to create a new wallet
-      const newWalletResponse = await readWriteClient.createWallet({
-        walletName: "New Wallet",
-        accounts: DEFAULT_ETHEREUM_ACCOUNTS,
-      });
-    }
-  } else {
-    // ...
-  }
-};
-```
-</Tab>
 </Tabs>
 
 ### Examples
 
-You can find examples of how to implement the above functionality and more in the following repositories:
+You can find examples of how to implement the above functionality using both an iframeClient and indexedDbClient and more in the following repositories:
 
 <CardGroup>
   <Card title="Demo Embedded Wallet" href="https://github.com/tkhq/demo-embedded-wallet" icon="github" iconType="solid" horizontal />
