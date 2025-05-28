@@ -1,0 +1,208 @@
+---
+title: "Movement"
+description: "Movement support on Turnkey"
+---
+
+## Address derivation
+
+Turnkey supports Movement address derivation. Movement is built on the Move VM and uses Ed25519 cryptography, which Turnkey fully supports.
+
+## Transaction construction and signing
+
+Turnkey supports Movement transaction signing through our core signing capabilities. We provide an example repository that demonstrates how to construct and sign Movement transactions:
+
+- [`examples/with-movement`](https://github.com/tkhq/sdk/tree/main/examples/with-movement): demonstrates transaction construction and broadcast on Movement.
+
+## Example
+
+Here's a comprehensive example showing how to integrate Turnkey with Movement for transaction signing:
+
+```typescript [expandable]
+import { Turnkey } from "@turnkey/sdk-server";
+import {
+  MovementClient,
+  AptosAccount,
+  TxnBuilderTypes,
+  BCS,
+  HexString
+} from "movement-sdk";
+
+// Custom Turnkey signer for Movement
+class TurnkeyMovementSigner {
+  private turnkeyClient: Turnkey;
+  private movementClient: MovementClient;
+  private address: string;
+  private organizationId: string;
+
+  constructor(
+    apiPrivateKey: string,
+    apiPublicKey: string,
+    organizationId: string,
+    address: string,
+    nodeUrl: string = "https://seed-node1.movementlabs.xyz"
+  ) {
+    this.turnkeyClient = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey,
+      apiPublicKey,
+      defaultOrganizationId: organizationId
+    });
+
+    this.movementClient = new MovementClient(nodeUrl);
+    this.address = address;
+    this.organizationId = organizationId;
+  }
+
+  // Get the account address
+  getAddress(): string {
+    return this.address;
+  }
+
+  // Sign a raw payload using Turnkey
+  async signRawPayload(payload: Uint8Array): Promise<Uint8Array> {
+    const hexPayload = Buffer.from(payload).toString('hex');
+
+    const signResult = await this.turnkeyClient.signRawPayload({
+      organizationId: this.organizationId,
+      signWith: this.address,
+      payload: hexPayload,
+      encoding: "hex"
+    });
+
+    return Buffer.from(signResult.signature, 'hex');
+  }
+
+  // Submit a transaction to Movement
+  async submitTransaction(payload: any): Promise<string> {
+    try {
+      // Get account info for sequence number
+      const accountInfo = await this.movementClient.getAccount(this.address);
+      const sequenceNumber = BigInt(accountInfo.sequence_number);
+
+      // Get chain ID for the transaction
+      const chainId = await this.movementClient.getChainId();
+
+      // Build raw transaction
+      const rawTx = new TxnBuilderTypes.RawTransaction(
+        // Account address
+        TxnBuilderTypes.AccountAddress.fromHex(this.address),
+        // Sequence number
+        sequenceNumber,
+        // Transaction payload
+        payload,
+        // Max gas
+        BigInt(10000),
+        // Gas unit price
+        BigInt(100),
+        // Expiration timestamp (30 seconds from now)
+        BigInt(Math.floor(Date.now() / 1000) + 30),
+        // Chain ID
+        new TxnBuilderTypes.ChainId(chainId)
+      );
+
+      // Serialize the transaction
+      const serializer = new BCS.Serializer();
+      rawTx.serialize(serializer);
+      const toSign = serializer.getBytes();
+
+      // Sign the transaction
+      const signature = await this.signRawPayload(toSign);
+
+      // In a real implementation, you would need the actual public key from the address
+      // Here we use a placeholder
+      const dummyPublicKey = new TxnBuilderTypes.Ed25519PublicKey(new Uint8Array(32));
+
+      // Create authenticator
+      const authenticator = new TxnBuilderTypes.TransactionAuthenticatorEd25519(
+        dummyPublicKey,
+        new TxnBuilderTypes.Ed25519Signature(signature)
+      );
+
+      // Create signed transaction
+      const signedTx = new TxnBuilderTypes.SignedTransaction(
+        rawTx,
+        authenticator
+      );
+
+      // Submit transaction
+      const txnResponse = await this.movementClient.submitTransaction(
+        BCS.bcsToBytes(signedTx)
+      );
+
+      return txnResponse.hash;
+    } catch (error) {
+      console.error("Error submitting transaction:", error);
+      throw error;
+    }
+  }
+}
+
+// Example usage: Transfer MOV tokens
+async function transferMovTokens() {
+  const signer = new TurnkeyMovementSigner(
+    process.env.API_PRIVATE_KEY!,
+    process.env.API_PUBLIC_KEY!,
+    process.env.ORGANIZATION_ID!,
+    process.env.MOVEMENT_ADDRESS!, // Your Movement address in Turnkey
+    "https://testnet.movementlabs.xyz" // Use testnet URL for development
+  );
+
+  const recipientAddress = "0x..."; // Recipient address
+  const amount = 1000000; // Amount (adjust decimal places as needed)
+
+  // Create a transfer transaction payload
+  const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
+      "0x1::coin",
+      "transfer",
+      [new TxnBuilderTypes.TypeTagStruct(
+        TxnBuilderTypes.StructTag.fromString("0x1::mov_coin::MOV")
+      )],
+      [
+        BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(recipientAddress)),
+        BCS.bcsSerializeUint64(amount)
+      ]
+    )
+  );
+
+  try {
+    const txnHash = await signer.submitTransaction(payload);
+    console.log(`Transaction submitted successfully! Hash: ${txnHash}`);
+    return txnHash;
+  } catch (error) {
+    console.error("Error transferring tokens:", error);
+    throw error;
+  }
+}
+
+## Movement Network Support
+
+Turnkey supports:
+
+* Movement Mainnet
+* Movement Testnet
+
+## Key Features for Movement
+
+* **Ed25519 Signing**: Turnkey fully supports the Ed25519 curve used by Movement
+* **BCS Format Support**: Sign transactions serialized in the Binary Canonical Serialization format
+* **Integration Example**: Our example repository provides a reference implementation for integrating with the Movement ecosystem
+
+## Benefits of Using Turnkey with Movement
+
+* **Secure Private Keys**: Keys are securely stored in Turnkey's infrastructure
+* **Customizable Policies**: Implement rules to control when and how transactions are signed
+* **Developer-Friendly**: Seamless integration with existing Movement development workflows
+* **Enterprise-Ready**: Built for production environments with high security requirements
+
+## Move Smart Contract Development
+
+Movement leverages the Move VM for smart contracts. When developing Move smart contracts on Movement, Turnkey can securely manage your private keys for:
+
+* Deploying Move modules
+* Publishing packages
+* Executing Move functions
+* Managing on-chain resources
+
+If you're building on Movement and need assistance with your Turnkey integration, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-31v4yhgw6-PwBzyNsWCCBTk2xft3EoHQ).
+```
