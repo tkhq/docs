@@ -7,24 +7,27 @@ Similar to [email auth](/authentication/email), social login authentication is i
 
 ## Roles and responsibilities
 
-* **Turnkey**: runs verifiable infrastructure to create credentials and verify OIDC tokens
+- **Turnkey**: runs verifiable infrastructure to create credentials and verify OIDC tokens
 
-* **Parent**: that's you! **For the rest of this guide we'll assume you, the reader, are a Turnkey customer**. We assume that you have:
+- **Parent**: that's you! **For the rest of this guide we'll assume you, the reader, are a Turnkey customer**. We assume that you have:
 
-  * an existing Turnkey organization (we'll refer to this organization as "the parent organization")
-  * a web application frontend (we'll refer to this as just "app" or "web app")
-  * a backend able to sign and POST Turnkey activities ("backend" or "parent backend")
+  - an existing Turnkey organization (we'll refer to this organization as "the parent organization")
+  - a web application frontend (we'll refer to this as just "app" or "web app")
+  - a backend able to sign and POST Turnkey activities ("backend" or "parent backend")
 
-* **End-User**: the end-user is a user of your web app. They have an account with Google.
+- **End-User**: the end-user is a user of your web app. They have an account with Google.
 
-* **OIDC Provider**: a provider able to authenticate your End-Users and provide OIDC tokens as proof. We'll use [Google](https://developers.google.com/identity/openid-connect/openid-connect) as an example.
+- **OIDC Provider**: a provider able to authenticate your End-Users and provide OIDC tokens as proof. We'll use [Google](https://developers.google.com/identity/openid-connect/openid-connect) as an example.
 
 ## OAuth step-by-step
 
 ### Registration (signup)
 
 <Frame>
-  <img src="/images/authentication/img/oauth_signup.png" alt="OAuth signup flow" />
+  <img
+    src="/images/authentication/img/oauth_signup.png"
+    alt="OAuth signup flow"
+  />
 </Frame>
 
 1. **End-User** enters the signup flow on the app, gets redirected to Google for authentication.
@@ -34,14 +37,17 @@ Similar to [email auth](/authentication/email), social login authentication is i
 
 The user is now registered: a sub-organization under the parent organization has been created with a a root user, authenticated via an OAuth Provider. Concretely:
 
-* `issuer` is set to `https://accounts.google.com`
-* `audience` is set to `<google-oauth-app-id>` (your Oauth app ID)
-* `subject` is set `<google-end-user-id>` (the user ID of `End-User` on Google's side)
+- `issuer` is set to `https://accounts.google.com`
+- `audience` is set to `<google-oauth-app-id>` (your Oauth app ID)
+- `subject` is set `<google-end-user-id>` (the user ID of `End-User` on Google's side)
 
 ### Authentication (login)
 
 <Frame>
-  <img src="/images/authentication/img/oauth_login.png" alt="OAuth login flow" />
+  <img
+    src="/images/authentication/img/oauth_login.png"
+    alt="OAuth login flow"
+  />
 </Frame>
 
 1. **End-User** enters the login flow on the app, gets redirected to Google for authentication.
@@ -60,8 +66,8 @@ We've designed a new secure enclave to fetch TLS content securely and bring [non
 
 To verify an OIDC token, other Turnkey enclaves receive the OIDC token as well as:
 
-* the signed content of the issuer's OpenId configuration. OpenId configuration **must** be hosted under `/.well-known/openid-configuration` for each domain. For Google for example, the issuer configuration is at [`accounts.google.com/.well-known/openid-configuration`](https://accounts.google.com/.well-known/openid-configuration). This JSON document contains, among other thing, a `jwksUri` key. The value for this key is a URL hosting the list of currently-valid OIDC token signers.
-* the signed content of the issuer's `jwksUri` (e.g., for Google, the `jwksUri` is [`googleapis.com/oauth2/v3/cert`](https://www.googleapis.com/oauth2/v3/certs)). This is a list of public keys against which the secure enclave can verify tokens. Note: **these public keys rotate periodically** (every \~6hrs), hence it's not possible to hardcode these public keys in our secure enclave code directly. We have to fetch them dynamically!
+- the signed content of the issuer's OpenId configuration. OpenId configuration **must** be hosted under `/.well-known/openid-configuration` for each domain. For Google for example, the issuer configuration is at [`accounts.google.com/.well-known/openid-configuration`](https://accounts.google.com/.well-known/openid-configuration). This JSON document contains, among other thing, a `jwksUri` key. The value for this key is a URL hosting the list of currently-valid OIDC token signers.
+- the signed content of the issuer's `jwksUri` (e.g., for Google, the `jwksUri` is [`googleapis.com/oauth2/v3/cert`](https://www.googleapis.com/oauth2/v3/certs)). This is a list of public keys against which the secure enclave can verify tokens. Note: **these public keys rotate periodically** (every \~6hrs), hence it's not possible to hardcode these public keys in our secure enclave code directly. We have to fetch them dynamically!
 
 With all of that, an enclave can independently verify an OIDC token without making outbound requests. Once the token is parsed and considered authentic, our enclaves match the `iss`, `aud` and `sub` attributes against the registered OAuth providers on the Turnkey sub-organization. We also check `exp` to make sure the OIDC token is not expired, and the `nonce` attribute (see next section).
 
@@ -69,8 +75,8 @@ With all of that, an enclave can independently verify an OIDC token without maki
 
 Our [`OAUTH`](/api-reference/user-auth/oauth) activity requires 2 parameters minimum:
 
-* `oidcToken`: the base64 OIDC token
-* `targetPublicKey`: the client-side public key generated by the user
+- `oidcToken`: the base64 OIDC token
+- `targetPublicKey`: the client-side public key generated by the user
 
 In order to prevent OIDC tokens from being used against multiple public keys, our enclaves parse the OIDC token and, as part of the validation logic, enforce that the `nonce` claim is set to `sha256(targetPublicKey)`.
 
@@ -84,8 +90,8 @@ If your OAuth provider does not allow you to customize `nonce` claims, Turnkey a
 
 [OAuth2.0](https://datatracker.ietf.org/doc/html/rfc6749) is a separate protocol from [OIDC](https://openid.net/specs/openid-connect-core-1_0.html), with distinct goals:
 
-* "OAuth2.0" is an authorization framework
-* "OIDC" is an authentication framework
+- "OAuth2.0" is an authorization framework
+- "OIDC" is an authentication framework
 
 We chose to name this feature "OAuth" because of the term familiarity: most Turnkey customers will have to setup an "OAuth" app with Google, and the user experience is often referred to as "OAuth" flows regardless of the protocol underneath.
 
@@ -98,7 +104,10 @@ Below, some details and pointers about specific providers we've worked with befo
 This provider is extensively tested and supported. We've integrated it in our demo wallet (hosted at [https://wallet.tx.xyz](https://wallet.tx.xyz)), along with Apple and Facebook:
 
 <Frame>
-  <img src="/images/authentication/img/oauth_demo_wallet.png" alt="OAuth demo wallet" />
+  <img
+    src="/images/authentication/img/oauth_demo_wallet.png"
+    alt="OAuth demo wallet"
+  />
 </Frame>
 
 The code is open-source, feel free to [check it out](https://github.com/tkhq/demo-embedded-wallet) for reference. The exact line where the OAuth component is loaded is here: [ui/src/screens/LandingScreen.tsx](https://github.com/tkhq/demo-embedded-wallet/blob/d4ec308e9ce0bf0da7b64da2b39e1a80c077eb82/ui/src/screens/LandingScreen.tsx#L384).
@@ -107,7 +116,7 @@ The main documentation for Google OIDC is available [here](https://github.com/tk
 
 ### Apple
 
-Apple integration is also extensively tested and supported, and is integrated into our demo wallet (hosted at [https://wallet.tx.xyz](https://wallet.tx.xyz)). The code provides an [example component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/apple-auth.tsx) as well as an [example redirect handler](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/\(landing\)/oauth-callback/apple/page.tsx).
+Apple integration is also extensively tested and supported, and is integrated into our demo wallet (hosted at [https://wallet.tx.xyz](https://wallet.tx.xyz)). The code provides an [example component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/apple-auth.tsx) as well as an [example redirect handler](<https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/apple/page.tsx>).
 
 Documentation for Apple OIDC can be found [here](https://developer.apple.com/documentation/sign_in_with_apple/sign_in_with_apple_rest_api/authenticating_users_with_sign_in_with_apple).
 
@@ -115,17 +124,20 @@ Documentation for Apple OIDC can be found [here](https://developer.apple.com/doc
 
 Facebook OIDC requires a [manual flow with PFKE](https://developers.facebook.com/docs/facebook-login/guides/advanced/oidc-token/) (Proof for Key Exchange). This flow requires a few extra steps compared with Apple or Google. Specifically:
 
-* You will need to generate a **code verifier** that can either be recalled (e.g. from a database) or reassembled in a later request.
-* You will need to provide a **code challenge** as a parameter of the OAuth redirect that is either the code verifier itself or the hash of the code verifier.
-* Instead of receiving the OIDC token after the OAuth flow, you will receive an **auth code** that must be exchanged for an OIDC token in a subsequent request. The code verifier and your app's ID are also required in this exchange.
+- You will need to generate a **code verifier** that can either be recalled (e.g. from a database) or reassembled in a later request.
+- You will need to provide a **code challenge** as a parameter of the OAuth redirect that is either the code verifier itself or the hash of the code verifier.
+- Instead of receiving the OIDC token after the OAuth flow, you will receive an **auth code** that must be exchanged for an OIDC token in a subsequent request. The code verifier and your app's ID are also required in this exchange.
 
 In our example demo wallet, we opt to avoid using a database in the authentication process and instead generate our verification code serverside using the hash of a nonce and a secret salt value. The nonce is then passed to and returned from the Facebook API as a **state** parameter (see [the API spec](https://developers.facebook.com/docs/facebook-login/guides/advanced/oidc-token/) for details). Finally, the server reconstructs the verification code by re-hashing the nonce and the the salt. The full flow is displayed below:
 
 <Frame>
-  <img src="/images/authentication/img/facebook-oauth.png" alt="Facebook OAuth flow" />
+  <img
+    src="/images/authentication/img/facebook-oauth.png"
+    alt="Facebook OAuth flow"
+  />
 </Frame>
 
-Code for the [redirect component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/facebook-auth.tsx), [OAuth callback](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/\(landing\)/oauth-callback/facebook/page.tsx), and [code exchange](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/actions/turnkey.ts#L54) are all available in the example wallet repo.
+Code for the [redirect component](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/components/facebook-auth.tsx), [OAuth callback](<https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/app/(landing)/oauth-callback/facebook/page.tsx>), and [code exchange](https://github.com/tkhq/demo-embedded-wallet/blob/bf0e2292cbd2ee9cde6b241591b077fadf7ee71b/src/actions/turnkey.ts#L54) are all available in the example wallet repo.
 
 If you prefer to use a database such as Redis instead of reassembling the verification code, you can store the verification code and retrieve it in the exchange stage using a lookup key either passed as **state** or stored in local browser storage.
 
@@ -140,3 +152,15 @@ For example, if a Google-authenticated user (OIDC token `sub` claim: `google-oau
 ### AWS Cognito
 
 The main thing to call out is the inability to pass custom `nonce` claims easily. To pass the hash of the end-user's iframe public key, use a custom `tknonce` claim instead.
+
+### Social linking
+
+Social linking is the concept of automatically linking an email address to a Turnkey user by authenticating with a social provider. This allows an end-user to authenticate with the social provider, or a matching email address. Currently, we only allow automatic linking for Google social logins.
+
+The cases are as follows:
+
+1. The end-user authenticates with Google, their email address can be automatically linked to their authentication methods and considered "verified", allowing for email otp or email auth login in the future.
+2. The end-user authenticates with a Google email (@gmail.com) via email otp or email auth. If this user tries to authenticate with Google later, Google OIDC will be automatically added as a valid login method for that user provided that the email in the Google account matches the aforementioned Google email.
+3. The end-user has existing non-Google authentication methods (e.g. phone number, passkeys, etc.) and later attempts to attempts to add Google OIDC as a login method (via [CREATE_OAUTH_PROVIDERS](/api-reference/activities/create-oauth-providers#api-key)). The email address in the Google account will be automatically marked as "verified" and linked to the existing user.
+
+For more information on how to implement social linking, see the [social linking code example](/embedded-wallets/code-examples/social-linking).
