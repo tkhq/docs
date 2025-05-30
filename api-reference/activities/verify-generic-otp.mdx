@@ -1,6 +1,6 @@
 ---
-title: "Sign Transaction"
-description: "Sign a transaction"
+title: "Verify Generic OTP"
+description: "Verify a Generic OTP"
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="sign_transaction" />
+<EndpointPath type="submit" path="verify_otp" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`
+Enum options: `ACTIVITY_TYPE_VERIFY_OTP`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,16 +32,16 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>parameters field</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
-    A Wallet account address, Private Key address, or Private Key identifier.
+    <NestedParam parentKey="parameters" childKey="otpId" type="string" required={true} default="">
+    ID representing the result of an init OTP activity.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="unsignedTransaction" type="string" required={true} default="">
-    Raw unsigned transaction to be signed
+    <NestedParam parentKey="parameters" childKey="otpCode" type="string" required={true} default="">
+    OTP sent out to a user's contact (email or SMS)
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="type" type="enum<string>" required={true} default="">
-    Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTION_TYPE_TRON`
+    <NestedParam parentKey="parameters" childKey="expirationSeconds" type="string" required={false} default="">
+    Expiration window (in seconds) indicating how long the verification token is valid for. If not provided, a default of 1 hour will be used. Maximum value is 86400 seconds (24 hours)
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -58,20 +58,17 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="signTransactionIntent" type="object" required={true}>
-      The signTransactionIntent object
-      <Expandable title="signTransactionIntent details">
-        <NestedParam parentKey="activity.intent.signTransactionIntent" childKey="privateKeyId" type="string" required={true}>
-Unique identifier for a given Private Key.
+        <NestedParam parentKey="activity.intent" childKey="verifyOtpIntent" type="object" required={true}>
+      The verifyOtpIntent object
+      <Expandable title="verifyOtpIntent details">
+        <NestedParam parentKey="activity.intent.verifyOtpIntent" childKey="otpId" type="string" required={true}>
+ID representing the result of an init OTP activity.
 </NestedParam>
-<NestedParam parentKey="activity.intent.signTransactionIntent" childKey="unsignedTransaction" type="string" required={true}>
-Raw unsigned transaction to be signed by a particular Private Key.
+<NestedParam parentKey="activity.intent.verifyOtpIntent" childKey="otpCode" type="string" required={true}>
+OTP sent out to a user's contact (email or SMS)
 </NestedParam>
-<NestedParam parentKey="activity.intent.signTransactionIntent" childKey="type" type="enum" required={true}>
-type field
-  
-Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTION_TYPE_TRON`
-
+<NestedParam parentKey="activity.intent.verifyOtpIntent" childKey="expirationSeconds" type="string" required={false}>
+Expiration window (in seconds) indicating how long the verification token is valid for. If not provided, a default of 1 hour will be used. Maximum value is 86400 seconds (24 hours)
 </NestedParam>
 
       </Expandable>
@@ -82,11 +79,11 @@ Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTI
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="signTransactionResult" type="object" required={true}>
-      The signTransactionResult object
-      <Expandable title="signTransactionResult details">
-        <NestedParam parentKey="activity.result.signTransactionResult" childKey="signedTransaction" type="string" required={true}>
-signedTransaction field
+        <NestedParam parentKey="activity.result" childKey="verifyOtpResult" type="object" required={true}>
+      The verifyOtpResult object
+      <Expandable title="verifyOtpResult details">
+        <NestedParam parentKey="activity.result.verifyOtpResult" childKey="verificationToken" type="string" required={true}>
+Signed JWT containing a unique id, expiry, verification type, contact
 </NestedParam>
 
       </Expandable>
@@ -102,18 +99,18 @@ signedTransaction field
 
 ```bash cURL
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/sign_transaction \
+  --url https://api.turnkey.com/public/v1/submit/verify_otp \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
   --data '{
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_VERIFY_OTP",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "signWith": "<string>",
-        "unsignedTransaction": "<string>",
-        "type": "<TRANSACTION_TYPE_ETHEREUM>"
+        "otpId": "<string>",
+        "otpCode": "<string>",
+        "expirationSeconds": "<string>"
     }
 }'
 ```
@@ -127,22 +124,22 @@ curl --request POST \
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_VERIFY_OTP",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
       "activity": {
         "type": "<string>",
         "intent": {
-          "signTransactionIntent": {
-            "privateKeyId": "<string>",
-            "unsignedTransaction": "<string>",
-            "type": "<TRANSACTION_TYPE_ETHEREUM>"
+          "verifyOtpIntent": {
+            "otpId": "<string>",
+            "otpCode": "<string>",
+            "expirationSeconds": "<string>"
           }
         },
         "result": {
-          "signTransactionResult": {
-            "signedTransaction": "<string>"
+          "verifyOtpResult": {
+            "verificationToken": "<string>"
           }
         }
       }
