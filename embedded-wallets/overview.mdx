@@ -1,48 +1,458 @@
 ---
-title: "Embedded Wallets"
-sidebarTitle: "Introduction"
+title: "Overview"
+sidebarTitle: "Overview"
 ---
 
-With embedded wallets on Turnkey, you can create custom wallet experiences that are seamlessly integrated into your product, without compromising on security. Whether you need custodial or non-custodial wallets, our infrastructure provides the foundation for building innovative, user-friendly crypto products.
+import { Logo } from "/snippets/logo.mdx";
+import { SquareCard } from "/snippets/square-card.mdx";
 
-### Why embedded wallets?
+With Embedded Wallets, you can create custom wallet experiences that are seamlessly integrated into your product, without compromising on security. Whether you need custodial or non-custodial wallets, our infrastructure provides the foundation for building innovative, user-friendly crypto products.
 
-Embedded wallets give you the freedom to design and control the entire user experience, while offloading the complexity and risk of private key management to Turnkey. As one of our customers put it:
+### Why Embedded Wallets?
 
-> "The ability for us to build our own stack and control the entire user experience without worrying about security has been one of the best things about Turnkey."
+Embedded Wallets give you the freedom to design and control the entire user experience, while offloading the complexity and risk of private key management to Turnkey.
 
-With Embedded wallets, you can:
+With Embedded Wallets, you can:
 
-* Create custom wallet flows that match your product's look and feel
-* Choose between custodial or non-custodial models based on your use case
-* Leverage advanced security and UX features like multi-sig and session keys
-* Support various authentication methods, from passkeys to email-based flows
-* Focus on building great products, not managing private keys
+- Leverage pre-built UI components to speed up your integration
+- Easily create a variety of wallets for your users
+- Authenticate users via email, phone number, biometrics, social logins, etc
+- Determine delegated access and co-owernership controls
+- Access out-of-the-box support for multiple chains and assets
+- Sign multiple transactions without additional approvals
+- Access simple integrations for gas sponsorship and smart contract wallets
 
-### How it works
+### Custodial vs non-custodial
 
-Turnkey's Embedded Wallets are built on top of our [Sub-Organizations](/concepts/sub-organizations) primitive. Each wallet is represented by a sub-organization, which can be configured with different security settings and access controls.
+Turnkey's Embedded Wallets are built on top of Sub-Organizations.
+Each wallet is represented by a sub-organization, which can be configured with different security settings and access controls.
 
-##### Custodial vs non-custodial
+- For custodial wallets, your application holds the master key and can initiate transactions on behalf of users.
+- For non-custodial wallets, users hold their own private keys and must approve each transaction,
+  whether it's via their own passkey, API key, or iframe session.
 
-* For custodial wallets, your application holds the master key and can initiate transactions on behalf of users.
-* For non-custodial wallets, users hold their own private keys and must approve each transaction, whether it's via their own passkey, API key, or iframe session.
+Below, we'll dive into how we set each of these up but first, let's make sure you're familiar with
+the Embedded Wallets concepts and architecture.
 
-##### Advanced features
+### Embedded Wallets Quickstart
 
-* Multi-sig: Require multiple approvals for sensitive transactions
-* Session Keys: Grant temporary, limited access to wallets for improved UX
-* Flexible Authentication: Use passkeys, email auth, or other methods to secure user access
+If you haven't yet, get started quickly using Turnkey's Account/Embedded Wallets Setup. You'll learn how to:
 
-##### Getting started
+- Create an Account
+- Get Your Organization ID
+- Create an API Key
+- Set up Turnkey's React SDK in a Next.js application
+- Configure authentication with email sign-in
+- Implement message signing functionality using a user's Turnkey wallet
+- Handle user sessions and wallet interactions
 
-To start building with embedded wallets, check out our detailed guides and API references:
+Get started [here](/getting-started/embedded-wallet-quickstart) and come back when you're ready.
+
+### Integrating Embedded Wallets
+
+Now that you've gotten started, this guide walks through 3 ways to use sub-organizations as
+Embedded Wallets for your users. We first show that it can be used to create non-custodial wallets,
+or end-user controlled wallets. Then we explain how you can create custodial wallets, and lastly shared custody wallets.
+
+#### Non-Custodial Wallets
+
+In this example wallet implementation, you will create a segregated sub-organization for each end-user, and leverage [passkeys](/authentication/passkeys/introduction) as cryptographic proof of ownership to ensure only the end-user has the ability to approve signing. Your application will construct transactions on behalf of the end-user, and then surface the relevant Turnkey activity request client-side for end-user approval.
+
+Note that Turnkey is not a customer authentication platform. This gives you the flexibility to create the user experience you envision. Typically, Turnkey integrators implement their own standard end-user authentication flows for login, then employ passkeys behind that login for transaction signing.
+
+If you'd like to see a live example, head over to our [✨Demo Embedded Wallet✨](https://wallet.tx.xyz/), and follow along with the code [here](https://github.com/tkhq/demo-embedded-wallet).
+
+**Before you start**
+
+Make sure you've set up your primary Turnkey organization with at least one API user for programmatic user onboarding.
+Check out our [Quickstart guide](/getting-started/quickstart) if you need help getting started.
+
+<Steps>
+
+  <Step title="Create a sub-organization" >
+  After the end-user is logged in, your application prompts the user for passkey creation on the application domain. Our JavaScript SDK has a helper for this: `getWebAuthnAttestation`. See [this example](https://github.com/tkhq/sdk/tree/main/examples/with-federated-passkeys).
+
+Your application then uses an API-only user to create a new sub-organization on behalf of the end-user with a `CREATE_SUB_ORGANIZATION` activity. In the example below, the new sub-organization has one root user controlled by the end user's passkey, and an associated Ethereum wallet:
+
+```js
+{
+  "type": "ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V4",
+  "timestampMs": "<time-in-ms>",
+  "organizationId": "<your-organization-id>",
+  "parameters": {
+    "subOrganizationName": "<sub-org-name>",
+    "rootUsers": [
+      {
+        "userName": "<end-user-name>",
+        "userEmail": "<email>(optional)",
+        "authenticators": [
+          {
+            "authenticatorName": "<passkey-name>",
+            "challenge": "<webauthn-challenge>",
+            "attestation": {
+              "credentialId": "<credential-id>",
+              "clientDataJson": "<client-data-json>",
+              "attestationObject": "<attestation-object>",
+              "transports": ["AUTHENTICATOR_TRANSPORT_HYBRID"]
+            }
+          }
+        ],
+        "apiKeys": []
+      }
+    ],
+    "rootQuorumThreshold": 1,
+    "wallet": {
+      "walletName": "Default Wallet",
+      "accounts": [
+        {
+          "curve": "CURVE_SECP256K1",
+          "pathFormat": "PATH_FORMAT_BIP32",
+          "path": "m/44'/60'/0'/0/0",
+          "addressFormat": "ADDRESS_FORMAT_ETHEREUM"
+        }
+      ]
+    }
+  }
+}
+```
+
+The response will contain the new sub-organization ID as well as details about its associated Ethereum wallet:
+
+```js
+{
+  "subOrganizationId": "<your-new-sub-org>", // the organization_id that the end-user must use when signing requests
+  "wallet": {
+    "walletId": "<your-new-wallet>", // the wallet ID used to generate more accounts
+    "addresses": "<your-new-addresses>" // the addresses you can now sign with
+  }
+}
+```
+
+Note: root users created with sub-organizations can have both API keys and authenticators (e.g. passkeys). In this example we only expect passkeys. See [Sub-Organizations as shared wallets](#sub-organizations-as-shared-wallets) for a use case which requires both.
+
+With this setup each end-user now has sole control over their sub-organization and any resources created within it. Your application cannot take any actions on resources within the sub-organization without explicit cryptographic authorization from the end-user in the form of a passkey signature.
+
+It's important to note that the initial activity to create a sub-organization has to be authorized by an API key of a user in your main Turnkey organization. Otherwise, anyone would be able to create sub-organizations in your organization! Here's an [example](https://github.com/tkhq/sdk/blob/a2bfbf3cbd6040902bbe4c247900ac560be42925/examples/with-federated-passkeys/src/pages/index.tsx#L88-L116) where the initial registration is done, and posted to a NextJS backend. The NextJS backend inserts the attestation and signs the `CREATE_SUB_ORGANIZATION_V4` activity [here](https://github.com/tkhq/sdk/blob/ba360baeb60d80276f7faeca602b99190fe5affe/examples/with-federated-passkeys/src/pages/api/createSubOrg.ts#L27-L106).
+
+  </Step>
+
+<Step title="Wallet creation" >
+
+While the **first wallet creation is already done** (our `CREATE_SUB_ORGANIZATION` activity accepts a `wallet` parameter!), your end-users can derive more accounts or create more wallets after the fact by using their passkeys to sign a `CREATE_WALLET` activity.
+
+We've abstracted getting WebAuthn signatures and creating signed Turnkey requests behind typed methods (e.g. `createWallet`).
+
+Our `TurnkeyClient` (from [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)) can be initialized with a `WebauthnStamper` (from [`@turnkey/webauthn-stamper`](https://www.npmjs.com/package/@turnkey/webauthn-stamper)):
+
+```js
+import { WebauthnStamper } from "@turnkey/webauthn-stamper";
+import { TurnkeyClient } from "@turnkey/http";
+
+const stamper = new WebAuthnStamper({
+  rpId: "your-domain.com",
+});
+
+// New HTTP client able to sign with passkeys!
+const httpClient = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  stamper
+);
+
+// Signs and sends a request to Turnkey
+await httpClient.createWallet({
+  type: "ACTIVITY_TYPE_CREATE_WALLET",
+  organizationId: "<user sub-organization>",
+  timestampMs: String(Date.now()),
+  parameters: {
+    walletName: "New Wallet",
+    accounts: [
+      {
+        curve: "CURVE_SECP256K1",
+        pathFormat: "PATH_FORMAT_BIP32",
+        path: "m/44'/60'/0'/0/0",
+        addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+      },
+    ],
+  },
+});
+```
+
+In the snippet above we send the activity directly to Turnkey's backend. Our SDK also comes with abstractions to create a `signedRequest`, which contain all the components needed to forward it to Turnkey: URL, body, and a stamp header (with name and value properties). Use `httpClient.stampCreateWallet` to get a signed request. Your backend server can then proxy it to Turnkey.
+
+Next, we can derive additional accounts (addresses) given a single HD wallet. The shape of the request is as follows:
+
+```js
+  {
+    "type": "ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS",
+    "timestampMs": "<time-in-ms>",
+    "organizationId": "<your-organization-id>",
+    "parameters": {
+      "walletId": "<your-wallet-id>",
+      "accounts": [
+        {
+          "curve": "CURVE_SECP256K1",
+          "pathFormat": "PATH_FORMAT_BIP32",
+          "path": "m/44'/60'/0'/0/0",
+          "addressFormat": "ADDRESS_FORMAT_ETHEREUM"
+        }
+      ]
+    }
+  }
+```
+
+</Step>
+
+<Step title="Transaction signing" >
+
+The end-user must provide a signature over each `SIGN_TRANSACTION` activity with their passkey. In your application, a user action (for example tapping a "Withdraw Rewards" button) might trigger the flow. The details of this transaction should be presented to the user for confirmation, followed by a passkey prompt to sign the Turnkey activity. An activity to sign a transaction looks like the following:
+
+The end-user must provide a signature over each `SIGN_TRANSACTION` activity with their passkey. In your application, a user action (for example tapping a "Withdraw Rewards" button) might trigger the flow. The details of this transaction should be presented to the user for confirmation, followed by a passkey prompt to sign the Turnkey activity. An activity to sign a transaction looks like the following:
+
+```js
+{
+  "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+  "timestampMs": "<time-in-ms>",
+  "organizationId": "<sub-organization-id>",
+  "parameters": {
+    "signWith": "<wallet account address, private key id, or private key address>",
+    "type": "TRANSACTION_TYPE_ETHEREUM",
+    "unsignedTransaction": "<unsigned-transaction>"
+  }
+}
+```
+
+Turnkey returns a signed transaction in the activity result which your application can broadcast using any provider you'd like.
+
+</Step>
+
+</Steps>
+
+#### Custodial Wallets
+
+Most of the steps outlined in the previous section remain unchanged: applications creating custodial wallets should still create segregated sub-organizations for their end-users to avoid limits (we currently have a maximum of 100 users per organization, whereas an organization can have unlimited sub-organizations).
+
+The main difference is in the Root Quorum settings: upon creating a new sub-organization, your business's API key is used to bootstrap each end-user organization. The `CREATE_SUB_ORGANIZATION_V4` activity becomes:
+
+```json
+{
+"type": "ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V4",
+"timestampMs": "<time-in-ms>",
+"organizationId": "<your-organization-id>",
+"parameters": {
+  "subOrganizationName": "<sub-org-name>",
+  "rootUsers": [{
+    "userName": "<your-business-user>",
+    "userEmail": "<email>(optional)",
+    "authenticators": [],
+    "apiKeys": [
+      "apiKeyName": "<api-key-name>",
+      "publicKey": "<your-business-api-public-key>"
+    ],
+  }],
+  "rootQuorumThreshold": 1,
+  "wallet": {
+    "walletName": "Default ETH Wallet",
+    "accounts": [
+      {
+        "curve": "CURVE_SECP256K1",
+        "pathFormat": "PATH_FORMAT_BIP32",
+        "path": "m/44'/60'/0'/0/0",
+        "addressFormat": "ADDRESS_FORMAT_ETHEREUM",
+      },
+    ],
+  },
+}
+}
+```
+
+(Note the empty `"authenticators"` list!)
+
+Key creation and signatures can also be performed with this root API user, and the end-user doesn't need to be involved in the activity signing process.
+
+Policies can be use to segregate permissions if needed: you could, for example, bootstrap each sub-org with 2 API users: one to create keys and setup the organization policies; the other to sign transactions.
+
+#### Shared Wallets
+
+For the sake of completeness: it is possible to create "shared custody" wallets with the sub-organization primitive. To do this, an application would setup sub-organizations with the following settings:
+
+- Root quorum threshold: 2
+
+- Root users:
+
+  - 1 user representing the end-user (with their Passkey as an authenticator)
+  - 1 user representing the business (with an API key attached)
+
+The signing process would then have to involve **both** the user and the business
+since the root quorum threshold is 2. To reduce friction for the end-user,
+many clients opt to start with a root quorum of 1. This way, you can take
+certain actions with your business's API key root user **prior** to updating
+the root quorum threshold to 2.
+
+Looking for more support? Check out our Demos, SDKs and Code Examples below\!
+
+## Demos
+
+### Demo Embedded Wallet ([code](https://github.com/tkhq/demo-embedded-wallet))
+
+A comprehensive demo showcasing how to build an embedded wallet using Turnkey. This demo uses the [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser), [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) and [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server) packages and includes features such as:
+
+- User authentication with passkeys, email auth, and OAuth
+- Creating new wallets and wallet accounts
+- Sending and receiving funds
+- Importing/Exporting a wallet
+- Adding a credential to the wallet
 
 <CardGroup>
-  <Card title="Sub-Organizations as Wallets" href="/embedded-wallets/sub-organizations-as-wallets" icon="puzzle-piece" iconType="solid" horizontal />
-  <Card title="Sub-Organization Email Auth" href="/embedded-wallets/sub-organization-auth" icon="envelope" iconType="solid" horizontal />
-  <Card title="Sub-Organization Recovery" href="/embedded-wallets/sub-organization-recovery" icon="key" iconType="solid" horizontal />
-  <Card title="Turnkey API Reference" href="/api-reference/overview" icon="file-code" iconType="solid" horizontal />
+  <Frame>
+  <img src="/images/getting-started/demo-embedded-wallet.png" alt="demo embedded wallet login view" />
+</Frame>
+
+  <Frame>
+    <img src="/images/getting-started/demo-embedded-wallet-ui.png" alt="demo embedded wallet dashboard view" />
+  </Frame>
 </CardGroup>
 
-Or, if you're looking to create smart wallets for your users, using Turnkey as a user-friendly, recoverable EOA, check out our [guide](/reference/aa-wallets) on integrating Account Abstraction (AA) wallets with Turnkey.
+See [https://github.com/tkhq/demo-embedded-wallet](https://github.com/tkhq/demo-embedded-wallet) for the code.
+
+### Demo Consumer Wallet ([code](https://github.com/tkhq/demo-consumer-wallet))
+
+A minimal consumer wallet app powered by Turnkey. Behind the scenes, it uses [`@turnkey/ethers`](https://www.npmjs.com/package/@turnkey/ethers) for signing and WalletConnect (v1) for accessing dapps.
+
+<Frame>
+  <video
+    src="https://github.com/tkhq/demo-consumer-wallet/assets/127255904/2c3409df-2d7c-4ec3-9aa8-e2944a0b0e0a"
+    width="100%"
+    height="420"
+    controls
+  ></video>
+</Frame>
+
+See [https://github.com/tkhq/demo-consumer-wallet](https://github.com/tkhq/demo-consumer-wallet) for the code.
+
+### Demo Embedded Wallet ([code](https://github.com/tkhq/demo-embedded-wallet), [live link](https://wallet.tx.xyz))
+
+A wallet application showing how users can register and authenticate using passkeys. This demo uses the Turnkey API to create a new [Turnkey Sub-Organization](/concepts/sub-organizations) for each user, create a testnet Ethereum address and send a transaction on Sepolia (ETH testnet).
+
+<Frame>
+  <img
+    src="/images/getting-started/demo-embedded-wallet.png"
+    alt="demo embedded wallet screenshot"
+  />
+</Frame>
+
+See [https://wallet.tx.xyz](https://wallet.tx.xyz) (and [https://github.com/tkhq/demo-embedded-wallet](https://github.com/tkhq/demo-embedded-wallet) for the code).
+
+### Demo Ethers Passkeys ([code](https://github.com/tkhq/demo-ethers-passkeys))
+
+A simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/ethers`](https://github.com/tkhq/sdk/tree/main/packages/ethers) signer, using passkeys.
+
+<Frame>
+  <img
+    src="/images/getting-started/ethers-ui-screenshot.png"
+    alt="ethers ui screenshot"
+  />
+</Frame>
+
+See [https://github.com/tkhq/demo-ethers-passkeys](https://github.com/tkhq/demo-ethers-passkeys) for the code.
+
+### Demo Viem Passkeys ([code](https://github.com/tkhq/demo-viem-passkeys))
+
+A similar, simple application demonstrating how to create sub-organizations, create private keys, and sign with the [`@turnkey/viem`](https://github.com/tkhq/sdk/tree/main/packages/viem) signer, using passkeys.
+
+<Frame>
+  <img
+    src="/images/getting-started/viem-ui-screenshot.png"
+    alt="viem ui screenshot"
+  />
+</Frame>
+
+See [https://github.com/tkhq/demo-viem-passkeys](https://github.com/tkhq/demo-viem-passkeys) for the code.
+
+### Demo Viem Passkeys with Gelato Relay ([code](https://github.com/gelatodigital/gelato-turnkey-passkeys-relay))
+
+This example demonstrates how to leverage Turnkey’s secure key management and Gelato's battle-tested relay infrastructure to enable seamless, sponsored interactions with meta-transactions using the [`@turnkey/viem`](https://github.com/tkhq/sdk/tree/main/packages/viem) signer and [`@gelatonetwork/relay-sdk-viem`](https://github.com/gelatodigital/relay-sdk-viem).
+
+<Frame>
+  <div style={{ width: "50%" }}>
+    <img
+      src="/images/getting-started/gelato_turnkey.png"
+      alt="gelato turnkey screenshot"
+    />
+  </div>
+</Frame>
+
+#### How Infinex Leverages Turnkey and Gelato
+
+Infinex, a platform designed to unify the decentralized ecosystem and applications under a single UX layer, eliminates the complexities of navigating fragmented crypto protocols. By integrating **Turnkey** and **Gelato**, Infinex delivers a seamless, secure, and cost-efficient experience for decentralized finance users.
+
+- **Secure Key Management with Turnkey**: Infinex ensures private keys are securely managed within Turnkey’s infrastructure, removing the need for traditional wallet pop-ups. This approach streamlines authentication through passkeys, offering a frictionless and secure user experience.
+
+- **Gasless Transactions with Gelato**: Leveraging Gelato’s Relay (ERC-2771), Infinex enables fully **sponsored transactions**, allowing users to interact with decentralized applications without ever paying gas fees. This enhances accessibility and usability, ensuring that users can participate without holding or managing native blockchain tokens for fees.
+
+The synergy between Turnkey and Gelato allows Infinex to offer an intuitive, cost-free user experience while maintaining the highest standards of security and scalability.
+
+### React Native Demo App ([code](https://github.com/tkhq/react-native-demo-wallet))
+
+A React Native app that demonstrates how to use the Turnkey's JavaScript packages in a mobile environment to authenticate users, create wallets, export wallets, sign messages, and more
+
+<Frame>
+  <video
+    controls
+    className="rounded-lg"
+    src="https://github.com/tkhq/react-native-demo-wallet/raw/refs/heads/main/assets/videos/demo_video.mov"
+    width="50%"
+    height="260"
+  ></video>
+</Frame>
+See [https://github.com/tkhq/react-native-demo-wallet](https://github.com/tkhq/react-native-demo-wallet)
+for the code.
+
+### Flutter Demo App ([code](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app))
+
+A Flutter app that demonstrates how to use the Turnkey's Flutter packages to authenticate users, create wallets, export wallets, sign messages, and more
+
+<Frame>
+  <video
+    className="rounded-lg"
+    src="https://github.com/tkhq/dart-sdk/raw/refs/heads/main/examples/flutter-demo-app/assets/videos/flutter-demo.mov"
+    width="40%"
+    height="auto"
+    controls
+  ></video>
+</Frame>
+See [https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app)
+for the code
+
+### SDKs
+
+<div className="flex gap-4 items-center justify-center">
+  <SquareCard
+    icon={<Logo id="react" className="h-8 w-8" />}
+    label="React"
+    href="/sdks/react"
+  />
+  <SquareCard
+    icon={<Logo id="react-native" className="h-8 w-8" />}
+    label="React Native"
+    href="/sdks/react-native"
+  />
+  <SquareCard
+    icon={<Logo id="ios-swift" className="h-8 w-8" />}
+    label="iOS (Swift)"
+    href="/sdks/swift"
+  />
+  <SquareCard
+    icon={<Logo id="flutter" className="h-8 w-8" />}
+    label="Flutter"
+    href="/sdks/flutter"
+  />
+  <SquareCard
+    icon={<Logo id="typescript" className="h-8 w-8" />}
+    label="Typescript"
+    href="/sdks/javascript-browser"
+  />
+</div>
+
+### Next Steps
+
+Learn more about our powerful features [here](/embedded-wallets/features/overview).

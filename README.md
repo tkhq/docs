@@ -40,34 +40,7 @@ Changes to the documentation are automatically deployed when merged to the main 
 
 You can access the Mintlify dashboard for this project at:
 [dashboard.mintlify.com](https://dashboard.mintlify.com/turnkey-0e7c1f5b/turnkey-0e7c1f5b)
-
-## The dashboard provides analytics, deployment status, and other management features for our documentation.
-
-## Legacy Documentation
-
-The following information pertains to the previous Docusaurus-based documentation setup.
-
-### Algolia
-
-We use the Algolia plugin for Docusaurus to manage search on our docs page. The primary dashboard can be accessed via https://dashboard.algolia.com/apps/89KSB43UFT/dashboard. Reach out to Jack, Arnaud, or Andrew for access.
-
-#### Crawling
-
-Our crawler settings can be found at https://crawler.algolia.com/admin/crawlers/15584ae7-61de-4f26-af35-4bc55d0de0b5/overview. Algolia crawls our docs site once a week on Monday at 12:31 (UTC). This is simply the default behavior. There are cases where we may want to forcefully trigger Algolia to crawl/index our site, i.e. when we do a big refactor or otherwise reorganize the structure of our docs significantly.
-
-In order to manually trigger a new crawl, use the `Restart crawling` button:
-
-<img src="./static/algolia-crawler.png" />
-
-Our docs site is small, so each crawl is quick (~30-60s).
-
-### Vercel
-
-Each push to Github will trigger a Vercel build:
-
-<img src="./static/vercel.png" />
-
-This is a convenient way to view changes, add feedback, and collaborate overall. Any build can also be promoted to production, if need be.
+The dashboard provides analytics, deployment status, and other management features for our documentation.
 
 ## Build & Code Generation
 
@@ -79,3 +52,20 @@ We provide the following Make targets to generate API reference content:
 - `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
 
 These commands require Node.js and `ts-node`.
+
+---
+
+**Shared Snippets Usage Guidelines**
+
+The docs in this repository utilize shared MDX snippets to ensure consistency and adherence to DRY principles across duplicate pages. When identical content is required in multiple locations, each duplicate page imports a shared snippet from the `/snippets/shared/` folder. This method minimizes maintenance overhead by centralizing content updates.
+
+**Important:** Always update the shared MDX file rather than modifying individual duplicate pages. This guarantees that any change propagates throughout all references.
+
+| Duplicate Page Path                                          | Shared MDX File                        |
+| ------------------------------------------------------------ | -------------------------------------- |
+| `concepts/policies/overview.mdx`                             | `/snippets/shared/policy-engine.mdx`   |
+| `products/embedded-wallets/features/policy-engine.mdx`         | `/snippets/shared/policy-engine.mdx`   |
+| `products/transaction-automation/features/export-wallets.mdx`  | `/snippets/shared/export-wallets.mdx`  |
+| `products/transaction-automation/features/import-wallets.mdx`  | `/snippets/shared/import-wallets.mdx`  |
+
+*Note: Duplicate pages must reside in separate file paths as required by `docs.json`. Mintlify restricts pages with identical content from sharing the same path to ensure correct sidebar behavior.*
