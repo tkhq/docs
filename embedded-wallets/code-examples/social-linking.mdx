@@ -1,6 +1,6 @@
 ---
 title: "Social Linking"
-description: "This is a guide to implementing social linking within a Turnkey powered application. For more information on what social linking is, see [here](/authentication/social-logins#social-linking)."
+description: "This is a guide to implementing social linking within a Turnkey-powered application. For more information on what social linking is, see [here](/authentication/social-logins#social-linking)."
 ---
 
 ## Using @turnkey/sdk-react
@@ -50,7 +50,7 @@ You can view the implementation of the `handleOAuthLogin` function within the `A
 
 ## Manual Implementation
 
-If you prefer to implement social linking manually, you can follow this guide to create a backend `handleOAuthLogin` function / endpoint that can optionally allow for social linking. Code references will in TypeScript, but you can easily adapt this to your backend language of choice.
+If you prefer to implement social linking manually, you can follow this guide to create a backend `handleOAuthLogin` function / endpoint that can optionally allow for social linking. Code references are in TypeScript, but you can easily adapt this to your backend language of choice.
 
 ### Parameters
 
@@ -63,7 +63,7 @@ This function will accept the following parameters
 
 ### Parse the OIDC Token
 
-Extract the `email` and `issuer` from the user's OIDC token.
+Extract the `email` and `issuer`(`iss`) from the user's OIDC token.
 
 ```ts
 import { jwtDecode } from "jwt-decode";
@@ -123,7 +123,7 @@ if (socialLinking && email && iss === "https://accounts.google.com") {
 
 ### If Still No Match, Create a New Sub-Organization
 
-If no match is found, create a new sub-org and pass in the email for a social linking flow. The email passed in will be marked as verified provided the OIDC token comes from Google and the email within the token matches the email passed in.
+If no match is found, create a new sub-org and include the email in the payload for a social linking flow. The email passed in will be marked as verified provided the OIDC token comes from Google and the email within the token matches the email passed in.
 
 ```ts
 const createSuborgParams: Record<string, any> = {
@@ -170,7 +170,7 @@ async function handleCreateSubOrg(params: Record<string, any>) {
 
   const result = await turnkey.createSubOrganization({
     organizationId: turnkeyConfig.defaultOrganizationId,
-    subOrganizationName,
+    subOrganizationName: "A social linking suborganization",
     rootUsers: [
       {
         userName: "A suborganization user",
@@ -212,11 +212,7 @@ async function handleOAuthLogin(
 
   if (orgIdsOidc.length > 0) {
     organizationId = orgIdsOidc[0];
-  } else if (
-    socialLinking &&
-    email &&
-    issuer === "https://accounts.google.com"
-  ) {
+  } else if (socialLinking && email && iss === "https://accounts.google.com") {
     // For Google, first check if there is an organization with the email
     const { organizationIds: orgIdsEmail } = await turnkey.getVerifiedSubOrgIds(
       {
