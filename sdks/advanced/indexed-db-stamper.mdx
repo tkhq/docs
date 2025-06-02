@@ -1,0 +1,61 @@
+---
+title: "IndexedDbStamper"
+---
+
+## Introduction
+
+The `@turnkey/indexed-db-stamper` package enables secure request stamping using an unextractable P-256 keypair stored in the browser’s `IndexedDB`. It serves the same purpose as `@turnkey/api-key-stamper`, allowing you to sign and approve requests to Turnkey’s API, but without exposing the private key. This is ideal for long-lived browser sessions in progressive web apps (PWAs), wallet extensions, or any context where the key must remain secure and persistent across reloads.
+
+The `IndexedDbStamper` generates the private key using `SubtleCrypto` and stores it in a non-exportable format, ensuring that it cannot be extracted or exfiltrated by application code. The keypair is stored in `IndexedDB` so that it can be reused in subsequent sessions.
+
+## Installing
+
+To get started, install the `@turnkey/indexed-db-stamper` package:
+
+```sh
+pnpm i @turnkey/indexed-db-stamper
+```
+
+## Initializing
+
+The `IndexedDbStamper` class implements the `TStamper` interface used by the `TurnkeyClient` in the `@turnkey/http` module. It encapsulates the logic necessary to sign activity requests and generates the appropriate HTTP headers for authentication.
+
+```ts
+import { IndexedDbStamper } from "@turnkey/indexed-db-stamper";
+
+// Initialize the stamper and generate or load the keypair
+const stamper = new IndexedDbStamper();
+await stamper.init();
+```
+
+Once initialized, the `stamper` is ready to be passed into the `TurnkeyClient`.
+
+## Methods
+
+### `init(): Promise<void>`
+
+Initializes the stamper by loading the keypair from `IndexedDB`. If the keypair does not exist, a new one is generated and stored securely.
+
+---
+
+### `getPublicKey(): string | null`
+
+Returns the compressed P-256 public key (hex-encoded). This can be used to register the credential with Turnkey, typically during credential creation or email/OTP authentication flows.
+
+---
+
+### `stamp(payload: string): Promise<TStamp>`
+
+Signs the given payload using the stored key and returns a stamp header suitable for authenticating a Turnkey API request.
+
+---
+
+### `resetKeyPair(): Promise<void>`
+
+Generates a new keypair and replaces the one stored in `IndexedDB`. Call this when you want to rotate the local credential. We would recommend doing this before calling login activities. Alternatively you can pass your own unextractable crypto key to this function (e.g for refreshSession uses cases)
+
+---
+
+### `clear(): Promise<void>`
+
+Clears the stored keypair from `IndexedDB`. The next time `init()` is called, a new keypair will be generated.
