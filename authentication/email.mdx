@@ -1,7 +1,6 @@
 ---
-title: "Overview"
+title: "Email Auth & Recovery"
 description: "Email Authentication enables users to authenticate and recover their Turnkey accounts using email-based verification. There are two methods of email authentication:"
-sidebarTitle: "Email"
 ---
 
 **One-Time Password**
@@ -26,7 +25,10 @@ Email Authentication is built with expiring API keys as the foundation. The two 
 The authentication process happens in two steps:
 
 <Steps>
-  <Step>A 6-9 digit or alphanumeric OTP code is sent to the user's verified email address</Step>
+  <Step>
+    A 6-9 digit or alphanumeric OTP code is sent to the user's verified email
+    address
+  </Step>
   <Step>
     Upon verification of the correct code, an API key credential is generated
     and encrypted for the client
@@ -38,6 +40,18 @@ The authentication process happens in two steps:
 The API key credential is encrypted and delivered directly through email to the user.
 
 In both cases, once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](/security/enclave-secure-channels) for more info on how we achieve secure delivery.
+
+## Prerequisites
+
+Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email auth on behalf of suborgs. Check out our [Quickstart guide](/getting-started/quickstart) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
+
+```json
+{
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'AUTH' && activity.action == 'CREATE'"
+}
+```
 
 ## User Experience
 
@@ -108,6 +122,58 @@ The recovery process consists of two phases:
 <Frame>
   <img src="/images/authentication/img/auth_email.png" alt="auth email" />
 </Frame>
+
+## Email Customization
+
+We offer customization for the following:
+
+- `appName`: the name of the application. This will be used in the email's subject, e.g. `Sign in to ${appName}`
+- `logoUrl`: a link to a PNG with a max width of 340px and max height of 124px
+- `magicLinkTemplate`: a template for the URL to be used in the magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`
+
+```js
+// Sign and submits the EMAIL_AUTH activity
+const response = await client.emailAuth({
+  type: "ACTIVITY_TYPE_EMAIL_AUTH",
+  timestampMs: String(Date.now()),
+  organizationId: <sub-organization-id>,
+  parameters: {
+    email: <user-email>,
+    targetPublicKey: <iframe-public-key>,
+    apiKeyName: <optional-api-key-name>,
+    expirationSeconds: <optional-api-key-expiration-in-seconds>,
+    emailCustomization: {
+      appName: <optional-your-app-name>,
+      logoUrl: <optional-your-logo-png>,
+      magicLinkTemplate: <optional-magic-link>
+    }
+  },
+});
+```
+
+### Email Templates
+
+We also support custom HTML email templates for [Enterprise](https://www.turnkey.com/pricing) clients on the **Scale** tier. This allows you to inject arbitrary data from a JSON string containing key-value pairs. In this case, the `emailCustomization` variable may look like:
+
+```js
+...
+emailCustomization: {
+  templateId: <HTML-template-stored-in-turnkey>,
+  templateVariables: "{\"username\": \"alice and bob\"}"
+}
+...
+```
+
+In this specific example, the value `alice and bob` can be interpolated into the email template using the key `username`. The use of such template variables is purely optional.
+
+Here's an example of a custom HTML email containing an email auth bundle:
+
+<Frame>
+  ![dynamic email auth
+  example](/images/embedded-wallets/img/email-auth-example-dynamic.png)
+</Frame>
+
+If you are interested in implementing bespoke, fully-customized email templates, please reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
 
 ## Authorization
 
