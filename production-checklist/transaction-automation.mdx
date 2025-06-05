@@ -1,35 +1,141 @@
 ---
-title: "Production Checklist - Transaction Automation"
-description: "This checklist contains recommendations and steps specifically for deploying a Transaction Automation production environment."
-sidebarTitle: "Transaction Automation"
+title: "Transaction Automation Implementation Guide"
+description: "Implementing transaction automation with Turnkey"
 ---
 
-## Production Setup
+Turnkey's infrastructure provides a secure, flexible way to manage crypto operations at scale, letting you automate everything from
+routine payments and treasury transfers to smart contract deployments and NFT minting.
 
-- Many of our customers prefer to maintain separate Development and Production [organizations](/concepts/organizations). If you choose to do so, ensure your production environment is referencing the correct organization ID.
-- Ensure you have an active subscription via the Account Settings page in the Turnkey dashboard.
-- If you are on an Enterprise plan, confirm your production organization ID with your account rep.
+In this guide, we'll walk through the key decisions you'll face integrating Turnkey, and how to design a high-throughput workflow
+without compromising on security or user experience.
 
-<Warning>
-  Double check our [resource limits](/concepts/resource-limits) and [rate
-  limits](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) to
-  ensure your implementation will not trigger these limits at production scale.
-</Warning>
+## Wallet structure: how to organize and scale your wallets
 
-## Security
+Every transaction starts with a wallet. The way you structure them will shape how scalable and maintainable your automation setup is.
 
-- Lock down your [root quorum](/concepts/users/root-quorum). We recommend a quorum of at least 3 with a threshold of at least 2.
-- Ensure any team members with critical permissions, especially root quorum members, have set up at least two authenticators for their account (e.g., touchID plus a hardware authenticator like a Yubikey).
-- Avoid using root user permissions for routine operations and instead use standard users with permissions explicitly granted via policies to limit the surface area of a compromised user.
-- Confirm that all API keys are stored securely and not embedded in exposed or vulnerable parts of the codebase. API keys should be stored in a secure, encrypted environment and should never be hard-coded in publicly accessible repositories or client-side code.
+**Option 1:** Single wallet with many accounts (HD path fan-out)  
+By default, Turnkey wallets use a hierarchical deterministic (HD) structure. That means you can generate unlimited accounts
+from a single wallet seed, each with its own address. This is ideal for:
 
-## Logging
+- Managing multiple user deposit addresses
+- Creating large numbers of accounts for batching or privacy
+- Assigning different onchain roles (e.g. one account for contract deployment, another for transfers)
 
-- Key identifiers in our service include sub-organization IDs, wallet IDs and addresses. Ensure these identifiers are securely stored, associated with your users as necessary.
-- Set up logging for activities and include relevant identifiers needed for audit, compliance, or troubleshooting purposes. We recommend logging activity IDs, status, creation date, as well as credential IDs and public keys of the approvers. You should also log other resource IDs if relevant for your data model (policies, tags, wallets, accounts, etc)
+This approach scales well and stays simple: one wallet, one policy, multiple accounts.
 
-## Errors and Retries
+**Option 2:** Multiple wallets in a single org  
+Use this when you need separation by use case. For example:
 
-- Activity submission is optimistically synchronous. In most cases activities will be completed and returned right away (synchronously), but if there is a lot of activity in a single organization, activities will be processed asynchronously. Make sure you handle PENDING activities by polling a few times until their completion. You can use [createActivityPoller](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/http/src/async.ts#L101) to do this if you're using our Typescript SDK.
-- Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. Incorporate [rate limiting](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) and exponential backoff in retry mechanisms.
-- Set up monitoring to detect and alert on patterns of failures
+- One wallet for treasury ops
+- One for NFT mints
+- One for sequencing contracts
+
+Policies can be set at the wallet level to enforce clear boundaries (e.g. only certain users or services can touch the NFT minting wallet).
+Note Turnkey's [resource limits](https://docs.turnkey.com/concepts/resource-limits#resource-limits) and ensure your intended
+scaled implementation fits within those limits.
+
+**Option 3:** Separate sub-orgs per wallet  
+This option is best when you need strict isolation — e.g. multi-tenant environments, or wallets with different authentication requirements.
+Each sub-org has its own root users and policy namespace. Downside: more setup, more moving parts.
+
+Most teams use a combination: they generate many accounts under a few wallets and reserve sub-orgs for user-facing or high-risk cases.
+
+## Trigger model: what kicks off transactions
+
+Transaction automation can be reactive, proactive, or user-driven. The right model depends on your use case.
+
+**Event-driven (most common):**  
+A transaction is triggered by an external event — a webhook, an internal job, or an offchain signal. Examples:
+
+- Market resolution triggers a payout
+- Onchain price changes trigger a rebalancing tx
+- A user hits a “claim” button in your app
+
+Use a background worker or event system to translate that trigger into a signing request.
+
+**Scheduled:**  
+Useful for treasury management, yield compounding, or periodic distribution flows. Run a job hourly/daily and trigger signing from there.
+
+**Manual with automation fallback:**  
+Sometimes a human should have the final say, but you want the transaction to be ready to go. You can submit a tx to Turnkey
+that requires approval, then notify a signer via Slack, email, or dashboard.
+
+Tip: Think in terms of "intent capture" (when does your system decide something needs to happen) vs. "signing execution"
+(when and how does it actually get signed).
+
+## Policy model: what rules do you want enforced?
+
+Policies are your automation safety net. Every action goes through the policy engine before it's allowed, and is explicitly denied by default.
+
+You'll want to decide:  
+**How many approvers?**
+
+- Use single-party approvals for low-risk flows (e.g. daily payouts)
+- Add quorum-based approvals (2-of-N) for anything that could move real money
+- You can enforce consensus based on value thresholds, contract targets, asset type, and more
+
+**Which users can do what?**
+
+- Assign narrow permissions to service accounts (e.g. only sign txs from wallet A to address X)
+- Add additional controls per user role or tag (e.g. “engineer” vs. “ops”)
+
+**What transactions are allowed?**
+
+- Restrict by destination address (eth.tx.to)
+- Restrict by method ID (eth.tx.data\[:4\])
+- Restrict by value (eth.tx.value)
+- Combine all of the above with consensus rules
+
+**How do you enforce UX constraints?**
+
+- Require user co-signing for certain transactions
+- Allow delegated signing within strict bounds
+- Use different policies for different environments (e.g. testnet policy vs. mainnet)
+
+Most automation systems have 3-5 core policies and evolve them as their product grows. Start tight, then expand.
+
+## Integration model: which interface drives automation?
+
+All interfaces (CLI, SDK, API) go through the same policy and enclave flow. The only difference is where your logic lives.
+
+**CLI:**  
+Best for prototyping or scripting internal workflows (e.g. rotate a key, create a wallet). You can also use it in CI pipelines.
+
+**SDK:**  
+Ideal for integrating into apps or backend services. Available in multiple programming languages. Handles signing, retries,
+and activity submission.
+
+**Direct API:**  
+Use this if you want full control or are building from a non-standard language. Slightly more effort to get right, but fully supported.
+
+**Dashboard:**  
+Not for automation — but useful for manual approval flows, audit trails, and monitoring.
+
+**Common pattern:**
+
+- Use SDK in your backend to submit signing requests
+- Use webhook or polling to detect consensus-needed flows
+- Use CLI for one-off or recovery flows
+- Use dashboard to inspect what happened
+
+Graveyard - add back when IndexedDb launches
+
+By default, session keys are stored in IndexedDB when running in the browser. These keys are non-extractable and can't be accessed by your app,
+by Turnkey, or by anything else running on the page. On mobile, session keys will typically be stored in the device's secure storage layer
+(e.g. Keychain or Keystore) depending on the SDK and environment.
+
+The biggest decision is how long sessions should last. Longer-lived sessions reduce friction, enabling users to stay signed in across reloads,
+tabs, or app restarts. For most embedded wallet use cases, long-lived sessions in IndexedDB strike a good balance between usability and safety.
+
+Scoping  
+You'll also want to decide whether your sessions should be scoped.
+
+Scoped sessions allow you to define exactly what a given session key is allowed to do — and enforce it via Turnkey's policy engine. For example,
+you can issue sessions that:
+
+- are read-only
+- can only sign transactions below a certain value
+- can only interact with specific contracts or functions (e.g. a swap function on Uniswap)
+
+This gives you a flexible way to enforce step-up authentication flows (e.g. OTP for read-only, passkey + OTP for full signing),
+build approval-based transaction flows, or safely grant session access in more complex environments.
