@@ -1,35 +1,113 @@
 ---
-title: "Production Checklist - Embedded Wallets"
-description: "This checklist contains recommendations and steps specifically for deploying an Embedded Wallet production environment."
-sidebarTitle: "Embedded Wallets"
+title: "Embedded Wallets Implementation Guide"
+description: "Designing your embedded wallet implementation"
 ---
 
-## Production Setup
+Turnkey is built to give you flexibility in exactly how you integrate.
+This guide outlines the most important architectural and implementation choices that you'll make as you integrate wallets into your app.
+It's designed to help you move quickly, avoid common pitfalls, and launch with confidence.
 
-- Many of our customers prefer to maintain separate Development and Production [organizations](/concepts/organizations). If you choose to do so, ensure your production environment is referencing the correct organization ID.
-- Ensure you have an active subscription via the Account Settings page in the Turnkey dashboard.
-- If you are on an Enterprise plan, confirm your production organization ID with your account rep.
+## Control model: Decide who holds the access
 
-<Warning>
-  Double check our [resource limits](/concepts/resource-limits) and [rate
-  limits](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) to
-  ensure your implementation will not trigger these limits at production scale.
-</Warning>
+This is one of the most important architectural decisions you'll make: who is in control of the wallets you create in your app.
 
-## Security
+WIth Turnkey embedded wallets, each wallet is created in a segregated sub-organization. You can configure who has access to resources
+in that sub-org at the time of creation. Turnkey offers a wide spectrum of options here, from fully user-controlled to fully app-controlled
+and everything in between.
 
-- Lock down your [root quorum](/concepts/users/root-quorum). We recommend a quorum of at least 3 with a threshold of at least 2.
-- Ensure any team members with critical permissions, especially root quorum members, have set up at least two authenticators for their account (e.g., touchID plus a hardware authenticator like a Yubikey).
-- Avoid using root user permissions for routine operations and instead use standard users with permissions explicitly granted via policies to limit the surface area of a compromised user.
-- Confirm that all API keys are stored securely and not embedded in exposed or vulnerable parts of the codebase. API keys should be stored in a secure, encrypted environment and should never be hard-coded in publicly accessible repositories or client-side code.
+- **Fully user-controlled:** Only the user can authorize actions. Your backend has zero access. This option is best for personal wallets or
+  any use case or audience where self-custody is important.
 
-## Logging
+- **Fully app-controlled:** Your backend holds the authenticators used to authorize actions on behalf of the user. Simple UX and no
+  restrictions on when or how actions are triggered, useful for things like limit orders or automated flows.
 
-- Key identifiers in our service include sub-organization IDs, wallet IDs and addresses. Ensure these identifiers are securely stored, associated with your users as necessary.
-- Set up logging for activities and include relevant identifiers needed for audit, compliance, or troubleshooting purposes. We recommend logging activity IDs, status, creation date, as well as credential IDs and public keys of the approvers. You should also log other resource IDs if relevant for your data model (policies, tags, wallets, accounts, etc)
+- **Delegated access:** The user controls the wallet, but your backend is granted narrow signing permissions via Turnkey's policy engine.
+  Ideal for transaction automation without taking on full control.
 
-## Errors and Retries
+- **Shared custody:** Both the user and your backend (or, the “co-signer) hold authenticators, and actions require approval from both.
+  Accomplished via root quorum settings, like a 2-of-2 signing requirement, this setup can offer improved security depending on the level
+  of independent validation done at the co-signer level.
 
-- Activity submission is optimistically synchronous. In most cases activities will be completed and returned right away (synchronously), but if there is a lot of activity in a single organization, activities will be processed asynchronously. Make sure you handle PENDING activities by polling a few times until their completion. You can use [createActivityPoller](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/http/src/async.ts#L101) to do this if you're using our Typescript SDK.
-- Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. Incorporate [rate limiting](/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) and exponential backoff in retry mechanisms.
-- Set up monitoring to detect and alert on patterns of failures
+Most teams choose user-controlled or delegated access models, but Turnkey supports the full spectrum and allows you to make the choice
+that's right for your business.
+
+## Authentication: Decide how users access their wallets
+
+Another key design choice is how users will authenticate to authorize actions. Every API request to Turnkey must include a signature, or stamp,
+over the POST body – that means every request to Turnkey needs to be authorized by a valid authenticator.
+
+Turnkey supports a range of authentication methods that can be enabled **individually or in combination.** You can configure which methods are
+allowed when getting started, and can always enable more options later as your product evolves.
+
+- **Passkeys:** WebAuthn-based authentication using device biometrics or security keys. Provides the strongest combination of security and UX
+  when supported by the user's browser and device.
+
+- **Email (magic link or OTP):** Passwordless login using a one-time link or code sent to the user's email. Ubiquitous, familiar,
+  and often the easiest option for onboarding.
+
+- **Social login (OAuth):** Sign in with providers like Google or Apple. Smooth UX and fast setup for users already logged into those ecosystems.
+  Requires OIDC configuration.
+
+- **SMS (OTP):** Login via a code sent by text message. Convenient in some markets but generally less secure due to SIM-swap risk.
+
+- **Multiple methods:** You can enable multiple authenticators per user — for example, allowing passkey + email fallback,
+  or social login + SMS recovery. This can improve account recovery or accessibility across devices.
+
+Most teams guide users toward one or two authentication methods based on their product goals, but if your use case demands maximum flexibility,
+you can enable any or all of the above and let users choose.
+
+Just like with the control model, there's no single right answer - the best approach depends on who your users are and how much control or
+recovery flexibility you want to offer.
+
+## Session handling: Decide how to manage session credentials
+
+In Turnkey, sessions are just asymmetric key pairs held client-side that can be used to authorize actions. Once a user signs in,
+they can take multiple actions like viewing balances or signing transactions without re-authenticating each time.
+When designing your session approach, there are two key decisions to make: where sessions are stored, and how long they last.
+
+Storage  
+Turnkey supports multiple storage approaches for session credentials, each with tradeoffs depending on platform and use case.
+
+Iframe-based session: Turnkey hosts a secure iframe at https://auth.turnkey.com which can be used to store the session credential
+used to authorize actions, without exposing those credentials to your app. This method is secure and browser-isolated, but:
+
+- Sessions last only as long as the iframe persists
+- iOS aggressively clears iframe storage, making it less reliable on mobile
+- React Native does not support iframes
+
+Local storage: The session credential can also be stored directly in Local Storage. This allows the credential to persist across tabs,
+reloads, or components in web apps. However, your app's domain can access Local Storage, so credentials must be handled with care.
+
+Mobile secure storage: On mobile devices, session credentials can be stored in the device's native secure storage layer,
+such as Keychain (iOS) or Keystore (Android). This offers the strongest guarantees for durability and isolation in native mobile apps.
+
+Duration  
+Session credentials are time-bound and expire after the duration you specify. This is set via the expirationSeconds parameter
+when the session is created. The default is 900 seconds (15 minutes), but you can configure this to suit your needs.
+
+To read more about sessions and how to manage them, head to the [Sessions Overview page](https://docs.turnkey.com/authentication/sessions#sessions).
+
+## Wallet type: Decide between smart contract and key-based wallets
+
+Turnkey supports two types of wallets: smart contract wallets and key-based wallets. Both are fully compatible with Turnkey's signing
+infrastructure — the difference lies in how the wallet behaves on-chain, and what additional infrastructure it requires.
+
+HD wallets generate addresses and private keys from a single seed, and work across multiple chains using standard derivation paths.
+They're contractless, chain-agnostic, and compatible with any network that supports standard signing curves — no bundlers or on-chain
+deployment required.
+
+Smart contract wallets give you more flexibility. These wallets use a smart contract to manage access control, enabling features like gas
+sponsorship, modular recovery, or batching. Turnkey can act as the signer behind these contracts, whether you're using your own implementation
+or integrating with frameworks like ZeroDev or Alchemy's Account Kit.
+
+Use smart contract wallets when you need advanced features. Otherwise, key-based wallets are simpler, faster, and work everywhere.
+
+## Wallet portability: Should users be able to import/export?
+
+Turnkey supports both import and export of private keys via secure iframe flows.
+
+Export lets users back up their wallet (e.g. display their mnemonic phrase). Import lets users bring an existing wallet into Turnkey.
+
+You do not need to offer either of these, but we do recommend enabling export to ensure users can bring their funds with them if they need.
+
+Import/export flows never expose the raw private key to your backend; they happen entirely in an isolated iframe and are encrypted client-side.
