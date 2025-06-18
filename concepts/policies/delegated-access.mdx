@@ -5,30 +5,30 @@ description: "With Turnkey you can create multi-user accounts with flexible co-o
 
 ## Overview
 
-Delegated access works by creating a specialized business-controlled user within each end-user’s sub-organization that has carefully scoped permissions to perform only specific actions, such as signing transactions to designated addresses. This can enable your backend to do things like: 
-* Automate common transactions (e.g., staking, redemptions) 
-* Sign transactions to whitelisted addresses without user involvement 
-* Perform scheduled operations 
-* Respond to specific onchain events programmatically 
+Delegated access works by creating a specialized business-controlled user within each end-user’s sub-organization that has carefully scoped permissions to perform only specific actions, such as signing transactions to designated addresses. This can enable your backend to do things like:
 
-## Implementation flow 
+- Automate common transactions (e.g., staking, redemptions)
+- Sign transactions to whitelisted addresses without user involvement
+- Perform scheduled operations
+- Respond to specific onchain events programmatically
+
+## Implementation flow
 
 Here’s how to implement delegated access for an embedded wallet setup:
-* Create a sub-organization with two root users: The end user and your “Delegated User” with an API key authenticator that you control 
-* Enable the Delegated Account to take particular actions by setting policies explicitly allowing those specific actions
-* Update the root quorum to ensure only the end-user retains root privileges
+
+- Create a sub-organization with two root users: The end user and your “Delegated User” with an API key authenticator that you control
+- Enable the Delegated Account to take particular actions by setting policies explicitly allowing those specific actions
+- Update the root quorum to ensure only the end-user retains root privileges
 
 A simple example demonstrating the delegated acess setup can be found [here](https://github.com/tkhq/sdk/tree/main/examples/delegated-access).
 
 ## Step-by-step implementation
 
+### Step 1: Create a sub-organization with two root users[​](#step-1-create-a-sub-organization-with-two-root-users)
 
-### Step 1: Create a sub-organization with two root users[​](#step-1-create-a-sub-organization-with-two-root-users "Direct link to Step 1: Create a sub-organization with two root users")
-
-* Create your sub-organization with the two root users being:
-
-  * The end-user
-  * A user you control (we'll call it the ‘Delegated Account’)
+- Create your sub-organization with the two root users being:
+  - The end-user
+  - A user you control (we'll call it the ‘Delegated Account’)
 
 ```json
 {
@@ -87,12 +87,11 @@ A simple example demonstrating the delegated acess setup can be found [here](htt
 
 ### Step 2: Limit the permissions of the Delegated Account user via policies
 
-* Create a custom policy granting the Delegated Account specific permissions. You might grant that user permissions to:
-
-  * Sign any transaction
-  * Sign only transactions to a specific address
-  * Create new users in the sub-org
-  * Or any other activity you want to be able to take using your Delegated Account
+- Create a custom policy granting the Delegated Account specific permissions. You might grant that user permissions to:
+  - Sign any transaction
+  - Sign only transactions to a specific address
+  - Create new users in the sub-org
+  - Or any other activity you want to be able to take using your Delegated Account
 
 Here’s one example, granting the Delegated Account only the permission to sign ethereum transactions to a specific receiver address:
 
@@ -232,3 +231,101 @@ dotenv.config();
     userIds: [subOrg.rootUserIds[1]], // retain the end user
   });
 ```
+
+## Frequently Asked Questions
+
+### Policy Design and Creation
+
+<Accordion title="Can I create policies on behalf of a user without their explicit approval?">
+  Yes — if the delegated access (DA) user is part of the root quorum, they can create policies unilaterally. Once removed from the root quorum, only the remaining quorum member (typically the end-user) can make further policy changes.
+
+  Note that this is also possible even if the initating user, the delegate, is not a root user: a policy may exist that grants explicit permissions to non-root users to create policies.
+</Accordion>
+
+<Accordion title="When does the user 'approve' a delegated access setup?">
+  End-user approval typically happens during **<u>intent</u>** creation — for example, when the end-user authorizes a DA user by adjusting the quorum or signs an initial setup transaction.
+</Accordion>
+
+<Accordion title="After a limit order is filled, how can I remove/null a policy programmatically?">
+  As long as the DA user remains authorized, they can remove policies programmatically. If they’ve been removed from the quorum, policy deletion will require the user’s explicit approval.
+
+  **<u>NOTE:</u>** Turnkey is looking to support the concept of 'one-time-use policies' to make it easier to manage redundany policies.
+</Accordion>
+
+### Security & Risk Management
+
+<Accordion title="If a delegated API key is leaked, does that allow someone to act on behalf of the user?">
+  Yes — if the key is attached to a broad policy. That’s why it’s important to limit the scope of policies and enforce API hygiene practices.
+</Accordion>
+
+<Accordion title="Is this the same risk as having a master delegate account?">
+  In effect, yes. The key difference is that granular policies **can restrict** what a DA user can do, offering better security hygiene even if there's still elevated access.
+</Accordion>
+
+<Accordion title="What are best practices for storing and rotating Delegate Access API keys?">
+  Typically this is a combination of, or all of the following practices, though not exclusive to just these:
+
+  - Using short-lived keys whenever viable
+  - Rotating API keys regurarly
+  - Monitoring the usage
+  - Secure storage (e.g. in HSMs or vaults)
+</Accordion>
+
+### Best Practices
+
+<Accordion title="How do I scope a delegated access policy to reduce signing risk?">
+  You can define strict transaction conditions. For example:
+
+  ```javascript
+  solana.tx.instructions.count() == 1 &&
+  solana.tx.transfers.count() == 1 &&
+  solana.tx.transfers.all(transfer, transfer.to == '<SPECIFIC_ADDRESS>')
+  ```
+
+  You can also consider the following:
+
+  - Recipient address restrictions (ie allowlisting addresses)
+  - Contract method selectors
+  - Transaction structure invariants
+  - Blockhash constraints (on Solana)
+</Accordion>
+
+<Accordion title="Can I dynamically add policies per limit order without user friction?">
+  Yes — this is a common pattern. You can add a policy per order (limit, stop loss, TWAP, etc.) using the DA user, without requiring the end-user to sign for each one.
+</Accordion>
+
+<Accordion title="What are common implementation patterns among Turnkey clients using Delegated Access?">
+  Turnkey's Policy Engine shines through its flexibility. There are many different approaches you can take based on your requirements, but various themes we see include:
+
+  - Using **broad policies** with business-controlled API keys
+  - Using \*\*fine-grained policies, \*\*scoped to predictable transaction shapes
+  - Using delegated access to implement **limit orders, automation flows, or advanced trading logic** (e.g. perps, TWAPs)
+  - Ensuring **strong operational security** (e.g. tight scoping & expiring keys) is increasingly common
+</Accordion>
+
+### EVM and SVM-Specific Strategies
+
+<Accordion title="Are time-bound transactions supported?">
+  Yes, on Solana via `solana.tx.recent_blockhash`, which restricts a transaction’s validity to a ~60–90 second window. Not ideal for delayed executions (e.g. limit orders), but useful for immediate, single-use actions.
+</Accordion>
+
+<Accordion title="For EVM transactions, can I enforce token-specific or contract-specific limits?">
+  Yes, though it’s limited today. You can inspect calldata (e.g., using `eth.tx.data[...]`) and enforce conditions like:
+
+  ```javascript
+  eth.tx.to == '<TOKEN_CONTRACT>' &&
+  eth.tx.data[0..4] == '<ERC20_FUNCTION_SELECTOR>'
+  ```
+
+  Granular support for calldata parsing and value limits is coming soon.
+</Accordion>
+
+<Accordion title="Is it safe to whitelist routers (e.g. Jupiter) in delegated access policies?">
+  Not entirely. Even if you allowlist the router, it could still be abused to swap all assets. You can’t control downstream behavior unless you control the contract.
+
+  > **Suggestion:** Only allow DA keys to interact with contracts you fully trust or control. Limit scope as much as possible (e.g., to specific instructions, amounts, or recipients).
+</Accordion>
+
+<Accordion title="What policy strategies work well for Solana limit orders?">
+  Use structure-based conditions (instruction count, token recipient), and if possible, include conditions like `recent_blockhash` for ephemeral actions. For limit orders with unknown execution time, dynamic policy creation per order is safer than relying on stale conditions.
+</Accordion>
