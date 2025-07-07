@@ -504,7 +504,10 @@ export default function WalletAuth() {
 
       if (!indexedDbClient) throw new Error('IndexedDb client not available');
 
-      // reset the indexedDb key pair before each login
+      // Reset the indexedDb key pair and session before each login
+      // Note that session reset is important when switching between multiple wallets within the same browser
+      await turnkey?.logout();
+      await client?.clear();
       await indexedDbClient.resetKeyPair();
       const pubKey = await indexedDbClient.getPublicKey();
 
@@ -633,7 +636,10 @@ export const login = async () => {
       throw new Error('indexedDbClient not initialized');
     }
 
-    // reset the indexedDb key pair before each login
+    // Reset the indexedDb key pair and session before each login
+    // Note that session reset is important when switching between multiple wallets within the same browser
+    await turnkey?.logout();
+    await client?.clear();
     await client!.resetKeyPair();
     const pubKey = await client!.getPublicKey();
 
@@ -672,7 +678,257 @@ export const login = async () => {
 </Tab>
 </Tabs>
 
-### Examples
+## Sign in with a Solana wallet
+
+As with Solana wallets there's not standard API like `personal_sign` for Ethereum, we'll need to build a couple of things:
+
+- Use the Turnkey `SolanaWalletInterface` to build our own `SolanaWallet()` function that would get the public key and sign a message. Create this new `SolanaWalletFactory.ts` component:
+
+```tsx app/SolanaWalletFactory.ts
+// This wrapper implements SolanaWalletInterface for WalletStamper
+import { WalletType, SolanaWalletInterface } from "@turnkey/wallet-stamper";
+
+export function SolanaWallet(wallet: {
+  publicKey: { toBytes(): Uint8Array } | null;
+  signMessage?: (msg: Uint8Array) => Promise<Uint8Array>;
+}): SolanaWalletInterface {
+  return {
+    type: WalletType.Solana,
+
+    async getPublicKey() {
+      if (!wallet.publicKey) throw new Error("No public key");
+      return Buffer.from(wallet.publicKey.toBytes()).toString("hex");
+    },
+
+    async signMessage(message: string) {
+      if (!wallet.signMessage) {
+        throw new Error("Wallet does not support signMessage");
+      }
+      const encoded = new TextEncoder().encode(message);
+      const signature = await wallet.signMessage(encoded);
+      return Buffer.from(signature).toString("hex");
+    },
+  };
+}
+```
+- Use the Solana wallet-addapter to detect and connect the installed wallets. Create this SolanaWalletProvider.tsx component:
+
+```tsx app/SolanaWalletProvider.tsx
+"use client";
+
+import { FC, ReactNode } from "react";
+import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
+import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+
+export const SolanaWalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const network = WalletAdapterNetwork.Mainnet;
+
+  const endpoint = "https://api.mainnet-beta.solana.com";
+
+  return (
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={[]} autoConnect> // you can add adapters for walllets not auto-detected here
+        <WalletModalProvider>{children}</WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  );
+};
+```
+
+Update the layout.tsx file:
+
+```tsx app/layout.tsx
+import "./globals.css";
+import "@solana/wallet-adapter-react-ui/styles.css";
+import { SolanaWalletContextProvider } from "./SolanaWalletProvider";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <SolanaWalletContextProvider>
+          {children}
+        </SolanaWalletContextProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+Update the config.ts file to include Solana:
+
+```ts config.ts
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+import { SolanaWallet } from "./SolanaWalletFactory";
+
+export const turnkeyConfig = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+};
+
+export const turnkeyEthereumConfig = {
+  ...turnkeyConfig,
+  wallet: new EthereumWallet(),
+};
+
+// Factory function for Solana
+export function createSolanaConfig(wallet: Parameters<typeof SolanaWallet>[0]) {
+  return {
+    ...turnkeyConfig,
+    wallet: SolanaWallet(wallet),
+  };
+}
+```
+Now let's put everything together:
+
+```tsx app/page.tsx expandable
+'use client';
+
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { Turnkey } from '@turnkey/sdk-browser';
+import { getSubOrg, createSubOrg } from './actions';
+import { useCallback, useEffect, useState } from 'react';
+import { DEFAULT_ETHEREUM_ACCOUNTS } from '@turnkey/sdk-browser';
+import { SessionType } from '@turnkey/sdk-types';
+import { SolanaWallet } from "./SolanaWalletFactory";
+import { createSolanaConfig } from "./config";
+
+export default function WalletAuth() {
+  const wallet = useWallet();
+  const [mounted, setMounted] = useState(false);
+  const [session, setSession] = useState<any | null>(null);
+  const [wallets, setWallets] = useState<any[]>([]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const login = useCallback(async () => {
+    try {
+      if (!wallet.connected || !wallet.publicKey) {
+        throw new Error('Wallet not connected');
+      }
+      
+      const turnkeyConfig = createSolanaConfig(wallet);
+      const turnkey = new Turnkey(turnkeyConfig);
+      const walletClient = turnkey.walletClient(SolanaWallet(wallet));
+
+      // Get the injected wallet public key
+      const publicKey = await walletClient?.getPublicKey();
+
+      const subOrgId = await getSubOrg(publicKey);
+      if (!subOrgId) {
+        const subOrgResponse = await createSubOrg(
+          publicKey,
+          'API_KEY_CURVE_ED25519'
+        );
+        const subOrg = subOrgResponse?.subOrganizationId ?? null;
+
+        if (!subOrg) throw new Error('Failed to create sub-organization');
+        console.log('Sub-Organization created:', subOrg);
+      }
+
+      // Initialize the indexedDbClient
+      const client = await turnkey.indexedDbClient();
+
+      if (!client) {
+        throw new Error('indexedDbClient not initialized');
+      }
+
+      // Reset the indexedDb key pair and session before each login
+      // Note that session reset is important when switching between multiple wallets within the same browser
+      await turnkey?.logout();
+      await client?.clear();
+      await client!.resetKeyPair();
+      
+      // Get the indexedDbClient public key
+      const pubKey = await client!.getPublicKey();
+
+      await walletClient!.loginWithWallet({
+        sessionType: SessionType.READ_WRITE, // use SessionType.READ_ONLY for read-only sessions
+        publicKey: pubKey!,
+      });
+
+      console.log('Login successful');
+
+      const session = await turnkey?.getSession();
+      setSession(session);
+
+      const subOrganizationId = session!.organizationId;
+
+      // Get existing suborg wallets
+      const wallets = await client.getWallets({
+        organizationId: subOrgId!,
+      });
+      setWallets(wallets.wallets);
+
+      // Create a new wallet with an Ethereum wallet account
+      const newWalletResponse = await client.createWallet({
+        walletName: 'New Wallet 1',
+        accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+      });
+
+      const updatedWallets = await client.getWallets({
+        organizationId: subOrganizationId,
+      });
+      setWallets(updatedWallets.wallets);
+    } catch (err) {
+      console.error('Login error:', err);
+    }
+  }, [wallet]);
+
+  if (!mounted) return null;
+
+  return (
+    <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-4">
+      <h2 className="text-xl font-bold mb-4 text-gray-800">
+        Turnkey Solana Wallet Auth
+      </h2>
+
+      {session && wallets.length > 0 && (
+        <div className="space-y-4 mb-6">
+          <h3 className="text-lg font-semibold text-gray-700">🧾 Wallets</h3>
+          {wallets.map((wallet) => (
+            <div
+              key={wallet.walletId}
+              className="border border-gray-200 rounded-md p-3 bg-gray-50 text-sm"
+            >
+              <div className="font-medium text-gray-800">
+                {wallet.walletName}
+              </div>
+              <div className="text-gray-500 text-xs">
+                Wallet ID: {wallet.walletId}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!session && (
+        <>
+          {!wallet.connected && <WalletMultiButton />}
+
+          {wallet.connected && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={login}
+                className="bg-purple-700 hover:bg-purple-800 text-white font-semibold py-2 px-4 rounded-md transition"
+              >
+                Sign In
+              </button>
+              <WalletMultiButton />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+## Examples
 
 You can find examples of how to implement the above functionality using the indexedDbClient and more in the following repositories:
 
