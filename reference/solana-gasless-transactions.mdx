@@ -1,54 +1,62 @@
 ---
-title: "How to Integrate Gasless Transactions On Solana With Turnkey"
+title: "How To Integrate Gasless Transactions On Solana With Turnkey"
 sidebarTitle: "Gasless Solana Transactions"
 ---
 
 Turnkey offers flexible infrastructure to create and manage private keys. By combining the secure private key infrastructure and with gas abstracted transactions, developers can easily integrate account abstraction features for any Turnkey-powered wallets.
 
-## **Setting up Gasless Transactions on Solana (SVM)**
+## **Setting up Gasless Transactions on Tron (TVM)**
 
-Turnkey offers deep and robust support for the [<u>Solana (SVM) ecosystem</u>](https://docs.turnkey.com/networks/solana). We utilize the Ed25519 cryptographic curve as the primitive for signing transactions, provide address derivation support, and make it easy to integrate for SVM through various SDKs. Beyond this, Solana developers can also leverage SVM transaction parsing and policies, managed by the Turnkey Policy Engine. 
+Turnkey offers deep and robust support for the [<u>Tron (TVM) ecosystem</u>](https://docs.turnkey.com/networks/tron). We utilize the SECP256K1 elliptic curve as the primitive for signing transactions, and provide address derivation support. Beyond this, Tron developers can also leverage TVM transaction parsing and policies for additional security and transaction granularity, all managed by the Turnkey Policy Engine.
 
-Here’s how to take advantage of Turnkey’s composable primitives for gas abstraction:
+Below, we demonstrate how to take advantage of Tron’s existing smart contract functions, combining it with Turnkey’s infrastructure to give end-users a gasless wallet experience, while maintaining the high standard for security, flexibility, and scalability.
 
-### **Option 1: Using Solana Address Fee Payer**
+### **Gasless Architecture: Setup Guide**
 
-For this approach, we will leverage [examples/with-solana](https://github.com/tkhq/sdk/tree/main/examples/with-solana), a full example of Solana transaction construction, and broadcasting using [@turnkey/with-solana](https://www.npmjs.com/package/@turnkey/solana). For a more comprehensive, full-stack example that leverages passkeys, check out [<u>examples/with-solana-passkeys</u>](https://github.com/tkhq/sdk/tree/main/examples/with-solana-passkeys).
+1. **Stake TRX for Bandwidth (resource)**
+   1. Ensure that your organization’s Turnkey wallet is funded with a sufficient TRX balance
+      - **TIP:** This can be a wallet contained within your parent organization
+   2. Initialize the staking activity by calling the [<u>freezeBalanceV2</u>](https://developers.tron.network/reference/freezebalancev2-1) function
+      - Refer to Tron Network’s [<u>official documentation</u>](https://developers.tron.network/docs/) for further information
+2. **Delegate the resource to end-user wallets**
+   1. After you’ve initialized the staking operation using freezeBalanceV2 (Step 2B) you’re now able to delegate the resources to end-user wallets
+   2. From the staking wallet, make a call to the Tron network using [<u>DelegateResource</u>](https://developers.tron.network/reference/delegateresource-1) function
+      - `owner_address`: Wallet that is staking TRX (Step 1A)
+      - `receiver_address`: Wallet controlled by the end-user
+      - `resource`: The resource you’re delegating, bandwidth
+3. **Transaction flow (end-user)**
+   1. After the staking has been initialized and resources delegated, the user experience is trivial: end-user wallets (receiver_address) can transact via the Tron network without needing to provide gas for their own transactions.
 
-\
-First, you’ll need to use one of the two optional environmental variables: `SOLANA_ADDRESS_FEE_PAYER`. While optional, the variable is necessary to create a separate fee payer address. The setup is as simple as passing in the fee payer address into the [<u>withFeePayer.ts</u>](https://github.com/tkhq/sdk/blob/main/examples/with-solana/src/withFeePayer.ts)
+### **Leveraging delegateResource smart contract function**
 
-```javascript
-// Assumes `turnkeyClient` is initialized and `createNewSolanaWallet` is available.
+As shown above, we are leveraging the existing [<u>DelegateResource</u>](https://developers.tron.network/reference/delegateresource-1) call to delegate bandwidth or energy resources to other accounts. Note that this operation requires you to have Tron’s native network token TRX staked in order to fund end-user’s transactions.
 
-let feePayerAddress = process.env.SOLANA_ADDRESS_FEE_PAYER;
-if (!feePayerAddress) {
-  feePayerAddress = await createNewSolanaWallet(turnkeyClient.apiClient());
-  console.log(`\nYour new Solana address: "${feePayerAddress}"`);
-} else {
-  console.log(
-    `\nUsing existing Solana address from ENV: "${feePayerAddress}"`,
-  );
+```shellscript
+curl --request POST \
+     --url https://api.shasta.trongrid.io/wallet/delegateresource \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+{
+  "owner_address": "TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g",
+  "receiver_address": "TPswDDCAWhJAZGdHPidFg5nEf8TkNToDX1",
+  "balance": 1000000,
+  "resource": "BANDWIDTH",
+  "lock": false,
+  "visible": true
 }
+'
 ```
 
-### **Option 2: Build a Paymaster on Solana using Turnkey**
+**Remember: **In the context of Tron, `owner_address` will be the Turnkey wallet that holds and stakes TRX. The `receiver_address` will be the end-user wallets.
 
-This method showcases the flexibility of Turnkey infrastructure and was written and open sourced by another developer building on top of Turnkey. Please note that the repo referenced below is not maintained by Turnkey itself.
-
-[<u>Build a Paymaster on Solana using Turnkey</u>](https://github.com/tkhq/turnkey-solana-paymaster) is easy to follow and will guide you from start to finish:
-
-1. Admin: Setting up Turnkey account, API keys, and Solana public/private key pairs
-2. Installing Dependencies
-3. Frontend Implementation
-4. Backend Implementation
-5. Receiving and Broadcasting the Completed Transactions
-
-## **Setting up Gasless Transactions on Ethereum (EVM)**
+## **Setting up Gasless Transactions on Ethereum (EVM) and Solana (SVM)**
 
 At the moment, Turnkey does not offer out-of-the-box gas sponsorships for the EVM ecosystem. This may change soon, and any updates will be announced via our official channels. 
 
 For now, you can leverage Turnkey’s partnerships with ZeroDev and Alchemy to provide gasless experiences to the end-users. Refer to the [<u>Account Abstraction article</u>](https://docs.turnkey.com/reference/aa-wallets#:~:text=Account%20Abstraction%20wallet) for more information.
+
+For Solana, head on over to [<u>How to Integrate Gasless Transactions on Solana With Turnkey</u>](https://docs.turnkey.com/reference/solana-gasless-transactions) article to learn how to create an in-house Solana Paymaster\!
 
 ## **Thinking about gasless transactions for other chains?**
 
