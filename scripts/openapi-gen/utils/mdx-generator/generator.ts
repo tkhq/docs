@@ -274,7 +274,7 @@ function generateJsonPayloadRecursive(
           // Array of simple types
           switch (itemField.type) {
             case "string":
-              itemValue = "<string_element>";
+              itemValue = "<string>";
               break;
             case "number":
               itemValue = 456;

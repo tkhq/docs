@@ -168,11 +168,28 @@ export function parseApiEndpoints(
                         "The activity object containing type, intent, and result",
                       childFields: [
                         {
+                          name: "id",
+                          type: "string",
+                          required: true,
+                          description: "Unique identifier for a given Activity object.",
+                        },
+                        {
+                          name: "organizationId",
+                          type: "string",
+                          required: true,
+                          description: "Unique identifier for a given Organization.",
+                        },
+                        {
+                          name: "status",
+                          type: "string",
+                          required: true,
+                          description: "The activity status",
+                        },
+                        {
                           name: "type",
                           type: "string",
                           required: true,
                           description: "The activity type",
-                          defaultValue: component.activityType,
                         },
                         {
                           name: "intent",
@@ -206,46 +223,43 @@ export function parseApiEndpoints(
                                   childFields: parseSchemaProperties(resultSchema),
                                 },
                               ]
-                            : [
-                                {
-                                  name: "activity",
-                                  type: "object",
-                                  required: true,
-                                  description: "The activity result object",
-                                  childFields: [
-                                    {
-                                      name: "id",
-                                      type: "string",
-                                      required: true,
-                                      description: "The activity ID",
-                                    },
-                                    {
-                                      name: "status",
-                                      type: "string",
-                                      required: true,
-                                      description: "The activity status",
-                                    },
-                                    {
-                                      name: "type",
-                                      type: "string",
-                                      required: true,
-                                      description: "The activity type",
-                                    },
-                                    {
-                                      name: "organizationId",
-                                      type: "string",
-                                      required: true,
-                                      description: "The organization ID",
-                                    },
-                                    {
-                                      name: "timestampMs",
-                                      type: "string",
-                                      required: true,
-                                      description: "The activity timestamp",
-                                    },
-                                  ],
-                                },
-                              ],
+                            : [],
+                        },
+                        {
+                          name: "votes",
+                          type: "array",
+                          required: true,
+                          description: "A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.",
+                        },
+                        {
+                          name: "fingerprint",
+                          type: "string",
+                          required: true,
+                          description: "An artifact verifying a User's action.",
+                        },
+                        {
+                          name: "canApprove",
+                          type: "boolean",
+                          required: true,
+                          description: "Whether the activity can be approved.",
+                        },
+                        {
+                          name: "canReject",
+                          type: "boolean",
+                          required: true,
+                          description: "Whether the activity can be rejected.",
+                        },
+                        {
+                          name: "createdAt",
+                          type: "string",
+                          required: true,
+                          description: "The creation timestamp.",
+                        },
+                        {
+                          name: "updatedAt",
+                          type: "string",
+                          required: true,
+                          description: "The last update timestamp.",
                         },
                       ],
                     },
@@ -527,74 +541,55 @@ function matchVersionedComponents(
   results: string[]
 ): VersionedComponent[] {
   const components: VersionedComponent[] = [];
-  const versionMap: Map<string, Partial<VersionedComponent>> = new Map();
 
-  // Process activity types
-  for (const typeName of activityTypes) {
-    const version = extractVersionFromComponent(typeName);
-    if (version) {
-      if (!versionMap.has(version)) versionMap.set(version, {});
-      versionMap.get(version)!.activityType = typeName;
-    }
-  }
+  // Find the latest version of each component type
+  const latestActivityType = findLatestVersion(activityTypes);
+  const latestIntent = findLatestVersion(intents);
+  const latestResult = findLatestVersion(results);
 
-  // Process intents
-  for (const intentName of intents) {
-    const version = extractVersionFromComponent(intentName);
-    if (version) {
-      if (!versionMap.has(version)) versionMap.set(version, {});
-      versionMap.get(version)!.intentName = intentName;
-    }
-  }
+  // If we have both activity type and intent, create a component
+  if (latestActivityType && latestIntent) {
+    const activityTypeVersion = extractVersionFromComponent(latestActivityType);
+    const intentVersion = extractVersionFromComponent(latestIntent);
+    
+    // Use the higher version number for the component version
+    const componentVersion = Math.max(
+      parseInt(activityTypeVersion || "1"),
+      parseInt(intentVersion || "1")
+    ).toString();
 
-  // Process results
-  for (const resultName of results) {
-    const version = extractVersionFromComponent(resultName);
-    if (version) {
-      if (!versionMap.has(version)) versionMap.set(version, {});
-      versionMap.get(version)!.resultName = resultName;
-    }
-  }
-
-  // Create final components where all parts are found
-  for (const [version, component] of versionMap.entries()) {
-    if (
-      component.activityType &&
-      component.intentName &&
-      component.resultName
-    ) {
-      components.push({
-        version,
-        activityType: component.activityType,
-        intentName: component.intentName,
-        resultName: component.resultName,
-      });
-    }
-  }
-
-  // Handle endpoints that use generic ActivityResponse (no specific result component)
-  // For these, we create a component with a generic result name
-  for (const [version, component] of versionMap.entries()) {
-    if (
-      component.activityType &&
-      component.intentName &&
-      !component.resultName
-    ) {
-      // Create a generic result name based on the intent name
-      const genericResultName = component.intentName.replace('Intent', 'Result');
-      components.push({
-        version,
-        activityType: component.activityType,
-        intentName: component.intentName,
-        resultName: genericResultName,
-      });
-    }
+    components.push({
+      version: componentVersion,
+      activityType: latestActivityType,
+      intentName: latestIntent,
+      resultName: latestResult || latestIntent.replace('Intent', 'Result'), // Use latest result or fallback
+    });
   }
 
   // Sort by version (optional, but good practice)
   components.sort((a, b) => a.version.localeCompare(b.version));
 
   return components;
+}
+
+/**
+ * Finds the component with the highest version number
+ */
+function findLatestVersion(components: string[]): string | null {
+  if (components.length === 0) return null;
+  
+  let latest = components[0];
+  let latestVersion = parseInt(extractVersionFromComponent(latest) || "1");
+
+  for (const component of components) {
+    const version = parseInt(extractVersionFromComponent(component) || "1");
+    if (version > latestVersion) {
+      latestVersion = version;
+      latest = component;
+    }
+  }
+
+  return latest;
 }
 
 /**
