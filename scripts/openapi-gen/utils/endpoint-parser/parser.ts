@@ -183,7 +183,9 @@ export function parseApiEndpoints(
                           name: "status",
                           type: "string",
                           required: true,
-                          description: "The activity status",
+                          description: baseEndpointInfo.path.includes("reject_activity") 
+                            ? "ACTIVITY_STATUS_REJECTED" 
+                            : "The activity status",
                         },
                         {
                           name: "type",
@@ -214,16 +216,16 @@ export function parseApiEndpoints(
                           required: true,
                           description: "The result of the activity",
                           childFields: resultSchema
-                            ? [
-                                {
-                                  name: component.resultName,
-                                  type: "object",
-                                  required: true,
-                                  description: `The ${component.resultName} object`,
-                                  childFields: parseSchemaProperties(resultSchema),
-                                },
-                              ]
-                            : [],
+                              ? [
+                                  {
+                                    name: component.resultName,
+                                    type: "object",
+                                    required: true,
+                                    description: `The ${component.resultName} object`,
+                                    childFields: parseSchemaProperties(resultSchema),
+                                  },
+                                ]
+                              : [],
                         },
                         {
                           name: "votes",
