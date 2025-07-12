@@ -196,17 +196,56 @@ export function parseApiEndpoints(
                           type: "object",
                           required: true,
                           description: "The result of the activity",
-                          childFields: [
-                            {
-                              name: component.resultName,
-                              type: "object",
-                              required: true,
-                              description: `The ${component.resultName} object`,
-                              childFields: resultSchema
-                                ? parseSchemaProperties(resultSchema)
-                                : [],
-                            },
-                          ],
+                          childFields: resultSchema
+                            ? [
+                                {
+                                  name: component.resultName,
+                                  type: "object",
+                                  required: true,
+                                  description: `The ${component.resultName} object`,
+                                  childFields: parseSchemaProperties(resultSchema),
+                                },
+                              ]
+                            : [
+                                {
+                                  name: "activity",
+                                  type: "object",
+                                  required: true,
+                                  description: "The activity result object",
+                                  childFields: [
+                                    {
+                                      name: "id",
+                                      type: "string",
+                                      required: true,
+                                      description: "The activity ID",
+                                    },
+                                    {
+                                      name: "status",
+                                      type: "string",
+                                      required: true,
+                                      description: "The activity status",
+                                    },
+                                    {
+                                      name: "type",
+                                      type: "string",
+                                      required: true,
+                                      description: "The activity type",
+                                    },
+                                    {
+                                      name: "organizationId",
+                                      type: "string",
+                                      required: true,
+                                      description: "The organization ID",
+                                    },
+                                    {
+                                      name: "timestampMs",
+                                      type: "string",
+                                      required: true,
+                                      description: "The activity timestamp",
+                                    },
+                                  ],
+                                },
+                              ],
                         },
                       ],
                     },
@@ -529,6 +568,25 @@ function matchVersionedComponents(
         activityType: component.activityType,
         intentName: component.intentName,
         resultName: component.resultName,
+      });
+    }
+  }
+
+  // Handle endpoints that use generic ActivityResponse (no specific result component)
+  // For these, we create a component with a generic result name
+  for (const [version, component] of versionMap.entries()) {
+    if (
+      component.activityType &&
+      component.intentName &&
+      !component.resultName
+    ) {
+      // Create a generic result name based on the intent name
+      const genericResultName = component.intentName.replace('Intent', 'Result');
+      components.push({
+        version,
+        activityType: component.activityType,
+        intentName: component.intentName,
+        resultName: genericResultName,
       });
     }
   }
