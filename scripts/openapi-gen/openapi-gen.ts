@@ -74,6 +74,16 @@ async function main() {
         }
       }
 
+      // Sort endpoints: activities first, then queries, then alphabetically within each type
+      uniqueList.sort((a, b) => {
+        // First sort by type: activities before queries
+        if (a.type === "activity" && b.type === "query") return -1;
+        if (a.type === "query" && b.type === "activity") return 1;
+        
+        // If same type, sort alphabetically by name
+        return a.name.localeCompare(b.name);
+      });
+
       const outPath = options.listEndpointsTags;
       // Ensure target directories exist
       const outDir = path.dirname(outPath);
