@@ -253,7 +253,7 @@ function generateJsonPayloadRecursive(
 
     // Special handling for ApproveActivity result field
     if (endpointPath?.includes("approve_activity") && field.name === "result" && field.childFields?.length === 0) {
-      value = "<approved activity result, if completed>";
+      value = "<object> (approved activity result, if completed)";
     } else if (field.type === "object" && field.childFields) {
       // Recursive call for nested objects
       value = generateJsonPayloadRecursive(field.childFields, endpointPath);
@@ -379,7 +379,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
     "  --header 'Content-Type: application/json' \\\n" +
-    '  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \\\n' + // Added reminder for secret
+    '  --header "X-Stamp: <string> (see https://docs.turnkey.com/developer-reference/api-overview/stamps)" \\\n' + // Added reminder for secret
     `  --data '${escapedDataPayloadString}'\n` +
     "```";
 
