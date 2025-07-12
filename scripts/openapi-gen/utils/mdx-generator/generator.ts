@@ -239,7 +239,8 @@ function generateResponseFieldMdxRecursive(
 
 // --- Helper: Generate JSON Payload Object ---
 function generateJsonPayloadRecursive(
-  fields: ApiField[] | undefined
+  fields: ApiField[] | undefined,
+  endpointPath?: string
 ): Record<string, any> {
   if (!fields) {
     return {};
@@ -250,9 +251,12 @@ function generateJsonPayloadRecursive(
   fields.forEach((field) => {
     let value: any;
 
-    if (field.type === "object" && field.childFields) {
+    // Special handling for ApproveActivity result field
+    if (endpointPath?.includes("approve_activity") && field.name === "result" && field.childFields?.length === 0) {
+      value = "<approved activity result, if completed>";
+    } else if (field.type === "object" && field.childFields) {
       // Recursive call for nested objects
-      value = generateJsonPayloadRecursive(field.childFields);
+      value = generateJsonPayloadRecursive(field.childFields, endpointPath);
     } else if (
       field.type === "array" &&
       field.childFields &&
@@ -289,7 +293,7 @@ function generateJsonPayloadRecursive(
       } else {
         // Items are objects: recursively generate structure using all childFields
         // Pass the *whole* childFields array, representing the structure of ONE item.
-        itemValue = generateJsonPayloadRecursive(field.childFields);
+        itemValue = generateJsonPayloadRecursive(field.childFields, endpointPath);
       }
       value = [itemValue]; // Create an array with one example element
     } else {
@@ -345,7 +349,8 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   if (parametersWrapper) {
     // activity-style endpoint
     const parametersObject = generateJsonPayloadRecursive(
-      parametersWrapper.childFields
+      parametersWrapper.childFields,
+      endpoint.path
     );
     dataPayloadObject = {
       type: activityType,
@@ -355,7 +360,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     };
   } else {
     // query-style endpoint: flatten all top-level fields
-    dataPayloadObject = generateJsonPayloadRecursive(fields);
+    dataPayloadObject = generateJsonPayloadRecursive(fields, endpoint.path);
   }
 
   // Stringify carefully, handle potential BigInts if they arise
@@ -406,7 +411,8 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
     // Assuming the success response structure is directly the content of 'activity.result'
     // Adjust this logic if the actual response schema nests the result differently
     activityResultPayload = generateJsonPayloadRecursive(
-      successResponse.fields
+      successResponse.fields,
+      endpoint.path
     );
   } else {
     // Fallback if no 200 response schema is defined
