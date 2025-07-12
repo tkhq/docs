@@ -388,11 +388,19 @@ function schemaToApiField(
 ): ApiField {
   const dataType = mapOpenApiTypeToDataType(schema.type);
 
+  // Provide better default descriptions for common fields
+  let defaultDescription: string;
+  if (name === "parameters") {
+    defaultDescription = "The parameters object containing the specific intent data for this activity.";
+  } else {
+    defaultDescription = `${name} field`;
+  }
+
   const field: ApiField = {
     name,
     type: dataType,
     required,
-    description: schema.description || `${name} field`,
+    description: schema.description || defaultDescription,
   };
 
   // Add example if available
