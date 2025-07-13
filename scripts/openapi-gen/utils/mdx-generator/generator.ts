@@ -379,7 +379,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
     "  --header 'Content-Type: application/json' \\\n" +
-    '  --header "X-Stamp: <string> (see https://docs.turnkey.com/developer-reference/api-overview/stamps)" \\\n' + // Added reminder for secret
+    '  --header "X-Stamp: <string> (see Authorizations)" \\\n' + // Added reminder for secret
     `  --data '${escapedDataPayloadString}'\n` +
     "```";
 
