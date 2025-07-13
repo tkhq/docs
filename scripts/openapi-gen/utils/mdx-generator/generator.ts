@@ -284,7 +284,7 @@ function generateJsonPayloadRecursive(
               itemValue = 456;
               break;
             case "boolean":
-              itemValue = false;
+              itemValue = "<boolean>";
               break;
             default:
               itemValue = `<${itemField.type || "unknown"}_element>`;
@@ -312,7 +312,7 @@ function generateJsonPayloadRecursive(
             value = 123;
             break;
           case "boolean":
-            value = true;
+            value = "<boolean>";
             break;
           default:
             value = `<${field.type || "unknown"}>`; // Use type as placeholder if known
