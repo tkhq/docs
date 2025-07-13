@@ -473,7 +473,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''");
 
   const curlCommand =
-    "```bash cURL\n" +
+    "```bash title=\"cURL\"\n" +
     "curl --request POST \\\n" +
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
@@ -489,7 +489,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
 ${sdkParameters}
 }`;
   const javascriptExample = 
-    "```javascript\n" +
+    "```javascript title=\"JavaScript\"\n" +
     "import { Turnkey } from \"@turnkey/sdk-server\";\n\n" +
     "const turnkeyClient = new Turnkey({\n" +
     "  apiBaseUrl: \"https://api.turnkey.com\",\n" +
@@ -500,7 +500,7 @@ ${sdkParameters}
     `const response = await turnkeyClient.apiClient().${sdkMethodName}(${jsParams});\n` +
     "```";
 
-  return `<RequestExample>\n\n<Tabs>\n  <Tab title=\"cURL\">\n${curlCommand}\n  </Tab>\n  <Tab title=\"JavaScript\">\n${javascriptExample}\n  </Tab>\n</Tabs>\n\n</RequestExample>`;
+  return `<RequestExample>\n\n${curlCommand}\n\n${javascriptExample}\n\n</RequestExample>`;
 }
 
 // --- Helper: Generate Response Example MDX ---
