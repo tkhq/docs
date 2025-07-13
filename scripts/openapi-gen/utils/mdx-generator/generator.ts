@@ -325,6 +325,105 @@ function generateJsonPayloadRecursive(
   return result;
 }
 
+// --- Helper: Map endpoint path to SDK method name ---
+function getSdkMethodName(endpoint: ApiEndpoint): string {
+  const path = endpoint.path || "";
+  
+  // Extract the last part of the path (e.g., "approve_activity" from "/public/v1/submit/approve_activity")
+  const pathParts = path.split("/").filter(Boolean);
+  const lastPart = pathParts[pathParts.length - 1];
+  
+  if (!lastPart) return "unknownMethod";
+  
+  // Convert snake_case to camelCase
+  return lastPart.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// --- Helper: Generate SDK parameter value for a field ---
+function generateSdkParameterValue(field: ApiField, indent: number = 2): string {
+  const indentStr = " ".repeat(indent);
+  const fieldName = field.name;
+  const fieldType = field.type;
+  const description = field.description ? ` // ${field.description}` : "";
+  
+  // Check if this is an enum field
+  const { isEnum, options } = getEnumDetails(field);
+  
+  if (isEnum && options.length > 0) {
+    // For enum fields, show the first option as an example
+    const firstOption = options[0].value;
+    return `${indentStr}${fieldName}: "<${firstOption}>"${description}`;
+  } else if (fieldType === "string") {
+    return `${indentStr}${fieldName}: "<string>${field.description ? ` (${field.description})` : ''}"`;
+  } else if (fieldType === "number") {
+    return `${indentStr}${fieldName}: 0${description}`;
+  } else if (fieldType === "boolean") {
+    return `${indentStr}${fieldName}: true${description}`;
+  } else if (fieldType === "array") {
+    if (field.childFields && field.childFields.length > 0) {
+      const childField = field.childFields[0]; // Get the first child field as template
+      if (childField.type === "object" && childField.childFields) {
+        const lines = [`${indentStr}${fieldName}: [{${description}`];
+        for (const grandChild of childField.childFields) {
+          lines.push(generateSdkParameterValue(grandChild, indent + 2));
+        }
+        lines.push(`${indentStr}}]`);
+        return lines.join(",\n");
+      } else {
+        return `${indentStr}${fieldName}: ["<string>"]${description}`;
+      }
+    } else {
+      return `${indentStr}${fieldName}: ["<string>"]${description}`;
+    }
+  } else if (fieldType === "object") {
+    if (field.childFields && field.childFields.length > 0) {
+      const lines = [`${indentStr}${fieldName}: {${description}`];
+      for (const childField of field.childFields) {
+        lines.push(generateSdkParameterValue(childField, indent + 2));
+      }
+      lines.push(`${indentStr}}`);
+      return lines.join(",\n");
+    } else {
+      return `${indentStr}${fieldName}: { /* object */ }${description}`;
+    }
+  }
+  
+  return `${indentStr}${fieldName}: "<unknown>"${description}`;
+}
+
+// --- Helper: Generate SDK parameters from endpoint ---
+function generateSdkParameters(endpoint: ApiEndpoint): string {
+  const fields = endpoint.requestBody?.fields || [];
+  const parametersWrapper = fields.find((f) => f.name === "parameters");
+  
+  if (parametersWrapper) {
+    if (parametersWrapper.childFields && parametersWrapper.childFields.length > 0) {
+      // For activity endpoints, extract parameters from the parameters wrapper only
+      const paramLines: string[] = [];
+      for (const field of parametersWrapper.childFields) {
+        paramLines.push(generateSdkParameterValue(field));
+      }
+      return paramLines.join(",\n");
+    } else {
+      // parameters exists but has no child fields, so no endpoint-specific parameters
+      return "";
+    }
+  } else {
+    // For query endpoints, use all top-level fields (excluding only type and timestampMs)
+    const commonFields = ["type", "timestampMs"]; // organizationId should be included for queries
+    const endpointSpecificFields = fields.filter(f => !commonFields.includes(f.name));
+    
+    if (endpointSpecificFields.length === 0) {
+      return ""; // No endpoint-specific parameters
+    }
+    const paramLines: string[] = [];
+    for (const field of endpointSpecificFields) {
+      paramLines.push(generateSdkParameterValue(field));
+    }
+    return paramLines.join(",\n");
+  }
+}
+
 // --- Helper: Generate Request Example MDX ---
 function generateRequestExample(endpoint: ApiEndpoint): string {
   const path = endpoint.path || "unknown_path";
@@ -383,7 +482,25 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     `  --data '${escapedDataPayloadString}'\n` +
     "```";
 
-  return `<RequestExample>\n\n${curlCommand}\n\n</RequestExample>`;
+  // Generate JavaScript SDK example
+  const sdkMethodName = getSdkMethodName(endpoint);
+  const sdkParameters = generateSdkParameters(endpoint);
+  const jsParams = sdkParameters.trim() === "" ? "{}" : `{
+${sdkParameters}
+}`;
+  const javascriptExample = 
+    "```javascript\n" +
+    "import { Turnkey } from \"@turnkey/sdk-server\";\n\n" +
+    "const turnkeyClient = new Turnkey({\n" +
+    "  apiBaseUrl: \"https://api.turnkey.com\",\n" +
+    "  apiPublicKey: process.env.API_PUBLIC_KEY!,\n" +
+    "  apiPrivateKey: process.env.API_PRIVATE_KEY!,\n" +
+    "  defaultOrganizationId: process.env.ORGANIZATION_ID!,\n" +
+    "});\n\n" +
+    `const response = await turnkeyClient.apiClient().${sdkMethodName}(${jsParams});\n` +
+    "```";
+
+  return `<RequestExample>\n\n<Tabs>\n  <Tab title=\"cURL\">\n${curlCommand}\n  </Tab>\n  <Tab title=\"JavaScript\">\n${javascriptExample}\n  </Tab>\n</Tabs>\n\n</RequestExample>`;
 }
 
 // --- Helper: Generate Response Example MDX ---
