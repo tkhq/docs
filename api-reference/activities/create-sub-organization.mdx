@@ -129,9 +129,8 @@ Unique identifier for a given Organization.
         Human-readable name for a Wallet.
         </NestedParam>
         
-        <ParamField body="accounts" type="enum<string[]>" required={true} path="parameters.wallet.accounts">
-          
-        Enum options: `CURVE_SECP256K1`, `CURVE_ED25519`
+        <ParamField body="accounts" type="array" required={true} path="parameters.wallet.accounts">
+          <p>A list of wallet Accounts. This field, if not needed, should be an empty array in your request body.</p>
           <Expandable title="item details">
             <NestedParam parentKey="parameters.wallet.accounts" childKey="curve" type="enum<string>" required={true} default="">
             Enum options: `CURVE_SECP256K1`, `CURVE_ED25519`
@@ -493,11 +492,40 @@ const turnkeyClient = new Turnkey({
 
 const response = await turnkeyClient.apiClient().createSubOrganization({
   subOrganizationName: "<string> (Name for this sub-organization)",
-  rootUsers: ["<string>"] // Root users to create within this sub-organization,
+  rootUsers: [{ // Root users to create within this sub-organization,
+    userName: "<string> (Human-readable name for a User.)",
+    userEmail: "<string> (The user's email address.)",
+    userPhoneNumber: "<string> (The user's phone number in E.164 format e.g. +13214567890)",
+    apiKeys: [{ // A list of API Key parameters. This field, if not needed, should be an empty array in your request body.,
+      apiKeyName: "<string> (Human-readable name for an API Key.)",
+      publicKey: "<string> (The public component of a cryptographic key pair used to sign messages and transactions.)",
+      curveType: "<API_KEY_CURVE_P256>" // curveType field,
+      expirationSeconds: "<string> (Optional window (in seconds) indicating how long the API Key should last.)",
+    }],
+    authenticators: [{ // A list of Authenticator parameters. This field, if not needed, should be an empty array in your request body.,
+      authenticatorName: "<string> (Human-readable name for an Authenticator.)",
+      challenge: "<string> (Challenge presented for authentication purposes.)",
+      attestation: { // attestation field,
+        credentialId: "<string> (The cbor encoded then base64 url encoded id of the credential.)",
+        clientDataJson: "<string> (A base64 url encoded payload containing metadata about the signing context and the challenge.)",
+        attestationObject: "<string> (A base64 url encoded payload containing authenticator data and any attestation the webauthn provider chooses.)",
+        transports: "<AUTHENTICATOR_TRANSPORT_BLE>" // The type of authenticator transports.,
+      },
+    }],
+    oauthProviders: [{ // A list of Oauth providers. This field, if not needed, should be an empty array in your request body.,
+      providerName: "<string> (Human-readable name to identify a Provider.)",
+      oidcToken: "<string> (Base64 encoded OIDC token)",
+    }],
+  }],
   rootQuorumThreshold: 0 // The threshold of unique approvals to reach root quorum. This value must be less than or equal to the number of root users,
   wallet: { // wallet field,
     walletName: "<string> (Human-readable name for a Wallet.)",
-    accounts: "<CURVE_SECP256K1>" // A list of wallet Accounts. This field, if not needed, should be an empty array in your request body.,
+    accounts: [{ // A list of wallet Accounts. This field, if not needed, should be an empty array in your request body.,
+      curve: "<CURVE_SECP256K1>" // curve field,
+      pathFormat: "<PATH_FORMAT_BIP32>" // pathFormat field,
+      path: "<string> (Path used to generate a wallet Account.)",
+      addressFormat: "<ADDRESS_FORMAT_UNCOMPRESSED>" // addressFormat field,
+    }],
     mnemonicLength: 0 // Length of mnemonic to generate the Wallet seed. Defaults to 12. Accepted values: 12, 15, 18, 21, 24.,
   },
   disableEmailRecovery: true // Disable email recovery for the sub-organization,

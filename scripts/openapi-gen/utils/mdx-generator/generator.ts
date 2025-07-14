@@ -25,11 +25,13 @@ function getEnumDetails(field: ApiField): {
       options: field.enumOptions,
     };
   }
-  // Check for array of enums
+  // Only treat as array of enums if the array items are enums (not objects)
   if (
     field.type === "array" &&
-    field.childFields?.[0]?.type === "enum" &&
-    field.childFields?.[0]?.enumOptions
+    field.childFields?.length === 1 &&
+    field.childFields[0].name === "item" &&
+    field.childFields[0].type === "enum" &&
+    field.childFields[0].enumOptions
   ) {
     return {
       isEnum: true, // Treat as enum context for display
@@ -361,15 +363,31 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
     return `${indentStr}${fieldName}: true${description}`;
   } else if (fieldType === "array") {
     if (field.childFields && field.childFields.length > 0) {
-      const childField = field.childFields[0]; // Get the first child field as template
-      if (childField.type === "object" && childField.childFields) {
+      // If the array is of objects (multiple fields, or first child is an object)
+      if (
+        field.childFields.length > 1 ||
+        (field.childFields.length === 1 && field.childFields[0].type === "object")
+      ) {
         const lines = [`${indentStr}${fieldName}: [{${description}`];
-        for (const grandChild of childField.childFields) {
-          lines.push(generateSdkParameterValue(grandChild, indent + 2));
+        for (const child of field.childFields) {
+          lines.push(generateSdkParameterValue(child, indent + 2));
         }
         lines.push(`${indentStr}}]`);
         return lines.join(",\n");
+      } else if (
+        field.childFields.length === 1 &&
+        field.childFields[0].name === "item"
+      ) {
+        // Array of primitives or enums
+        const itemField = field.childFields[0];
+        const { isEnum, options } = getEnumDetails(itemField);
+        if (isEnum && options.length > 0) {
+          return `${indentStr}${fieldName}: ["<${options[0].value}>"]${description}`;
+        } else {
+          return `${indentStr}${fieldName}: ["<string>"]${description}`;
+        }
       } else {
+        // Fallback
         return `${indentStr}${fieldName}: ["<string>"]${description}`;
       }
     } else {
