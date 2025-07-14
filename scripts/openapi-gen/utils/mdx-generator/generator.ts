@@ -523,35 +523,42 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
   );
 
   // Generate payload based on response schema if available, otherwise fallback
-  let activityResultPayload: Record<string, any>;
+  let resultPayload: Record<string, any>;
   if (successResponse?.fields) {
-    // Assuming the success response structure is directly the content of 'activity.result'
-    // Adjust this logic if the actual response schema nests the result differently
-    activityResultPayload = generateJsonPayloadRecursive(
+    resultPayload = generateJsonPayloadRecursive(
       successResponse.fields,
       endpoint.path
     );
   } else {
-    // Fallback if no 200 response schema is defined
-    activityResultPayload = { "<result_key>": "<result_value>" };
+    resultPayload = { "<result_key>": "<result_value>" };
   }
 
-  const responsePayloadObject = {
-    activity: {
-      id: "<activity-id>",
-      status: "ACTIVITY_STATUS_COMPLETED", // Example status
-      type: activityType, // Echo derived or placeholder type from request
-      organizationId: "<organization-id>",
-      timestampMs: "<timestamp> (e.g. 1746736509954)",
-      result: activityResultPayload, // Use generated or fallback result
-    },
-  };
-
-  const responseJsonString = JSON.stringify(
-    responsePayloadObject,
-    (key, value) => (typeof value === "bigint" ? value.toString() : value),
-    2
-  ); // 2-space indent
+  let responseJsonString: string;
+  if (endpoint.type === "activity") {
+    // Activity endpoints: wrap in activity object
+    const responsePayloadObject = {
+      activity: {
+        id: "<activity-id>",
+        status: "ACTIVITY_STATUS_COMPLETED", // Example status
+        type: activityType, // Echo derived or placeholder type from request
+        organizationId: "<organization-id>",
+        timestampMs: "<timestamp> (e.g. 1746736509954)",
+        result: resultPayload, // Use generated or fallback result
+      },
+    };
+    responseJsonString = JSON.stringify(
+      responsePayloadObject,
+      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2
+    ); // 2-space indent
+  } else {
+    // Query endpoints: just the result object
+    responseJsonString = JSON.stringify(
+      resultPayload,
+      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2
+    );
+  }
 
   const responseJsonBlock = `\`\`\`json 200\n${responseJsonString}\n\`\`\``;
 
