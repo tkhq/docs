@@ -1,0 +1,352 @@
+---
+title: "ABIs & IDLs - Smart Contract Interfaces"
+description: "This page provides an overview of the Policy Engine's support for parsing calls to Smart Contracts on Ethereum and Programs on Solana by uploading the json respresentation of the respective ABI (ethereum) or IDL (Solana)"
+sidebarTitle: "ABI's & IDL's"
+---
+
+## Using ABIs and IDLs to control transaction signing:
+
+With the introduction of Turnkey’s Smart Contract Interface functionality, our policy engine includes enhanced support for uploading Ethereum ABIs and Solana IDLs, empowering your organization to build more sophisticated and context-aware policies. By parsing transaction call data through these standardized interfaces, the policy engine can accurately interpret and enforce rules based on the specific function calls, arguments, and data structures used in smart contract interactions. This enables granular control over wallet operations, such as restricting access to certain contract methods and validating transaction parameters—across both Ethereum and Solana ecosystems.
+
+The following guide will walk you through uploading a specific ABI or IDL, and then crafting a policy that targets specific contract call arguments.
+
+### Usage Walkthrough
+
+Let's walk through an example flow of how to explicitly reference smart contract arguments in policies by uploading the ABI for the smart contract which you will be invoking in your transactions. Let’s take the Wrapped ETH (WETH) smart contract as an example. Its ABI can be found [here](https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2#code), and we’ve included the JSON down below:
+
+```json 
+[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"guy","type":"address"},{"name":"wad","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[],"name":"deposit","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"},{"name":"","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":true,"name":"src","type":"address"},{"indexed":true,"name":"guy","type":"address"},{"indexed":false,"name":"wad","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"src","type":"address"},{"indexed":true,"name":"dst","type":"address"},{"indexed":false,"name":"wad","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"dst","type":"address"},{"indexed":false,"name":"wad","type":"uint256"}],"name":"Deposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"src","type":"address"},{"indexed":false,"name":"wad","type":"uint256"}],"name":"Withdrawal","type":"event"}]
+```
+
+We’ll first navigate to the Security tab of your [Turnkey dashboard](https://app.turnkey.com/dashboard/welcome):
+
+<Frame>
+  <img
+    src="/images/concepts/policies/img/diagrams/dashboard_welcome.png"
+    alt="dashboard welcome"For the purposes of this guide, we’ll be targeting the transfer function call. It has two arguments: wad (uint256) and dst (address), corresponding to the amount and destination, respectively. We can now next construct a policy like the following:
+  />
+</Frame>
+
+You’ll then see a section on Smart Contract Interfaces:
+
+<Frame>
+  <img
+    src="/images/concepts/policies/img/diagrams/smart_contract_interfaces.png"
+    alt="smart contract interfaces"
+  />
+</Frame>
+
+Upon clicking the Create interface button, you can enter in your Smart Contract Interface details:
+
+<Frame>
+  <img
+    src="/images/concepts/policies/img/diagrams/create_interface_empty.png"
+    alt="create interface empty"
+  />
+</Frame>
+
+Finally, you can confirm the details:
+
+NOTE: It's important to make sure that the `Address` section of the smart contract interface creation is populated with the correct Address. It is case insensitive with Ethereum, but case sensitive with Solana. 
+
+<Frame>
+  <img
+    src="/images/concepts/policies/img/diagrams/create_interface_review.png"
+    alt="create interface review"
+  />
+</Frame>
+
+For the purposes of this guide, we’ll be targeting the `transfer` function call. It has two arguments: `wad` (uint256) and `dst` (address), corresponding to the amount and destination, respectively. We can now next construct a policy like the following:
+
+```json
+{
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.contract_call_args['wad'] < 1000000000000000000 && eth.tx.contract_call_args['dst'] == '0x08d2b0a37F869FF76BACB5Bab3278E26ab7067B7'"
+}
+```
+
+In plain English, this policy requires that the transaction has a wad of less than 1 ETH, and that the `dst` is a specific address (our testnet warchest). 
+
+We can create this policy via the same Security tab:
+
+<Frame>
+  <img
+    src="/images/concepts/policies/img/diagrams/create_policy.png"
+    alt="create policy"
+  />
+</Frame>
+
+After entering the policy details, we can review and approve the activity:
+
+<Frame>
+  <img
+    src="/images/concepts/policies/img/diagrams/create_policy_review.png"
+    alt="create policy review"
+  />
+</Frame>
+
+In addition to contract call arguments, you can also explicitly specify the function name and function signature corresponding to a transaction. Given we’re currently using a `transfer` call, we can enforce it within a policy via the following:
+
+```json 
+{
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'transfer' && eth.tx.function_signature == '0xa9059cbb'
+}
+
+```
+
+Note that the `0x` prefix is necessary when writing a policy against function signatures. Generally, you can find function signatures on an explorer like Etherscan. In this case, the function signature for WETH’s `transfer` can be found [here](https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2#writeContract).
+
+Note that these two operations, creating a new Smart Contract Interface and a Policy, can be performed programmatically as well. Here’s are two respective sample snippets that use our [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server) package:
+
+```ts
+// Create Smart Contract Interface
+import { Turnkey as TurnkeySDKServer } from "@turnkey/sdk-server";
+
+...
+
+const turnkeyClient = new TurnkeySDKServer({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+
+const abi = []; // your ABI here
+
+const { smartContractInterfaceId } = await turnkeyClient.apiClient().createSmartContractInterface({
+    label: "WETH mainnet",
+    notes: "For WETH mainnet transfers",
+    type: "SMART_CONTRACT_INTERFACE_TYPE_ETHEREUM",
+    smartContractAddress: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+    smartContractInterface: JSON.stringify(abi),
+  });
+```
+
+```ts
+// Create Policy
+import { Turnkey as TurnkeySDKServer } from "@turnkey/sdk-server";
+
+...
+
+const turnkeyClient = new TurnkeySDKServer({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  });
+
+const { policyId } = await turnkeyClient.apiClient().createPolicy({
+    policyName: "Limit WETH transfers",
+    condition: "eth.tx.contract_call_args['wad'] < 1000000000000000000 && eth.tx.contract_call_args['dst'] == '0x08d2b0a37F869FF76BACB5Bab3278E26ab7067B7'",
+    effect: "EFFECT_ALLOW",
+    notes: "Specify WETH amount and destination",
+  });
+
+```
+
+
+### Ethereum
+
+#### ABI Format
+Ethereum ABI’s are represented in JSON format as an array of objects, each describing a function, constructor, event, or error. Each object contains specific fields that fully describe the callable interface or event signature. [ABI documentation reference](https://docs.ethers.org/v5/api/utils/abi/formats/)
+
+##### Example ABI
+
+```json
+[
+  {
+    "type": "function",
+    "name": "transfer",
+    "inputs": [
+      {
+        "name": "_to",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "Transfer",
+    "inputs": [
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  }
+]
+```
+
+#### Policy Formats
+
+For Ethereum, if an ABI corresponding to a contract has been uploaded, then ABI related policies for transactions calling that contract will be available under the following namespaces:
+- **function_name**: This field contains the string representation of the name of the function as defined in the ABI
+- **function_signature**: This field contains the bytes making up the function signature
+- **contract_call_args**: This field contains all the arguments in a mapping of arg name to argument
+**NOTE:** The contract_call_args field, at the first level, uses a `MapKey` access pattern. All arguments are named and are accessed using the syntax as such:
+
+```json
+{
+    "condition": "eth.tx.contract_call_args[‘arg_name’] == 1"
+}
+```
+
+### Solana
+
+For Turnkey’s Solana IDL support, we accept IDL’s formatted according to [Anchor’s IDL language](https://www.anchor-lang.com/docs) standardization. While other standards do exist, most commonly used IDL’s that aren’t Solana’s own native IDL’s, adhere to the Anchor IDL format, and there exist tools like [native-to-anchor](https://github.com/acheroncrypto/native-to-anchor) which can help create anchor formatted IDL’s for native solana programs. 
+
+####Turnkey Formatting requirements 
+
+**NOTE**: this is just included for reference and troubleshooting, most Anchor IDL’s should work straight out of the box. Also, some older formats of IDL’s are supported (such as using the optional boolean `signer` instead of `isSigner`, or the optional boolean `writable` instead of `isMut`) – the format detailed below is the most widely used format, for reference. 
+
+**Instructions Array**
+*The instructions array is a list of objects, each defining an instruction callable by the program.*
+
+- **instructions** (array of objects)
+  - **name** (string): Name of the instruction.
+  - **discriminator** (optional): Unique identifier for the instruction (optional).
+  - **accounts** (array of objects): List of accounts required by the instruction.
+    - **isMut** (boolean): Whether the account is mutable.
+    - **isSigner** (boolean): Whether the account is a signer.
+    - **isOptional** (boolean): Whether the account is optional.
+    - **name** (string): Name of the account.
+  - **args** (array of objects): Arguments required by the instruction.
+    - **name** (string): Name of the argument.
+    - **type** (IDL type enum): Data type of the argument.
+
+**Types Array**
+*The types array defines custom data structures used by the program.*
+- **types** (array of objects)
+  - **name** (string): Name of the custom type.
+  - **type** (object)
+    - **kind** (string enum): The kind of type (e.g., "struct").
+    - **fields** (array of objects): Fields within the type.
+      - **name** (string): Name of the field.
+      - **type** (IDL type enum): Data type of the field.
+
+**NOTE:* discriminators are optional because anchor has a default method of generating the discriminators deterministically from the instruction names. If your uploaded IDL does not include instruction discriminators, we will internally generate them as per this standard.[Anchor Discriminator Reference](https://www.anchor-lang.com/docs/basics/idl#discriminators)
+
+##### Example IDL
+
+```json
+{
+  "instructions": [
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true,
+          "isOptional": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "MyStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Supported Arg Types**
+Solana IDL's support various different types of arguments to instructions. The following argument types are supported for Solana IDL parsing and call data parsing.
+
+**IdlType**
+- **Fixed arrays:** Array<IdlType>
+- **Booleans:** Bool
+- **Byte strings:** Bytes
+- **Float types:** F32, F64
+- **Signed Integer Types:** I8, I16, I32, I64, I128
+- **Unsigned Integer Types:** U8, U16, U32, U64, U128
+- **Solana Addresses:** PublicKey
+- **Vectors:** Vec<IdlType>
+- **Strings:** String
+- **Optional Types:** Option<IdlType>
+- **Custom Defined Types:** DefinedType
+
+The most notable here are **Defined Types.** Defined types in IDLs refer to custom types—such as structs and enums—that are created by the Solana program developer and used as argument types in instructions or as fields in accounts. The following defined types are currently supported:
+- Enum
+- Struct
+- Alias
+
+##### Where to get IDLs from
+Solana IDL JSON objects, as formatted for use with Turnkey, can be obtained by the following methods:
+
+- **Explorer Links**
+ - Solscan:
+   - [Example Solscan Link to Program IDL (Jupiter)](https://solscan.io/account/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4#anchorProgramIdl)
+   - [Example Solana.Explorer Link to Program IDL (Jupiter)](https://explorer.solana.com/address/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4/anchor-program)
+- [Anchor CLI:](https://www.anchor-lang.com/docs/references/cli)
+ - Using the command: `anchor idl <program_account_string>`
+
+#### Policy Formats
+
+On the Solana side, if an IDL corresponding to a program has been uploaded, then IDL related policies for instructions calling that program will be available in each instruction under the `parsed_instruction_data` namespace. The subfields will be as follows:
+- **instruction_name:** Name of the instruction that is being called in call data
+- **discriminator:** the bytes at the beginning of the instruction call data that signifies which instruction is being called
+- **named_accounts:** a mapping of account names (as defined in the IDL) to the actual accounts that were entered to this instruction
+- **program_call_args:** all program arguments required by this instruction call
+**Note:** The program_call_args field, at the first level, uses a `MapKey` access pattern. All arguments are named and are accessed using the syntax as such:
+
+```json
+{
+    "condition": "solana.tx.instructions[0].parsed_instruction_data.program_call_args[‘arg_name’] == 1"
+}
+```
+
+#####Example Usage
+Let’s say that the IDL for Jupiter has been uploaded, as found [here](https://explorer.solana.com/address/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4/anchor-program)
+
+Here’s an example policy related to its `route` instruction 
+
+```json
+{ 
+   "effect": "EFFECT_ALLOW", 
+   "condition": "solana.tx.instructions.any(i, i.program_key == 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4' && i.parsed_instruction_data.instruction_name == 'route' && i.parsed_instruction_data.program_call_args['in_amount'] == 995500000)"
+}
+```
+
+**References**
+- [Native to Anchor](https://github.com/acheroncrypto/native-to-anchor): Tool that creates Anchor IDL’s for native solana programs 
+- [Anchor Framework Github (Solana Foundation)](https://github.com/solana-foundation/anchor/tree/master?tab=readme-ov-file): Github reference for Anchor 
+
+FAQ:
+- Q: Is there a size limit on ABIs or IDLs?
+- A: Yes, we enforce a limit of 200kb. If your ABI/IDL exceeds that, we recommend minifying the JSON string (to get rid of whitespaces or extra characters). This can be done programmatically via a command similar to `JSON.stringify()`, or a webtool like [`https://codebeautify.org/jsonminifier`](https://codebeautify.org/jsonminifier) .
