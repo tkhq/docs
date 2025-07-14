@@ -1,0 +1,142 @@
+---
+title: "Stacks"
+---
+
+## Address derivation
+
+Turnkey supports Stacks address derivation with `ADDRESS_FORMAT_COMPRESSED` and `ADDRESS_FORMAT_UNCOMPRESSED` address formats. Stacks addresses are derived from the secp256k1 curve, which Turnkey fully supports.
+
+## Transasction construction and signing
+
+Turnkey supports Stacks transaction signing through the core signing capabilities. We have an example respository that demonstrates how to construct and sign Sui transactions:
+
+[examples/with-stacks:](https://github.com/tkhq/sdk/tree/main/examples/with-stacks) A sample script that demonstrates how to sign a [Stacks](https://docs.hiro.so/stacks/stacks.js) transaction with Turnkey. Stacks uses the secp256k1 cryptographic curve for transaction signing, but there some specific data formatting that takes place for the [signing process](https://github.com/stacksgov/sips/blob/main/sips/sip-005/sip-005-blocks-and-transactions.md#transaction-signing-and-verifying).
+
+## Example
+
+Here is a practical example demonstrating how to integrate Turnkey with Stacks for transaction signing:
+
+```typescript
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
+import {
+  broadcastTransaction,
+  createMessageSignature,
+  makeUnsignedSTXTokenTransfer,
+  sigHashPreSign,
+  SingleSigSpendingCondition,
+  TransactionSigner,
+  type StacksTransactionWire,
+} from "@stacks/transactions";
+import * as path from "path";
+import * as dotenv from "dotenv";
+
+// Load environment variables from `.env.local`
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+
+// Define the Turnkey API client
+const client = new TurnkeyServerSDK({
+  apiBaseUrl: process.env.TURNKEY_BASE_URL!,
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+});
+
+// Build a simple Stacks tx to STACKS_RECIPIENT_ADDRESS
+const constructStacksTx = async (pubKey: string) => {
+  const recipient = process.env.STACKS_RECIPIENT_ADDRESS!;
+  const nonce = 0n;
+  const fee = 180n;
+
+  let transaction = await makeUnsignedSTXTokenTransfer({
+    recipient,
+    amount: 1_000_000n,
+    publicKey: pubKey,
+    nonce,
+    fee,
+    network: "testnet",
+  });
+
+  // The `signer` contains the `sigHash` property needed for the `preSignSigHash`
+  const signer = new TransactionSigner(transaction);
+
+  return { stacksTransaction: transaction, stacksTxSigner: signer };
+};
+
+const generatePreSignSigHash = (
+  transaction: StacksTransactionWire,
+  signer: TransactionSigner,
+) => {
+  let preSignSigHash = sigHashPreSign(
+    signer.sigHash,
+    transaction.auth.authType,
+    transaction.auth.spendingCondition.fee,
+    transaction.auth.spendingCondition.nonce,
+  );
+
+  return preSignSigHash;
+};
+
+const signStacksTx = async () => {
+  try {
+    const stacksPublicKey = process.env.TURNKEY_SIGNER_PUBLIC_KEY!;
+
+    let { stacksTransaction, stacksTxSigner } = await constructStacksTx(
+      stacksPublicKey!,
+    );
+    let preSignSigHash = generatePreSignSigHash(
+      stacksTransaction,
+      stacksTxSigner,
+    );
+
+    const payload = `0x${preSignSigHash}`;
+
+    const signature = await client?.apiClient().signRawPayload({
+      payload,
+      signWith: stacksPublicKey,
+      encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+      hashFunction: "HASH_FUNCTION_NO_OP",
+    });
+
+    // r and s values returned are in hex format, padStart r and s values
+    const nextSig = `${signature!.v}${signature!.r.padStart(64, "0")}${signature!.s.padStart(64, "0")}`;
+
+    // Reassign signature field in transaction with `nextSig`
+    let spendingCondition = stacksTransaction.auth
+      .spendingCondition as SingleSigSpendingCondition;
+    spendingCondition.signature = createMessageSignature(nextSig);
+
+    return stacksTransaction;
+  } catch (err) {
+    console.error("Signing failed:", err);
+    return undefined;
+  }
+};
+
+const handleBroadcastTx = async () => {
+  let tx = await signStacksTx();
+
+  let result = await broadcastTransaction({
+    transaction: tx!,
+    network: "testnet",
+  });
+
+  console.log("Broadcast Result:", result);
+};
+
+(async () => {
+  await handleBroadcastTx();
+})();
+```
+
+## Key Features for Stacks
+
+- **secp256k1 signing**: Turnkey fully supports secp256k1 curve used by Stacks
+- Raw Transaction Signing: Sign any Stacls transaction format with Turnkey's flexible signing API
+- Integration Example: Our example repositoru provides a reference implememntatio
+
+## Benefits of Using Turnkey with Stacks
+
+- **Secure Key Management**: Private keys never leave Turnkey’s secure infrastructure
+- **Developer Friendly**: Integrate with existing Stacks development workflows
+- **Signing Policies**: Apply custom policies to control transaction approvals
+- **Multi-user Support**: Manage multiple Stacks addresses under a single organization
