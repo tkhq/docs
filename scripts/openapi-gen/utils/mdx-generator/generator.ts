@@ -303,7 +303,20 @@ function generateJsonPayloadRecursive(
       const fieldDetails = getEnumDetails(field);
       if (fieldDetails.isEnum && fieldDetails.options.length > 0) {
         // Simple Enum
-        value = `<${fieldDetails.options[0].value}>`;
+        let enumValue = `<${fieldDetails.options[0].value}>`;
+
+        console.log("enumValue", enumValue);
+        
+        // Special handling for credential type in get-api-key and get-api-keys endpoints
+        if (
+          (endpointPath?.includes("get_api_key") || endpointPath?.includes("get_api_keys")) &&
+          field.name === "type" &&
+          enumValue === "<CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR>"
+        ) {
+          enumValue = "<CREDENTIAL_TYPE_API_KEY_P256>";
+        }
+        
+        value = enumValue;
       } else {
         // Simple Type (non-enum)
         switch (field.type) {
