@@ -283,7 +283,7 @@ function generateJsonPayloadRecursive(
               itemValue = "<string>";
               break;
             case "number":
-              itemValue = 456;
+              itemValue = "<number>";
               break;
             case "boolean":
               itemValue = "<boolean>";
@@ -304,10 +304,10 @@ function generateJsonPayloadRecursive(
       if (fieldDetails.isEnum && fieldDetails.options.length > 0) {
         // Simple Enum
         let enumValue = `<${fieldDetails.options[0].value}>`;
-
-        console.log("enumValue", enumValue);
         
-        // Special handling for credential type in get-api-key and get-api-keys endpoints
+        // Special handling for credential type in get-api-key and get-api-keys endpoints.
+        // Current behavior: for enum types, we grab the first (which defaults to CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR).
+        // However, for `get_api_key` and `get_api_keys` endpoints, we want to use CREDENTIAL_TYPE_API_KEY_P256.
         if (
           (endpointPath?.includes("get_api_key") || endpointPath?.includes("get_api_keys")) &&
           field.name === "type" &&
@@ -324,7 +324,7 @@ function generateJsonPayloadRecursive(
             value = "<string>";
             break;
           case "number":
-            value = 123;
+            value = "<number>";
             break;
           case "boolean":
             value = "<boolean>";
