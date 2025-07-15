@@ -242,7 +242,8 @@ function generateResponseFieldMdxRecursive(
 // --- Helper: Generate JSON Payload Object ---
 function generateJsonPayloadRecursive(
   fields: ApiField[] | undefined,
-  endpointPath?: string
+  endpointPath?: string,
+  parentPath: string = ""
 ): Record<string, any> {
   if (!fields) {
     return {};
@@ -252,13 +253,24 @@ function generateJsonPayloadRecursive(
 
   fields.forEach((field) => {
     let value: any;
+    const currentPath = parentPath ? `${parentPath}.${field.name}` : field.name;
 
     // Special handling for ApproveActivity result field
     if (endpointPath?.includes("approve_activity") && field.name === "result" && field.childFields?.length === 0) {
       value = "<object> (approved activity result, if completed)";
     } else if (field.type === "object" && field.childFields) {
-      // Recursive call for nested objects
-      value = generateJsonPayloadRecursive(field.childFields, endpointPath);
+      // Special handling for get-activity: only include the first intent in the response example
+      if (
+        endpointPath?.includes("get_activity") &&
+        field.name === "intent" &&
+        field.childFields.length > 0
+      ) {
+        // Only include the first intent child
+        value = generateJsonPayloadRecursive([field.childFields[0]], endpointPath, currentPath);
+      } else {
+        // Recursive call for nested objects
+        value = generateJsonPayloadRecursive(field.childFields, endpointPath, currentPath);
+      }
     } else if (
       field.type === "array" &&
       field.childFields &&
@@ -295,7 +307,7 @@ function generateJsonPayloadRecursive(
       } else {
         // Items are objects: recursively generate structure using all childFields
         // Pass the *whole* childFields array, representing the structure of ONE item.
-        itemValue = generateJsonPayloadRecursive(field.childFields, endpointPath);
+        itemValue = generateJsonPayloadRecursive(field.childFields, endpointPath, currentPath);
       }
       value = [itemValue]; // Create an array with one example element
     } else {
