@@ -679,12 +679,6 @@ Congrats! You've exported your wallet account 🎉
 </Step>
 </Steps>
 
-## Solana notes
-
-Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
-
-When importing into a multichain wallet such as Phantom, see [this guide](https://help.phantom.app/hc/en-us/articles/12988493966227-What-derivation-paths-does-Phantom-wallet-support#:~:text=The%20addresses%20are%20grouped%20into,'%2F0'%2F0%2F0.) on matching private keys across Solana, Ethereum, and Polygon.
-
 ## UI customization
 
 Everything is customizable in the import iframe except the sentence of mnemonic words, which is minimally styled: the text is left-aligned and the padding and margins are zero. Here's an example of how you can configure the styling of the iframe.
@@ -708,4 +702,41 @@ return (
     <style>{iframeCss}</style>
   </div>
 );
+```
+
+## Solana notes
+
+Solana paths do not include an `index`. Creating a wallet account with an index specified could lead to unexpected behavior when exporting and importing into another wallet.
+
+When importing into a multichain wallet such as Phantom, see [this guide](https://help.phantom.app/hc/en-us/articles/12988493966227-What-derivation-paths-does-Phantom-wallet-support#:~:text=The%20addresses%20are%20grouped%20into,'%2F0'%2F0%2F0.) on matching private keys across Solana, Ethereum, and Polygon.
+
+When exporting, if you export with the `hexadecimal` format, you can easily convert to base58 (Phantom-compatible) with a script like the following:
+
+
+```javascript
+var web3 = require('@solana/web3.js')
+var bs58 = require('bs58')
+
+const uint8arrayToHexString = (buffer) => {
+  return [...buffer].map((x) => x.toString(16).padStart(2, "0")).join("");
+};
+
+const uint8arrayFromHexString = (hexString) =>
+  new Uint8Array(hexString.match(/../g).map((h) => parseInt(h, 16)));
+
+const privateKey = "<your turnkey-provided exported private key (without 0x)>"
+const address = "<your solana address>"
+
+const base58DecodedAddress = bs58.decode(address)
+const base58DecodedAddressHex = uint8arrayToHexString(base58decodedAddress)
+const uintarr = uint8arrayFromHexString(`${privateKey}${base58decodedAddressHex}`)
+
+const imported = web3.Keypair.fromSecretKey(uintarr);
+console.log('imported wallet', imported) // verify import
+
+const privateKeyString = bs58.encode(uintarr);
+
+// NOTE: this log is for demonstration purposes only.
+// This key material is extremely sensitive and should be handled with care.
+console.log('phantom-importable private key string', privateKeyString)
 ```
