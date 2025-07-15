@@ -30,7 +30,7 @@ Unique identifier for a given Organization.
 </ParamField>
 
 <ParamField body="parameters" type="object" required={true} path="parameters">
-  <p>parameters field</p>
+  <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="otpType" type="string" required={true} default="">
     Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL
@@ -108,7 +108,16 @@ A successful response returns the following fields:
 <ResponseField name="activity" type="object" required={true}>
   The activity object containing type, intent, and result
   <Expandable title="activity details">
-    <NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
 The activity type
 </NestedParam>
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
@@ -195,18 +204,36 @@ Unique identifier for an OTP authentication
 
       </Expandable>
     </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
 
   </Expandable>
 </ResponseField>
 
 <RequestExample>
 
-```bash cURL
+```bash title="cURL"
 curl --request POST \
   --url https://api.turnkey.com/public/v1/submit/init_otp \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
-  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
+  --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
     "type": "ACTIVITY_TYPE_INIT_OTP",
     "timestampMs": "<string> (e.g. 1746736509954)",
@@ -214,7 +241,7 @@ curl --request POST \
     "parameters": {
         "otpType": "<string>",
         "contact": "<string>",
-        "otpLength": 123,
+        "otpLength": "<number>",
         "emailCustomization": {
             "appName": "<string>",
             "logoUrl": "<string>",
@@ -227,12 +254,45 @@ curl --request POST \
         },
         "userIdentifier": "<string>",
         "sendFromEmailAddress": "<string>",
-        "alphanumeric": true,
+        "alphanumeric": "<boolean>",
         "sendFromEmailSenderName": "<string>",
         "expirationSeconds": "<string>",
         "replyToEmailAddress": "<string>"
     }
 }'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().initOtp({
+  otpType: "<string> (Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL)",
+  contact: "<string> (Email or phone number to send the OTP code to)",
+  otpLength: 0 // Optional length of the OTP code. Default = 9,
+  emailCustomization: { // emailCustomization field,
+    appName: "<string> (The name of the application.)",
+    logoUrl: "<string> (A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px.)",
+    magicLinkTemplate: "<string> (A template for the URL to be used in a magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`.)",
+    templateVariables: "<string> (JSON object containing key/value pairs to be used with custom templates.)",
+    templateId: "<string> (Unique identifier for a given Email Template. If not specified, the default is the most recent Email Template.)",
+  },
+  smsCustomization: { // smsCustomization field,
+    template: "<string> (Template containing references to .OtpCode i.e Your OTP is {{.OtpCode}})",
+  },
+  userIdentifier: "<string> (Optional client-generated user identifier to enable per-user rate limiting for SMS auth. We recommend using a hash of the client-side IP address.)",
+  sendFromEmailAddress: "<string> (Optional custom email address from which to send the OTP email)",
+  alphanumeric: true // Optional flag to specify if the OTP code should be alphanumeric (Crockford’s Base32). Default = true,
+  sendFromEmailSenderName: "<string> (Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications')",
+  expirationSeconds: "<string> (Expiration window (in seconds) indicating how long the OTP is valid for. If not provided, a default of 5 minutes will be used. Maximum value is 600 seconds (10 minutes))",
+  replyToEmailAddress: "<string> (Optional custom email address to use as reply-to)"
+});
 ```
 
 </RequestExample>
@@ -249,12 +309,15 @@ curl --request POST \
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
       "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
         "type": "<string>",
         "intent": {
           "initOtpIntent": {
             "otpType": "<string>",
             "contact": "<string>",
-            "otpLength": 123,
+            "otpLength": "<number>",
             "emailCustomization": {
               "appName": "<string>",
               "logoUrl": "<string>",
@@ -267,7 +330,7 @@ curl --request POST \
             },
             "userIdentifier": "<string>",
             "sendFromEmailAddress": "<string>",
-            "alphanumeric": true,
+            "alphanumeric": "<boolean>",
             "sendFromEmailSenderName": "<string>",
             "expirationSeconds": "<string>",
             "replyToEmailAddress": "<string>"
@@ -277,7 +340,13 @@ curl --request POST \
           "initOtpResult": {
             "otpId": "<string>"
           }
-        }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
       }
     }
   }

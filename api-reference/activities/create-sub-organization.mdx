@@ -30,7 +30,7 @@ Unique identifier for a given Organization.
 </ParamField>
 
 <ParamField body="parameters" type="object" required={true} path="parameters">
-  <p>parameters field</p>
+  <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="subOrganizationName" type="string" required={true} default="">
     Name for this sub-organization
@@ -129,9 +129,8 @@ Unique identifier for a given Organization.
         Human-readable name for a Wallet.
         </NestedParam>
         
-        <ParamField body="accounts" type="enum<string[]>" required={true} path="parameters.wallet.accounts">
-          
-        Enum options: `CURVE_SECP256K1`, `CURVE_ED25519`
+        <ParamField body="accounts" type="array" required={true} path="parameters.wallet.accounts">
+          <p>A list of wallet Accounts. This field, if not needed, should be an empty array in your request body.</p>
           <Expandable title="item details">
             <NestedParam parentKey="parameters.wallet.accounts" childKey="curve" type="enum<string>" required={true} default="">
             Enum options: `CURVE_SECP256K1`, `CURVE_ED25519`
@@ -179,7 +178,16 @@ A successful response returns the following fields:
 <ResponseField name="activity" type="object" required={true}>
   The activity object containing type, intent, and result
   <Expandable title="activity details">
-    <NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
 The activity type
 </NestedParam>
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
@@ -380,18 +388,36 @@ item field
 
       </Expandable>
     </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
 
   </Expandable>
 </ResponseField>
 
 <RequestExample>
 
-```bash cURL
+```bash title="cURL"
 curl --request POST \
   --url https://api.turnkey.com/public/v1/submit/create_sub_organization \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
-  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
+  --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
     "type": "ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7",
     "timestampMs": "<string> (e.g. 1746736509954)",
@@ -433,7 +459,7 @@ curl --request POST \
                 ]
             }
         ],
-        "rootQuorumThreshold": 123,
+        "rootQuorumThreshold": "<number>",
         "wallet": {
             "walletName": "<string>",
             "accounts": [
@@ -444,14 +470,69 @@ curl --request POST \
                     "addressFormat": "<ADDRESS_FORMAT_UNCOMPRESSED>"
                 }
             ],
-            "mnemonicLength": 123
+            "mnemonicLength": "<number>"
         },
-        "disableEmailRecovery": true,
-        "disableEmailAuth": true,
-        "disableSmsAuth": true,
-        "disableOtpEmailAuth": true
+        "disableEmailRecovery": "<boolean>",
+        "disableEmailAuth": "<boolean>",
+        "disableSmsAuth": "<boolean>",
+        "disableOtpEmailAuth": "<boolean>"
     }
 }'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().createSubOrganization({
+  subOrganizationName: "<string> (Name for this sub-organization)",
+  rootUsers: [{ // Root users to create within this sub-organization,
+    userName: "<string> (Human-readable name for a User.)",
+    userEmail: "<string> (The user's email address.)",
+    userPhoneNumber: "<string> (The user's phone number in E.164 format e.g. +13214567890)",
+    apiKeys: [{ // A list of API Key parameters. This field, if not needed, should be an empty array in your request body.,
+      apiKeyName: "<string> (Human-readable name for an API Key.)",
+      publicKey: "<string> (The public component of a cryptographic key pair used to sign messages and transactions.)",
+      curveType: "<API_KEY_CURVE_P256>" // curveType field,
+      expirationSeconds: "<string> (Optional window (in seconds) indicating how long the API Key should last.)",
+    }],
+    authenticators: [{ // A list of Authenticator parameters. This field, if not needed, should be an empty array in your request body.,
+      authenticatorName: "<string> (Human-readable name for an Authenticator.)",
+      challenge: "<string> (Challenge presented for authentication purposes.)",
+      attestation: { // attestation field,
+        credentialId: "<string> (The cbor encoded then base64 url encoded id of the credential.)",
+        clientDataJson: "<string> (A base64 url encoded payload containing metadata about the signing context and the challenge.)",
+        attestationObject: "<string> (A base64 url encoded payload containing authenticator data and any attestation the webauthn provider chooses.)",
+        transports: "<AUTHENTICATOR_TRANSPORT_BLE>" // The type of authenticator transports.,
+      },
+    }],
+    oauthProviders: [{ // A list of Oauth providers. This field, if not needed, should be an empty array in your request body.,
+      providerName: "<string> (Human-readable name to identify a Provider.)",
+      oidcToken: "<string> (Base64 encoded OIDC token)",
+    }],
+  }],
+  rootQuorumThreshold: 0 // The threshold of unique approvals to reach root quorum. This value must be less than or equal to the number of root users,
+  wallet: { // wallet field,
+    walletName: "<string> (Human-readable name for a Wallet.)",
+    accounts: [{ // A list of wallet Accounts. This field, if not needed, should be an empty array in your request body.,
+      curve: "<CURVE_SECP256K1>" // curve field,
+      pathFormat: "<PATH_FORMAT_BIP32>" // pathFormat field,
+      path: "<string> (Path used to generate a wallet Account.)",
+      addressFormat: "<ADDRESS_FORMAT_UNCOMPRESSED>" // addressFormat field,
+    }],
+    mnemonicLength: 0 // Length of mnemonic to generate the Wallet seed. Defaults to 12. Accepted values: 12, 15, 18, 21, 24.,
+  },
+  disableEmailRecovery: true // Disable email recovery for the sub-organization,
+  disableEmailAuth: true // Disable email auth for the sub-organization,
+  disableSmsAuth: true // Disable OTP SMS auth for the sub-organization,
+  disableOtpEmailAuth: true // Disable OTP email auth for the sub-organization
+});
 ```
 
 </RequestExample>
@@ -468,6 +549,9 @@ curl --request POST \
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
       "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
         "type": "<string>",
         "intent": {
           "createSubOrganizationIntentV7": {
@@ -507,7 +591,7 @@ curl --request POST \
                 ]
               }
             ],
-            "rootQuorumThreshold": 123,
+            "rootQuorumThreshold": "<number>",
             "wallet": {
               "walletName": "<string>",
               "accounts": [
@@ -518,12 +602,12 @@ curl --request POST \
                   "addressFormat": "<ADDRESS_FORMAT_UNCOMPRESSED>"
                 }
               ],
-              "mnemonicLength": 123
+              "mnemonicLength": "<number>"
             },
-            "disableEmailRecovery": true,
-            "disableEmailAuth": true,
-            "disableSmsAuth": true,
-            "disableOtpEmailAuth": true
+            "disableEmailRecovery": "<boolean>",
+            "disableEmailAuth": "<boolean>",
+            "disableSmsAuth": "<boolean>",
+            "disableOtpEmailAuth": "<boolean>"
           }
         },
         "result": {
@@ -532,14 +616,20 @@ curl --request POST \
             "wallet": {
               "walletId": "<string>",
               "addresses": [
-                "<string_element>"
+                "<string>"
               ]
             },
             "rootUserIds": [
-              "<string_element>"
+              "<string>"
             ]
           }
-        }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
       }
     }
   }

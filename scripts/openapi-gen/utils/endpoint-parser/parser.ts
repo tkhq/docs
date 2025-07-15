@@ -168,11 +168,30 @@ export function parseApiEndpoints(
                         "The activity object containing type, intent, and result",
                       childFields: [
                         {
+                          name: "id",
+                          type: "string",
+                          required: true,
+                          description: "Unique identifier for a given Activity object.",
+                        },
+                        {
+                          name: "organizationId",
+                          type: "string",
+                          required: true,
+                          description: "Unique identifier for a given Organization.",
+                        },
+                        {
+                          name: "status",
+                          type: "string",
+                          required: true,
+                          description: baseEndpointInfo.path.includes("reject_activity") 
+                            ? "ACTIVITY_STATUS_REJECTED" 
+                            : "The activity status",
+                        },
+                        {
                           name: "type",
                           type: "string",
                           required: true,
                           description: "The activity type",
-                          defaultValue: component.activityType,
                         },
                         {
                           name: "intent",
@@ -196,17 +215,53 @@ export function parseApiEndpoints(
                           type: "object",
                           required: true,
                           description: "The result of the activity",
-                          childFields: [
-                            {
-                              name: component.resultName,
-                              type: "object",
-                              required: true,
-                              description: `The ${component.resultName} object`,
-                              childFields: resultSchema
-                                ? parseSchemaProperties(resultSchema)
-                                : [],
-                            },
-                          ],
+                          childFields: resultSchema
+                              ? [
+                                  {
+                                    name: component.resultName,
+                                    type: "object",
+                                    required: true,
+                                    description: `The ${component.resultName} object`,
+                                    childFields: parseSchemaProperties(resultSchema),
+                                  },
+                                ]
+                              : [],
+                        },
+                        {
+                          name: "votes",
+                          type: "array",
+                          required: true,
+                          description: "A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.",
+                        },
+                        {
+                          name: "fingerprint",
+                          type: "string",
+                          required: true,
+                          description: "An artifact verifying a User's action.",
+                        },
+                        {
+                          name: "canApprove",
+                          type: "boolean",
+                          required: true,
+                          description: "Whether the activity can be approved.",
+                        },
+                        {
+                          name: "canReject",
+                          type: "boolean",
+                          required: true,
+                          description: "Whether the activity can be rejected.",
+                        },
+                        {
+                          name: "createdAt",
+                          type: "string",
+                          required: true,
+                          description: "The creation timestamp.",
+                        },
+                        {
+                          name: "updatedAt",
+                          type: "string",
+                          required: true,
+                          description: "The last update timestamp.",
                         },
                       ],
                     },
@@ -333,11 +388,19 @@ function schemaToApiField(
 ): ApiField {
   const dataType = mapOpenApiTypeToDataType(schema.type);
 
+  // Provide better default descriptions for common fields
+  let defaultDescription: string;
+  if (name === "parameters") {
+    defaultDescription = "The parameters object containing the specific intent data for this activity.";
+  } else {
+    defaultDescription = `${name} field`;
+  }
+
   const field: ApiField = {
     name,
     type: dataType,
     required,
-    description: schema.description || `${name} field`,
+    description: schema.description || defaultDescription,
   };
 
   // Add example if available
@@ -488,55 +551,55 @@ function matchVersionedComponents(
   results: string[]
 ): VersionedComponent[] {
   const components: VersionedComponent[] = [];
-  const versionMap: Map<string, Partial<VersionedComponent>> = new Map();
 
-  // Process activity types
-  for (const typeName of activityTypes) {
-    const version = extractVersionFromComponent(typeName);
-    if (version) {
-      if (!versionMap.has(version)) versionMap.set(version, {});
-      versionMap.get(version)!.activityType = typeName;
-    }
-  }
+  // Find the latest version of each component type
+  const latestActivityType = findLatestVersion(activityTypes);
+  const latestIntent = findLatestVersion(intents);
+  const latestResult = findLatestVersion(results);
 
-  // Process intents
-  for (const intentName of intents) {
-    const version = extractVersionFromComponent(intentName);
-    if (version) {
-      if (!versionMap.has(version)) versionMap.set(version, {});
-      versionMap.get(version)!.intentName = intentName;
-    }
-  }
+  // If we have both activity type and intent, create a component
+  if (latestActivityType && latestIntent) {
+    const activityTypeVersion = extractVersionFromComponent(latestActivityType);
+    const intentVersion = extractVersionFromComponent(latestIntent);
+    
+    // Use the higher version number for the component version
+    const componentVersion = Math.max(
+      parseInt(activityTypeVersion || "1"),
+      parseInt(intentVersion || "1")
+    ).toString();
 
-  // Process results
-  for (const resultName of results) {
-    const version = extractVersionFromComponent(resultName);
-    if (version) {
-      if (!versionMap.has(version)) versionMap.set(version, {});
-      versionMap.get(version)!.resultName = resultName;
-    }
-  }
-
-  // Create final components where all parts are found
-  for (const [version, component] of versionMap.entries()) {
-    if (
-      component.activityType &&
-      component.intentName &&
-      component.resultName
-    ) {
-      components.push({
-        version,
-        activityType: component.activityType,
-        intentName: component.intentName,
-        resultName: component.resultName,
-      });
-    }
+    components.push({
+      version: componentVersion,
+      activityType: latestActivityType,
+      intentName: latestIntent,
+      resultName: latestResult || latestIntent.replace('Intent', 'Result'), // Use latest result or fallback
+    });
   }
 
   // Sort by version (optional, but good practice)
   components.sort((a, b) => a.version.localeCompare(b.version));
 
   return components;
+}
+
+/**
+ * Finds the component with the highest version number
+ */
+function findLatestVersion(components: string[]): string | null {
+  if (components.length === 0) return null;
+  
+  let latest = components[0];
+  let latestVersion = parseInt(extractVersionFromComponent(latest) || "1");
+
+  for (const component of components) {
+    const version = parseInt(extractVersionFromComponent(component) || "1");
+    if (version > latestVersion) {
+      latestVersion = version;
+      latest = component;
+    }
+  }
+
+  return latest;
 }
 
 /**

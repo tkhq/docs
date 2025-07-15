@@ -39,6 +39,8 @@ export async function parseOpenAPI(
     // Dereference the parsed JSON
     const api = await OpenAPIParser.default.dereference(jsonContent);
 
+    console.log('api', api);
+
     return api;
   } catch (error: any) {
     // Enhance error message to provide more context

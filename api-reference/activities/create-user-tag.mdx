@@ -30,7 +30,7 @@ Unique identifier for a given Organization.
 </ParamField>
 
 <ParamField body="parameters" type="object" required={true} path="parameters">
-  <p>parameters field</p>
+  <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="userTagName" type="string" required={true} default="">
     Human-readable name for a User Tag.
@@ -52,7 +52,16 @@ A successful response returns the following fields:
 <ResponseField name="activity" type="object" required={true}>
   The activity object containing type, intent, and result
   <Expandable title="activity details">
-    <NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
 The activity type
 </NestedParam>
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
@@ -103,18 +112,36 @@ item field
 
       </Expandable>
     </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
 
   </Expandable>
 </ResponseField>
 
 <RequestExample>
 
-```bash cURL
+```bash title="cURL"
 curl --request POST \
   --url https://api.turnkey.com/public/v1/submit/create_user_tag \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
-  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
+  --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
     "type": "ACTIVITY_TYPE_CREATE_USER_TAG",
     "timestampMs": "<string> (e.g. 1746736509954)",
@@ -122,10 +149,26 @@ curl --request POST \
     "parameters": {
         "userTagName": "<string>",
         "userIds": [
-            "<string_element>"
+            "<string>"
         ]
     }
 }'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().createUserTag({
+  userTagName: "<string> (Human-readable name for a User Tag.)",
+  userIds: ["<string>"] // A list of User IDs.
+});
 ```
 
 </RequestExample>
@@ -142,12 +185,15 @@ curl --request POST \
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
       "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
         "type": "<string>",
         "intent": {
           "createUserTagIntent": {
             "userTagName": "<string>",
             "userIds": [
-              "<string_element>"
+              "<string>"
             ]
           }
         },
@@ -155,10 +201,16 @@ curl --request POST \
           "createUserTagResult": {
             "userTagId": "<string>",
             "userIds": [
-              "<string_element>"
+              "<string>"
             ]
           }
-        }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
       }
     }
   }

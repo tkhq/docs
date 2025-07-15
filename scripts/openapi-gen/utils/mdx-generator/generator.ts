@@ -25,11 +25,13 @@ function getEnumDetails(field: ApiField): {
       options: field.enumOptions,
     };
   }
-  // Check for array of enums
+  // Only treat as array of enums if the array items are enums (not objects)
   if (
     field.type === "array" &&
-    field.childFields?.[0]?.type === "enum" &&
-    field.childFields?.[0]?.enumOptions
+    field.childFields?.length === 1 &&
+    field.childFields[0].name === "item" &&
+    field.childFields[0].type === "enum" &&
+    field.childFields[0].enumOptions
   ) {
     return {
       isEnum: true, // Treat as enum context for display
@@ -239,7 +241,9 @@ function generateResponseFieldMdxRecursive(
 
 // --- Helper: Generate JSON Payload Object ---
 function generateJsonPayloadRecursive(
-  fields: ApiField[] | undefined
+  fields: ApiField[] | undefined,
+  endpointPath?: string,
+  parentPath: string = ""
 ): Record<string, any> {
   if (!fields) {
     return {};
@@ -249,10 +253,24 @@ function generateJsonPayloadRecursive(
 
   fields.forEach((field) => {
     let value: any;
+    const currentPath = parentPath ? `${parentPath}.${field.name}` : field.name;
 
-    if (field.type === "object" && field.childFields) {
-      // Recursive call for nested objects
-      value = generateJsonPayloadRecursive(field.childFields);
+    // Special handling for ApproveActivity result field
+    if (endpointPath?.includes("approve_activity") && field.name === "result" && field.childFields?.length === 0) {
+      value = "<object> (approved activity result, if completed)";
+    } else if (field.type === "object" && field.childFields) {
+      // Special handling for get-activity: only include the first intent in the response example
+      if (
+        endpointPath?.includes("get_activity") &&
+        field.name === "intent" &&
+        field.childFields.length > 0
+      ) {
+        // Only include the first intent child
+        value = generateJsonPayloadRecursive([field.childFields[0]], endpointPath, currentPath);
+      } else {
+        // Recursive call for nested objects
+        value = generateJsonPayloadRecursive(field.childFields, endpointPath, currentPath);
+      }
     } else if (
       field.type === "array" &&
       field.childFields &&
@@ -274,13 +292,13 @@ function generateJsonPayloadRecursive(
           // Array of simple types
           switch (itemField.type) {
             case "string":
-              itemValue = "<string_element>";
+              itemValue = "<string>";
               break;
             case "number":
-              itemValue = 456;
+              itemValue = "<number>";
               break;
             case "boolean":
-              itemValue = false;
+              itemValue = "<boolean>";
               break;
             default:
               itemValue = `<${itemField.type || "unknown"}_element>`;
@@ -289,7 +307,7 @@ function generateJsonPayloadRecursive(
       } else {
         // Items are objects: recursively generate structure using all childFields
         // Pass the *whole* childFields array, representing the structure of ONE item.
-        itemValue = generateJsonPayloadRecursive(field.childFields);
+        itemValue = generateJsonPayloadRecursive(field.childFields, endpointPath, currentPath);
       }
       value = [itemValue]; // Create an array with one example element
     } else {
@@ -297,7 +315,20 @@ function generateJsonPayloadRecursive(
       const fieldDetails = getEnumDetails(field);
       if (fieldDetails.isEnum && fieldDetails.options.length > 0) {
         // Simple Enum
-        value = `<${fieldDetails.options[0].value}>`;
+        let enumValue = `<${fieldDetails.options[0].value}>`;
+        
+        // Special handling for credential type in get-api-key and get-api-keys endpoints.
+        // Current behavior: for enum types, we grab the first (which defaults to CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR).
+        // However, for `get_api_key` and `get_api_keys` endpoints, we want to use CREDENTIAL_TYPE_API_KEY_P256.
+        if (
+          (endpointPath?.includes("get_api_key") || endpointPath?.includes("get_api_keys")) &&
+          field.name === "type" &&
+          enumValue === "<CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR>"
+        ) {
+          enumValue = "<CREDENTIAL_TYPE_API_KEY_P256>";
+        }
+        
+        value = enumValue;
       } else {
         // Simple Type (non-enum)
         switch (field.type) {
@@ -305,10 +336,10 @@ function generateJsonPayloadRecursive(
             value = "<string>";
             break;
           case "number":
-            value = 123;
+            value = "<number>";
             break;
           case "boolean":
-            value = true;
+            value = "<boolean>";
             break;
           default:
             value = `<${field.type || "unknown"}>`; // Use type as placeholder if known
@@ -319,6 +350,121 @@ function generateJsonPayloadRecursive(
   });
 
   return result;
+}
+
+// --- Helper: Map endpoint path to SDK method name ---
+function getSdkMethodName(endpoint: ApiEndpoint): string {
+  const path = endpoint.path || "";
+  
+  // Extract the last part of the path (e.g., "approve_activity" from "/public/v1/submit/approve_activity")
+  const pathParts = path.split("/").filter(Boolean);
+  const lastPart = pathParts[pathParts.length - 1];
+  
+  if (!lastPart) return "unknownMethod";
+  
+  // Convert snake_case to camelCase
+  return lastPart.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// --- Helper: Generate SDK parameter value for a field ---
+function generateSdkParameterValue(field: ApiField, indent: number = 2): string {
+  const indentStr = " ".repeat(indent);
+  const fieldName = field.name;
+  const fieldType = field.type;
+  const description = field.description ? ` // ${field.description}` : "";
+  
+  // Check if this is an enum field
+  const { isEnum, options } = getEnumDetails(field);
+  
+  if (isEnum && options.length > 0) {
+    // For enum fields, show the first option as an example
+    const firstOption = options[0].value;
+    return `${indentStr}${fieldName}: "<${firstOption}>"${description}`;
+  } else if (fieldType === "string") {
+    return `${indentStr}${fieldName}: "<string>${field.description ? ` (${field.description})` : ''}"`;
+  } else if (fieldType === "number") {
+    return `${indentStr}${fieldName}: 0${description}`;
+  } else if (fieldType === "boolean") {
+    return `${indentStr}${fieldName}: true${description}`;
+  } else if (fieldType === "array") {
+    if (field.childFields && field.childFields.length > 0) {
+      // If the array is of objects (multiple fields, or first child is an object)
+      if (
+        field.childFields.length > 1 ||
+        (field.childFields.length === 1 && field.childFields[0].type === "object")
+      ) {
+        const lines = [`${indentStr}${fieldName}: [{${description}`];
+        for (const child of field.childFields) {
+          lines.push(generateSdkParameterValue(child, indent + 2));
+        }
+        lines.push(`${indentStr}}]`);
+        return lines.join(",\n");
+      } else if (
+        field.childFields.length === 1 &&
+        field.childFields[0].name === "item"
+      ) {
+        // Array of primitives or enums
+        const itemField = field.childFields[0];
+        const { isEnum, options } = getEnumDetails(itemField);
+        if (isEnum && options.length > 0) {
+          return `${indentStr}${fieldName}: ["<${options[0].value}>"]${description}`;
+        } else {
+          return `${indentStr}${fieldName}: ["<string>"]${description}`;
+        }
+      } else {
+        // Fallback
+        return `${indentStr}${fieldName}: ["<string>"]${description}`;
+      }
+    } else {
+      return `${indentStr}${fieldName}: ["<string>"]${description}`;
+    }
+  } else if (fieldType === "object") {
+    if (field.childFields && field.childFields.length > 0) {
+      const lines = [`${indentStr}${fieldName}: {${description}`];
+      for (const childField of field.childFields) {
+        lines.push(generateSdkParameterValue(childField, indent + 2));
+      }
+      lines.push(`${indentStr}}`);
+      return lines.join(",\n");
+    } else {
+      return `${indentStr}${fieldName}: { /* object */ }${description}`;
+    }
+  }
+  
+  return `${indentStr}${fieldName}: "<unknown>"${description}`;
+}
+
+// --- Helper: Generate SDK parameters from endpoint ---
+function generateSdkParameters(endpoint: ApiEndpoint): string {
+  const fields = endpoint.requestBody?.fields || [];
+  const parametersWrapper = fields.find((f) => f.name === "parameters");
+  
+  if (parametersWrapper) {
+    if (parametersWrapper.childFields && parametersWrapper.childFields.length > 0) {
+      // For activity endpoints, extract parameters from the parameters wrapper only
+      const paramLines: string[] = [];
+      for (const field of parametersWrapper.childFields) {
+        paramLines.push(generateSdkParameterValue(field));
+      }
+      return paramLines.join(",\n");
+    } else {
+      // parameters exists but has no child fields, so no endpoint-specific parameters
+      return "";
+    }
+  } else {
+    // For query endpoints, use all top-level fields (excluding only type and timestampMs)
+    const commonFields = ["type", "timestampMs"]; // organizationId should be included for queries
+    const endpointSpecificFields = fields.filter(f => !commonFields.includes(f.name));
+    
+    if (endpointSpecificFields.length === 0) {
+      return ""; // No endpoint-specific parameters
+    }
+    const paramLines: string[] = [];
+    for (const field of endpointSpecificFields) {
+      paramLines.push(generateSdkParameterValue(field));
+    }
+    return paramLines.join(",\n");
+  }
 }
 
 // --- Helper: Generate Request Example MDX ---
@@ -345,7 +491,8 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   if (parametersWrapper) {
     // activity-style endpoint
     const parametersObject = generateJsonPayloadRecursive(
-      parametersWrapper.childFields
+      parametersWrapper.childFields,
+      endpoint.path
     );
     dataPayloadObject = {
       type: activityType,
@@ -355,7 +502,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     };
   } else {
     // query-style endpoint: flatten all top-level fields
-    dataPayloadObject = generateJsonPayloadRecursive(fields);
+    dataPayloadObject = generateJsonPayloadRecursive(fields, endpoint.path);
   }
 
   // Stringify carefully, handle potential BigInts if they arise
@@ -369,16 +516,34 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''");
 
   const curlCommand =
-    "```bash cURL\n" +
+    "```bash title=\"cURL\"\n" +
     "curl --request POST \\\n" +
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
     "  --header 'Content-Type: application/json' \\\n" +
-    '  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \\\n' + // Added reminder for secret
+    '  --header "X-Stamp: <string> (see Authorizations)" \\\n' + // Added reminder for secret
     `  --data '${escapedDataPayloadString}'\n` +
     "```";
 
-  return `<RequestExample>\n\n${curlCommand}\n\n</RequestExample>`;
+  // Generate JavaScript SDK example
+  const sdkMethodName = getSdkMethodName(endpoint);
+  const sdkParameters = generateSdkParameters(endpoint);
+  const jsParams = sdkParameters.trim() === "" ? "{}" : `{
+${sdkParameters}
+}`;
+  const javascriptExample = 
+    "```javascript title=\"JavaScript\"\n" +
+    "import { Turnkey } from \"@turnkey/sdk-server\";\n\n" +
+    "const turnkeyClient = new Turnkey({\n" +
+    "  apiBaseUrl: \"https://api.turnkey.com\",\n" +
+    "  apiPublicKey: process.env.API_PUBLIC_KEY!,\n" +
+    "  apiPrivateKey: process.env.API_PRIVATE_KEY!,\n" +
+    "  defaultOrganizationId: process.env.ORGANIZATION_ID!,\n" +
+    "});\n\n" +
+    `const response = await turnkeyClient.apiClient().${sdkMethodName}(${jsParams});\n` +
+    "```";
+
+  return `<RequestExample>\n\n${curlCommand}\n\n${javascriptExample}\n\n</RequestExample>`;
 }
 
 // --- Helper: Generate Response Example MDX ---
@@ -401,34 +566,42 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
   );
 
   // Generate payload based on response schema if available, otherwise fallback
-  let activityResultPayload: Record<string, any>;
+  let resultPayload: Record<string, any>;
   if (successResponse?.fields) {
-    // Assuming the success response structure is directly the content of 'activity.result'
-    // Adjust this logic if the actual response schema nests the result differently
-    activityResultPayload = generateJsonPayloadRecursive(
-      successResponse.fields
+    resultPayload = generateJsonPayloadRecursive(
+      successResponse.fields,
+      endpoint.path
     );
   } else {
-    // Fallback if no 200 response schema is defined
-    activityResultPayload = { "<result_key>": "<result_value>" };
+    resultPayload = { "<result_key>": "<result_value>" };
   }
 
-  const responsePayloadObject = {
-    activity: {
-      id: "<activity-id>",
-      status: "ACTIVITY_STATUS_COMPLETED", // Example status
-      type: activityType, // Echo derived or placeholder type from request
-      organizationId: "<organization-id>",
-      timestampMs: "<timestamp> (e.g. 1746736509954)",
-      result: activityResultPayload, // Use generated or fallback result
-    },
-  };
-
-  const responseJsonString = JSON.stringify(
-    responsePayloadObject,
-    (key, value) => (typeof value === "bigint" ? value.toString() : value),
-    2
-  ); // 2-space indent
+  let responseJsonString: string;
+  if (endpoint.type === "activity") {
+    // Activity endpoints: wrap in activity object
+    const responsePayloadObject = {
+      activity: {
+        id: "<activity-id>",
+        status: "ACTIVITY_STATUS_COMPLETED", // Example status
+        type: activityType, // Echo derived or placeholder type from request
+        organizationId: "<organization-id>",
+        timestampMs: "<timestamp> (e.g. 1746736509954)",
+        result: resultPayload, // Use generated or fallback result
+      },
+    };
+    responseJsonString = JSON.stringify(
+      responsePayloadObject,
+      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2
+    ); // 2-space indent
+  } else {
+    // Query endpoints: just the result object
+    responseJsonString = JSON.stringify(
+      resultPayload,
+      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2
+    );
+  }
 
   const responseJsonBlock = `\`\`\`json 200\n${responseJsonString}\n\`\`\``;
 

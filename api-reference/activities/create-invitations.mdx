@@ -30,7 +30,7 @@ Unique identifier for a given Organization.
 </ParamField>
 
 <ParamField body="parameters" type="object" required={true} path="parameters">
-  <p>parameters field</p>
+  <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <ParamField body="invitations" type="array" required={true} path="parameters.invitations">
       <p>A list of Invitations.</p>
@@ -68,7 +68,16 @@ A successful response returns the following fields:
 <ResponseField name="activity" type="object" required={true}>
   The activity object containing type, intent, and result
   <Expandable title="activity details">
-    <NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
 The activity type
 </NestedParam>
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
@@ -134,18 +143,36 @@ item field
 
       </Expandable>
     </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
 
   </Expandable>
 </ResponseField>
 
 <RequestExample>
 
-```bash cURL
+```bash title="cURL"
 curl --request POST \
   --url https://api.turnkey.com/public/v1/submit/create_invitations \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
-  --header "X-Stamp: <YOUR_API_KEY.YOUR_API_SECRET>" \
+  --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
     "type": "ACTIVITY_TYPE_CREATE_INVITATIONS",
     "timestampMs": "<string> (e.g. 1746736509954)",
@@ -156,7 +183,7 @@ curl --request POST \
                 "receiverUserName": "<string>",
                 "receiverUserEmail": "<string>",
                 "receiverUserTags": [
-                    "<string_element>"
+                    "<string>"
                 ],
                 "accessType": "<ACCESS_TYPE_WEB>",
                 "senderUserId": "<string>"
@@ -164,6 +191,27 @@ curl --request POST \
         ]
     }
 }'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().createInvitations({
+  invitations: [{ // A list of Invitations.,
+    receiverUserName: "<string> (The name of the intended Invitation recipient.)",
+    receiverUserEmail: "<string> (The email address of the intended Invitation recipient.)",
+    receiverUserTags: ["<string>"] // A list of tags assigned to the Invitation recipient. This field, if not needed, should be an empty array in your request body.,
+    accessType: "<ACCESS_TYPE_WEB>" // accessType field,
+    senderUserId: "<string> (Unique identifier for the Sender of an Invitation.)",
+  }]
+});
 ```
 
 </RequestExample>
@@ -180,6 +228,9 @@ curl --request POST \
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
       "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
         "type": "<string>",
         "intent": {
           "createInvitationsIntent": {
@@ -188,7 +239,7 @@ curl --request POST \
                 "receiverUserName": "<string>",
                 "receiverUserEmail": "<string>",
                 "receiverUserTags": [
-                  "<string_element>"
+                  "<string>"
                 ],
                 "accessType": "<ACCESS_TYPE_WEB>",
                 "senderUserId": "<string>"
@@ -199,10 +250,16 @@ curl --request POST \
         "result": {
           "createInvitationsResult": {
             "invitationIds": [
-              "<string_element>"
+              "<string>"
             ]
           }
-        }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
       }
     }
   }
