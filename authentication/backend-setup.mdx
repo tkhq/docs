@@ -29,16 +29,15 @@ sequenceDiagram
 
     %% Login/Signup Flow
     User->>Frontend: Login/Signup Action
-    Frontend->>Frontend: Create signed Turnkey request
-    Frontend->>Backend: Send signed request
-    Backend->>Turnkey: Forward request
+    Frontend->>Backend: Send auth info
+    Backend->>Backend: Create and sign Turnkey request
+    Backend->>Turnkey: Send signed request
     Turnkey->>Backend: Return session JWT
     Backend->>Frontend: Return session JWT
     Frontend->>Frontend: Store session JWT
 
     %% Subsequent Request Flow
     User->>Frontend: Action requiring Backend Authentication
-    Frontend->>Frontend: Create signed request
     Frontend->>Backend: Send request with JWT
     Backend->>Backend: Validate JWT
     Backend->>Backend: Check user permissions
@@ -68,13 +67,13 @@ sequenceDiagram
     participant Turnkey
 
     User->>Frontend: Begin signup (create passkey)
-    Frontend->>Frontend: Create passkey and API key
-    Frontend->>Backend: Send passkey + API public key
-    Backend->>Turnkey: Create sub-org with passkey + API key
+    Frontend->>Frontend: Create passkey and ephemeral API key
+    Frontend->>Backend: Send passkey + ephemeral API public key
+    Backend->>Turnkey: Create sub-org with passkey + API public key
     Turnkey->>Backend: Return subOrgId
     Backend->>Frontend: Return subOrgId
-    Frontend->>Frontend: Create TurnkeyClient with API key
-    Frontend->>Turnkey: Call stampLogin()
+    Frontend->>Frontend: Create TurnkeyClient with ephemeral API key
+    Frontend->>Turnkey: Call stampLogin() using ephemeral API key
     Turnkey->>Frontend: Return session JWT
     User->>Frontend: Action requiring Backend Authentication
     Frontend->>Backend: Send request along with session JWT
@@ -151,7 +150,7 @@ sequenceDiagram
 </Steps>
 
 ### OTP Authentication
-Turnkey also supports email-based One-Time Passcode (OTP) authentication, allowing users to log in by entering a code sent to their email or phone number. We’ll cover OTP login and signup together, since the flows are similar and most apps handle them in a unified way.
+Turnkey also supports SMS and email-based One-Time Passcode (OTP) authentication, allowing users to log in by entering a code sent to their email or phone number. We’ll cover OTP login and signup together, since the flows are similar and most apps handle them in a unified way.
 
 ```mermaid
 sequenceDiagram
@@ -171,15 +170,15 @@ sequenceDiagram
     Backend->>Turnkey: Call verifyOtp()
     Turnkey->>Backend: Return verification token
     Backend->>Frontend: Return verification token
-    Frontend->>Frontend: Create ephemeral key pair
-    Frontend->>Backend: Send publicKey + verification token
+    Frontend->>Frontend: Create API key
+    Frontend->>Backend: Send API public key + verification token
     Backend->>Turnkey: Call getSubOrgIds() with contact info
     Turnkey->>Backend: Return existing subOrgId (if any)
     alt SubOrgId not found
         Backend->>Turnkey: Create new sub-org with contact
         Turnkey->>Backend: Return new subOrgId
     end
-    Backend->>Turnkey: Call otpLogin() with subOrgId, publicKey, and token
+    Backend->>Turnkey: Call otpLogin() with subOrgId, public key, and token
     Turnkey->>Backend: Return session JWT
     Backend->>Frontend: Return session JWT
     User->>Frontend: Action requiring Backend Authentication
@@ -200,7 +199,7 @@ sequenceDiagram
   </Step>
 
   <Step title="Get or Create a Turnkey Sub-organization">
-  The frontend generates an ephemeral key pair, then sends the public key and verification token to the backend. The backend checks with Turnkey whether a sub-organization already exists for the contact. If not, it creates a new one.
+  The frontend generates an API key, then sends the API public key and verification token to the backend. The backend checks with Turnkey whether a sub-organization already exists for the contact. If not, it creates a new one.
   </Step>
 
   <Step title="Create a Session">
@@ -216,6 +215,8 @@ sequenceDiagram
 After a user completes Turnkey authentication and a session is created (via passkey, OTP, or another supported method), your backend returns a session JWT to the frontend. This token proves the user’s identity and is the frontend’s responsibility to store and include in all future authenticated requests to your backend.
 
 The session JWT should be attached to each request using the `Authorization` header. This allows your backend to identify the authenticated user and enforce any necessary access control based on the `user_id` or `organization_id`.
+
+**Note:** These requests are sent to your own backend endpoints and may contain any application-specific payload, such as a form submission, a database mutation, or a business action. They are not necessarily related to Turnkey.
 
 Here’s an example of how the frontend might send the JWT:
 ```typescript
