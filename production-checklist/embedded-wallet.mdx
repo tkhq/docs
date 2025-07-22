@@ -68,6 +68,20 @@ When designing your session approach, there are two key decisions to make: where
 Storage  
 Turnkey supports multiple storage approaches for session credentials, each with tradeoffs depending on platform and use case.
 
+IndexedDB session (web only): For web apps that want stronger session persistence without relying on iframes or exposing credentials to your app’s JavaScript runtime, Turnkey supports using the [SubtleCrypto](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto) API to generate unextractable asymmetric key pairs and store them securely in the browser’s IndexedDB.
+
+This approach enables long-lived, client-held sessions that survive page reloads, tab closures, and even browser restarts - **without ever exposing the private key** to your JavaScript code.
+
+Turnkey’s SDK provides helpers to:
+- Create a new session by generating a P-256 key pair via `crypto.subtle.generateKey()`
+- Sign requests
+- Store and retrieve the key using IndexedDB under a given session ID
+- Abstractions built on top of the `IndexedDBStamper` that simplify authentication flows 
+
+This is currently the **most persistent** session model for modern browsers that support WebCrypto. It is especially valuable in Progressive Web App (PWA) contexts or when iframe and localStorage approaches are insufficient.
+
+To see a full working example, check out our [IndexedDB sdk example](https://github.com/tkhq/sdk/tree/main/examples/with-indexed-db). Or our [Web demo application](https://github.com/tkhq/demo-ewk) that leverages abstractions such as the `IndexedDbClient` for full e2e authentication flows.
+
 Iframe-based session: Turnkey hosts a secure iframe at https://auth.turnkey.com which can be used to store the session credential
 used to authorize actions, without exposing those credentials to your app. This method is secure and browser-isolated, but:
 
@@ -78,7 +92,7 @@ used to authorize actions, without exposing those credentials to your app. This 
 Local storage: The session credential can also be stored directly in Local Storage. This allows the credential to persist across tabs,
 reloads, or components in web apps. However, your app's domain can access Local Storage, so credentials must be handled with care.
 
-Mobile secure storage: On mobile devices, session credentials can be stored in the device's native secure storage layer,
+SecureStorage (mobile only): On mobile devices, session credentials can be stored in the device's native secure storage layer,
 such as Keychain (iOS) or Keystore (Android). This offers the strongest guarantees for durability and isolation in native mobile apps.
 
 Duration  

@@ -28,63 +28,54 @@ If you’d like to do this via our SDK abstractions, you can leverage the [login
 
 ### Read-write sessions
 
-In contrast to read-only sessions, a read-write session makes sense when a user would like to make several write requests in a window of time without having to manually authenticate each one via passkey. There are a few ways to achieve this:
+In contrast to read-only sessions, a read-write session makes sense when a user would like to make several authenticated write requests in a window of time. There are a few ways to achieve this:
 
 #### Creating a read-write session
 
-Developers can leverage the [CreateReadWriteSession](/api-reference/sessions/create-read-write-session) activity, which requires a target embedded key and returns a credential bundle. This is a pattern that many core, secure flows follow, including Email Auth, and OTP Auth. See [documentation](/authentication/email#mechanism-and-cryptographic-details) for more details.
+There are several mechanisms to obtain read-write sessions: OTP, OAuth, Passkey sessions, and Session refreshing
 
 <Frame>
   <img src="/images/features/img/read_write_sessions.png" alt="Read-write sessions" />
 </Frame>
 
-As illustrated above, once you have a target embedded key in place on the client side, you can call `CreateReadWriteSession`, get the resulting credential bundle, and decrypt it on the client side using the “TEK”. Upon decryption, the result is a usable Turnkey API key that can be used to make both read and write requests.
-
-Our SDK contains an abstraction called [loginWithReadWriteSession](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/sdk-browser/src/sdk-client.ts#L257-L284). Crucially, it is able to infer the organization (or sub-organization) based on a stamp, and create a read-write session on behalf of that organization. From an end-user experience perspective, this means that a developer can request an end-user’s passkey approval once, and subsequently give that user a read-write session.
-
-Note that `loginWithReadWriteSession` stores the resulting credential bundle (returned by Turnkey) in Local Storage. We store this credential bundle in Local Storage as it can be used across various React components and pages – as long as both the target embedded key and credential bundle exist, they can be used as a credential to create Turnkey requests. For details on the shape of this stored artifact, see [here](https://github.com/tkhq/sdk/blob/9e9943387123d077fa3b7f38ef3be007291a2c8a/packages/sdk-browser/src/storage.ts#L64-L117).
+Our SDK contains several abstractions that manage authentication. You can checkout all of our examples leveraging these examples [here](https://github.com/tkhq/sdk/tree/main/examples)
 
 ### Mechanisms
 
-Your next question might be: where can I get the target embedded key? There are two primary mechanisms we offer that provide such embedded keys:
+There are two primary mechanisms we offer that provide client side key generation and signing to support read-write sessions.
 
-#### iframes:
+#### IndexedDB (web only):
 
-Turnkey hosts an iframe for use cases such as this one at [https://auth.turnkey.com](https://auth.turnkey.com) (see [here](https://github.com/tkhq/frames/tree/main/auth) for code implementation). It’s to be used in conjunction with our [@turnkey/iframe-stamper](/sdks/advanced/iframe-stamper), but note that some complexity can be abstracted away if using @turnkey/sdk-react. See this [code example](/embedded-wallets/code-examples/create-passkey-session) for more.
+For web apps that want stronger session persistence without relying on iframes or exposing credentials to your app’s JavaScript runtime, Turnkey supports using the [SubtleCrypto](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto) API to generate unextractable asymmetric key pairs and store them securely in the browser’s IndexedDB.
 
-The iframe is responsible for holding the “TEK” mentioned in the previous diagram. In addition to housing the TEK, it exposes some methods to be able to interact with (but not extract!) the TEK. The end result is that the iframe can safely and securely sign requests to Turnkey. If you would like to take a look at lower level implementation details, see [here](https://github.com/tkhq/sdk/blob/main/packages/iframe-stamper/src/index.ts).
+This approach enables long-lived, client-held sessions that survive page reloads, tab closures, and even browser restarts – **without ever exposing the private key** to your JavaScript code.
 
-There are a few considerations to note when using sessions with iframes:
+Turnkey’s SDK provides helpers to:
+- Create a new session by generating a P-256 key pair via `crypto.subtle.generateKey()`
+- Sign requests
+- Store and retrieve the key using IndexedDB under a given session ID
+- Abstractions built on top of the `IndexedDBStamper` that simplify authentication flows 
 
-* Sessions only last as long as the iframe is maintained on the browser
-* On desktop, this generally is as long as the user doesn’t completely quit the browser
-* On mobile, specifically iOS devices, this behavior is much more finicky as iOS is aggressive in clearing out data contained within iframes
-* In either case, sessions are indeed shared across different browser tabs and windows
-* May be more difficult to set up to use in conjunction with React Native or other frameworks
+This is currently the **most persistent** session model for modern browsers that support WebCrypto. It is especially valuable in Progressive Web App (PWA) contexts or when iframe and Local Storage approaches are insufficient.
 
-#### Local Storage:
+To see a full working example, check out our [IndexedDB SDK example](https://github.com/tkhq/sdk/tree/main/examples/with-indexed-db). Or our [Web demo application](https://github.com/tkhq/demo-ewk) that leverages abstractions such as the `IndexedDbClient` for full end-to-end authentication flows.
 
-Another potential host for a TEK is directly in Local Storage. We’ve created libraries to create a target embedded key (P-256 implementation [here](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/crypto/src/crypto.ts#L268-L284)). Mechanically, it operates much like the iframe. However, unlike the iframe approach, anyone with access to your application’s domain also has direct access to items stored in Local Storage.
 
-Here are some considerations for using Local Storage:
+#### SecureStorage (mobile only)
 
-* Generally more durable than using iframes in various contexts (i.e. web on both desktop and mobile)
-* Can be used in other settings such as React Native, Flutter, etc.
-* As mentioned, the developer has complete control over the target embedded key. As a result, it’s important to manage this credential with caution.
+Secure Storage operates essentially the same as IndexedDB with respect to authentication flows for Turnkey except it is mobile native and keys are generated using @turnkey/crypto rather than WebCrypto. 
 
-For an example that leverages Local Storage with Email Auth, see [here](https://github.com/tkhq/sdk/tree/main/examples/email-auth-local-storage).
+#### LocalStorage:
 
-#### API Key:
-
-Another option is to create an API key and store it directly within Local Storage. However, this is a riskier setup than via TEK (as mentioned in the above Local Storage section), as anyone who is able to access this client-side API key has full access to a User.
+Another option is to create an API key and store it directly within Local Storage. However, this is a riskier setup than IndexedDb/SecureStorage as anyone who is able to access this client-side API key has full access to a User.
 
 ### Sessions FAQ
 <AccordionGroup>
   <Accordion title="How can I refresh a session?">
-    Once a user has a valid session, it is trivial to use that session to create a new session. It is possible to reuse the same loginWithReadWriteSession abstraction, as this will create a brand new session and automatically store the resulting credential bundle in local storage.
+    Once a user has a valid session, it is trivial to use that session to create a new session. The `refreshSession` abstraction will create a brand new session and automatically store the resulting new session in local storage.
   </Accordion>
   <Accordion title="How can I delete a session?">
-    In order to delete a session, simply remove all user-related artifacts from Local Storage. See implementation in context [here](https://github.com/tkhq/sdk/blob/9e9943387123d077fa3b7f38ef3be007291a2c8a/packages/sdk-browser/src/sdk-client.ts#L242-L255).
+    In order to delete a session, simply remove all user-related artifacts from Local Storage.
 
     ```ts
     /**
@@ -92,12 +83,9 @@ Another option is to create an API key and store it directly within Local Storag
       *
       * @returns {Promise<boolean>}
       */
-      logoutUser = async (): Promise<boolean> => {
-        await removeStorageValue(StorageKeys.AuthBundle); // DEPRECATED
-        await removeStorageValue(StorageKeys.CurrentUser);
-        await removeStorageValue(StorageKeys.UserSession);
-        await removeStorageValue(StorageKeys.ReadWriteSession);
-
+      logout = async (): Promise<boolean> => {
+        await removeStorageValue(StorageKeys.Client);
+        await removeStorageValue(StorageKeys.Session);
         return true;
       };
     ```
@@ -110,15 +98,9 @@ Another option is to create an API key and store it directly within Local Storag
 
     * Expired API keys are deleted first
     * If no expired keys exist, the oldest unexpired key is deleted
-If you are looking to invalidate existing sessions, you can use the `invalidateExisting` parameter for Email Auth and OTP Auth activities. This will clear all existing session keys.
+If you are looking to invalidate existing sessions, you can use the `invalidateExisting` parameter for all `_LOGIN` activities. This will clear all existing session keys.
   </Accordion>
   <Accordion title="Can I use the same sessions implementation for web and mobile?">
-    This is not recommended, because:
-
-* iOS Safari handles iframes differently. Specifically, it very aggressively evicts data stored within the iframe's local storage.
-* React Native doesn’t support iframes natively at all
-* Mobile browsers have different storage behaviors generally
-
-Instead, implement platform-specific session management using Local Storage for mobile.
+    Absolutely! Through leveraging IndexedDb you can handle sessions in the same way for Web and PWAs. However, for React Native/Mobile applications you will need to leverage Secure Storage.
 </Accordion>
 </AccordionGroup>
