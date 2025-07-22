@@ -22,7 +22,7 @@ Email Authentication is built with expiring API keys as the foundation. The two 
 
 ### OTP-based Method
 
-The authentication process happens in two steps:
+The authentication process happens in three steps:
 
 <Steps>
   <Step>
@@ -30,16 +30,19 @@ The authentication process happens in two steps:
     address
   </Step>
   <Step>
-    Upon verification of the correct code, an API key credential is generated
-    and encrypted for the client
+    Upon verification of the correct code, a verification token is generated
+  </Step>
+  <Step>
+    The verification token used to create a persistent session on the client side
   </Step>
 </Steps>
 
 ### Credential Bundle Method
 
 The API key credential is encrypted and delivered directly through email to the user.
+Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](/security/enclave-secure-channels) for more info on how we achieve secure delivery.
 
-In both cases, once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](/security/enclave-secure-channels) for more info on how we achieve secure delivery.
+**Note:** this method is only supported with legacy iframe-based flow, if no hard requirement, we suggest to use the IndexedDB-based OTP flow instead.
 
 ## Prerequisites
 
@@ -49,7 +52,7 @@ Make sure you have set up your primary Turnkey organization with at least one AP
 {
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
-  "condition": "activity.resource == 'AUTH' && activity.action == 'CREATE'"
+  "condition": "activity.resource in ['AUTH', 'OTP'] && activity.action in ['CREATE','VERIFY']"
 }
 ```
 
@@ -57,32 +60,46 @@ Make sure you have set up your primary Turnkey organization with at least one AP
 
 ### OTP-based Authentication Flow
 
-The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP_AUTH` with these parameters:
+All the three steps below are being signed by the parent organization user:
 
-- `otpType`: specify `"OTP_TYPE_EMAIL"`
-- `contact`: user's email address (must match their registered email)
-- `emailCustomization`: optional parameters for customizing emails
-- `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user.
-  We recommend generating this server-side based on the user's IP address or public key.
-  See the [OTP Rate Limits](#otp-rate-limits) section below for more details.
-- `alphanumeric`: optional parameter for making this code bech32 alphanumeric or not. default: true
-- `otpLength`: optional parameter for selecting the length of the OTP. default: 9
+<Steps>
+  <Step>
+  The user (on the client side) passes the email or phone number to the backend where the parent organziation sends the OTP code to the user's mailbox or phone number.
+  This is an activity of type `ACTIVITY_TYPE_INIT_OTP` with these parameters:
+  - `otpType`: specify `OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`
+  - `contact`: user's email address (must match their registered email)
+  - `emailCustomization`: optional parameters for customizing emails
+  - `smsCustomization` : optional parameters for customizing SMS
+  - `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user. We recommend generating this server-side based on the user's IP address or public key. See the [OTP Rate Limits](#otp-rate-limits) section below for more details.
+  - `alphanumeric`: optional parameter for making this code bech32 alphanumeric or not. default: true
+  - `otpLength`: optional parameter for selecting the length of the OTP. default: 9
+  - `sendFromEmailAddress` : optional custom email address from which to send the OTP email
+  - `sendFromEmailSenderName` : optional custom sender name for use with sendFromEmailAddress; if left empty, will default to ‘Notifications’
+  - `expirationSeconds` : expiration window (in seconds) indicating how long the OTP is valid for (defaults to 5 minutes)
+  - `replyToEmailAddress` : optional custom email address to use as reply-to
+ </Step>
+ <Step>
+  After receiving the OTP, the user is passing it back to the backend, the parent organization user initiates `ACTIVITY_TYPE_VERIFY_OTP` and returns a JWT confirming that the email/phone number is verified:
+  - `otpId`: ID from the init activity
+  - `otpCode`: the 6-9 digit or alphanumeric code received via email
+  - `expirationSeconds`: Expiration window (in seconds) indicating how long the verification token is valid for (defaults to 1 hour) 
 
-After receiving the OTP, users complete authentication with `ACTIVITY_TYPE_OTP_AUTH`:
-
-- `otpId`: ID from the init activity
-- `otpCode`: the 6-9 digit or alphanumeric code received via email
-- `targetPublicKey`: public key for credential encryption
-- `apiKeyName`: optional name (defaults to `OTP Auth - <Timestamp>`)
-- `expirationSeconds`: optional validity window (defaults to 15 minutes)
-- `invalidateExisting`: optional boolean to invalidate previous OTP Auth API keys
-
-<Frame>
-  <img
-    src="/images/authentication/img/auth_otp_email.png"
-    alt="auth otp email"
-  />
-</Frame>
+  <Frame>
+    <img
+      src="/images/authentication/img/auth_otp_email.png"
+      alt="auth otp email"
+    />
+  </Frame>
+ </Step>
+ <Step>
+  The parent organization initiates `ACTIVITY_TYPE_OTP_LOGIN` to target a specific organization id and create a session. It's passing the the JWT token from verify OTP activity, along with the public key of the indexedDbClient (passed from the Frontend) and an organization id.
+  A session JWT is returned with expiry date and the public key in indexedDb is added to organization data.
+  - `verificationToken` : Signed JWT returned by the verify activity containing a unique id, expiry, verification type, contact
+  - `publicKey` : Client-side public key generated by the user, which will be conditionally added to org data based on the validity of the verification token
+  - `expirationSeconds` : Expiration window (in seconds) indicating how long the Session is valid for. If not provided, a default of 15 minutes will be used.
+  - `invalidateExisting` : Invalidate all other previously generated Login API keys
+ </Step>
+</Steps>
 
 ### OTP Rate Limits
 
@@ -102,22 +119,6 @@ This alternative method uses `ACTIVITY_TYPE_EMAIL_AUTH` with these parameters:
 - `expirationSeconds`: optional validity window (defaults to 15 minutes)
 - `emailCustomization`: optional parameters for customizing emails
 - `invalidateExisting`: optional boolean to invalidate previous Email Auth API keys
-
-<Frame>
-  <img src="/images/authentication/img/auth_email.png" alt="auth email" />
-</Frame>
-
-### Recovery Flow
-
-For account recovery scenarios, users can initiate a recovery-specific flow using the `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` activity type, which requires:
-
-- `email`: the email of the user needing recovery (must match their registered email)
-- `targetPublicKey`: the public key for recovery credential encryption
-
-The recovery process consists of two phases:
-
-1. **Initiation**: Generates a temporary recovery credential and sends it via email
-2. **Finalization**: User decrypts the recovery credential and uses it to sign an `ACTIVITY_TYPE_RECOVER_USER` activity, which can add new authenticators to regain account access
 
 <Frame>
   <img src="/images/authentication/img/auth_email.png" alt="auth email" />
@@ -189,61 +190,18 @@ Both OTP-based and credential bundle authentication activities:
 
 Specifically:
 
-- For OTP-based auth: `ACTIVITY_TYPE_INIT_OTP_AUTH` and `ACTIVITY_TYPE_OTP_AUTH`
+- For OTP-based auth: `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_VERIFY_OTP` and `ACTIVITY_TYPE_OTP_LOGIN`
 - For credential bundle auth: `ACTIVITY_TYPE_EMAIL_AUTH`
-
-### Recovery
-
-- `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY`:
-
-  - Initiates the recovery process
-  - Requires proper authorization via policies
-  - Can target any user in the organization or sub-organizations
-
-- `ACTIVITY_TYPE_RECOVER_USER`:
-
-  - Must be signed by the recovery credential received via email
-  - Users can add credentials to their own user when authenticated
-  - Recovery credentials expire after 15 minutes
-  - Only the most recent recovery credential remains valid
-  - Users can add new authenticators to regain account access when authenticated with a recovery credential
-
-<Frame>
-  <img
-    src="/images/authentication/img/diagrams/email_auth_authorization.png"
-    alt="email auth authorization"
-  />
-</Frame>
 
 ## Implementation in Sub-organizations
 
-Both authentication methods and recovery work seamlessly with [sub-organizations](/concepts/sub-organizations).
+Both authentication methods work seamlessly with [sub-organizations](/concepts/sub-organizations).
 
 ### Example Implementations
 
 - [OTP Auth Example](https://github.com/tkhq/sdk/tree/main/examples/otp-auth)
 - [Email Auth Example](https://github.com/tkhq/sdk/tree/main/examples/email-auth)
-- [Email Recovery Example](https://github.com/tkhq/sdk/tree/main/examples/email-recovery)
 - [Demo Embedded Wallet](https://wallet.tx.xyz) ([code](https://github.com/tkhq/demo-embedded-wallet))
-
-For implementation details:
-
-<CardGroup>
-  <Card
-    title="Sub-Organization Email Auth Guide"
-    href="/embedded-wallets/sub-organization-auth"
-    icon="file-lines"
-    iconType="solid"
-    horizontal
-  />
-  <Card
-    title="Sub-Organization Recovery Guide"
-    href="/embedded-wallets/sub-organization-recovery"
-    icon="file-lines"
-    iconType="solid"
-    horizontal
-  />
-</CardGroup>
 
 ## Implementation in Organizations
 
@@ -253,7 +211,6 @@ For organizations accessed via dashboard:
 
    - `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP-based authentication
    - `FEATURE_NAME_EMAIL_AUTH` for credential bundle authentication
-   - Recovery features if needed
 
 2. Users initiating the request must have appropriate permissions
 
@@ -265,13 +222,11 @@ Use `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` to disable:
 
 - `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP-based authentication
 - `FEATURE_NAME_EMAIL_AUTH` for credential bundle authentication
-- `FEATURE_NAME_EMAIL_RECOVERY` for recovery
 
 When creating sub-organizations, use:
 
 - `disableOtpEmailAuth` parameter for OTP-based authentication
 - `disableEmailAuth` parameter for credential bundle authentication
-- `disableEmailRecovery` parameter for recovery
 
 ## Implementation Notes[​](#implementation-notes "Direct link to Implementation Notes")
 
