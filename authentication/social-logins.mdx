@@ -19,44 +19,82 @@ Similar to [email auth](/authentication/email), social login authentication is i
 
 - **OIDC Provider**: a provider able to authenticate your End-Users and provide OIDC tokens as proof. We'll use [Google](https://developers.google.com/identity/openid-connect/openid-connect) as an example.
 
-## OAuth step-by-step
+## OAuth Authentication
+This section covers the OAuth authentication process, including both login and signup flows, since they are similar and most apps handle them in a unified way.
 
-### Registration (signup)
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant OAuth Provider
+    participant Backend
+    participant Turnkey
 
-<Frame>
-  <img
-    src="/images/authentication/img/oauth_signup.png"
-    alt="OAuth signup flow"
-  />
-</Frame>
+    Frontend->>Frontend: Create API keypair
+    User->>Frontend: Clicks "Log in with <OAuth provider>"
+    Frontend->>OAuth Provider: Start OAuth flow with nonce=sha256(API publicKey)
+    OAuth Provider->>User: Prompt to grant permission
+    User->>OAuth Provider: Grants permission
+    OAuth Provider->>Frontend: Return oidcToken
+    Frontend->>Backend: Send oidcToken + API publicKey
+    Backend->>Turnkey: Gets subOrgIds with that associated oidcToken
+    Turnkey->>Backend: Return subOrgId (or null)
+    alt SubOrgId not found
+        Backend->>Turnkey: Create sub-org using oidcToken
+        Turnkey->>Backend: Return new subOrgId
+    end
+    Backend->>Turnkey: Call oauth_login with oidcToken, API publicKey
+    Turnkey->>Backend: Return session JWT
+    Backend->>Frontend: Return session JWT
+```
 
-1. **End-User** enters the signup flow on the app, gets redirected to Google for authentication.
-2. Upon completion, the **Parent**'s backend receives the OIDC token authenticating **End-User**.
-3. This token is used inside of a `CREATE_SUB_ORGANIZATION` activity to register Google as the Oauth provider under the root user.
-4. **Turnkey** verifies the OIDC token and creates a new sub-organization.
+<Steps>
+  <Step title="Create API Key">
+  The frontend generates an API keypair before starting the OAuth login flow. This keypair will later become the session keypair once the user is authenticated via Turnkey.
+  </Step>
 
-The user is now registered: a sub-organization under the parent organization has been created with a a root user, authenticated via an OAuth Provider. Concretely:
+  <Step title="Start the OAuth Login Flow">
+  The user begins the login process by clicking "Log in with &lt;OAuth provider&gt;" on the frontend.
+  </Step>
 
-- `issuer` is set to `https://accounts.google.com`
-- `audience` is set to `<google-oauth-app-id>` (your Oauth app ID)
-- `subject` is set `<google-end-user-id>` (the user ID of `End-User` on Google's side)
+  <Step title="Initiate OAuth with Nonce">
+  When starting the OAuth request to the provider, the frontend sets the `nonce` to `sha256(publicKey)` based on the API public key. This binds the resulting OIDC token to the keypair.
+  </Step>
 
-### Authentication (login)
+  <Step title="User Grants Permission">
+  The OAuth provider prompts the user to grant permission to share their identity. Once approved, the OAuth provider returns an `oidcToken` to the frontend.
+  </Step>
 
-<Frame>
-  <img
-    src="/images/authentication/img/oauth_login.png"
-    alt="OAuth login flow"
-  />
-</Frame>
+  <Step title="Send Credentials to Backend">
+  The frontend sends the `oidcToken` and API public key to your backend.
+  </Step>
 
-1. **End-User** enters the login flow on the app, gets redirected to Google for authentication.
-2. Upon completion, `Parent backend` receives the OIDC token authenticating **End-User**.
-3. This token is used inside of an `OAUTH_LOGIN` activity, signed by the **Parent**'s backend.
-4. **Turnkey** verifies the OIDC token and encrypts an expiring API key credential to **End-User**.
-5. **End-User** decrypts the credential.
+  <Step title="Get or Create a Turnkey Sub-organization">
+  The backend gets subOrgIds that are associated with that `oidcToken`. If no sub-organization exists, it creates one using the identity in the token.
+  </Step>
 
-The user is now authenticated and able to perform Turnkey activities.
+  <Step title="Create a Session">
+  The backend calls `oauth_login` with the `oidcToken`, and API public key. Turnkey validates that the token’s `nonce` matches `sha256(publicKey)` and returns a session JWT. The backend sends this JWT to the frontend.
+  </Step>
+
+  <Step title="You're Now Authenticated">
+  Your frontend now treats the API keypair as the session keypair. It can use the private key to sign requests to Turnkey using the `x-stamp` header.
+  </Step>
+</Steps>
+
+## What does Turnkey use from the OIDC tokens to prove identity?
+Turnkey parses and validates the following fields from the OIDC token to confirm the user's identity:
+- `issuer` (iss) – The OAuth provider that issued the token (e.g., `https://accounts.google.com`)
+- `audience` (aud) – The OAuth app’s client ID
+- `subject` (sub) – The unique identifier for the user in the OAuth provider's system
+
+**Note:**  
+Some OAuth providers (like Google) encourage you to register separate client IDs for each platform (e.g., web, iOS, Android). However, as discussed above, in the Turnkey flow the `aud` claim from the OIDC token is used as part of how sub-organizations are identified.
+
+If a user logs in on one platform using the web client ID, and then later logs in on another platform using a different iOS client ID, the two tokens will have different `aud` values. Because of this, Turnkey will not consider them the same identity.
+
+To ensure users are recognized consistently across platforms, you must use the same OAuth client ID everywhere. In most cases, this means using your web client ID for web, iOS, and Android flows.
+
 
 ## OIDC token verification
 
@@ -80,7 +118,7 @@ Our [`OAUTH_LOGIN`](/api-reference/user-auth/oauth_login) activity requires 2 pa
 
 In order to prevent OIDC tokens from being used against multiple public keys, our enclaves parse the OIDC token and, as part of the validation logic, enforce that the `nonce` claim is set to `sha256(publicKey)`.
 
-For example, if the iframe public key is `04bb76f9a8aaafbb0722fa184f66642ae425e2a032bde8ffa0479ff5a93157b204c7848701cf246d81fd58f6c4c47a437d9f81e6a183042f2f1aa2f6aa28e4ab65`, our enclaves expect the OIDC token nonce to be `1f9570d976946c0cb72f0e853eea0fb648b5e9e9a2266d25f971817e187c9b18`.
+For example, if the public key is `04bb76f9a8aaafbb0722fa184f66642ae425e2a032bde8ffa0479ff5a93157b204c7848701cf246d81fd58f6c4c47a437d9f81e6a183042f2f1aa2f6aa28e4ab65`, our enclaves expect the OIDC token nonce to be `1f9570d976946c0cb72f0e853eea0fb648b5e9e9a2266d25f971817e187c9b18`.
 
 This restriction only applies during **authentication** (`OAUTH` activity). Registration via `CREATE_OAUTH_PROVIDER` and `CREATE_SUB_ORGANIZATION` activities is not affected since these activities do not accept a `publicKey` and do not return encrypted credentials as a result.
 
@@ -151,7 +189,7 @@ For example, if a Google-authenticated user (OIDC token `sub` claim: `google-oau
 
 ### AWS Cognito
 
-The main thing to call out is the inability to pass custom `nonce` claims easily. To pass the hash of the end-user's iframe public key, use a custom `tknonce` claim instead.
+The main thing to call out is the inability to pass custom `nonce` claims easily. To pass the hash of the end-user's public key, use a custom `tknonce` claim instead.
 
 ### Social linking
 
