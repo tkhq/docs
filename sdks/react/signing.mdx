@@ -1,0 +1,156 @@
+---
+title: "Signing"
+description: "Learn how to sign transactions and messages in your React app using Turnkey's Embedded Wallets or an external browser wallet."
+sidebarTitle: "Signing"
+---
+
+## Overview
+
+The `@turnkey/react-wallet-kit` provides a simple way to sign messages and transactions in your React application. You can use Turnkey's Embedded Wallets or an external wallet for signing.
+
+## Signing Messages
+
+To sign messages, you can use the `signMessage` function from the `useTurnkey` hook. You can grab the wallet account you want to use from the `wallets` array in the `useTurnkey` hook.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function SignMessageButton() {
+  const { signMessage, wallets } = useTurnkey();
+
+  const doSignMessage = async () => {
+    try {
+      const walletAccount = wallets[0]?.accounts[0]; // Use the first account of the first wallet
+      const message = "Hello, Turnkey!";
+
+      const signature = await signMessage({
+        walletAccount,
+        message,
+      });
+      console.log("Message signed:", signature);
+    } catch (error) {
+      console.error("Error signing message:", error);
+    }
+  };
+
+  return <button onClick={doSignMessage}>Sign Message</button>;
+}
+```
+
+### With a modal
+
+If you want to show a modal for signing messages, you can use the `handleSignMessage` function from the `useTurnkey` hook. This will automatically show a modal with the message to sign.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function SignMessageButton() {
+  const { handleSignMessage, wallets } = useTurnkey();
+
+  const doSignMessage = async () => {
+    try {
+      const walletAccount = wallets[0]?.accounts[0]; // Use the first account of the first wallet
+      const message = "Hello, Turnkey!";
+
+      const signature = await handleSignMessage({
+        walletAccount,
+        message,
+      });
+      console.log("Message signed:", signature);
+    } catch (error) {
+      console.error("Error signing message:", error);
+    }
+  };
+
+  return <button onClick={doSignMessage}>Sign Message</button>;
+}
+```
+
+You will see a modal with the message to sign, and the user can confirm the signature.
+
+<img
+  src="/images/sdks/img/react/sign-component.png"
+  alt="Signing message modal"
+/>
+
+## Signing Transactions
+
+To sign transactions, you can use the `signTransaction` function from the `useTurnkey` hook. Similar to signing messages, you can grab the wallet account you want to use from the `wallets` array.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function SignTransactionButton() {
+  const { signTransaction, wallets } = useTurnkey();
+
+  const doSignTransaction = async () => {
+    try {
+      const walletAccount = wallets[0]?.accounts[0]; // Use the first account of the first wallet
+      const unsignedTransaction = "0x..."; // Replace with your unsigned transaction data
+
+      const signature = await signTransaction({
+        walletAccount,
+        unsignedTransaction,
+        transactionType: "TRANSACTION_TYPE_ETHEREUM",
+      });
+      console.log("Transaction signed:", signature);
+    } catch (error) {
+      console.error("Error signing transaction:", error);
+    }
+  };
+
+  return <button onClick={doSignTransaction}>Sign Transaction</button>;
+}
+```
+
+## Using an External Wallet
+
+You can use external wallets like MetaMask to sign messages and transactions. The same `signMessage`, `handleSignMessage` or `signTransaction` functions can be used. You simply need to pass in the external wallet's `walletAccount` object from the same `wallets` array.
+
+You can check if the wallet is an external wallet by checking the `source` property of the `wallet` object:
+
+```tsx
+import { useTurnkey, WalletSource } from "@turnkey/react-wallet-kit";
+
+function SignMessageWithExternalWalletButton() {
+  const { handleSignMessage, wallets } = useTurnkey();
+
+  const doSignMessage = async () => {
+    try {
+      const externalWallet = wallets.find(
+        (wallet) => wallet.source === WalletSource.Embedded
+      ); // Find an external wallet
+
+      if (!externalWallet) {
+        throw new Error("No external wallet found");
+      }
+
+      const walletAccount = externalWallet.accounts[0]; // Use the first account of the external wallet
+      const message = "Hello, Turnkey!";
+
+      const signature = await handleSignMessage({
+        walletAccount,
+        message,
+      });
+      console.log("Message signed with external wallet:", signature);
+    } catch (error) {
+      console.error("Error signing message with external wallet:", error);
+    }
+  };
+
+  return (
+    <button onClick={doSignMessage}>Sign Message with External Wallet</button>
+  );
+}
+```
+
+The user will be prompted by their external wallet to sign the message.
+
+<img
+  src="/images/sdks/img/react/sign-external.png"
+  alt="Signing message with external wallet"
+/>
+
+## Next Steps
+
+Now that you know how to sign messages and transactions in your React application, checkout the [UI Customization](/sdks/react/ui-customization) guide to learn how to customize the look and feel of the signing modals and other UI components.
