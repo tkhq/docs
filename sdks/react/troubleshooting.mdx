@@ -1,0 +1,234 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions when using @turnkey/react-wallet-kit."
+sidebarTitle: "Troubleshooting"
+---
+
+## Overview
+
+This guide provides solutions to common issues you might encounter while using the `@turnkey/react-wallet-kit`. If you run into any problems, check this section first for potential fixes.
+
+### Handling Errors With `onError`
+
+Before we begin, let's attach an `onError` callback function to the `TurnkeyProvider`. Any errors that occur during the execution of functions or initialization will be passed into this callback. This will help you debug issues more effectively.
+
+```tsx
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+function App() {
+  const turnkeyConfig = {
+    //... your existing configuration
+  };
+
+  return (
+    <TurnkeyProvider
+      config={turnkeyConfig}
+      callbacks={{
+        onError: (error) => {
+          // You can also show a user-friendly message, toast or perform other actions here
+          console.error("Error:", error);
+
+          // Optionally, you can parse the error to get individual details
+          console.error("Error details:", {
+            message: error?.message,
+            code: error?.code,
+            cause: error?.cause,
+            name: error?.name,
+            stack: error?.stack,
+          });
+        },
+      }}
+    >
+      {children}
+    </TurnkeyProvider>
+  );
+}
+```
+
+## Common Issues
+
+There are a few common issues that developers or end-users may encounter when using the `@turnkey/react-wallet-kit`. Here are some of them along with potential solutions:
+
+### 1. Turnkey SDK Failed to Initialize
+
+<img
+  src="/images/sdks/img/react/sdk-fail-init.png"
+  alt="Turnkey SDK Failed to Initialize"
+/>
+
+#### Problem
+
+This error shows up when the SDK fails to initialize properly. The initialization process includes a series of network requests that must be made to Turnkey so your configuration must be correct before you launch your app.
+
+This issue can happen for several reasons, such as:
+
+- Missing or incorrect `authProxyId` or `organizationId` in the `TurnkeyProvider` config.
+- Network issues preventing the SDK from reaching Turnkey's servers.
+- Incorrectly configured `apiBaseUrl` or `authProxyUrl`.
+- Auth proxy not being enabled in the Turnkey dashboard.
+
+You can see the full error by handling it through the `onError` callback in the `TurnkeyProvider` as shown above.
+
+#### Solution
+
+Make sure you have the correct `authProxyId` and `organizationId` in your `TurnkeyProvider` config. You can find these values in the [Turnkey dashboard](https://app.turnkey.com).
+
+```tsx
+const turnkeyConfig = {
+  authProxyId: process.env.NEXT_PUBLIC_AUTH_PROXY_ID || "",
+  organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID || "",
+  // other configurations...
+};
+```
+
+If you are using environment variables, ensure they are correctly set up in your `.env` file or environment configuration. You can also log these values to the console to verify they are being set correctly.
+
+```tsx
+console.log("Auth Proxy ID:", process.env.NEXT_PUBLIC_AUTH_PROXY_ID);
+console.log("Organization ID:", process.env.NEXT_PUBLIC_ORGANIZATION_ID);
+```
+
+If you are using Turnkey's auth proxy, ensure it is enabled in the Turnkey dashboard under the **wallet kit** section. You can also check the [getting started](/sdks/react/getting-started) guide for more details on setting up the auth proxy.
+
+If you decide to use your own authentication setup with a backend, you can simply omit the `authProxyId` from the `TurnkeyProvider` config. This will disable the Turnkey auth proxy and allow you to use your own authentication flow. Note that the **Log in or sign up** modal will not be available in this case, and you will need to implement your own authentication flow.
+
+### 2. Proxy not Enabled
+
+<img
+  src="/images/sdks/img/react/proxy-not-enabled.png"
+  alt="Proxy not enabled"
+/>
+
+#### Problem
+
+This error indicates that you are trying to use the **Log in or sign up** modal without using Turnkey's auth proxy. The `authProxyId` is required to use the Turnkey authentication flow.
+
+#### Solution
+
+To resolve this issue, you need to enable the auth proxy in the Turnkey dashboard under the **wallet kit** section. Once enabled, you will receive an `authProxyId` that you can use in your `TurnkeyProvider` config. Pass this `authProxyId` to the `TurnkeyProvider` config to enable the authentication flow.
+
+```tsx
+const turnkeyConfig = {
+  authProxyId: process.env.NEXT_PUBLIC_AUTH_PROXY_ID || "",
+  organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID || "",
+  // other configurations...
+};
+```
+
+If you prefer to use your own authentication flow, you can simply omit the `authProxyId` from the `TurnkeyProvider` config. This will disable the Turnkey auth proxy and allow you to use your own authentication flow. Note that the **Log in or sign up** modal will not be available in this case, and you will need to implement your own authentication flow.
+
+### 3. Turnkey styles are missing
+
+<img
+  src="/images/sdks/img/react/styles-missing.png"
+  alt="Turnkey styles are missing"
+/>
+#### Problem
+
+This error indicates that the Turnkey styles are not being applied to the UI components. This can happen if you forget to import the styles in your main application file.
+
+#### Solution
+
+Make sure to import the Turnkey styles in your main application file (e.g., `app/layout.tsx` in Next.js). You can do this by adding the following line at the top of your file:
+
+```tsx
+import "@turnkey/react-wallet-kit/dist/styles.css";
+```
+
+### 4. Event handlers cannot be passed to Client Component props
+
+<img
+  src="/images/sdks/img/react/event-handlers.png"
+  alt="Event handlers cannot be passed to Client Component props"
+/>
+
+#### Problem
+
+This error occurs when you try to pass in a callback into the `TurnkeyProvider` but you're using the `TurnkeyProvider` in a server component. In Next.js, components default to server components, which means they cannot have event handlers or state.
+
+#### Solution
+
+To resolve this issue, you need to ensure that the `TurnkeyProvider` is used in a client component. You can do this by adding `"use client";` at the top of your file. This will make the component a client component and allow you to pass in event handlers.
+
+```tsx
+"use client";
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+function App() {
+  const turnkeyConfig = {
+    //... your existing configuration
+  };
+
+  return (
+    <TurnkeyProvider
+      config={turnkeyConfig}
+      callbacks={{
+        onError: (error) => console.error("Turnkey error:", error),
+      }}
+    >
+      {children}
+    </TurnkeyProvider>
+  );
+}
+```
+
+### 5. No active session or token available
+
+<img
+  src="/images/sdks/img/react/no-active-session.png"
+  alt="No active session or token available"
+/>
+
+#### Problem
+
+This error occurs when you try to use functions that require an authenticated user, such as `handleSignMessage`, without having an active session. This can happen if the user is not logged in or if the session has expired.
+
+#### Solution
+
+To resolve this issue, ensure that the user is authenticated before calling functions that require an active session. You can check the `authState` variable from the `useTurnkey` hook to determine if the user is authenticated.
+
+```tsx
+import { useTurnkey, AuthState } from "@turnkey/react-wallet-kit";
+
+function AuthStatus() {
+  const { authState, user, handleLogin } = useTurnkey();
+
+  return (
+    <div>
+      {authState === AuthState.Unauthenticated ? (
+        <p>Welcome back, {user?.userName}!</p>
+      ) : (
+        <button onClick={handleLogin}>Log in</button>
+      )}
+    </div>
+  );
+}
+```
+
+You can allow the session to automatically refresh by enabling the `autoRefreshSession` option in the `TurnkeyProvider` config. This will ensure that the session is refreshed before it expires, keeping the user authenticated.
+
+```tsx
+const turnkeyConfig = {
+  //... your existing configuration
+  auth: {
+    //... your existing auth configuration
+    autoRefreshSession: true, // Enable automatic session refresh
+  },
+};
+```
+
+You can know when a session expires by using the `onSessionExpired` callback in the `TurnkeyProvider`. This will allow you to handle session expiration gracefully, such as prompting the user to log in again.
+
+```tsx
+<TurnkeyProvider
+  config={turnkeyConfig}
+  callbacks={{
+    onSessionExpired: () => {
+      console.log("Session expired. Please log in again.");
+      // Optionally, you can redirect the user to the login page or show a modal
+    },
+  }}
+>
+  {children}
+</TurnkeyProvider>
+```
