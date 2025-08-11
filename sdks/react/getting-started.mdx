@@ -1,6 +1,6 @@
 ---
 title: "Getting Started with @turnkey/react-wallet-kit"
-description: "Learn how to set up @turnkey/react-wallet-kit in your React application. This page will guide you through the initial setup, including enabling Turnkey's auth proxy, installing the SDK, and configuring your app."
+description: "Learn how to set up `@turnkey/react-wallet-kit` in your React application. This page will guide you through the initial setup, including enabling Turnkey's auth proxy, installing the SDK, and configuring your app."
 sidebarTitle: "Getting Started"
 ---
 
@@ -27,7 +27,7 @@ For this setup, we will be using Turnkey's auth proxy to handle authentication. 
 
     <Step title="Customize auth methods">
 
-    You can choose which auth methods to enable and customize various options from this screen. For this quickstart, let's enable **email otp** and **passkeys**. When you're done, click **Save**.
+    You can choose which auth methods to enable and customize various options from this screen. For this quickstart, let's enable **email OTP** and **passkeys**. When you're done, click **Save**.
 
 
     THIS IMAGE WILL CHANGE
@@ -91,53 +91,66 @@ yarn add @turnkey/react-wallet-kit
 
 ## Provider
 
-    Wrap your app with the `TurnkeyProvider` component, and import `"@turnkey/react-wallet-kit/dist/styles.css"` to include styles for the UI components.
+Wrap your app with the `TurnkeyProvider` component, and import `"@turnkey/react-wallet-kit/dist/styles.css"` to include styles for the UI components.
 
-    **Note** If you're using Next.js, this should be done in the `app/layout.tsx` file. The component **must** be a client component in order to add callbacks, so make sure to add `"use client";` at the top of the file.
+With Next.js App Router, keep `app/layout.tsx` as a server component and create a separate `app/providers.tsx` client wrapper. This is necessary if you want to pass callbacks (e.g., onError), which must be defined in a client component.
 
-    ```tsx src/app/layout.tsx
-    "use client";
+```tsx app/providers.tsx
+"use client";
 
-    import "./globals.css";
-    import {
-      TurnkeyProvider,
-      TurnkeyProviderConfig,
-    } from "@turnkey/react-wallet-kit";
-    import "@turnkey/react-wallet-kit/dist/styles.css"; // Import styles. Crucial for using the UI components
+import {
+  TurnkeyProvider,
+  TurnkeyProviderConfig,
+} from "@turnkey/react-wallet-kit";
 
-    const turnkeyConfig: TurnkeyProviderConfig = {
-      authProxyId: process.env.NEXT_PUBLIC_AUTH_PROXY_ID || "", // Your auth proxy ID from the dashboard
-      organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID || "",  // Your organization ID from the dashboard
-    };
+const turnkeyConfig: TurnkeyProviderConfig = {
+  organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+  authProxyId: process.env.NEXT_PUBLIC_AUTH_PROXY_ID!,
+};
 
-    export default function RootLayout({
-      children,
-    }: Readonly<{
-      children: React.ReactNode,
-    }>) {
-      return (
-        <html lang="en">
-          <body>
-            <TurnkeyProvider config={turnkeyConfig} >
-              {children}
-            </TurnkeyProvider>
-          </body>
-        </html>
-      );
-    }
-    ```
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
+}
+```
 
-    In case anything goes wrong, let's add an `onError` callback to the `TurnkeyProvider` to catch any errors that may occur.
+In case anything goes wrong, let's add an `onError` callback to the `TurnkeyProvider` to catch any errors that may occur.
 
-    ```tsx src/app/layout.tsx
-    <TurnkeyProvider
-      config={turnkeyConfig}
-      callbacks={{
-        onError: (error) => console.error("Turnkey error:", error),
-      }}
-    >
-    ```
+```tsx app/providers.tsx
+<TurnkeyProvider
+  config={turnkeyConfig}
+  callbacks={{
+    onError: (error) => console.error("Turnkey error:", error),
+  }}
+>
+```
+
+Then, use the `Providers` component to wrap your app in `app/layout.tsx`.
+
+```tsx app/layout.tsx
+import "./globals.css";
+import Providers from "./providers";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+> **Why this pattern?**
+>
+> - Callbacks (and other interactive bits) must be declared in a client component.
+> - Keeping layout.tsx as a server component maintains optimal rendering and avoids making your entire app client-side unnecessarily.
+> - Centralizing Turnkey setup in app/providers.tsx keeps configuration, styles, and callbacks in one place.
 
 ## Next steps
 
-Ready to start building your app? Check out the [Authentication](/sdks/react/auth) guide to learn how to set up log in or sign up with one line of code in your app!
+Ready to start building your app? Check out the [Authentication](/sdks/react/auth) guide to learn how to set up log in or sign up with one line of code!
