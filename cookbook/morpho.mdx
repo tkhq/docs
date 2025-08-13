@@ -1,0 +1,256 @@
+---
+title: 'Use Turnkey wallets with Morpho'
+sidebarTitle: "Morpho integration"
+---
+
+## Overview
+
+[Morpho Vaults](https://docs.morpho.org/build/earn/getting-started) are smart contracts that allow users to deposit assets into yield-generating vaults built on top of Morpho's lending protocol.
+
+We'll walk through the steps of using Turnkey to sign some common transactions to Morpho's Steakhouse USDC Vault on Base Mainnet.
+The flow is also going to show Turnkey's policy engine in action by restricting the signing operations only to the specific Morpho contracts.
+The working example can be found [here](https://github.com/tkhq/sdk/tree/main/examples/with-morpho).
+
+## Getting started
+
+The first step is to set up your Turnkey organization and account. By following the [Quickstart guide](/getting-started/quickstart), you should have:
+
+- A root user with a public/private API key pair within the Turnkey parent organization
+- An organization ID
+
+The next step is to create another user within the organization with a different API key and remove it from the root quorum. You can do this from the Turnkey [dashboard](https://app.turnkey.com/dashboard/security/updateRootQuorum) or [API](https://docs.turnkey.com/api-reference/activities/update-root-quorum). 
+Here's a simple [script](https://github.com/tkhq/sdk/blob/main/examples/kitchen-sink/src/sdk-server/updateRootQuorum.ts) that shows how to update the root quorum using @turnkey/sdk-server.
+
+Finally, make sure you have a wallet with an Ethereum account created within this organization and have it funded with some ETH and USDC on Base Mainnet.
+
+## Setting up the policy for the non-root user
+
+Now, we want to use the non-root user for signing transactions to Morpho and restrict it to only be able to interact with the USDC and Morpho vault smart contracts.
+We'll define a new API client that would use the organization root user to create the required policy:
+
+```tsx
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+}).apiClient();
+
+const userId = '<The id of the non-root user that you'll be using to sign the Morpho related transactions>';
+
+const MORPHO_VAULT_ADDRESS = 0xbeeF010f9cb27031ad51e3333f9aF9C6B1228183;
+const USDC_ADDRESS = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+
+const policyName = "Allow API key user to only call the MORPHO_VAULT_ADDRESS and USDC_ADDRESS";
+const effect = "EFFECT_ALLOW";
+const consensus = `approvers.any(user, user.id == '${userId}')`;
+const condition = `eth.tx.to in ['USDC_ADDRESS', 'MORPHO_VAULT_ADDRESS']`;
+const notes = "";
+
+const { policyId } = await turnkeyClient.createPolicy({
+    policyName,
+    condition,
+    consensus,
+    effect,
+    notes,
+});
+```
+
+## Set up the Turnkey signer
+
+We'll be using `@turnkey/viem` to create a Turnkey custom signer which implements the signing APIs expected by the `viem` client. Notice that the Turnkey API client is going to use the non-root user API key now as using a root user will bypass the policy engine evaluation.
+
+```tsx
+import { base } from "viem/chains";
+import { createAccount } from "@turnkey/viem";
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
+import {
+    createWalletClient,
+    http,
+    type Account,
+    erc20Abi,
+    createPublicClient,
+    parseAbi,
+    parseUnits,
+} from "viem";
+
+ const turnkeyClient = new TurnkeyServerSDK({
+    apiBaseUrl: process.env.TURNKEY_BASE_URL!,
+    apiPrivateKey: process.env.NONROOT_API_PRIVATE_KEY!,
+    apiPublicKey: process.env.NONROOT_API_PUBLIC_KEY!,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+});
+
+const turnkeyAccount = await createAccount({
+    client: turnkeyClient.apiClient(),
+    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    signWith: process.env.SIGN_WITH!,
+});
+
+const client = createWalletClient({
+    account: turnkeyAccount as Account,
+    chain: base,
+    transport: http(
+      `https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY!}`,
+    ),
+});
+
+// Use the standard viem client for non-signing operations
+const publicClient = createPublicClient({
+    transport: http(
+      `https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY!}`,
+    ),
+    chain: base,
+});
+```
+
+## Approve the vault to spend USDC and deposit USDC into the vault
+
+```tsx
+ // Approve the vault to spend for 10 USDC, use maxUint256 if you want the max token approval
+const { request: approveReq } = await publicClient.simulateContract({
+    abi: erc20Abi,
+    address: USDC_ADDRESS as `0x${string}`,
+    functionName: "approve",
+    chain: base,
+    args: [MORPHO_VAULT_ADDRESS as `0x${string}`, parseUnits("10", 6)],
+    account: client.account,
+});
+
+const approveHash = await client.writeContract(approveReq);
+
+console.log("Approve transaction:", `https://basescan.org/tx/${approveHash}`);
+
+// Deposit USDC into vault
+const vaultAbi = parseAbi([
+    "function deposit(uint256 assets, address receiver) external returns (uint256 shares)",
+]);
+
+const { request: depositReq } = await publicClient.simulateContract({
+    abi: vaultAbi,
+    address: MORPHO_VAULT_ADDRESS as `0x${string}`,
+    functionName: "deposit",
+    args: [parseUnits("0.5", 6), (turnkeyAccount as Account).address],
+    account: turnkeyAccount as Account,
+});
+const depositHash = await client.writeContract(depositReq);
+
+console.log("Deposit transaction:", `https://basescan.org/tx/${depositHash}`);
+```
+
+## Check user share balance and vault data
+
+In order to see how much the user can withdraw we can call the `balanceOf` function if the Vault contract.
+
+```tsx
+ const balanceAbi = parseAbi([
+    "function balanceOf(address account) external view returns (uint256)",
+    "function decimals() external view returns (uint8)",
+]);
+
+const decimals = await publicClient.readContract({
+    address: MORPHO_VAULT_ADDRESS as `0x${string}`,
+    abi: balanceAbi,
+    functionName: "decimals",
+});
+
+const rawBalance = await publicClient.readContract({
+    address: MORPHO_VAULT_ADDRESS as `0x${string}`,
+    abi: balanceAbi,
+    functionName: "balanceOf",
+    args: [turnkeyAccount.address],
+});
+
+// Format to human-readable
+const readableBalance = formatUnits(rawBalance, decimals);
+console.log(`User vault balance: ${readableBalance} shares`);
+```
+
+You can also call the Morpho GraphQL API and fetch the vault live data:
+
+```tsx
+const query = `
+    query {
+      vaultByAddress(
+        address: "${MORPHO_VAULT_ADDRESS}"
+        chainId: ${BASE_CHAIN_ID}
+      ) {
+        state {
+          sharePriceUsd
+          apy
+        }
+        asset {
+          priceUsd
+        }
+      }
+    }
+  `;
+
+const response = await fetch("https://api.morpho.org/graphql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+});
+
+const json = await response.json();
+
+console.log("Vault data:", JSON.stringify(json.data, null, 2));
+```
+
+## Withdraw from the vault or redeem the whole amount
+
+Call the `withdraw` function if you want a specific amount:
+
+```tsx
+ const withdrawAbi = parseAbi([
+    "function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares)",
+]);
+const { request: withdrawReq } = await publicClient.simulateContract({
+    abi: withdrawAbi,
+    address: MORPHO_VAULT_ADDRESS as `0x${string}`,
+    functionName: "withdraw",
+    args: [
+      parseUnits("0.1", 6),
+      (turnkeyAccount as Account).address,
+      (turnkeyAccount as Account).address,
+    ],
+    account: turnkeyAccount as Account,
+});
+const withdrawHash = await client.writeContract(withdrawReq);
+
+console.log("Withdraw transaction:", `https://basescan.org/tx/${withdrawHash}`);
+```
+
+Or `redeem` for the full shares amount:
+
+```tsx
+const balanceAbi = parseAbi([
+    "function balanceOf(address account) external view returns (uint256)",
+]);
+
+const rawBalance = await publicClient.readContract({
+    address: MORPHO_VAULT_ADDRESS as `0x${string}`,
+    abi: balanceAbi,
+    functionName: "balanceOf",
+    args: [turnkeyAccount.address],
+});
+
+// Redeem all user shares
+const redeemAbi = parseAbi([
+    "function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets)",
+]);
+const { request: redeemReq } = await publicClient.simulateContract({
+    abi: redeemAbi,
+    address: MORPHO_VAULT_ADDRESS as `0x${string}`,
+    functionName: "redeem",
+    args: [
+      rawBalance,
+      (turnkeyAccount as Account).address,
+      (turnkeyAccount as Account).address,
+    ],
+    account: turnkeyAccount as Account,
+});
+const redeemHash = await client.writeContract(redeemReq);
+
+console.log("redeem tx:", `https://basescan.org/tx/${redeemHash}`);
+```

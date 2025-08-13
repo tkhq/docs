@@ -50,6 +50,7 @@ We provide the following Make targets to generate API reference content:
 - `make openapi-gen`: Run the OpenAPI generator CLI with custom arguments. See [scripts/openapi-gen/README.md](scripts/openapi-gen/README.md) for details.
 - `make gen`: Default MDX generation for API reference under `api-reference/`.
 - `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
+- `make mintlify-check`: This attempts to compare the locally installed version of mintlify cli against the latest published version on NPM. If the local version is behind this will attempt to update the version to the latest. This command gets run before `make gen`, `make openapi-gen`, and `make tags` to prevent parsing errors.
 
 These commands require Node.js and `ts-node`.
 
@@ -61,11 +62,11 @@ The docs in this repository utilize shared MDX snippets to ensure consistency an
 
 **Important:** Always update the shared MDX file rather than modifying individual duplicate pages. This guarantees that any change propagates throughout all references.
 
-| Duplicate Page Path                                          | Shared MDX File                        |
-| ------------------------------------------------------------ | -------------------------------------- |
-| `concepts/policies/overview.mdx`                             | `/snippets/shared/policy-engine.mdx`   |
-| `products/embedded-wallets/features/policy-engine.mdx`         | `/snippets/shared/policy-engine.mdx`   |
-| `products/transaction-automation/features/export-wallets.mdx`  | `/snippets/shared/export-wallets.mdx`  |
-| `products/transaction-automation/features/import-wallets.mdx`  | `/snippets/shared/import-wallets.mdx`  |
+| Duplicate Page Path                                           | Shared MDX File                       |
+| ------------------------------------------------------------- | ------------------------------------- |
+| `concepts/policies/overview.mdx`                              | `/snippets/shared/policy-engine.mdx`  |
+| `products/embedded-wallets/features/policy-engine.mdx`        | `/snippets/shared/policy-engine.mdx`  |
+| `products/transaction-automation/features/export-wallets.mdx` | `/snippets/shared/export-wallets.mdx` |
+| `products/transaction-automation/features/import-wallets.mdx` | `/snippets/shared/import-wallets.mdx` |
 
-*Note: Duplicate pages must reside in separate file paths as required by `docs.json`. Mintlify restricts pages with identical content from sharing the same path to ensure correct sidebar behavior.*
+_Note: Duplicate pages must reside in separate file paths as required by `docs.json`. Mintlify restricts pages with identical content from sharing the same path to ensure correct sidebar behavior._
