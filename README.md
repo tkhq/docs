@@ -56,6 +56,17 @@ These commands require Node.js and `ts-node`.
 
 ---
 
+### Mono Releases & Updating API Reference
+
+1. Checkout the specific [Mono Release tag](https://github.com/tkhq/mono/tags)
+   - `git checkout v2025.8.3`
+   - `make -C proto`
+1. Convert [public_api.swagger.json](https://github.com/tkhq/mono/blob/main/src/js/internal/http/src/__internal__/services/coordinator/public/v1/public_api.swagger.json) to Open API v3. You can use [Next Swagger Editor](https://editor-next.swagger.io/) for conversion.
+   - Copy [public_api.swagger.json](https://github.com/tkhq/mono/blob/main/src/js/internal/http/src/__internal__/services/coordinator/public/v1/public_api.swagger.json) into the editor.
+   - From the menu bar click `Edit` -> `Convert to OpenAPI 3.0.x`
+1. Copy and paste the converted output into [openapi.json](openapi.json)
+1. Run `make gen`
+
 **Shared Snippets Usage Guidelines**
 
 The docs in this repository utilize shared MDX snippets to ensure consistency and adherence to DRY principles across duplicate pages. When identical content is required in multiple locations, each duplicate page imports a shared snippet from the `/snippets/shared/` folder. This method minimizes maintenance overhead by centralizing content updates.
