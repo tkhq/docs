@@ -2643,7 +2643,10 @@
         "ACTIVITY_TYPE_UPDATE_USER_PHONE_NUMBER",
         "ACTIVITY_TYPE_INIT_FIAT_ON_RAMP",
         "ACTIVITY_TYPE_CREATE_SMART_CONTRACT_INTERFACE",
-        "ACTIVITY_TYPE_DELETE_SMART_CONTRACT_INTERFACE"
+        "ACTIVITY_TYPE_DELETE_SMART_CONTRACT_INTERFACE",
+        "ACTIVITY_TYPE_ENABLE_AUTH_PROXY",
+        "ACTIVITY_TYPE_DISABLE_AUTH_PROXY",
+        "ACTIVITY_TYPE_UPDATE_AUTH_PROXY_CONFIG"
       ]
     },
     "AddressFormat": {
@@ -4130,6 +4133,11 @@
           "type": "boolean",
           "x-nullable": true,
           "description": "Disable OTP email auth for the sub-organization"
+        },
+        "verificationToken": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Signed JWT containing a unique id, expiry, verification type, contact"
         }
       },
       "required": ["subOrganizationName", "rootUsers", "rootQuorumThreshold"]
@@ -5159,6 +5167,12 @@
       },
       "required": ["walletIds"]
     },
+    "DisableAuthProxyIntent": {
+      "type": "object"
+    },
+    "DisableAuthProxyResult": {
+      "type": "object"
+    },
     "DisablePrivateKeyIntent": {
       "type": "object",
       "properties": {
@@ -5346,6 +5360,19 @@
         }
       }
     },
+    "EnableAuthProxyIntent": {
+      "type": "object"
+    },
+    "EnableAuthProxyResult": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "A User ID with permission to initiate authentication."
+        }
+      },
+      "required": ["userId"]
+    },
     "ExportPrivateKeyIntent": {
       "type": "object",
       "properties": {
@@ -5519,7 +5546,8 @@
         "FEATURE_NAME_EMAIL_RECOVERY",
         "FEATURE_NAME_WEBHOOK",
         "FEATURE_NAME_SMS_AUTH",
-        "FEATURE_NAME_OTP_EMAIL_AUTH"
+        "FEATURE_NAME_OTP_EMAIL_AUTH",
+        "FEATURE_NAME_AUTH_PROXY"
       ]
     },
     "FiatOnRampBlockchainNetwork": {
@@ -7141,6 +7169,15 @@
         },
         "deleteSmartContractInterfaceIntent": {
           "$ref": "#/definitions/DeleteSmartContractInterfaceIntent"
+        },
+        "enableAuthProxyIntent": {
+          "$ref": "#/definitions/EnableAuthProxyIntent"
+        },
+        "disableAuthProxyIntent": {
+          "$ref": "#/definitions/DisableAuthProxyIntent"
+        },
+        "updateAuthProxyConfigIntent": {
+          "$ref": "#/definitions/UpdateAuthProxyConfigIntent"
         }
       }
     },
@@ -8148,6 +8185,15 @@
         },
         "deleteSmartContractInterfaceResult": {
           "$ref": "#/definitions/DeleteSmartContractInterfaceResult"
+        },
+        "enableAuthProxyResult": {
+          "$ref": "#/definitions/EnableAuthProxyResult"
+        },
+        "disableAuthProxyResult": {
+          "$ref": "#/definitions/DisableAuthProxyResult"
+        },
+        "updateAuthProxyConfigResult": {
+          "$ref": "#/definitions/UpdateAuthProxyConfigResult"
         }
       }
     },
@@ -8794,6 +8840,98 @@
     },
     "UpdateAllowedOriginsResult": {
       "type": "object"
+    },
+    "UpdateAuthProxyConfigIntent": {
+      "type": "object",
+      "properties": {
+        "allowedOrigins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Updated list of allowed origins for CORS."
+        },
+        "allowedAuthMethods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Updated list of allowed proxy authentication methods."
+        },
+        "sendFromEmailAddress": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Custom 'from' address for auth-related emails."
+        },
+        "replyToEmailAddress": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Custom reply-to address for auth-related emails."
+        },
+        "emailAuthTemplateId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Template ID for email-auth messages."
+        },
+        "otpTemplateId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Template ID for OTP SMS messages."
+        },
+        "emailCustomizationParams": {
+          "$ref": "#/definitions/EmailCustomizationParams",
+          "x-nullable": true,
+          "description": "Overrides for auth-related email content."
+        },
+        "smsCustomizationParams": {
+          "$ref": "#/definitions/SmsCustomizationParams",
+          "x-nullable": true,
+          "description": "Overrides for auth-related SMS content."
+        },
+        "walletKitSettings": {
+          "$ref": "#/definitions/WalletKitSettingsParams",
+          "x-nullable": true,
+          "description": "Overrides for react wallet kit related settings."
+        },
+        "otpExpirationSeconds": {
+          "type": "integer",
+          "format": "int32",
+          "x-nullable": true,
+          "description": "OTP code lifetime in seconds."
+        },
+        "verificationTokenExpirationSeconds": {
+          "type": "integer",
+          "format": "int32",
+          "x-nullable": true,
+          "description": "Verification-token lifetime in seconds."
+        },
+        "sessionExpirationSeconds": {
+          "type": "integer",
+          "format": "int32",
+          "x-nullable": true,
+          "description": "Session lifetime in seconds."
+        },
+        "otpAlphanumeric": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Enable alphanumeric OTP codes."
+        },
+        "otpLength": {
+          "type": "integer",
+          "format": "int32",
+          "x-nullable": true,
+          "description": "Desired OTP code length (6–9)."
+        }
+      }
+    },
+    "UpdateAuthProxyConfigResult": {
+      "type": "object",
+      "properties": {
+        "configId": {
+          "type": "string",
+          "description": "Unique identifier for a given User. (representing the turnkey signer user id)"
+        }
+      }
     },
     "UpdatePolicyIntent": {
       "type": "object",
@@ -9756,6 +9894,19 @@
         }
       },
       "required": ["curve", "pathFormat", "path", "addressFormat"]
+    },
+    "WalletKitSettingsParams": {
+      "type": "object",
+      "properties": {
+        "enabledSocialProviders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of enabled social login providers (e.g., 'apple', 'google', 'facebook')",
+          "title": "Enabled Social Providers"
+        }
+      }
     },
     "WalletParams": {
       "type": "object",
