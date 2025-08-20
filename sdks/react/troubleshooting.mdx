@@ -128,14 +128,27 @@ If you prefer to use your own authentication flow, you can simply omit the `auth
 />
 #### Problem
 
-This error indicates that the Turnkey styles are not being applied to the UI components. This can happen if you forget to import the styles in your main application file.
+This error indicates that the Turnkey styles are not being applied to the UI components. This can happen if you forget to import the styles in your main application file or if the styles are being modified by other CSS rules in your application.
 
 #### Solution
 
 Make sure to import the Turnkey styles in your main application file (e.g., `app/layout.tsx` in Next.js). You can do this by adding the following line at the top of your file:
 
 ```tsx
-import "@turnkey/react-wallet-kit/dist/styles.css";
+import "@turnkey/react-wallet-kit/styles.css";
+```
+
+If you're using Tailwind CSS v3, please refer to the [Tailwind v3 error](#6-%40layer-utilities-is-used-but-no-matching-%40tailwind-utilities-directive-is-present-tailwind-v3-error) below for specific instructions on how to import the styles correctly.
+
+If you are still running into the error but your styles are imported correctly, you can supress the error by adding `supressMissingStylesError: true` to the `ui` object in the `TurnkeyProvider` config. This will disable the styles check.
+
+```tsx
+const turnkeyConfig = {
+  //... your existing configuration
+  ui: {
+    suppressMissingStylesError: true, // Disable styles check. Only do this if you are sure that the styles are being applied correctly.
+  },
+};
 ```
 
 ### 4. Event handlers cannot be passed to Client Component props
@@ -235,3 +248,69 @@ You can know when a session expires by using the `onSessionExpired` callback in 
   {children}
 </TurnkeyProvider>
 ```
+
+### 6. `@layer utilities` is used but no matching `@tailwind utilities` directive is present (Tailwind V3 Error)
+
+<img
+  src="/images/sdks/img/react/tw3-error.png"
+  alt="Tailwind utilities error"
+/>
+
+#### Problem
+
+This error occurs after importing the Turnkey styles in a Tailwind CSS project using Tailwind CSS v3. `@turnkey/react-wallet-kit` is built with Tailwind CSS v4 under the hood, and exports the styles into a regular CSS file for importing into any project. However, if you are using Tailwind CSS v3, you may encounter this error because Tailwind CSS v3 uses different syntax for CSS directives. Note that this error does not occur in Tailwind CSS v4 projects or when Tailwind CSS is not installed at all.
+
+#### Solution
+
+We recommend upgrading to Tailwind CSS v4 since this is currently the latest version. You can use the official [Tailwind CSS upgrade guide](https://tailwindcss.com/docs/upgrade-guide) to help you with the upgrade process.
+
+If you cannot upgrade to Tailwind CSS v4, you can follow these steps to resolve the issue:
+
+<Steps>
+
+<Step title="Install postcss-import">
+
+Install `postcss-import` if you haven't already:
+
+```bash
+npm install -D postcss-import
+```
+
+</Step>
+
+<Step title="Add postcss-import to your PostCSS config">
+
+Add postcss-import to your `postcss.config.mjs` (or equivalent) file:
+
+```js
+/** @type {import('postcss-load-config').Config} */
+const config = {
+  plugins: {
+    tailwindcss: {},
+    "postcss-import": {}, // Add postcss-import here
+  },
+};
+
+export default config;
+```
+
+</Step>
+<Step title="Import Turnkey styles in your main CSS file">
+Import the Turnkey styles in your main CSS file (e.g., `styles/globals.css`):
+
+We usually recommend importing the styles in your main application file (e.g., `app/layout.tsx` in Next.js) however, if you're using Tailwind CSS v3, you can't do this. Please remove the import if you already have it in your main application file.
+
+For Tailwind CSS v3, you need to import the Turnkey styles in your main CSS file (e.g., `styles/globals.css`) by pointing the import to the `@turnkey/react-wallet-kit/dist/styles.css` file:
+
+```css
+@import "@turnkey/react-wallet-kit/dist/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+The Turnkey styles must be imported before the Tailwind directives to ensure that the styles are applied correctly. You also must point to the dist directory to properly retrieve the styles ( `@turnkey/react-wallet-kit/dist/styles.css` instead of the `@turnkey/react-wallet-kit/styles.css`).
+
+</Step>
+</Steps>
