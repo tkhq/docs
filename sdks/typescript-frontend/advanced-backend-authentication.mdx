@@ -1,40 +1,16 @@
 ---
 title: "Advanced Backend Authentication"
-description: "Learn how to setup authentication using your backend and `@turnkey/react-wallet-kit`."
+description: "Learn how to setup authentication using your backend and `@turnkey/core`."
 sidebarTitle: "Advanced Backend Authentication"
 ---
 
 ## Overview
 
-This guide explains how to set up authentication in your React application using your backend server in conjunction with the `@turnkey/react-wallet-kit`. This approach is useful if you do not want to use Turnkey's auth proxy or are migrating from a previous version of the SDK and already have an existing backend auth setup.
+This guide explains how to set up authentication in your frontend JavaScript application using your backend server in conjunction with the `@turnkey/core`. This approach is useful if you do not want to use Turnkey's auth proxy or are migrating from a previous version of the SDK and already have an existing backend auth setup.
 
 ## What you can't use
 
-When implementing backend authentication, you cannot use any authentication helper methods from the `useTurnkey` hook, such as `handleLogin`, `completeOtp`, or `completeOauth`. These methods are designed to work with Turnkey's auth proxy and will not function with a custom backend authentication flow.
-
-## Disabling the Auth Proxy
-
-To disable auth proxy usage in `@turnkey/react-wallet-kit`, simply omit the `authProxyConfigId` parameter in the `TurnkeyProvider` configuration. This will prevent the SDK from automatically fetching authentication configuration from your Turnkey dashboard.
-
-```tsx
-import {
-  TurnkeyProvider,
-  TurnkeyProviderConfig,
-} from "@turnkey/react-wallet-kit";
-import "@turnkey/react-wallet-kit/styles.css";
-
-function App() {
-  const turnkeyConfig: TurnkeyProviderConfig = {
-    organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!, // Your organization ID from the Turnkey dashboard
-
-    // authProxyConfigId: process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID!, // Omit this line to disable auth proxy
-
-    //... your existing configuration
-  };
-
-  return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
-}
-```
+When implementing backend authentication, you cannot use any authentication helper methods from the `TurnkeyClient`, such as `completeOtp`, or `completeOauth`. These methods are designed to work with Turnkey's auth proxy and will not function with a custom backend authentication flow.
 
 ## On your backend
 
@@ -132,15 +108,11 @@ On the frontend, you will need to implement your own authentication flows that i
 
 Login endpoints like `otpLogin` and `oauthLogin` will require a public key to be passed in the request.
 
-You can use `createApiKeyPair` from the `useTurnkey` hook to generate a keypair for this purpose.
+You can use `createApiKeyPair` from the `TurnkeyClient` to generate a keypair for this purpose.
 
 ```tsx
-import { useTurnkey } from "@turnkey/react-wallet-kit";
-
-const { createApiKeyPair } = useTurnkey();
-
 const otpLogin = async (verificationToken: string) => {
-  const publicKey = await createApiKeyPair();
+  const publicKey = await turnkeyClient.createApiKeyPair();
 
   // Send the public key to your backend to initiate the OTP login flow
   const response = await fetch("/YOUR-BACKEND-URL/otp-login", {
@@ -162,19 +134,15 @@ const otpLogin = async (verificationToken: string) => {
 };
 ```
 
-The private key generated from `createApiKeyPair` will be automatically stored in [`indexedDB`](/authentication/sessions#indexeddb-web-only-%3A) and used for stamping requests to Turnkey after authentication. You can learn more about stamps [here](/developer-reference/api-overview/stamps).
+The private key generated from `createApiKeyPair` will be automatically stored in [indexedDB](/authentication/sessions#indexeddb-web-only-%3A) on web environments or [secure storage](/authentication/sessions#securestorage-mobile-only) on React Native and used for stamping requests to Turnkey after authentication. You can learn more about stamps [here](/developer-reference/api-overview/stamps).
 
 ### Storing the session
 
-Login endpoints like `otpLogin` and `oauthLogin` will [return a session token in JWT format](/authentication/sessions#creating-a-read-write-session) that you need to store in your application. You can use the `storeSession` function from the `useTurnkey` hook to store the session token.
+Login endpoints like `otpLogin` and `oauthLogin` will [return a session token in JWT format](/authentication/sessions#creating-a-read-write-session) that you need to store in your application. You can use the `storeSession` function from the `TurnkeyClient` to store the session token.
 
 ```tsx
-import { useTurnkey } from "@turnkey/react-wallet-kit";
-
-const { storeSession } = useTurnkey();
-
 const otpLogin = async (verificationToken: string) => {
-  const publicKey = await createApiKeyPair();
+  const publicKey = await turnkeyClient.createApiKeyPair();
 
   // Send the public key to your backend to initiate the OTP login flow
   const response = await fetch("/YOUR-BACKEND-URL/otp-login", {
@@ -195,28 +163,8 @@ const otpLogin = async (verificationToken: string) => {
   const { sessionToken } = await response.json();
 
   // Store the session token in your application
-  storeSession(sessionToken);
+  turnkeyClient.storeSession(sessionToken);
 };
 ```
 
-By using `storeSession`, the SDK will automatically handle the session and keypair management for you.
-
-If you have `autoRefreshSession` enabled under the `auth` object in the `TurnkeyProvider` configuration, the SDK will automatically refresh the session token when it expires. You can also continue to use the `authState` variable from the `useTurnkey` hook to check if the user is authenticated.
-
-```tsx
-import { useTurnkey, AuthState } from "@turnkey/react-wallet-kit";
-function AuthStatus() {
-  const { authState, user } = useTurnkey();
-  return (
-    <div>
-      {authState === AuthState.Authenticated ? (
-        <p>Welcome, {user?.userName}!</p>
-      ) : (
-        <p>Please log in.</p>
-      )}
-    </div>
-  );
-}
-```
-
-Once the user is authenticated, you can continue to use `@turnkey/react-wallet-kit` as usual.
+Once the user is authenticated, you can continue to use `@turnkey/core` as usual.

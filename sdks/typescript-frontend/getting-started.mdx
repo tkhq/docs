@@ -1,0 +1,142 @@
+---
+title: "Getting Started with @turnkey/core"
+description: "Learn how to set up `@turnkey/core` in your frontend JavaScript application. This page will guide you through creating a Turnkey organization, configuring authentication, installing the SDK, and initializing the client."
+sidebarTitle: "Getting Started"
+---
+
+## Turnkey Organization Setup
+
+To start, you must create a Turnkey organization via the [Turnkey dashboard](https://app.turnkey.com). The steps are described in the [Account Setup](/getting-started/quickstart) section.
+
+For this setup, we will use Turnkey's **Auth Proxy** to handle authentication. You can enable and configure this through the Turnkey dashboard.
+
+<Steps>
+  <Step title="Enable auth proxy">
+    Navigate to the **Auth** section in the Turnkey dashboard and enable the
+    **Auth Proxy**.
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-toggle.png"
+      alt="Auth Proxy toggle"
+    />
+
+  </Step>
+
+<Step title="Customize auth methods">
+  You can choose which auth methods to enable and customize various options from
+  this screen. For this quickstart, let's enable **email OTP** and **passkeys**.
+  When you're done, click **Save**.
+  <img
+    src="/images/getting-started/img/quickstart/auth-proxy-options.png"
+    alt="Auth Proxy options"
+  />
+</Step>
+
+  <Step title="Finish up">
+    Once you're finished with the auth proxy setup, copy your **Auth Proxy Config ID** and your **Organization ID** from the dashboard.
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-id.png"
+      alt="Auth Proxy Config id"
+    />
+    <img
+      src="/images/getting-started/img/quickstart/org-id.png"
+      alt="Organization id"
+    />
+
+These values will be required to configure the SDK in your app.
+
+  </Step>
+</Steps>
+
+---
+
+## Installation
+
+Install the Turnkey Core SDK into your project:
+
+<CodeGroup>
+
+```bash npm
+npm install @turnkey/core
+```
+
+```bash pnpm
+pnpm add @turnkey/core
+```
+
+```bash yarn
+yarn add @turnkey/core
+```
+
+</CodeGroup>
+
+## Client Initialization
+
+Unlike `@turnkey/react-wallet-kit`, `@turnkey/core` doesn't provide a React provider or hooks — you work directly with the TurnkeyClient.
+
+Here's a minimal setup example:
+
+```ts
+import { TurnkeyClient, TurnkeyError } from "@turnkey/core";
+
+const client = new TurnkeyClient({
+  organizationId: "YOUR_ORGANIZATION_ID",
+  authProxyConfigId: "YOUR_AUTH_PROXY_CONFIG_ID", // Can be omitted if you don't use the Auth Proxy
+});
+
+// Initialize the client. Required for async initialization.
+await client.init();
+```
+
+## Optional Configuration
+
+The client accepts optional configuration for **passkeys** and **external browser wallets**. If omitted, those features will not be initialized.
+
+### Passkeys
+
+```ts
+const client = new TurnkeyClient({
+  organizationId: "...",
+  authProxyConfigId: "...",
+  passkeyConfig: {
+    rpId: "example.com", // Required for React Native
+    timeout: 60000, // Default: 5 minutes
+    userVerification: "preferred",
+  },
+});
+```
+
+All fields are optional in web environments. On React Native, `rpId` is required.
+
+### External Browser Wallets
+
+```ts
+const client = new TurnkeyClient({
+  organizationId: "...",
+  authProxyConfigId: "...",
+  walletConfig: {
+    chains: {
+      ethereum: {
+        native: true,
+        walletConnectNamespaces: ["eip155:1"], // Ethereum mainnet
+      },
+      solana: {
+        native: true,
+        walletConnectNamespaces: ["solana:mainnet"],
+      },
+    },
+
+    // Optional: Configure WalletConnect. WalletConnect is used for connecting wallets from mobile devices.
+    walletConnect: {
+      projectId: "YOUR_PROJECT_ID",
+      appMetadata: {
+        name: "My App",
+        description: "My dApp powered by Turnkey",
+        url: "https://example.com",
+        icons: ["https://example.com/icon.png"],
+      },
+    },
+  },
+});
+```
