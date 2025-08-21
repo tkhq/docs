@@ -1,0 +1,216 @@
+---
+title: "Auth Proxy"
+description: "Use Turnkey’s managed Auth Proxy to securely run OTP/OAuth/signup flows without standing up your own backend."
+sidebarTitle: "Auth Proxy"
+---
+
+## Overview
+
+The **Turnkey Auth Proxy** is a managed, multi-tenant service that signs and forwards authentication requests (OTP, OAuth, signup/suborg creation) to the Turnkey Coordinator (Public API) on your behalf so you don’t need to host your own backend for auth.
+
+- **Host:** `https://authproxy.turnkey.com`
+- **What it does:** Validates origin, looks up your org’s proxy configuration, signs the request with a proxy-scoped API key, and forwards the request to Turnkey Coordinator.
+- **What it doesn’t do:** It cannot log in users without their participation (e.g., OTP code entry, OAuth consent). It doesn’t access funds or broader org operations.
+
+Enable and configure the Auth Proxy from the **Dashboard** → AUTH section (allowed origins, templates, session lengths, etc).
+
+## When to Use the Auth Proxy
+
+- Use when you want backend-signed OTP/OAuth/signup flows with origin enforcement and central config. Your frontend calls Auth Proxy endpoints directly.
+
+## How It Works
+
+1. Enable in Dashboard. Toggle **Auth Proxy** ON. Turnkey creates a Proxy User and proxy API key, stored encrypted in the auth proxy config for your org.  
+2. Configure Allowed Origins. Only requests from these origins may call the proxy (CORS + origin validation). By default all origins are allowed (*)  
+3. Your App Calls Auth Proxy. Your frontend hits `https://authproxy.turnkey.com/v1/...` with your auth proxy config id and the flow parameters. This should be passed to the X-Auth-Proxy-Config-Id header in your request
+4. Proxy Signs & Forwards. Auth Proxy decrypts your proxy key in-memory, signs the activity, and forwards to Turnkey Coordinator.  
+5. Coordinator Responds. Proxy returns success / error, plus any response payload (e.g., organizationId, session).  
+
+**Security notes:**
+- Proxy keys are HPKE encrypted inside our enclave; decrypted per request only in memory.
+- Strict separation from Turnkey’s core backend; communicates via public API only.
+
+## Base URL
+
+All endpoints are under https://authproxy.turnkey.com
+
+## Authentication & Headers
+
+- **Auth Proxy Config Id** (required): identifies your parent org’s proxy config.  
+  - Send as header:  
+    ```
+    X-Auth-Proxy-Config-Id: <auth-proxy-config-token>
+- **CORS & Origin:** Requests must originate from a whitelisted origin set in the dashboard.
+
+## Endpoints
+
+### Signup (Create Sub-Organization)
+
+**POST** `/v1/signup`
+
+Onboard a new user by creating a sub-organization. Optionally creates a wallet.
+
+**Request Body**
+```json
+{
+  "userName": "newuser@example.com",
+  "organizationName": "Example Org",
+  "userEmail": "newuser@example.com",
+  "apiKeys": [],
+  "authenticators": [],
+  "oauthProviders": [],
+  "wallet": {
+    "path": "m/44'/0'/0'/0/0",
+    "curve": "CURVE_TYPE_ED25519"
+  }
+}
+```
+
+**Response**
+```json
+{
+  "organizationId": "suborg-abc123"
+}
+```
+
+## Init OTP
+
+POST /v1/otp_init
+
+Initialize an OTP (SMS or email) for a user.
+
+**Request Body**
+```json
+{
+  "otpType": "OTP_TYPE_SMS",
+  "contact": "+12265550123"
+}
+```
+**Response**
+```json
+{
+  "otpId": "otp-xyz789"
+}
+```
+
+## Verify OTP
+
+POST /v1/otp_verify
+
+Verify the OTP code previously sent to the user’s contact.
+
+**Request Body**
+
+```json
+{
+  "otpId": "otp-xyz789",
+  "otpCode": "123456"
+}
+```
+
+**Response**
+
+```json
+{
+  "verificationToken": "verify-token-abc"
+}
+```
+
+## OTP Login
+
+POST /v1/otp_login
+
+Login using a verification token and public key.
+
+**Request Body**
+
+```json
+{
+  "verificationToken": "verify-token-abc",
+  "publicKey": "02ab...compressedP256",
+}
+```
+
+**Response**
+
+```json
+{
+  "session": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+## OAuth Login
+
+POST /v1/oauth_login
+
+Login using an OIDC token and public key.
+
+**Request Body**
+
+```json
+{
+  "oidcToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6...",
+  "publicKey": "02ab...compressedP256",
+  "invalidateExisting": false
+}
+```
+
+**Response**
+
+```json
+{
+  "session": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+## Get Account
+
+POST /v1/account
+
+Return organization id associated with a given filter (e.g. email, phone, credential ID, OIDC token).
+
+**Request Body**
+
+```json
+{
+  "filterType": "EMAIL",
+  "filterValue": "user@example.com"
+}
+```
+
+**Response**
+
+```json
+{
+  "organizationId": "suborg-abc123"
+}
+```
+
+## Get Wallet Kit Config
+
+POST /v1/wallet_kit_config
+
+Return Wallet Kit feature toggles for the calling organization.
+
+**Request Body**
+
+```json
+{}
+```
+
+**Response**
+
+```json
+{
+  "enabledProviders": ["google", "facebook", "apple", "email", "sms", "passkey", "wallet"],
+  "sessionExpirationSeconds": "1800",
+  "organizationId": "org-abc123"
+}
+```
+
+## Configuration (Dashboard → AUTH)
+
+- Enable/Disable the Auth Proxy for your org  
+- Allowed Frontend Origins (CORS enforcement)  
+- Email/SMS Customization  
+- Session Expiration
