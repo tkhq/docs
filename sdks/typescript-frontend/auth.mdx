@@ -1,0 +1,54 @@
+---
+title: "Authentication"
+description: "Learn how to set up log in or sign up using @turnkey/core in your frontend JavaScript application."
+sidebarTitle: "Authentication"
+---
+
+## Triggering Authentication
+
+You can call the specific login or signup methods you want to support. For example, with passkeys:
+
+```ts
+// Log in with a passkey
+const session = await turnkeyClient.loginWithPasskey();
+
+// Or sign up with a passkey
+const session = await turnkeyClient.signUpWithPasskey();
+```
+
+Here's an example using email OTP:
+
+```ts
+// Log in with email OTP
+import { OtpType } from "@turnkey/core";
+
+cosnt otpId = await turnkeyClient.initOtp({ otpType: OtpType.Email, contact: "email@example.com" })
+const session = await turnkeyClient.completeOtp({
+        otpId,
+        otpCode: 123456, // The code the user received via email or SMS
+        contact: "email@example.com",
+        otpType: OtpType.Email,
+    });
+```
+
+Sessions will be automatically created and stored in the browser's local storage or mobile async storage on React Native.
+
+## Checking Authentication State
+
+To check if a user is authenticated, call `client.getSession()` and verify the expiry:
+
+```ts
+const session = await turnkeyClient.getSession();
+
+if (session && session.expiry \* 1000 > Date.now()) {
+    console.log("User is authenticated:", session);
+} else {
+    console.log("User is not authenticated");
+}
+```
+
+If the session is expired or the user is done with their session, you can log them out:
+
+```ts
+await turnkeyClient.logout();
+```
