@@ -1,0 +1,124 @@
+---
+title: "Access control"
+description: "This page provides examples of policies governing access."
+sidebarTitle: "Access control"
+---
+
+#### Allow a specific user to create wallets
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to create wallets",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.resource == 'WALLET' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow users with a specific tag to create users
+
+```json
+{
+  "policyName": "Allow user_tag <USER_TAG_ID> to create users",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
+  "condition": "activity.resource == 'USER' && activity.action == 'CREATE'"
+}
+```
+
+#### Require two users with a specific tag to add policies
+
+```json
+{
+  "policyName": "Require two users with user_tag <USER_TAG_ID> to create policies",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.filter(user, user.tags.contains('<USER_TAG_ID>')).count() >= 2",
+  "condition": "activity.resource == 'POLICY' && activity.action == 'CREATE'"
+}
+```
+
+#### Deny all delete actions for users with a specific tag
+
+```json
+{
+  "policyName": "Only user_tag <USER_TAG_ID> can take actions",
+  "effect": "EFFECT_DENY",
+  "consensus": "approvers.any(user, user.tags.contains('<USER_TAG_ID>'))",
+  "condition": "activity.action == 'DELETE'"
+}
+```
+
+#### Allow a specific user (e.g. API-only user) to create a sub-org
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to create a sub-org",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'ORGANIZATION' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow a specific user to perform auth type activities (full list [here](/concepts/policies/language#activity-breakdown))
+
+Note: The `activity.resource` portion determines which activities can be performed. The `activity.action` determines what types of actions can be taken upon those resources.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to initiate auth type activities",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource == 'AUTH' && activity.action == 'CREATE'"
+}
+```
+
+#### Allow a specific user to perform [generic OTP](/api-reference/activities/init-generic-otp) activities
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to initiate and verify generic OTP activities",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.resource in ['AUTH', 'OTP'] && activity.action in ['CREATE','VERIFY']"
+}
+```
+
+#### Allow a specific user to perform a specific activity type (full list [here](/concepts/policies/language#activity-breakdown))
+
+Note: Activities may be upgraded over time, and thus new versions may be introduced.
+These policies will NOT be valid if an activity type is upgraded and requests are made on the new activity type.
+For example, if Turnkey introduces `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` (upgraded from `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2`)
+and a request is made with the newer `V3` version, this policy with not allow that user to perform `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V3` activities.
+
+```json JSON
+{
+  "policyName": "Allow user <USER_ID> to perform create read write session v2",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2'"
+}
+```
+
+#### Allow a specific credential type to perform a specific action (full list of credential types [here](/authentication/credentials#credential-types))
+
+This policy can be used to say, only passkeys are allowed to sign transactions and not authentication through SMS (or any other authentication method).
+
+```json JSON
+{
+  "policyName": "Allow signing with only passkeys",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "credentials.any(credential, credential.type == 'CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2'"
+}
+```
+
+#### Allow a specific credential with a specific public key type to perform a specific action
+
+```json JSON
+{
+  "policyName": "Allow signing with only passkeys",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "credentials.any(credential, credential.public_key == '<YOUR_CREDENTIAL_PUBLIC_KEY>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2'"
+}
+```
