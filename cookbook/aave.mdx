@@ -1,0 +1,270 @@
+---
+title: 'Use Turnkey wallets with Aave'
+sidebarTitle: "Aave integration"
+---
+
+## Overview
+
+Aave V3 is a decentralized liquidity protocol where users can supply assets to earn yield and withdraw them at any time.
+In this guide, we’ll walk through using Turnkey to sign common Aave transactions on Base Mainnet with USDC: approving the Aave Pool to spend USDC, supplying USDC, reading the resulting aUSDC balance, and withdrawing USDC back to the wallet.
+
+We’ll also demonstrate Turnkey’s policy engine by restricting signing operations to the specific Aave Pool and USDC contracts on Base.
+A working example can be found [here](https://github.com/tkhq/sdk/tree/main/examples/with-aave).
+
+## Getting started
+
+The first step is to set up your Turnkey organization and account. By following the [Quickstart guide](/getting-started/quickstart), you should have:
+
+- A root user with a public/private API key pair within the Turnkey parent organization
+- An organization ID
+
+The next step is to create another non-root user within the organization with a different API key and exclude it from the root quorum. If you would like to remove a root user from root quorum, you can do this from the Turnkey [dashboard](https://app.turnkey.com/dashboard/security/updateRootQuorum) or [API](https://docs.turnkey.com/api-reference/activities/update-root-quorum).
+Here's a simple [script](https://github.com/tkhq/sdk/blob/main/examples/kitchen-sink/src/sdk-server/updateRootQuorum.ts) that shows how to update the root quorum using @turnkey/sdk-server.
+
+Finally, make sure you have a wallet with an Ethereum account created within this organization and have it funded with some ETH and USDC on Base Mainnet.
+
+## Setting up the policy for the non-root user
+
+Now we’ll use a non-root Turnkey user to sign Aave transactions, while ensuring it can only interact with the USDC token and the Aave Pool contracts on Base mainnet.
+We'll define a new API client that would use the organization root user to create the required policy:
+
+```tsx
+import { Turnkey } from "@turnkey/sdk-server";
+import { AaveV3Base } from "@bgd-labs/aave-address-book";
+
+const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+}).apiClient();
+
+const userId = "<The id of the non-root user that you'll be using to sign the Aave related transactions>";
+
+// Pull addresses from Aave Address Book (Base)
+const USDC_ADDRESS = AaveV3Base.ASSETS.USDC.UNDERLYING;
+const AAVE_POOL = AaveV3Base.POOL;
+
+const policyName =
+    "Allow API key user to only sign txs to Aave Pool and USDC";
+    const effect = "EFFECT_ALLOW";
+    const consensus = `approvers.any(user, user.id == '${userId}')`;
+    const condition = `eth.tx.to in ['${USDC_ADDRESS}', '${AAVE_POOL}']`;
+    const notes = "";
+
+const { policyId } = await turnkeyClient.createPolicy({
+    policyName,
+    condition,
+    consensus,
+    effect,
+    notes,
+});
+```
+
+## Set up the Turnkey signer
+
+We'll be using `@turnkey/viem` to create a Turnkey custom signer which implements the signing APIs expected by the `viem` client. Notice that the Turnkey API client is going to use the non-root user API key now as using a root user will bypass the policy engine evaluation.
+
+```tsx
+import { base } from "viem/chains";
+import { createAccount } from "@turnkey/viem";
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
+import {
+    parseAbi,
+    erc20Abi,
+    parseUnits,
+    createWalletClient,
+    http,
+    createPublicClient,
+    type Account,
+} from "viem";
+
+const turnkeyClient = new TurnkeyServerSDK({
+    apiBaseUrl: process.env.TURNKEY_BASE_URL!,
+    apiPrivateKey: process.env.NONROOT_API_PRIVATE_KEY!,
+    apiPublicKey: process.env.NONROOT_API_PUBLIC_KEY!,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+});
+
+const turnkeyAccount = await createAccount({
+    client: turnkeyClient.apiClient(),
+    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    signWith: process.env.SIGN_WITH!,
+});
+
+const client = createWalletClient({
+    account: turnkeyAccount as Account,
+    chain: base,
+    transport: http(
+      `https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY!}`,
+    ),
+});
+
+// Use the standard viem client for non-signing operations
+const publicClient = createPublicClient({
+    transport: http(
+      `https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY!}`,
+    ),
+    chain: base,
+});
+```
+
+## Approve the Aave Pool contract to spend USDC
+
+```tsx
+import { AaveV3Base } from "@bgd-labs/aave-address-book";
+
+// Pull addresses from Aave Address Book (Base)
+const USDC_ADDRESS = AaveV3Base.ASSETS.USDC.UNDERLYING;
+const AAVE_POOL = AaveV3Base.POOL;
+
+// Approve Pool to spend 10 USDC
+const { request: approveReq } = await publicClient.simulateContract({
+    address: USDC_ADDRESS as `0x${string}`,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [AAVE_POOL as `0x${string}`, parseUnits("10", 6)], // USDC has 6 decimals
+    account: walletClient.account,
+});
+
+const approveHash = await walletClient.writeContract(approveReq);
+const receiptApprove = await publicClient.waitForTransactionReceipt({
+    hash: approveHash,
+});
+
+console.log("Approve transaction:", `https://basescan.org/tx/${approveHash}`, receiptApprove.status);
+```
+
+## Deposit USDC into Aave Pool
+
+```tsx
+// Supply 0.5 USDC
+const poolAbi = parseAbi([
+    "function supply(address asset,uint256 amount,address onBehalfOf,uint16 referralCode)",
+]);
+
+const { request: supplyReq } = await publicClient.simulateContract({
+    address: AAVE_POOL as `0x${string}`,
+    abi: poolAbi,
+    functionName: "supply",
+    args: [
+      USDC_ADDRESS,
+      parseUnits("0.5", 6),
+      (walletClient.account as Account).address,
+      0,
+    ],
+    account: walletClient.account as Account,
+});
+
+// The USDC transfer path & proxy layers sometimes make estimateGas under-shoot
+// Adding a buffer to avoid occasional out-of-gas errors
+const gas = await publicClient.estimateContractGas({
+    address: AAVE_POOL as `0x${string}`,
+    abi: poolAbi,
+    functionName: "supply",
+    args: [
+      USDC_ADDRESS,
+      parseUnits("0.5", 6),
+      (walletClient.account as Account).address,
+      0,
+    ],
+    account: walletClient.account as Account,
+});
+
+const gasWithBuffer = (gas * 130n) / 100n;
+
+const supplyHash = await walletClient.writeContract({
+    ...supplyReq,
+    gas: gasWithBuffer,
+});
+const receiptSupply = await publicClient.waitForTransactionReceipt({
+    hash: supplyHash,
+});
+
+console.log("Supply transaction:", `https://basescan.org/tx/${supplyHash}`, receiptSupply.status);
+```
+
+
+## Read the aUSDC balance
+
+When you supply USDC into Aave, you receive aUSDC (an ERC-20 “receipt” token), aUSDC.balanceOf(user) already shows your live underlying balance (principal + interest), because it’s auto-scaled by Aave’s liquidity index.
+
+```tsx
+// Pull aUSDC address from Aave Address Book (Base)
+const aUSDC = AaveV3Base.ASSETS.USDC.A_TOKEN;
+
+// Read aUSDC balance which tracks your supplied principal + interest
+const erc20ReadAbi = parseAbi([
+    "function balanceOf(address) view returns (uint256)",
+    "function decimals() view returns (uint8)",
+]);
+
+const [decimals, rawBal] = await Promise.all([
+    publicClient.readContract({
+        address: aUSDC as `0x${string}`,
+        abi: erc20ReadAbi,
+        functionName: "decimals",
+}),
+    publicClient.readContract({
+        address: aUSDC as `0x${string}`,
+        abi: erc20ReadAbi,
+        functionName: "balanceOf",
+        args: [(walletClient.account as Account).address],
+    }),
+]);
+
+console.log("aUSDC balance:", formatUnits(rawBal, Number(decimals)));
+```
+
+## Withdraw USDC from the Aave Pool
+
+On withdraw, Aave burns your aUSDC and sends you back USDC:
+
+```tsx
+// Pull addresses from Aave Address Book (Base)
+const USDC_ADDRESS = AaveV3Base.ASSETS.USDC.UNDERLYING;
+const AAVE_POOL = AaveV3Base.POOL;
+
+const poolReadWriteAbi = parseAbi([
+    "function withdraw(address asset,uint256 amount,address to) returns (uint256)",
+]);
+
+// withdraw 0.1 USDC
+const { request: withdrawReq } = await publicClient.simulateContract({
+    address: AAVE_POOL as `0x${string}`,
+    abi: poolReadWriteAbi,
+    functionName: "withdraw",
+    args: [
+      USDC_ADDRESS,
+      parseUnits("0.1", 6),
+      (walletClient.account as Account).address,
+    ],
+    account: walletClient.account as Account,
+});
+
+// the USDC transfer path & proxy layers sometimes make estimateGas under-shoot
+// adding a buffer to avoid occasional out-of-gas errors
+const gas = await publicClient.estimateContractGas({
+    address: AAVE_POOL as `0x${string}`,
+    abi: poolReadWriteAbi,
+    functionName: "withdraw",
+    args: [
+      USDC_ADDRESS,
+      parseUnits("0.1", 6),
+      (walletClient.account as Account).address,
+    ],
+    account: walletClient.account as Account,
+});
+
+const gasWithBuffer = (gas * 130n) / 100n;
+
+const withdrawHash = await walletClient.writeContract({
+    ...withdrawReq,
+    gas: gasWithBuffer,
+});
+const receiptWithdraw = await publicClient.waitForTransactionReceipt({
+    hash: withdrawHash,
+});
+
+console.log("Withdraw transaction:", `https://basescan.org/tx/${withdrawHash}`, receiptWithdraw.status);
+```
