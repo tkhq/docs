@@ -135,24 +135,6 @@ This alternative method uses `ACTIVITY_TYPE_EMAIL_AUTH` with these parameters:
   <img src="/images/authentication/img/auth_email.png" alt="auth email" />
 </Frame>
 
-### Recovery flow
-
-**Note:** this is legacy flow, if starting fresh please use the above email auth methods also for recovery purposes
-
-For account recovery scenarios, users can initiate a recovery-specific flow using the `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` activity type, which requires:
-
-- `email`: the email of the user needing recovery (must match their registered email)
-- `targetPublicKey`: the public key for recovery credential encryption
-
-The recovery process consists of two phases:
-
-1. **Initiation**: Generates a temporary recovery credential and sends it via email
-2. **Finalization**: User decrypts the recovery credential and uses it to sign an `ACTIVITY_TYPE_RECOVER_USER` activity, which can add new authenticators to regain account access
-
-<Frame>
-  <img src="/images/authentication/img/auth_email.png" alt="auth email" />
-</Frame>
-
 ## Email customization
 
 We offer customization for the following:
@@ -203,9 +185,37 @@ Here's an example of a custom HTML email containing an email auth bundle:
   example](/images/embedded-wallets/img/email-auth-example-dynamic.png)
 </Frame>
 
+<Warning>
+  **Bespoke HTML templates** and **custom email sender domains** are available to [**Enterprise clients**](https://www.turnkey.com/pricing) on the **Scale tier** or higher.
+</Warning>
+
 If you are interested in implementing bespoke, fully-customized email templates, please reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
 
-## Authorization
+### Custom email sender domain
+
+[Enterprise](https://www.turnkey.com/pricing) clients  can also customize the email sender domain. To get set up, please reach out to your Turnkey rep to get started but here is what you'll be able to configure:
+
+```js
+// Optional custom email address from which to send the OTP email
+"sendFromEmailAddress": "notifs@mail.domain.com"
+
+// Optional custom sender name
+"sendFromEmailSenderName": "MyApp Notifications"
+
+// Optional reply-to email address
+"replyToEmailAddress": "reply@mail.domain.com"
+```
+
+Please keep in mind that:
+
+- Email has to be from a pre-whitelisted domain
+- If there is no `sendFromEmailAddress` or it's invalid, the other two fields are ignored
+- If `sendFromEmailSenderName` is absent, it defaults to "Notifications" (again, ONLY if `sendFromEmailAddress` is present and valid)
+- If `replyToEmailAddress` is absent, then there is no reply-to added. If it is present, it must ALSO be from a valid, whitelisted domain, but it doesn't have to be the same email address as the `sendFromEmailAddress` one (though once again, this first one MUST be present, or the other two feature are ignored)
+
+If you are interested in implementing bespoke, fully-customized email templates and sender domain, please reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
+
+### Authorization
 
 Authorization is managed through our [policy engine](/concepts/policies/overview):
 
@@ -222,22 +232,6 @@ Specifically:
 - For OTP-based auth: `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_VERIFY_OTP` and `ACTIVITY_TYPE_OTP_LOGIN`
 - For credential bundle auth: `ACTIVITY_TYPE_EMAIL_AUTH`
 
-### Recovery
-
-- `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY`:
-
-  - Initiates the recovery process
-  - Requires proper authorization via policies
-  - Can target any user in the organization or sub-organizations
-
-- `ACTIVITY_TYPE_RECOVER_USER`:
-
-  - Must be signed by the recovery credential received via email
-  - Users can add credentials to their own user when authenticated
-  - Recovery credentials expire after 15 minutes
-  - Only the most recent recovery credential remains valid
-  - Users can add new authenticators to regain account access when authenticated with a recovery credential
-
 <Frame>
   <img
     src="/images/authentication/img/diagrams/email_auth_authorization.png"
@@ -245,35 +239,11 @@ Specifically:
   />
 </Frame>
 
-## Implementation in sub-organizations
-
-Both authentication methods and recovery work seamlessly with [sub-organizations](/concepts/sub-organizations).
-
 ### Example implementations
 
 - [OTP Auth Example](https://github.com/tkhq/sdk/tree/main/examples/otp-auth)
 - [Email Auth Example](https://github.com/tkhq/sdk/tree/main/examples/email-auth)
-- [Email Recovery Example](https://github.com/tkhq/sdk/tree/main/examples/email-recovery)
 - [Demo Embedded Wallet](https://wallet.tx.xyz) ([code](https://github.com/tkhq/demo-embedded-wallet))
-
-For implementation details:
-
-<CardGroup>
-  <Card
-    title="Sub-Organization Email Auth Guide"
-    href="/embedded-wallets/sub-organization-auth"
-    icon="file-lines"
-    iconType="solid"
-    horizontal
-  />
-  <Card
-    title="Sub-Organization Recovery Guide"
-    href="/embedded-wallets/sub-organization-recovery"
-    icon="file-lines"
-    iconType="solid"
-    horizontal
-  />
-</CardGroup>
 
 ## Implementation in organizations
 
@@ -283,7 +253,6 @@ For organizations accessed via dashboard:
 
    - `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP-based authentication
    - `FEATURE_NAME_EMAIL_AUTH` for credential bundle authentication
-   - Recovery features if needed
 
 2. Users initiating the request must have appropriate permissions
 
@@ -295,13 +264,11 @@ Use `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` to disable:
 
 - `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP-based authentication
 - `FEATURE_NAME_EMAIL_AUTH` for credential bundle authentication
-- `FEATURE_NAME_EMAIL_RECOVERY` for recovery
 
 When creating sub-organizations, use:
 
 - `disableOtpEmailAuth` parameter for OTP-based authentication
 - `disableEmailAuth` parameter for credential bundle authentication
-- `disableEmailRecovery` parameter for recovery
 
 ## Implementation notes
 
