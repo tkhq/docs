@@ -1,26 +1,55 @@
 ---
 title: "Social logins"
-description: "Social logins provide a familiar and convenient way for users to access applications using their existing accounts from popular platforms like Google, Apple, or Facebook. Under the hood, this functionality is powered by OAuth - a robust authentication protocol that enables secure user verification through OpenID Connect ([OIDC](https://openid.net/specs/openid-connect-core-1_0.html)) tokens. This feature is available exclusively for sub-organization users."
+description: "Social logins provide a familiar and convenient way for users to access applications using their existing accounts from popular platforms like Google, Apple, Facebook, X/Twitter, etc. Under the hood, this functionality is powered by OAuth - a robust auth protocol which enables secure user verification through OpenID Connect ([OIDC](https://openid.net/specs/openid-connect-core-1_0.html)) tokens. This feature is available exclusively for sub-organization users."
 ---
 
 Similar to [email auth](/authentication/email), social login authentication is ideal for users who prefer not to manage API keys or [passkeys](/authentication/passkeys/introduction) directly. This makes it particularly well-suited for onboarding users who are comfortable with traditional web2-style accounts but may be unfamiliar with cryptographic keys and credentials. An example implementing social login authentication for an organization can be found in our SDK repo [here](https://github.com/tkhq/sdk/tree/main/examples/oauth).
 
+Turnkey supports two different types of Social Login Providers:
+
+1) **OIDC Providers**
+(Google, Apple, Auth0, Cognito…)
+These Providers issue your app an **OIDC ID Token** identifying an end-user, which can subsequently be passed to Turnkey as a means of authentication.
+
+2) **OAuth-Only Providers**
+(X/Twitter, Discord…)
+These Providers do *not* issue **OIDC ID Tokens** themselves, and instead provide only bare-bones OAuth 2.0.  To work around this limitation, Turnkey runs the **OAuth 2.0 Authorization Code + PKCE** flow, calls the provider’s `who-am-I` endpoint using your app credentials, and then uses the returned User Data to **mint a short-lived OIDC ID token**.  In effect, Turnkey acts as an "*OIDC Wrapper*" for these OAuth 2.0 Services.
+
+While the backend flows associated with these two types of Providers differ upstream of **OIDC ID Token** generation, they converge at that point and have no downstream differences.  In both cases, the goal is to get an **OIDC ID Token** identifying the end user.
+
+## Social Login Provider Types - Comparison
+
+The table below can be helpful in understanding the similarities and differences between the two types of Social Login Providers that Turnkey supports:
+
+| **Provider Type**   | **OIDC Provider**                                 | **OAuth-Only Providers**                                          |
+|---------------------|---------------------------------------------------|-------------------------------------------------------------------|
+| Providers           | Google, Apple, Facebook, Auth0, Cognito           | X/Twitter, Discord                                                |
+| Token Transport     | Returned to your App by Provider                  | Returned by Turnkey after **OAuth 2.0 Auth Code + PKCE** flow     |
+| Issuer (`iss`)      | Provider (iss = Provider URL)                     | Turnkey (iss = Turnkey URL)                                       |
+| Audience  (`aud`)   | Provider’s `client_id` for your app               | Provider’s `client_id` for your app                               |
+| Subject (`sub`)     | Provider’s subject (stable user ID)               | Derived from ID `who-am-I` response (e.g., `x:123456789`)         |
+| Nonce (`nonce`)     | Sent to Provider; echoed in ID token              | Sent to Turnkey; echoed in ID token.                              |
+| Refresh/access      | If the Provider returns them, you may use them    | Not provided.                                                     |
+
 ## Roles and responsibilities
 
-- **Turnkey**: runs verifiable infrastructure to create credentials and verify OIDC tokens
+- **Turnkey**: Runs verifiable infrastructure to create credentials, verify OIDC tokens and, in the case of **OAuth-Only Providers**, issue them as well.
 
-- **Parent**: that's you! **For the rest of this guide we'll assume you, the reader, are a Turnkey customer**. We assume that you have:
+- **Parent**: That's you! **For the rest of this guide we'll assume you, the reader, are a Turnkey customer**. We assume that you have:
 
-  - an existing Turnkey organization (we'll refer to this organization as "the parent organization")
-  - a web application frontend (we'll refer to this as just "app" or "web app")
-  - a backend able to sign and POST Turnkey activities ("backend" or "parent backend")
+  - An existing Turnkey organization (we'll refer to this organization as "the parent organization")
+  - A web application frontend (we'll refer to this as just "app" or "web app")
+  - A backend able to sign and POST Turnkey activities ("backend" or "parent backend")
 
-- **End-User**: the end-user is a user of your web app. They have an account with Google.
+- **End-User**: The end-user is a user of your web app. They have an account with Google.
 
 - **OIDC Provider**: a provider able to authenticate your End-Users and provide OIDC tokens as proof. We'll use [Google](https://developers.google.com/identity/openid-connect/openid-connect) as an example.
 
-## OAuth Authentication
-This section covers the OAuth authentication process, including both login and signup flows, since they are similar and most apps handle them in a unified way.
+## Authentication Sequence Diagrams
+
+The sequence diagrams below display the differing flows for the two types of Social Login Providers.
+
+### OIDC Provider
 
 ```mermaid
 sequenceDiagram
@@ -67,6 +96,72 @@ sequenceDiagram
 
   <Step title="Send Credentials to Backend">
   The frontend sends the `oidcToken` and API public key to your backend.
+  </Step>
+
+  <Step title="Get or Create a Turnkey Sub-organization">
+  The backend gets subOrgIds that are associated with that `oidcToken`. If no sub-organization exists, it creates one using the identity in the token.
+  </Step>
+
+  <Step title="Create a Session">
+  The backend calls `oauth_login` with the `oidcToken`, and API public key. Turnkey validates that the token’s `nonce` matches `sha256(publicKey)` and returns a session JWT. The backend sends this JWT to the frontend.
+  </Step>
+
+  <Step title="You're Now Authenticated">
+  Your frontend now treats the API keypair as the session keypair. It can use the private key to sign requests to Turnkey using the `x-stamp` header.
+  </Step>
+</Steps>
+
+### OAuth-Only Provider
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant OAuth Provider
+    participant Backend
+    participant Turnkey
+
+    User->>Frontend: Clicks "Log in with <OAuth provider>"
+    Frontend->>OAuth Provider: Start OAuth flow
+    OAuth Provider->>User: Prompt to grant permission
+    User->>OAuth Provider: Grants permission
+    OAuth Provider->>Backend: Return auth_code via redirect_uri
+    Backend->>Turnkey: Send auth_code + redirect_uri
+    Turnkey->>Backend: Return OIDC Token
+    Backend->>Turnkey: Gets subOrgIds with that associated oidcToken
+    Turnkey->>Backend: Return subOrgId (or null)
+    alt SubOrgId not found
+        Backend->>Turnkey: Create sub-org using oidcToken
+        Turnkey->>Backend: Return new subOrgId
+    end
+    Backend->>Turnkey: Call oauth_login with oidcToken, API publicKey
+    Turnkey->>Backend: Return session JWT
+    Backend->>Frontend: Return session JWT
+```
+
+<Steps>
+  <Step title="Create API Key">
+  The frontend generates an API keypair before starting the OAuth login flow. This keypair will later become the session keypair once the user is authenticated via Turnkey.
+  </Step>
+
+  <Step title="Start the OAuth Login Flow">
+  The user begins the login process by clicking "Log in with &lt;OAuth provider&gt;" on the frontend.
+  </Step>
+
+  <Step title="Initiate OAuth">
+  The frontend initiates the OAuth Authentication flow with the provider.
+  </Step>
+
+  <Step title="User Grants Permission">
+  The OAuth provider prompts the user to grant permission to share their identity. Once approved, the OAuth provider returns an `oidcToken` to the frontend.
+  </Step>
+
+  <Step title="Provider Delivers auth_code">
+  The provider delivers a short-lived auth_code via the redirect_uri.
+  </Step>
+
+  <Step title="Get OIDC Token">
+  The backend exchanges sends the auth_code + redirect_uri to Turnkey in exchange for an OIDC ID Token.
   </Step>
 
   <Step title="Get or Create a Turnkey Sub-organization">
