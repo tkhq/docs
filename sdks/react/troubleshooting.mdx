@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting"
-description: "Common issues and solutions when using `@turnkey/react-wallet-kit`."
+description: "Common issues and solutions when using the Embedded Wallet Kit."
 sidebarTitle: "Troubleshooting"
 ---
 
@@ -8,7 +8,7 @@ sidebarTitle: "Troubleshooting"
 
 This guide provides solutions to common issues you might encounter while using the `@turnkey/react-wallet-kit`. If you run into any problems, check this section first for potential fixes.
 
-### Handling Errors With `onError`
+### Handling errors with `onError`
 
 Before we begin, let's attach an `onError` callback function to the `TurnkeyProvider`. Any errors that occur during the execution of functions or initialization will be passed into this callback. This will help you debug issues more effectively.
 
@@ -45,11 +45,11 @@ function App() {
 }
 ```
 
-## Common Issues
+## Common issues
 
 There are a few common issues that developers or end-users may encounter when using the `@turnkey/react-wallet-kit`. Here are some of them along with potential solutions:
 
-### 1. Turnkey SDK Failed to Initialize
+### 1. Turnkey SDK failed to initialize
 
 <img
   src="/images/sdks/img/react/sdk-fail-init.png"
@@ -65,13 +65,13 @@ This issue can happen for several reasons, such as:
 - Missing or incorrect `authProxyConfigId` or `organizationId` in the `TurnkeyProvider` config.
 - Network issues preventing the SDK from reaching Turnkey's servers.
 - Incorrectly configured `apiBaseUrl` or `authProxyUrl`.
-- Auth proxy not being enabled in the Turnkey dashboard.
+- Auth proxy not being enabled in the Turnkey Dashboard.
 
 You can see the full error by handling it through the `onError` callback in the `TurnkeyProvider` as shown above.
 
 #### Solution
 
-Make sure you have the correct `authProxyConfigId` and `organizationId` in your `TurnkeyProvider` config. You can find these values in the [Turnkey dashboard](https://app.turnkey.com).
+Make sure you have the correct `authProxyConfigId` and `organizationId` in your `TurnkeyProvider` config. You can find these values in the [Turnkey Dashboard](https://app.turnkey.com).
 
 ```tsx
 const turnkeyConfig = {
@@ -91,11 +91,11 @@ console.log(
 console.log("Organization ID:", process.env.NEXT_PUBLIC_ORGANIZATION_ID);
 ```
 
-If you are using Turnkey's auth proxy, ensure it is enabled in the Turnkey dashboard under the **wallet kit** section. You can also check the [getting started](/sdks/react/getting-started) guide for more details on setting up the auth proxy.
+If you are using Turnkey's Auth Proxy, ensure it is enabled in the Turnkey Dashboard under the **Wallet Kit** section. You can also check the [Getting Started](/sdks/react/getting-started) guide for more details on setting up the Auth Poxy.
 
 If you decide to use your own authentication setup with a backend, you can simply omit the `authProxyConfigId` from the `TurnkeyProvider` config. This will disable the Turnkey auth proxy and allow you to use your own authentication flow. Note that the **Log in or sign up** modal will not be available in this case, and you will need to implement your own authentication flow.
 
-### 2. Proxy not Enabled
+### 2. Proxy not enabled
 
 <img
   src="/images/sdks/img/react/proxy-not-enabled.png"
@@ -108,7 +108,7 @@ This error indicates that you are trying to use the **Log in or sign up** modal 
 
 #### Solution
 
-To resolve this issue, you need to enable the auth proxy in the Turnkey dashboard under the **wallet kit** section. Once enabled, you will receive an `authProxyConfigId` that you can use in your `TurnkeyProvider` config. Pass this `authProxyConfigId` to the `TurnkeyProvider` config to enable the authentication flow.
+To resolve this issue, you need to enable the Auth Proxy in the Turnkey Dashboard under the **Wallet Kit** section. Once enabled, you will receive an `authProxyConfigId` that you can use in your `TurnkeyProvider` config. Pass this `authProxyConfigId` to the `TurnkeyProvider` config to enable the authentication flow.
 
 ```tsx
 const turnkeyConfig = {
@@ -118,7 +118,7 @@ const turnkeyConfig = {
 };
 ```
 
-If you prefer to use your own authentication flow, you can simply omit the `authProxyConfigId` from the `TurnkeyProvider` config. This will disable the Turnkey auth proxy and allow you to use your own authentication flow. Note that the **Log in or sign up** modal will not be available in this case, and you will need to implement your own authentication flow.
+If you prefer to use your own authentication flow, you can simply omit the `authProxyConfigId` from the `TurnkeyProvider` config. This will disable the Turnkey Auth Proxy and allow you to use your own authentication flow. Note that the **Log in or sign up** modal will not be available in this case, and you will need to implement your own authentication flow.
 
 ### 3. Turnkey styles are missing
 
@@ -310,7 +310,96 @@ For Tailwind CSS v3, you need to import the Turnkey styles in your main CSS file
 @tailwind utilities;
 ```
 
-The Turnkey styles must be imported before the Tailwind directives to ensure that the styles are applied correctly. You also must point to the dist directory to properly retrieve the styles ( `@turnkey/react-wallet-kit/dist/styles.css` instead of the `@turnkey/react-wallet-kit/styles.css`).
+The Turnkey styles must be imported before the Tailwind directives to ensure that the styles are applied correctly. You also must point to the `dist` directory to properly retrieve the styles (`@turnkey/react-wallet-kit/dist/styles.css` instead of the `@turnkey/react-wallet-kit/styles.css`).
+
+</Step>
+</Steps>
+
+### 7. Radix UI overlapping portals
+
+<img
+  src="/images/sdks/img/react/radix-bug.gif"
+  alt="Radix UI overlapping portals"
+/>
+
+#### Problem
+
+This issue occurs when using certain Radix UI components (e.g., Dialog, DropdownMenu, etc.) in the same application as `@turnkey/react-wallet-kit`. Radix UI uses portals to render components outside of the main DOM hierarchy, which can cause conflicts when trying to open a Turnkey modal while a Radix UI component is also open. You may notice that the Turnkey modal becomes unresponsive or that the Radix UI component remains open and blocks interaction with the Turnkey modal.
+
+#### Solution
+
+We recommend avoiding using portal-based components from Radix UI (or similar libraries that use portals) while Turnkey's modals are open. You can also try switching to [`headless-ui`](https://headlessui.com/) components since Turnkey's modals are built with [`headless-ui`](https://headlessui.com/) under the hood.
+
+If you cannot avoid using Radix UI components, you can try the following workaround:
+
+<Steps>
+
+<Step title="Update your global CSS file">
+
+Add the following CSS to your global CSS file (e.g., `styles/globals.css`):
+
+```css
+#headlessui-portal-root {
+  pointer-events: auto;
+}
+```
+
+This will apply `pointer-events: auto;` to the Turnkey modal portal, allowing it to receive pointer events even when other portals are open.
+
+</Step>
+
+<Step title="Modify your Radix UI components">
+You need to prevent outside click events from closing the Radix UI components when the Turnkey modal is open.
+
+You can do this by adding the following `onPointerDownOutside` handler to your Radix UI components:
+
+```tsx
+import { useModal } from "@turnkey/react-wallet-kit";
+import * as Dialog from "@radix-ui/react-dialog";
+
+const { modalStack } = useModal();  // Get the modal stack from Turnkey's modal system
+return (
+  {/* Your dialog root, trigger, overlay, etc. */}
+  <Dialog.Content
+    onPointerDownOutside={(e) => {
+      if (modalStack.length > 0) {
+        e.preventDefault();
+      }
+    }}
+  >
+    {/* Your dialog content */}
+  </Dialog.Content>
+)
+```
+
+Overall, your Radix UI dialog component (or similar) should look something like this:
+
+```tsx
+import { useModal } from "@turnkey/react-wallet-kit";
+import * as Dialog from "@radix-ui/react-dialog";
+
+function RadixDialog() {
+  const { modalStack } = useModal(); // Get the modal stack from Turnkey's modal system
+
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger>Open Dialog</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay />
+        <Dialog.Content
+          onPointerDownOutside={(e) => {
+            if (modalStack.length > 0) {
+              e.preventDefault();
+            }
+          }}
+        >
+          {/* Your dialog content */}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+```
 
 </Step>
 </Steps>
