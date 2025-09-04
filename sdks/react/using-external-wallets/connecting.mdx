@@ -1,0 +1,251 @@
+---
+title: "Connecting External wallets"
+description: "Allow users to connect external wallets like MetaMask, Phantom, or WalletConnect alongside Turnkey’s embedded wallets in your React app."
+sidebarTitle: "Connecting"
+---
+
+## Setting up Connecting Wallet support
+The toggle to enable connecting external wallets is available in the `TurnkeyProvider` configuration. You can further customize settings, such as which chains are enabled, which providers are supported, and whether WalletConnect is allowed.
+
+> **Note:**  
+> - For wallet connecting to work, you must define at least one `ethereum` or `solana` chain, either as `native` or with `walletConnectNamespaces`. 
+> ```tsx
+> walletConfig: {
+>   // at least one chain must be enabled (native: true) 
+>   // or have non-empty `walletConnectNamespaces`
+>   chains: {
+>     ethereum: {
+>       native: false,
+>       walletConnectNamespaces: ["eip155:1"],
+>     },
+>    solana: {
+>      native: false,
+>      walletConnectNamespaces: [],
+>    },
+>  },
+>```
+> - To enable WalletConnect, you must configure both the `walletConnect` object **and** define `walletConnectNamespaces` in at least one chain (e.g., `ethereum` or `solana`).  
+> - For EVM chain switching on WalletConnect, all supported chain namespaces must be listed in `walletConnectNamespaces` under `ethereum`. Attempting to switch to a chain not listed here will result in an error. The first chain in the array is the default chain you will be connected to.  
+
+```tsx
+import {
+  TurnkeyProvider,
+  TurnkeyProviderConfig,
+} from "@turnkey/react-wallet-kit";
+import "@turnkey/react-wallet-kit/styles.css";
+
+function App() {
+  const turnkeyConfig: TurnkeyProviderConfig = {
+    // ...your existing configuration
+    walletConfig: {
+      features: {
+        // enable external wallet connecting
+        connecting: true,
+      },
+      chains: {
+        ethereum: {
+          // enable native EIP-1193 Ethereum providers (e.g., MetaMask, Phantom)
+          native: true,
+          // enable WalletConnect for Ethereum mainnet
+          walletConnectNamespaces: ["eip155:1"],
+        },
+        solana: {
+          // enable native Solana Wallet Standard providers (e.g., MetaMask, Phantom)
+          native: true,
+          // enable WalletConnect for Solana mainnet
+          walletConnectNamespaces: ["solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"],
+        },
+      },
+      walletConnect: {
+        projectId: "<YOUR_WALLET_CONNECT_PROJECT_ID>",
+        appMetadata: {
+          name: "<YOUR_APP_NAME>",
+          description: "<YOUR_APP_DESCRIPTION>",
+          url: "<YOUR_WALLET_CONNECT_PROJECT_URL>",
+          icons: ["<YOUR_APP_ICON_URL>"],
+        },
+      },
+    },
+  };
+
+  return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
+}
+```
+
+## Wallet connecting
+
+Connecting a wallet refers to initializing a session with an external wallet provider (e.g., MetaMask, Phantom, or WalletConnect). This process establishes a connection between your application and the user’s wallet, enabling the app to interact with the wallet for operations like signing transactions and messages. When these operations are requested, the external provider will prompt the user to review and approve each action through its interface.
+
+One thing to understand is that when a user authenticates into a Turnkey sub-org using their wallet, that wallet is also considered connected. This is because the authentication flow includes stamping (i.e., signing) an activity payload, which inherently requires a connection to the wallet.
+
+To put it simply: **logging in with a wallet automatically connects it.**
+
+That means the wallet can then be used both:
+- as a stamper for Turnkey activities, and
+- as a connected wallet for signing messages and transactions in your app logic
+
+### What happens after a wallet is connected?
+Once a wallet is successfully connected, several things become available in your app:
+
+<Steps>
+  <Step title="Wallet Provider is Connected">
+
+  The `WalletProvider` you connected to now shows in the `connectedAddresses` property of the provider.
+
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { getWalletProviders } = useTurnkey();
+
+    const providers = await getWalletProviders();
+
+    // this represents the WalletProvider (e.g., MetaMask) we just connected to
+    const connectedProvider = providers[0];
+
+    // this is an array of connected wallet addresses
+    // it's normally just one address, unless this provider is WalletConnect
+    const connectedAddresses = connectedProvider.connectedAddresses;
+  ```
+  </Step>
+
+  <Step title="Wallets state includes that connected wallet">
+
+  The wallet you just connected to will automatically be included in the `wallets` state.
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { wallets } = useTurnkey();
+  ```
+
+  #### Understanding the connected wallet structure
+
+  When a user connects to an external wallet (like a wallet in MetaMask or Phantom), Turnkey creates a `Wallet` object representing that provider. This wallet contains one or more `WalletAccount` entries, each representing a connected address on a specific chain (e.g., Ethereum or Solana).
+
+  For example, if the user connects to MetaMask with an Ethereum address, a Wallet named "MetaMask" is created, and a corresponding Ethereum account is added. If the user then connects to MetaMask with a Solana address, that address appears as an additional account within the same wallet.
+
+  In short:
+  - The `Wallet` represents the external provider (e.g., "MetaMask").
+  - The `WalletAccounts` represent the connected addresses, one per namespace (Ethereum, and or Solana) under that provider.
+  </Step>
+
+  <Step title="Abstracted Signing">
+
+  Once connected, you can call high-level signing functions by passing in that wallet account just like you would with an embedded wallet.
+
+```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { signMessage, signTransaction, signAndSendTransaction } = useTurnkey();
+  ```
+  </Step>
+</Steps>
+
+### Connecting and disconnecting a wallet
+
+There are two paths you can take: let us handle it for you, or build it yourself. We recommend letting us do the heavy lifting using our built-in modal.
+
+#### Option 1: Use our `Connect External Wallet`
+If you want a fully styled, plug-and-play experience, use our Connect External Wallet modal. It handles the entire connection flow for you.
+
+```tsx
+  import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+  const { handleConnectExternalWallet } = useTurnkey();
+```
+
+Below are screenshots of what the default UI looks like out of the box when using the built-in Connect External Wallet modal:
+
+<div style={{ margin: "-2rem"}}>
+  <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+    <img
+      src="/images/sdks/img/react/connecting-wallet-provider-select.png"
+      alt="Wallet Auth Modal"
+      style={{ width: "100%", maxWidth: "300px" }}
+    />
+    <img
+      src="/images/sdks/img/react/disconnect-chain-select.png"
+      alt="Wallet Chain Select"
+      style={{ width: "100%", maxWidth: "300px" }}
+    />
+  </div>
+  <div style={{ display: "flex", justifyContent: "center", marginTop: "-3rem" }}>
+    <img
+      src="/images/sdks/img/react/disconnect-confirmation.png"
+      alt="WalletConnect QR Modal"
+      style={{ width: "100%", maxWidth: "300px" }}
+    />
+  </div>
+</div>
+
+> **Note**: this UI is customizable. Checkout the [UI Customization](/sdks/react/ui-customization) guide to learn how to customize the look and feel of the Connect External Wallet modal and other UI components. 
+
+#### Option 2: Build a custom connection flow 
+If you prefer full control over the connection experience, you can use our low-level functions to handle the flow manually.
+
+<Steps>
+  <Step title="Get the WalletProvider you want to use">
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { getWalletProviders } = useTurnkey();
+
+    const providers = await getWalletProviders();
+
+    // we select the first available provider for simplicity
+    // this represents the WalletProvider (e.g., MetaMask) and the currently selected wallet within it
+    // this is the wallet that will be connected to
+    const selectedProvider = providers[0];
+  ```
+  </Step>
+
+  <Step title="Connect the wallet account">
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { connectWalletAccount } = useTurnkey();
+
+    const handleConnectWalletAccount = async () => {
+      try {
+        await connectWalletAccount(selectedProvider);
+      } catch (error) {
+        console.error("Error connecting this wallet account:", error);
+      }
+    };
+  ```
+  </Step>
+
+  <Step title="Disconnect the wallet account">
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { disconnectWalletAccount } = useTurnkey();
+
+    const handleDisconnectWalletAccount = async () => {
+      try {
+        await disconnectWalletAccount(selectedProvider);
+      } catch (error) {
+        console.error("Error disconnecting this wallet account:", error);
+      }
+    };
+  ```
+  </Step>
+</Steps>
+
+## How does this look structurally in a Turnkey organization?
+If you're just looking to implement wallet authentication or connection in your app, you don't need to worry about the internal structure. But if you're curious about how these flows map to Turnkey's organization model under the hood, here's a deeper look:
+
+### Wallet authentication
+At its core, a wallet is just a key pair. When a user signs up with a wallet, Turnkey creates a sub-org for that user and sets up the public key of the wallet as an authenticator for that sub-org.
+
+From then on, whenever the user wants to log in, they call `stampLogin()`. This involves signing the login payload with the same wallet key pair.
+
+### Wallet connecting
+Wallet connecting has no structural impact within Turnkey itself. Everything about the connection is handled entirely on the client side.
+
+The “connected wallets” you see in your app when using our SDK are not stored or tracked by Turnkey. These are purely frontend abstractions created to help developers manage and interact with external wallets in the context of their app's UI. There's no backend representation of a “connected wallet” in Turnkey's infrastructure.
+
+We included this feature because many developers want to allow users to connect external wallets (like MetaMask or Phantom) to use alongside Turnkey's embedded wallets. While this connection flow isn't structurally tied to Turnkey, it's a common need when building hybrid wallet experiences. Instead of requiring every team to build this from scratch, we've provided a clean, built-in flow to handle it for you!
+
+## Next steps
+
+Now that you have an external wallet connected, check out the [Signing](/sdks/react/signing) guide to learn how to sign transactions and messages.

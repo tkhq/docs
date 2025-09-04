@@ -1,0 +1,91 @@
+---
+title: "Using External wallets"
+description: "Learn how you can use external wallets alongside your embedded wallets in your React app using Turnkey's abstractions."
+sidebarTitle: "Overview"
+---
+
+## Overview
+The Embedded Wallet Kit provides a straightforward way to authenticate and use external wallets in your React application. The EWK offers abstractions to easily discover available wallet providers, connect to them, sign messages and transactions, switch chains, and use external wallets alongside embedded ones. This creates a seamless developer experience when switching between embedded and external wallets, with minimal changes required to your application logic.
+
+## Different uses cases of external wallets
+External wallets can be used in two primary ways within your application:
+
+<Steps>
+  <Step title="Authentication">
+    Use an external wallet to authenticate into a sub-organization. Under the hood the wallet acts as a **stamper** signing requests sent to Turnkey.  
+  </Step>
+
+  <Step title="Connecting">
+    Use an external wallet to sign alongside or instead of embedded wallets.
+
+     **Key functionality:**
+     - Connect to supported wallet providers
+     - Sign messages using a connected wallet
+     - Sign transactions using a connected wallet
+     - Switch between EVM chains when multiple networks are supported
+     - Disconnect a connected wallet
+  </Step>
+</Steps>
+
+## What is a WalletProvider?
+Both authentication and external wallet connecting flows rely on a `WalletProvider`.
+
+A **WalletProvider** refers to an external wallet interface, such as a browser extension (e.g., MetaMask, Phantom) or a bridge like WalletConnect (if enabled). These providers act as the bridge between your app and the user's wallet for signing, authentication, and transaction purposes.
+
+You can retrieve available wallet providers by calling the `getWalletProviders()`, which returns an array of WalletProvider instances available in the current environment.
+```tsx
+const providers = await getWalletProviders();
+```
+
+If a provider is already connected, it will still appear in the result of `getWalletProviders()`. To determine whether it's connected, you can inspect the `provider.connectedAddresses` property. This will list the currently connected addresses for that provider.
+
+> **Note:**  
+> - Each `WalletProvider` can only maintain **one active connection per namespace** (e.g., one Ethereum address *and* one Solana address at a time).  
+>   - Example: if you connect a second Ethereum address in MetaMask, it will replace the currently connected one. The same applies for Solana.  
+>
+> - If a provider supports multiple namespaces (e.g., MetaMask supports both Ethereum and Solana), it will appear as **two separate providers** in the result of `getWalletProviders()`.  
+>   - They may share the same display name (e.g., `"MetaMask"`), but they’ll have different `chainInfo` values and are treated independently in authentication and connection logic.  
+>
+> - The **duration of a connection** depends on the provider’s behavior.  
+>   - Most providers maintain a session until it is explicitly disconnected, either from your app or manually via the wallet UI (e.g., disconnecting in MetaMask).  
+
+### What does the WalletProvider object look like?
+Here’s an example of how MetaMask `WalletProvider` objects are returned when both Ethereum and Solana native support are enabled. MetaMask appears as two separate providers, one for each namespace.  
+
+#### Ethereum Provider
+
+```ts
+{
+  interfaceType: "ethereum",
+  chainInfo: {
+    namespace: "ethereum",
+    chainId: "0x2105", // Ethereum Sepolia
+  },
+  info: {
+    uuid: "9d549e1b-b0ee-42a9-883b-a8455e199637",
+    name: "MetaMask",
+    icon: "data:image/svg+xml;base64,...", // base64-encoded wallet icon
+    rdns: "io.metamask",
+  },
+  provider: { ... }, // RPC provider injected by MetaMask
+  connectedAddresses: [], // populated once user connects
+}
+```
+
+#### Solana Provider
+```ts
+{
+  interfaceType: "solana",
+  chainInfo: {
+    namespace: "solana",
+  },
+  info: {
+    name: "MetaMask",
+    icon: "data:image/svg+xml;base64,...", // base64-encoded wallet icon
+  },
+  provider: { ... }, // RPC provider for Solana via MetaMask
+  connectedAddresses: [], // populated once user connects
+}
+```
+
+

@@ -1,0 +1,161 @@
+---
+title: "External Wallet Authentication"
+description: "Allow users to authenticate with external wallets like MetaMask, Phantom, or WalletConnect in your React app."
+sidebarTitle: "Authentication"
+---
+
+## Setting up wallet authentication
+The toggle to enable wallet authentication is available in the `TurnkeyProvider` configuration. Wallet authentication can also be set in the dashboard, but the `TurnkeyProvider` configuration takes precedence. You can further customize settings, such as which chains are enabled, which providers are supported, and whether WalletConnect is allowed.
+
+> **Note:**  
+> - For authentication to work, you must define at least one `ethereum` or `solana` chain, either as `native` or with `walletConnectNamespaces`. 
+> ```tsx
+> walletConfig: {
+>   // at least one chain must be enabled (native: true) 
+>   // or have non-empty `walletConnectNamespaces`
+>   chains: {
+>     ethereum: {
+>       native: false,
+>       walletConnectNamespaces: ["eip155:1"],
+>     },
+>    solana: {
+>      native: false,
+>      walletConnectNamespaces: [],
+>    },
+>  },
+>```
+> - To enable WalletConnect, you must configure both the `walletConnect` object **and** define `walletConnectNamespaces` in at least one chain (e.g., `ethereum` or `solana`).  
+
+```tsx
+import {
+  TurnkeyProvider,
+  TurnkeyProviderConfig,
+} from "@turnkey/react-wallet-kit";
+import "@turnkey/react-wallet-kit/styles.css";
+
+function App() {
+  const turnkeyConfig: TurnkeyProviderConfig = {
+    // ...your existing configuration
+    walletConfig: {
+      features: {
+        // enable external wallet authentication
+        auth: true,
+      },
+      chains: {
+        ethereum: {
+          // enable native EIP-1193 Ethereum providers (e.g., MetaMask, Phantom)
+          native: true,
+          // enable WalletConnect for Ethereum mainnet
+          walletConnectNamespaces: ["eip155:1"],
+        },
+        solana: {
+          // enable native Solana Wallet Standard providers (e.g., MetaMask, Phantom)
+          native: true,
+          // enable WalletConnect for Solana mainnet
+          walletConnectNamespaces: ["solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"],
+        },
+      },
+      walletConnect: {
+        projectId: "<YOUR_WALLET_CONNECT_PROJECT_ID>",
+        appMetadata: {
+          name: "<YOUR_APP_NAME>",
+          description: "<YOUR_APP_DESCRIPTION>",
+          url: "<YOUR_WALLET_CONNECT_PROJECT_URL>",
+          icons: ["<YOUR_APP_ICON_URL>"],
+        },
+      },
+    },
+  };
+
+  return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
+}
+```
+
+## Wallet authentication
+
+There are two paths you can take: let us handle it for you, or build it yourself. We recommend letting us do the heavy lifting using our built-in modal.
+
+### Option 1: Use the auth modal
+If you want a fully styled, plug-and-play experience, use our `Auth` modal. It handles the entire authentication flow for you.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function LoginButton() {
+  const { handleLogin } = useTurnkey();
+
+  return <button onClick={handleLogin}>Login / Sign Up</button>;
+}
+```
+
+Below are screenshots of what the default UI looks like out of the box when using the built-in Auth modal:
+
+<div style={{ margin: "-2rem"}}>
+  <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+    <img
+      src="/images/sdks/img/react/wallet-auth-provider-select.png"
+      alt="Wallet Auth Modal"
+      style={{ width: "100%", maxWidth: "300px" }}
+    />
+    <img
+      src="/images/sdks/img/react/wallet-auth-chain-select.png"
+      alt="Wallet Chain Select"
+      style={{ width: "100%", maxWidth: "300px" }}
+    />
+  </div>
+  <div style={{ display: "flex", justifyContent: "center", marginTop: "-3rem" }}>
+    <img
+      src="/images/sdks/img/react/wallet-auth-wallet-connect-qr.png"
+      alt="WalletConnect QR Modal"
+      style={{ width: "100%", maxWidth: "300px" }}
+    />
+  </div>
+</div>
+
+
+
+> **Note**: this UI is customizable. Checkout the [UI Customization](/sdks/react/ui-customization) guide to learn how to customize the look and feel of the Auth modal and other UI components.
+
+### Option 2: Build a custom auth flow
+
+There are a few ways to authenticate users with their wallets. We provide several abstraction functions that handle authentication, each with slightly different behavior:
+1. `loginWithWallet()`
+2. `signUpWithWallet()`
+3. `loginOrSignUpWithWallet()`
+
+All three generally follow the same flow, with only minor differences in implementation.
+
+For this guide, we'll use `loginOrSignUpWithWallet()` as the reference, since it's the most commonly used approach.
+
+<Steps>
+  <Step title="Get the WalletProvider you want to use">
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { getWalletProviders } = useTurnkey();
+
+    const providers = await getWalletProviders();
+
+    // we select the first available provider for simplicity
+    // this represents the WalletProvider (e.g., MetaMask) and the currently selected wallet within it
+    // this is the wallet that will be used to authenticate into the sub-org
+    const selectedProvider = providers[0];
+  ```
+  </Step>
+
+  <Step title="Log in or sign up with that wallet">
+  ```tsx
+    import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+    const { loginOrSignUpWithWallet } = useTurnkey();
+
+    const handleLoginOrSignUp = async () => {
+      try {
+        await loginOrSignUpWithWallet(selectedProvider);
+      } catch (error) {
+        console.error("Error logging in or signing up:", error);
+      }
+    };
+  ```
+  </Step>
+</Steps>
