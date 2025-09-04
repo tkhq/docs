@@ -1,7 +1,7 @@
 ---
-title: "External wallet linking"
+title: "External wallets"
 description: "Learn how to use external wallets alongside your embedded wallets in your React app using Turnkey's abstractions."
-sidebarTitle: "External wallet linking"
+sidebarTitle: "External wallets"
 ---
 
 ## Overview
@@ -31,7 +31,22 @@ External wallets can be used in two primary ways within your application:
 The toggle to enable wallet authentication and link external wallets is available in the `TurnkeyProvider` configuration. Wallet authentication can also be set in the dashboard, but the `TurnkeyProvider` configuration takes precedence. You can further customize settings, such as which chains are enabled, which providers are supported, and whether WalletConnect is allowed.
 
 > **Note:**  
-> - For both authentication and wallet connecting to work, you must define at least one `ethereum` or `solana` chain, either as `native` or with `walletConnectNamespaces`.  
+> - For both authentication and wallet connecting to work, you must define at least one `ethereum` or `solana` chain, either as `native` or with `walletConnectNamespaces`. 
+> ```tsx
+> walletConfig: {
+>   // at least one chain must be enabled (native: true) 
+>   // or have non-empty `walletConnectNamespaces`
+>   chains: {
+>     ethereum: {
+>       native: false,
+>       walletConnectNamespaces: ["eip155:1"],
+>     },
+>    solana: {
+>      native: false,
+>      walletConnectNamespaces: [],
+>    },
+>  },
+>```
 > - To enable WalletConnect, you must configure both the `walletConnect` object **and** define `walletConnectNamespaces` in at least one chain (e.g., `ethereum` or `solana`).  
 > - For EVM chain switching on WalletConnect, all supported chain namespaces must be listed in `walletConnectNamespaces` under `ethereum`. Attempting to switch to a chain not listed here will result in an error. The first chain in the array is the default chain you will be connected to.  
 
@@ -81,7 +96,7 @@ function App() {
 ```
 
 ## What is a WalletProvider?
-Both authentication and external wallet linking flows rely on a `WalletProvider`.
+Both authentication and external wallet connecting flows rely on a `WalletProvider`.
 
 A **WalletProvider** refers to an external wallet interface, such as a browser extension (e.g., MetaMask, Phantom) or a bridge like WalletConnect (if enabled). These providers act as the bridge between your app and the user's wallet for signing, authentication, and transaction purposes.
 
@@ -92,12 +107,16 @@ const providers = await getWalletProviders();
 
 If a provider is already connected, it will still appear in the result of `getWalletProviders()`. To determine whether it's connected, you can inspect the `provider.connectedAddresses` property. This will list the currently connected addresses for that provider.
 
-> **Note**:  
-> Each `WalletProvider` can only maintain a single active connection per namespace (i.e., one Ethereum address and one Solana address at a time). For example, if you're using MetaMask and connect a second Ethereum address, it will replace the currently connected one. The same applies to Solana addresses.  
+> **Note:**  
+> - Each `WalletProvider` can only maintain **one active connection per namespace** (e.g., one Ethereum address *and* one Solana address at a time).  
+>   - Example: if you connect a second Ethereum address in MetaMask, it will replace the currently connected one. The same applies for Solana.  
 >
-> If a provider supports both Ethereum and Solana (e.g., MetaMask), it will appear as two separate providers in the result of `getWalletProviders()`, one for each namespace. While they may share the same display name (e.g., "MetaMask"), they will have different chainInfo values and are treated independently in both authentication and connection logic.
->  
-> The duration of the connection depends on the specific `WalletProvider`'s behavior. Most providers maintain a long-lived session until the connection is explicitly disconnected. This is either from within your app or manually through the wallet interface (e.g., disconnecting from MetaMask directly).
+> - If a provider supports multiple namespaces (e.g., MetaMask supports both Ethereum and Solana), it will appear as **two separate providers** in the result of `getWalletProviders()`.  
+>   - They may share the same display name (e.g., `"MetaMask"`), but they’ll have different `chainInfo` values and are treated independently in authentication and connection logic.  
+>
+> - The **duration of a connection** depends on the provider’s behavior.  
+>   - Most providers maintain a session until it is explicitly disconnected, either from your app or manually via the wallet UI (e.g., disconnecting in MetaMask).  
+
 
 ## Wallet authentication
 
@@ -166,7 +185,7 @@ For this guide, we'll use `loginOrSignUpWithWallet()` as the reference, since it
 
     // we select the first available provider for simplicity
     // this represents the WalletProvider (e.g., MetaMask) and the currently selected wallet within it
-    // this is the wallet that will be used to authenticate into the subOrg
+    // this is the wallet that will be used to authenticate into the sub-org
     const selectedProvider = providers[0];
   ```
   </Step>
@@ -192,7 +211,7 @@ For this guide, we'll use `loginOrSignUpWithWallet()` as the reference, since it
 
 Connecting a wallet refers to initializing a session with an external wallet provider (e.g., MetaMask, Phantom, or WalletConnect). This process establishes a link between your application and the user’s wallet, enabling the app to interact with the wallet for operations like signing transactions and messages. When these operations are requested, the external provider will prompt the user to review and approve each action through its interface.
 
-One thing to understand is that when a user authenticates into a Turnkey sub org using their wallet, that wallet is also considered connected. This is because the authentication flow includes stamping (i.e., signing) an activity payload, which inherently requires a connection to the wallet. As a result, if your app has both wallet authentication and external wallet connection enabled, logging in with a wallet automatically establishes that connection.
+One thing to understand is that when a user authenticates into a Turnkey sub-org using their wallet, that wallet is also considered connected. This is because the authentication flow includes stamping (i.e., signing) an activity payload, which inherently requires a connection to the wallet. As a result, if your app has both wallet authentication and external wallet connection enabled, logging in with a wallet automatically establishes that connection.
 
 ### What happens after a wallet is connected?
 Once a wallet is successfully connected, several things become available in your app:
