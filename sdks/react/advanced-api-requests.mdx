@@ -1,0 +1,84 @@
+---
+title: "Advanced API requests"
+description: "Learn how to make advanced API requests to Turnkey's infrastructure."
+sidebarTitle: "Advanced API requests"
+---
+
+## Overview
+
+The Embedded Wallet Kit provides a wide variety of helper functions to abstract interactions with Turnkey's infrastructure. However, you can also make advanced API requests directly to Turnkey's endpoints if you need more control or want to implement custom features.
+
+## The HTTP client
+
+To make advanced API requests, you can use the `httpClient` provided by the `useTurnkey` hook. This client is tied to the active session meaning stamping and organization context are automatically handled for you.
+
+You can see the [API Reference](/api-reference/overview) for a complete list of available API endpoints and their parameters. All of these can be accessed through the `httpClient`.
+
+Here's how you can use the `httpClient` to make a `signRawPayload` request to Turnkey:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function SignRawPayloadButton() {
+  const { httpClient, wallets } = useTurnkey();
+
+  const doSignRawPayload = async () => {
+    try {
+      const signWith = wallets[0]?.accounts[0].address; // Use the address of the first account of the first wallet
+      const message = "Hello, Turnkey!";
+
+      const hashedMessage = Buffer.from(message, "utf8").toString("hex"); // Convert message to hex format
+
+      const response = await httpClient.signRawPayload({
+        signWith,
+        payload: hashedMessage,
+        encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+        hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+      });
+
+      const signature = {response.r, response.s, response.v}; // Extract the signature from the response
+
+      console.log("Message signed:", signature);
+    } catch (error) {
+      console.error("Error signing message:", error);
+    }
+  };
+
+  return <button onClick={doSignRawPayload}>Sign Message</button>;
+}
+```
+
+## Viewing the activity
+
+When creating, modifying, or using resources within Turnkey, an activity is created. You can learn more about activities in the [Activities](/api-reference/activities/overview) section.
+
+If you use the `httpClient`, you can view all the metadata of the activity you are performing. This includes the activity ID, votes list, status, and more.
+
+```tsx
+const response = await httpClient?.updateWallet({
+  walletId: "a-wallet-id-123",
+  walletName: "New wallet name",
+});
+
+const { id, votes, status } = response?.activity!;
+```
+
+## Using other stampers
+
+By default, the `httpClient` will use a securely stored API key to stamp requests to Turnkey. You can switch this to use a **passkey** or **external wallet** by passing in a `StamperType` to the `httpClient` functions. The user will be prompted to sign using the selected method before the request is made.
+
+For example, to use a passkey to stamp the `signRawPayload` request, simply pass in `StamperType.Passkey` as the second argument:
+
+```tsx
+import { useTurnkey, StamperType } from "@turnkey/react-wallet-kit";
+
+const response = await httpClient.signRawPayload(
+  {
+    signWith,
+    payload: hashedMessage,
+    encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+    hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+  },
+  StamperType.Passkey // Use a passkey to stamp this request
+);
+```

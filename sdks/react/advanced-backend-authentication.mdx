@@ -1,0 +1,223 @@
+---
+title: "Advanced backend authentication"
+description: "Learn how to set up authentication using your backend and the Embedded Wallet Kit."
+sidebarTitle: "Advanced backend authentication"
+---
+
+## Overview
+
+This guide explains how to set up authentication in your React application using your backend server in conjunction with the Embedded Wallet Kit. This approach is useful if you do not want to use Turnkey's Auth Proxy or are migrating from a previous version of the SDK and already have an existing backend auth setup.
+
+## What you can't use
+
+When implementing backend authentication, you cannot use any authentication helper methods from the `useTurnkey` hook, such as `handleLogin`, `completeOtp`, or `completeOauth`. These methods are designed to work with Turnkey's auth proxy and will not function with a custom backend authentication flow.
+
+## Disabling the Auth Proxy
+
+To disable auth proxy usage in the Embedded Wallet Kit, simply omit the `authProxyConfigId` parameter in the `TurnkeyProvider` configuration. This will prevent the SDK from automatically fetching authentication configuration from your Turnkey Dashboard.
+
+```tsx
+import {
+  TurnkeyProvider,
+  TurnkeyProviderConfig,
+} from "@turnkey/react-wallet-kit";
+import "@turnkey/react-wallet-kit/styles.css";
+
+function App() {
+  const turnkeyConfig: TurnkeyProviderConfig = {
+    organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!, // Your organization ID from the Turnkey dashboard
+    
+    // Omit this line to disable auth proxy
+    // authProxyConfigId: process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID!,
+
+    //... your existing configuration
+  };
+
+  return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
+}
+```
+
+## On your backend
+
+You will need to implement various authentication endpoints on your backend server to forward authentication requests to Turnkey. You'll need to implement some or all of the following endpoints depending on your authentication flow:
+
+- [`createSubOrganization`](/api-reference/activities/create-sub-organization): Create a new sub-organization for the user.
+- [`initOtp`](/api-reference/activities/init-generic-otp): Send an OTP authentication code.
+- [`verifyOtp`](/api-reference/activities/verify-generic-otp): Verify the OTP code entered by the user.
+- [`otpLogin`](/api-reference/activities/login-with-otp): Handle OTP login flow (you can also combine this with `verifyOtp` to make a single endpoint).
+- [`oauthLogin`](/api-reference/activities/login-with-oauth): Handle OAuth login flow.
+
+**Note:** **passkey** and **wallet** login will occur in the frontend using [`stampLogin`](/api-reference/activities/login-with-a-stamp), so you do not need to implement any additional endpoints for those. Signup however will still require the `createSubOrganization` endpoint to create a new sub-organization for the user. See the [implementation in `@turnkey/core`](https://github.com/tkhq/sdk/blob/amir/sdk-js/packages/core/src/__clients__/core.ts) for more details on how to implement `loginWithPasskey` and `loginWithWallet` using the `stampLogin` activity.
+
+Here's an example of how you might implement the `createSubOrganization` endpoint in Node.js using Express and the [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server) package:
+
+```js
+import { Request } from "express";
+import dotenv from "dotenv";
+import { DEFAULT_ETHEREUM_ACCOUNTS, Turnkey } from "@turnkey/sdk-server";
+import { CreateSubOrgParams, CreateSubOrgResponse } from "./types.js";
+
+dotenv.config();
+
+export const turnkeyConfig = {
+  apiBaseUrl: process.env.TURNKEY_API_URL ?? "",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID ?? "",
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY ?? "",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY ?? "",
+};
+
+const turnkey = new Turnkey(turnkeyConfig).apiClient();
+
+export async function createSubOrg(
+  req: Request<{}, {}, CreateSubOrgParams>
+): Promise<CreateSubOrgResponse> {
+  const { email, phone, passkey, oauth, apiKeys } = req.body;
+
+  const authenticators = passkey
+    ? [
+        {
+          authenticatorName: "Passkey",
+          challenge: passkey.challenge,
+          attestation: passkey.attestation,
+        },
+      ]
+    : [];
+
+  const oauthProviders = oauth
+    ? [
+        {
+          providerName: oauth.providerName,
+          oidcToken: oauth.oidcToken,
+        },
+      ]
+    : [];
+
+  let userEmail = email;
+  const userPhoneNumber = phone;
+
+  const subOrganizationName = `Sub Org - ${new Date().toISOString()}`;
+
+  const result = await turnkey.createSubOrganization({
+    organizationId: turnkeyConfig.defaultOrganizationId,
+    subOrganizationName,
+    rootUsers: [
+      {
+        userName: "User",
+        userEmail,
+        userPhoneNumber,
+        authenticators,
+        oauthProviders: oauthProviders,
+        apiKeys: apiKeys ?? [],
+      },
+    ],
+    rootQuorumThreshold: 1,
+    wallet: {
+      walletName: "Default Wallet",
+      accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+    },
+  });
+
+  return { subOrganizationId: result.subOrganizationId };
+}
+```
+
+_Code snippet taken from our Swift example [here](https://github.com/tkhq/swift-sdk/blob/main/Examples/swift-demo-wallet/example-server/src/handler.ts). You can use this as reference for a full Javascript server implementation._
+
+Turnkey also offers [Rust](https://github.com/tkhq/rust-sdk) and [Go](https://github.com/tkhq/go-sdk) SDKs that can be used to implement the backend endpoints. You can also use any other backend language you prefer as long as it can make HTTP requests to the Turnkey API.
+
+## On your frontend
+
+On the frontend, you will need to implement your own authentication flows that interact with your backend endpoints.
+
+### Creating a keypair
+
+Login endpoints like `otpLogin` and `oauthLogin` will require a public key to be passed in the request.
+
+You can use `createApiKeyPair` from the `useTurnkey` hook to generate a keypair for this purpose.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { createApiKeyPair } = useTurnkey();
+
+const otpLogin = async (verificationToken: string) => {
+  const publicKey = await createApiKeyPair();
+
+  // Send the public key to your backend to initiate the OTP login flow
+  const response = await fetch("/YOUR-BACKEND-URL/otp-login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      verificationToken, // The OTP verification token received after running verifyOtp with a successful OTP code and OTP id
+      publicKey,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to initiate OTP login");
+  }
+
+  //... continued in the next section
+};
+```
+
+The private key generated from `createApiKeyPair` will be automatically stored in [`indexedDB`](/authentication/sessions#indexeddb-web-only-%3A) and used for stamping requests to Turnkey after authentication. You can learn more about stamps [here](/developer-reference/api-overview/stamps).
+
+### Storing the session
+
+Login endpoints like `otpLogin` and `oauthLogin` will [return a session token in JWT format](/authentication/sessions#creating-a-read-write-session) that you need to store in your application. You can use the `storeSession` function from the `useTurnkey` hook to store the session token.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { storeSession } = useTurnkey();
+
+const otpLogin = async (verificationToken: string) => {
+  const publicKey = await createApiKeyPair();
+
+  // Send the public key to your backend to initiate the OTP login flow
+  const response = await fetch("/YOUR-BACKEND-URL/otp-login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      verificationToken, // The OTP verification token received after running verifyOtp with a successful OTP code and OTP id
+      publicKey,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to initiate OTP login");
+  }
+
+  const { sessionToken } = await response.json();
+
+  // Store the session token in your application
+  storeSession(sessionToken);
+};
+```
+
+By using `storeSession`, the SDK will automatically handle the session and keypair management for you.
+
+If you have `autoRefreshSession` enabled under the `auth` object in the `TurnkeyProvider` configuration, the SDK will automatically refresh the session token when it expires. You can also continue to use the `authState` variable from the `useTurnkey` hook to check if the user is authenticated.
+
+```tsx
+import { useTurnkey, AuthState } from "@turnkey/react-wallet-kit";
+function AuthStatus() {
+  const { authState, user } = useTurnkey();
+  return (
+    <div>
+      {authState === AuthState.Authenticated ? (
+        <p>Welcome, {user?.userName}!</p>
+      ) : (
+        <p>Please log in.</p>
+      )}
+    </div>
+  );
+}
+```
+
+Once the user is authenticated, you can continue to use the Embedded Wallet Kit as usual.

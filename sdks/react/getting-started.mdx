@@ -1,0 +1,162 @@
+---
+title: "Getting started with Turnkey's Embedded Wallet Kit"
+description: "Learn how to set up the Embedded Wallet Kit (EWK) in your React application. This page will guide you through the initial setup, including enabling Turnkey's Auth Proxy, installing the SDK, and configuring your app."
+sidebarTitle: "Getting started"
+---
+
+## Turnkey organization setup
+
+To start, you must create a Turnkey organization via the [Turnkey dashboard](https://app.turnkey.com). The steps to do so are described in the [Account Setup](/getting-started/quickstart) section.
+
+For this setup, we will be using Turnkey's Auth Proxy to handle authentication. We can enable and configure this through the Turnkey dashboard.
+
+<Steps>
+  <Step title="Enable Auth Proxy">
+    Navigate to the **Wallet Kit** section in the Turnkey Dashboard and enable the
+    **Auth Proxy**.
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-toggle.png"
+      alt="Auth Proxy toggle"
+    />
+
+  </Step>
+
+    <Step title="Customize auth methods">
+
+    You can choose which auth methods to enable and customize various options from this screen. For this quickstart, let's enable **email OTP** and **passkeys**. When you're done, click **Save**.
+
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-options.png"
+      alt="Auth Proxy options"
+    />
+
+  </Step>
+
+  <Step title="Finish up">
+
+    Once you're finished with the auth proxy setup, you can copy the **auth proxy config ID**
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-id.png"
+      alt="Auth Proxy Config id"
+    />
+
+and your **organization ID** from the dashboard.
+
+  <img
+      src="/images/getting-started/img/quickstart/org-id.png"
+      alt="Organization id"
+    />
+  These will be used in the next steps to configure your app.
+</Step>
+</Steps>
+
+## Installation
+
+You can use `@turnkey/react-wallet-kit` in any React based web application.
+
+For this guide, let's create a new `Next.js` app. If you already have an existing app, you don't need to do this.
+
+```bash npx
+npx create-next-app@latest
+```
+
+Now, install the Turnkey React Wallet Kit package:
+
+<CodeGroup>
+
+```bash npm
+npm install @turnkey/react-wallet-kit
+```
+
+```bash pnpm
+pnpm add @turnkey/react-wallet-kit
+```
+
+```bash yarn
+yarn add @turnkey/react-wallet-kit
+```
+
+</CodeGroup>
+
+Finally, create a `.env` file within your app directory, and populate it with the **IDs** from before
+
+```bash .env
+NEXT_PUBLIC_ORGANIZATION_ID="here"
+NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID="and_here"
+```
+
+## Provider
+
+Wrap your app with the `TurnkeyProvider` component, and import `"@turnkey/react-wallet-kit/styles.css"` to include styles for the UI components.
+
+<Info>
+  **For Tailwind CSS V3 users:**
+    
+  Please refer to the [Tailwind V3 error](./troubleshooting#6-%40layer-utilities-is-used-but-no-matching-%40tailwind-utilities-directive-is-present-tailwind-v3-error) in the [troubleshooting](./troubleshooting) section for specific instructions on how to import the styles correctly.
+
+You can continue with the guide as normal if you are using **Tailwind CSS V4** or **not using Tailwind CSS at all**.
+
+</Info>
+
+With Next.js App Router, keep `app/layout.tsx` as a server component and create a separate `app/providers.tsx` client wrapper. This is necessary if you want to pass callbacks (e.g., onError), which must be defined in a client component.
+
+```tsx app/providers.tsx
+"use client";
+
+import {
+  TurnkeyProvider,
+  TurnkeyProviderConfig,
+} from "@turnkey/react-wallet-kit";
+
+const turnkeyConfig: TurnkeyProviderConfig = {
+  organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+  authProxyConfigId: process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID!,
+};
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <TurnkeyProvider
+    config={turnkeyConfig}
+    callbacks={{
+      onError: (error) => console.error("Turnkey error:", error),
+    }}
+  >{children}</TurnkeyProvider>;
+}
+```
+
+In case anything goes wrong, we've added an `onError` callback to the `TurnkeyProvider` to catch any errors.
+
+
+Then, use the `Providers` component to wrap your app in `app/layout.tsx`.
+
+```tsx app/layout.tsx
+import "@turnkey/react-wallet-kit/styles.css";
+import "./globals.css";
+import { Providers } from "./providers";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+> **Why this pattern?**
+>
+> - Callbacks (and other interactive bits) must be declared in a client component.
+> - Keeping layout.tsx as a server component maintains optimal rendering and avoids unnecessarily making your entire app client-side.
+> - Centralizing Turnkey setup in app/providers.tsx keeps configuration, styles, and callbacks in one place.
+
+## Next steps
+
+Ready to start building your app? Check out the [Authentication](/sdks/react/auth) guide to learn how to set up login or signup with just one line of code!
