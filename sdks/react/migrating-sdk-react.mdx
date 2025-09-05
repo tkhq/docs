@@ -4,4 +4,183 @@ description: "A guide to help you migrate your React applications from the legac
 sidebarTitle: "Migrating from @turnkey/sdk-react"
 ---
 
-Coming soon...
+This guide will help you migrate your React apps from `@turnkey/sdk-react` to `@turnkey/react-wallet-kit`.
+
+## Install
+
+```bash
+pnpm add @turnkey/react-wallet-kit
+# or
+npm i @turnkey/react-wallet-kit
+```
+
+## New features and improvements
+
+- **Unified provider + modal flows**: Built-in UI for Passkey, Wallet, Email/SMS OTP, and OAuth (Google, Apple, Facebook, X, Discord).
+- **Automatic OAuth redirect handling**: The provider completes OAuth redirects on page load; no manual token injection.
+- **First-class export/import**: Secure export/import via Turnkey iframes with simple handlers.
+- **External wallet connection**: Connect MetaMask, Phantom, WalletConnect providers for Ethereum/Solana.
+- **Session lifecycle management**: Auto-refresh with `beforeSessionExpiry`/`onSessionExpired` callbacks.
+- **UI customization**: Theme overrides, dark mode, border radius/background blur, and modal placement.
+
+## Breaking changes
+
+### Provider and hooks
+
+- **Old**: `@turnkey/sdk-react` exposes a `TurnkeyProvider` and a custom `TurnkeyContext`; you manually manage clients (`passkeyClient`, `iframeClient`, `walletClient`, `indexedDbClient`).
+- **New**: `@turnkey/react-wallet-kit` exposes a `TurnkeyProvider` and the `useTurnkey` hook that returns state (`session`, `user`, `wallets`, etc.) plus high-level methods (auth, export/import, signing, external wallets) and all `TurnkeyClientMethods` from `@turnkey/core`.
+
+```tsx
+// @turnkey/sdk-react  // Remove
+import { TurnkeyProvider } from "@turnkey/sdk-react"; // Remove
+
+// @turnkey/react-wallet-kit  // Add
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit"; // Add
+```
+
+### Authentication flows
+
+- **Manual client selection/injection** has been replaced by a single modal-driven flow (`handleLogin`) and dedicated OAuth helpers. Stop calling `injectCredentialBundle` on iframes; the provider manages sessions and completes OAuth automatically.
+
+```tsx
+// Old (sdk-react)  // Remove
+const { session, authClient } = useSession(); // Remove
+// ...custom UI per-method and iframeClient.injectCredentialBundle(session.token) // Remove
+
+// New (react-wallet-kit)  // Add
+import { useTurnkey } from "@turnkey/react-wallet-kit"; // Add
+const { handleLogin, session } = useTurnkey(); // Add
+await handleLogin(); // Add
+```
+
+#### OAuth helpers
+
+```tsx
+// Old (sdk-react)  // Remove
+// Manually parse code/state from URL, exchange for token, and inject into iframe // Remove
+
+// New (react-wallet-kit)  // Add
+const { handleGoogleOauth } = useTurnkey(); // Add
+await handleGoogleOauth({ openInPage: false }); // Add (popup); set true for redirect
+```
+
+### Configuration
+
+- The base config now uses `TurnkeyProviderConfig` (extends `@turnkey/core` `TurnkeySDKClientConfig`) and adds `auth`, `ui`, and iframe URLs.
+- If you previously passed auth iframe-specific settings, remove them; use `auth.*` and built-in modal flows instead. For export/import, use `exportIframeUrl`/`importIframeUrl` as needed.
+
+```tsx
+// Example provider config migration
+<TurnkeyProvider
+  config={{
+    // Core config (same fields supported)
+    apiBaseUrl: "...",
+    organizationId: "...",
+    authProxyUrl: "...",
+    authProxyConfigId: "...",
+    passkeyConfig: { rpId: "...", timeout: 60000 },
+
+    // @turnkey/sdk-react-specific iframe usage // Remove
+    // iframeUrl: "https://auth.turnkey.com", // Remove
+
+    // New auth controls // Add
+    auth: {
+      methods: {
+        passkeyAuthEnabled: true,
+        walletAuthEnabled: true,
+        googleOauthEnabled: true,
+      },
+      oauthConfig: {
+        oauthRedirectUri: "https://your.app/callback",
+        googleClientId: "GOOGLE_CLIENT_ID",
+        openOauthInPage: false,
+      },
+      autoRefreshSession: true,
+    },
+
+    // Optional iframe URLs for export/import // Add
+    exportIframeUrl: "https://export.turnkey.com",
+    importIframeUrl: "https://import.turnkey.com",
+
+    // Wallets and chains // Add
+    walletConfig: {
+      features: { auth: true, connecting: true },
+      chains: {
+        ethereum: { native: true },
+        solana: { native: true },
+      },
+      // walletConnect: { projectId: "..." },
+    },
+
+    // UI customization // Add
+    ui: { darkMode: true, renderModalInProvider: true },
+  }}
+>
+  {children}
+</TurnkeyProvider>
+```
+
+### Export/import
+
+- **Old**: You managed export/import iframes directly.
+- **New**: Use built-in handlers and modals.
+
+```tsx
+const {
+  handleExportWallet,
+  handleExportPrivateKey,
+  handleExportWalletAccount,
+} = useTurnkey();
+await handleExportWallet({ walletId: "..." });
+```
+
+### External wallets
+
+- **Old**: Integrate/connect wallets yourself.
+- **New**: Use built-in discovery/connect/disconnect across Ethereum/Solana (native and WalletConnect).
+
+```tsx
+const { handleConnectExternalWallet } = useTurnkey();
+await handleConnectExternalWallet();
+```
+
+### Callbacks
+
+Register lifecycle and error callbacks on the provider.
+
+```tsx
+<TurnkeyProvider
+  config={config}
+  callbacks={{
+    onAuthenticationSuccess: ({ session, action, method, identifier }) => {},
+    beforeSessionExpiry: ({ sessionKey }) => {},
+    onSessionExpired: ({ sessionKey }) => {},
+    onOauthRedirect: ({ idToken, publicKey }) => {},
+    onError: (error) => {},
+  }}
+>
+  {children}
+</TurnkeyProvider>
+```
+
+## Minimal migration checklist
+
+- **Replace provider**: `@turnkey/sdk-react` → `@turnkey/react-wallet-kit`.
+- **Remove manual client management**: Use `useTurnkey()`; stop injecting credential bundles into iframes.
+- **Enable auth methods**: Configure `config.auth.methods` and `config.auth.oauthConfig`.
+- **Switch auth triggers**: Call `handleLogin()` or specific `handle{Provider}Oauth()`.
+- **Wire export/import**: Use `handleExport*` (and built-in import modal).
+- **Connect external wallets**: Use `handleConnectExternalWallet()`.
+- **Customize UI**: Use `config.ui` and optional `ui.renderModalInProvider`.
+
+## Common gotchas
+
+- **Redirect URI**: Ensure `auth.oauthConfig.oauthRedirectUri` exactly matches what's registered (some providers require trailing slash).
+- **Methods not showing**: Verify `auth.methods.*Enabled` and provider client IDs.
+- **WalletConnect**: Provide `walletConfig.walletConnect.projectId` if you expect WC providers.
+- **Session refresh**: Use `beforeSessionExpiry`/`onSessionExpired` to refresh or logout.
+
+## API quick reference
+
+- **Hook**: `useTurnkey()` → `{ session, user, wallets, authState, clientState, allSessions, httpClient, ...TurnkeyClientMethods, handleLogin, handleGoogleOauth, handleAppleOauth, handleFacebookOauth, handleXOauth, handleDiscordOauth, handleConnectExternalWallet, refreshUser, refreshWallets, handleSignMessage, handleExportWallet, handleExportPrivateKey, handleExportWalletAccount }`.
+- **Types**: `TurnkeyProviderConfig` extends `TurnkeySDKClientConfig` with `auth`, `ui`, `exportIframeUrl`, `importIframeUrl`.
