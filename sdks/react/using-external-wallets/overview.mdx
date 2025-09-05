@@ -50,10 +50,9 @@ If a provider is already connected, it will still appear in the result of `getWa
 >   - Most providers maintain a session until it is explicitly disconnected, either from your app or manually via the wallet UI (e.g., disconnecting in MetaMask).  
 
 ### What does the WalletProvider object look like?
-Here’s an example of how MetaMask `WalletProvider` objects are returned when both Ethereum and Solana native support are enabled. MetaMask appears as two separate providers, one for each namespace.  
+Here’s an example of how `WalletProvider` objects are returned when both Ethereum, Solana, and WalletConnect are enabled.
 
-#### Ethereum Provider
-
+#### Native Ethereum Provider
 ```ts
 {
   interfaceType: "ethereum",
@@ -72,7 +71,7 @@ Here’s an example of how MetaMask `WalletProvider` objects are returned when b
 }
 ```
 
-#### Solana Provider
+#### Native Solana Provider
 ```ts
 {
   interfaceType: "solana",
@@ -87,5 +86,42 @@ Here’s an example of how MetaMask `WalletProvider` objects are returned when b
   connectedAddresses: [], // populated once user connects
 }
 ```
+
+#### WalletConnect Provider (Ethereum example)
+```ts
+{
+  interfaceType: "wallet-connect",
+  chainInfo: {
+    namespace: "ethereum",
+    chainId: "0x1", // Ethereum Mainnet
+  },
+  info: {
+    name: "Rainbow",
+    icon: "data:image/svg+xml;base64,...", // base64-encoded wallet icon
+  },
+  provider: { ... }, // RPC provider via WalletConnect
+  connectedAddresses: [], // populated once user connects
+}
+```
+
+#### Shared attributes
+
+All providers, regardless of chain, include:
+- `interfaceType` – identifies where the provider came from:
+  - "ethereum" → native EIP-1193 Ethereum provider (e.g., MetaMask, Rabby).
+  - "solana" → native Wallet Standard Solana provider (e.g., Phantom, Backpack).
+  - "wallet-connect" → WalletConnect provider.
+- `chainInfo` – the blockchain namespace, and optionally a chain ID.
+- `info` – metadata about the provider, such as name, icon, and (sometimes) uuid or rdns.
+- `provider` – the underlying RPC provider injected by the wallet.
+- `connectedAddresses` – an array of currently connected addresses (populated after the user connects).
+
+#### Namespace-specific differences
+- Ethereum (`namespace: "ethereum"`) - always includes a `chainId` in `chainInfo` (e.g., "0x1" for Mainnet, "0xaa36a7" for Sepolia).
+- Solana (`namespace: "solana"`) - never includes a `chainId`, since Solana is a single-chain ecosystem.
+
+#### Provider-specific differences
+- WalletConnect (`interfaceType: "wallet_connect"`) - includes a `uri` property used for the session handshake.
+- Metadata (`info`) - Native Ethereum providers may expose extra fields like `uuid` and `rdns`, while Native Solana providers usually only include a `name` and `icon`.
 
 
