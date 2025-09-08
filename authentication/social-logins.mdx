@@ -26,7 +26,7 @@ The table below can be helpful in understanding the similarities and differences
 | **Provider Type**   | **OIDC Provider**                                 | **OAuth 2.0-Only Providers**                                          |
 |---------------------|---------------------------------------------------|-------------------------------------------------------------------|
 | Providers           | Google, Apple, Facebook, Auth0, Cognito           | X/Twitter, Discord                                                |
-| Token Transport     | Returned to your App by Provider                  | Returned by Turnkey after **OAuth 2.0 Auth Code + PKCE** flow     |
+| Token Transport     | Returned to your App by Provider                  | Returned by Turnkey after the **OAuth 2.0 Auth Code + PKCE** flow     |
 | Issuer (`iss`)      | Provider (iss = Provider URL)                     | Turnkey (iss = Turnkey URL)                                       |
 | Audience  (`aud`)   | Provider’s `client_id` for your app               | Provider’s `client_id` for your app                               |
 | Subject (`sub`)     | Provider’s subject (stable user ID)               | Derived from ID `who-am-I` response (e.g., `x:123456789`)         |
@@ -45,7 +45,9 @@ The table below can be helpful in understanding the similarities and differences
 
 - **End-User**: The end-user is a user of your web app. They have an account with Google.
 
-- **OIDC Provider**: a provider able to authenticate your End-Users and provide OIDC tokens as proof. We'll use [Google](https://developers.google.com/identity/openid-connect/openid-connect) as an example.
+- **OIDC Provider**: A provider able to authenticate your End-Users and provide OIDC tokens as proof. We'll use [Google](https://developers.google.com/identity/openid-connect/openid-connect) as an example.
+
+- **OAuth 2.0-Only Provider**: A provider of OAuth 2.0-based Authorization, for which Turnkey is able to act as an "*OIDC Wrapper*".
 
 ## Authentication Sequence Diagrams
 
@@ -127,8 +129,9 @@ sequenceDiagram
     Frontend->>OAuth Provider: Start OAuth flow
     OAuth Provider->>User: Prompt to grant permission
     User->>OAuth Provider: Grants permission
-    OAuth Provider->>Backend: Return auth_code via redirect_uri
-    Backend->>Turnkey: Send auth_code + redirect_uri
+    OAuth Provider->>Frontend: User redirected to redirect_uri and delivered auth_code
+    Frontend->>Backend: User calls with redirect_uri and auth_code
+    Backend->>Turnkey: Send auth_code + redirect_uri via `OAuth2Authenticate` call
     Turnkey->>Backend: Return OIDC Token
     Backend->>Turnkey: Gets subOrgIds with that associated oidcToken
     Turnkey->>Backend: Return subOrgId (or null)
@@ -163,7 +166,7 @@ sequenceDiagram
   </Step>
 
   <Step title="Get OIDC Token">
-  The backend exchanges the auth_code + redirect_uri for an OIDC ID Token using the `oauth2Authenticate` endpoint.
+  The backend exchanges the auth_code + redirect_uri for an OIDC ID Token using the `OAuth2Authenticate` activity.
   </Step>
 
   <Step title="Get or Create a Turnkey Sub-organization">
@@ -308,11 +311,23 @@ Navigate to the [X developer portal](https://developer.twitter.com/en/portal/das
 
 ![alt text](../images/authentication/img/x_client_information.png)
 
+#### Required Scopes
+
+In order for Turnkey to access the `/2/users/me` endpoint, the following scopes must be set during Authorization:
+- `tweet.read`
+- `user.read`
+
 ### Setting Up Discord
 
 Navigate to the [Discord developer portal](https://discord.com/developers) and create/setup your app.  In the **General Information** section, you'll need to save your **Client ID** and **Client Secret** so that these values can be uploaded to Turnkey's servers:
 
 ![alt text](../images/authentication/img/discord_client_information.png)
+
+#### Required Scopes
+
+In order for Turnkey to access the `/api/users/@me` endpoint, the following scopes must be set during Authorization:
+- `identify`
+- `email`
 
 ### Client Secret Upload
 
