@@ -25,21 +25,39 @@ npm i @turnkey/react-wallet-kit
 
 ### Provider and hooks
 
-- **Old**: `@turnkey/sdk-react` exposes a `TurnkeyProvider` and a custom `TurnkeyContext`; you manually manage clients (`passkeyClient`, `iframeClient`, `walletClient`, `indexedDbClient`).
-- **New**: `@turnkey/react-wallet-kit` exposes a `TurnkeyProvider` and the `useTurnkey` hook that returns state (`session`, `user`, `wallets`, etc.) plus high-level methods (auth, export/import, signing, external wallets) and all `TurnkeyClientMethods` from `@turnkey/core`.
+**Old Approach (Manual SDK)**
+
+Previously, `@turnkey/sdk-react` exposed a `TurnkeyProvider` and a custom `TurnkeyContext`;
+you manually managed multiple clients (`passkeyClient`, `iframeClient`, `walletClient`, `indexedDbClient`).
 
 ```tsx
-// @turnkey/sdk-react  // Remove
-import { TurnkeyProvider } from "@turnkey/sdk-react"; // Remove
-
-// @turnkey/react-wallet-kit  // Add
-import { TurnkeyProvider } from "@turnkey/react-wallet-kit"; // Add
+import { TurnkeyProvider } from "@turnkey/sdk-react";
 ```
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use `@turnkey/react-wallet-kit`'s `TurnkeyProvider` and `useTurnkey` hook, which returns state (`session`, `user`, `wallets`, etc.),
+high-level helpers (auth, export/import, signing, external wallets), and all `TurnkeyClientMethods` from `@turnkey/core`.
+
+```tsx
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+```
+
+Key differences:
+
+- Single provider + hook replaces multiple manually managed clients
+- High-level helpers for auth/export/import/signing/external wallets
+- All core client methods available via the hook
 
 ### Configuration
 
-- The base config now uses `TurnkeyProviderConfig` (extends `@turnkey/core` `TurnkeySDKClientConfig`) and adds `auth`, `ui`, and iframe URLs.
-- If you previously passed auth iframe-specific settings, remove them; use `auth.*` and built-in modal flows instead. For export/import, use `exportIframeUrl`/`importIframeUrl` as needed.
+**Old Approach (Manual SDK iframe config)**
+
+Previously, auth flows used iframe-specific configuration (e.g., `iframeUrl`) and manual wiring for auth flows. OAuth often required redirect handling and token injection.
+
+**New Approach (Hook-Based Provider config)**
+
+Use the provider config with `auth`, `ui`, wallet configuration, and optional export/import iframe URLs. Built-in modal flows replace iframe-specific auth settings.
 
 ```tsx
 <TurnkeyProvider
@@ -51,10 +69,11 @@ import { TurnkeyProvider } from "@turnkey/react-wallet-kit"; // Add
     authProxyConfigId: "...",
     passkeyConfig: { rpId: "...", timeout: 60000 },
 
-    // @turnkey/sdk-react specific iframe usage // Remove
-    // iframeUrl: "https://auth.turnkey.com", // Remove
+    // Optional iframe URLs for export/import
+    exportIframeUrl: "https://export.turnkey.com",
+    importIframeUrl: "https://import.turnkey.com",
 
-    // New auth controls // Add
+    // Auth controls
     auth: {
       methods: {
         passkeyAuthEnabled: true,
@@ -69,11 +88,7 @@ import { TurnkeyProvider } from "@turnkey/react-wallet-kit"; // Add
       autoRefreshSession: true,
     },
 
-    // Optional iframe URLs for export/import // Add
-    exportIframeUrl: "https://export.turnkey.com",
-    importIframeUrl: "https://import.turnkey.com",
-
-    // Wallets and chains // Add
+    // Wallets and chains
     walletConfig: {
       features: { auth: true, connecting: true },
       chains: {
@@ -83,7 +98,7 @@ import { TurnkeyProvider } from "@turnkey/react-wallet-kit"; // Add
       // walletConnect: { projectId: "..." },
     },
 
-    // UI customization // Add
+    // UI customization
     ui: { darkMode: true, renderModalInProvider: true },
   }}
 >
@@ -91,20 +106,36 @@ import { TurnkeyProvider } from "@turnkey/react-wallet-kit"; // Add
 </TurnkeyProvider>
 ```
 
+Key differences:
+
+- Replace iframe-specific auth settings with `auth.*` and built-in modal flows
+- Centralize OAuth settings via `auth.oauthConfig`; redirect handling is automatic
+- Configure wallets/chains and UI theming directly on the provider
+
 ### Authentication
 
 - **Manual client selection/injection** has been replaced by a single modal-driven flow (`handleLogin`) and dedicated OAuth helpers. Stop calling `injectCredentialBundle` on iframes; the provider manages sessions and completes OAuth automatically.
 
 #### OAuth
 
-```tsx
-// Old (sdk-react)  // Remove
-// Manually parse code/state from URL, exchange for token, and inject into iframe // Remove
+**Old Approach (Manual SDK)**
 
-// New (react-wallet-kit)  // Add
-const { handleGoogleOauth } = useTurnkey(); // Add
-await handleGoogleOauth({ openInPage: false }); // Add (popup); set true for redirect
+Previously, you manually parsed `code/state` from the URL, exchanged for a token, and injected credentials into an iframe.
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use a dedicated helper to trigger the OAuth flow. The provider completes redirects automatically on load.
+
+```tsx
+const { handleGoogleOauth } = useTurnkey();
+await handleGoogleOauth({ openInPage: false }); // set true for redirect
 ```
+
+Key differences:
+
+- No manual URL parsing/token exchange/injection
+- Single helper per provider; popup or full-page redirect
+- Redirect completion handled automatically by the provider
 
 The same applies for other OAuth providers such as Apple, Facebook. See [Configuring OAuth](/sdks/react/auth#configuring-oauth) for more details.
 
@@ -114,9 +145,9 @@ The same applies for other OAuth providers such as Apple, Facebook. See [Configu
 
 Previously, passkey login used a read/write session with a freshly generated public key. Passkey signup first created a WebAuthn credential (challenge + attestation) and then created a new sub-organization/user using that credential.
 
-**Login — Typical Code:**
+<CodeGroup>
 
-```tsx
+```tsx login.client.tsx
 import { useTurnkey } from "@turnkey/sdk-react";
 import { SessionType } from "@turnkey/sdk-types";
 
@@ -131,9 +162,7 @@ await passkeyClient?.loginWithPasskey({
 });
 ```
 
-**Signup — Typical Code:**
-
-```tsx
+```tsx signup.client.tsx
 import { useTurnkey } from "@turnkey/sdk-react";
 
 const { passkeyClient } = useTurnkey();
@@ -152,11 +181,11 @@ const { subOrg, user } = await createUserSubOrg({
 });
 ```
 
+</CodeGroup>
+
 **New Approach (Hook-Based: `useTurnkey()`)**
 
 Use the built-in helpers to trigger passkey login and sign-up flows.
-
-**Typical Code:**
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-wallet-kit";
@@ -165,6 +194,12 @@ const { handlePasskeyLogin, handlePasskeySignUp } = useTurnkey();
 await handlePasskeyLogin();
 await handlePasskeySignUp();
 ```
+
+Key differences:
+
+- No manual public key management or session type selection
+- WebAuthn challenge/attestation handled by helpers and proxy
+- Provider manages session creation and storage
 
 #### OTP (SMS & Email)
 
@@ -537,8 +572,6 @@ if (authenticatorId) {
 
 Previously, wallet listing relied on manually instantiating a Turnkey client and invoking SDK methods to fetch both wallets and their accounts.
 
-**Typical Code:**
-
 ```ts
 const { wallets } = await indexedDbClient.getWallets();
 const walletsWithAccounts = await Promise.all(
@@ -556,8 +589,6 @@ const walletsWithAccounts = await Promise.all(
 
 The new method utilizes the `useTurnkey` React hook, which abstracts data fetching, session management, and provides ready-to-use wallet/account lists and actions.
 
-**Typical Code:**
-
 ```ts
 const {
   wallets: hookWallets,
@@ -571,6 +602,12 @@ const {
 // Listing wallets is now as simple as using hookWallets
 const wallets = hookWallets ?? [];
 ```
+
+Key differences:
+
+- No manual wallet/account fetch + merge
+- Hook provides wallets and accounts with provider-managed session
+- Simpler state consumption via `useTurnkey()`
 
 #### Creating Wallets and Accounts
 
@@ -656,8 +693,6 @@ export function WalletActions() {
 
 Previously, exporting required manually initializing an export iframe and orchestrating export API calls and decryption within the iframe.
 
-**Typical Code:**
-
 ```tsx
 import { useTurnkey } from "@turnkey/sdk-react";
 
@@ -697,8 +732,6 @@ await iframeClient?.injectKeyExportBundle(
 
 Use the built-in export handlers that open a modal and perform the export/iframe flow for you.
 
-**Typical Code:**
-
 ```tsx
 const {
   handleExportWallet,
@@ -710,6 +743,12 @@ await handleExportWallet({ walletId: "..." });
 // await handleExportPrivateKey({ privateKeyId: "...", keyFormat: KeyFormat.Hexadecimal });
 // await handleExportWalletAccount({ address: "0x...", keyFormat: KeyFormat.Hexadecimal });
 ```
+
+Key differences:
+
+- Modal handlers replace manual iframe client orchestration
+- No direct bundle injection/extraction steps
+- Provider/session context handled automatically
 
 #### Import
 
@@ -803,8 +842,6 @@ await handleImportPrivateKey({
 Previously, transactions were signed using `ethers` with `TurnkeySigner` from `@turnkey/ethers`, wired to the `@turnkey/sdk-react` client.
 You manually constructed the signer/provider and invoked `sendTransaction`.
 
-**Typical Code:**
-
 ```tsx
 import { ethers } from "ethers";
 import { TurnkeySigner } from "@turnkey/ethers";
@@ -833,8 +870,6 @@ await signer.sendTransaction(tx);
 
 Use `useTurnkey()`'s `signAndSendTransaction` helper. The provider handles session state and request stamping; you pass a wallet account and an unsigned transaction.
 For more details, see: [/sdks/react/signing#signing-transactions](/sdks/react/signing#signing-transactions).
-
-**Typical Code:**
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-wallet-kit";
@@ -870,13 +905,17 @@ function SignTransactionButton() {
 }
 ```
 
+Key differences:
+
+- No `TurnkeySigner` or manual provider wiring
+- Pass an unsigned transaction and account; SDK stamps and sends
+- Session/state handled by the provider
+
 #### Messages
 
 **Old Approach**
 
 Messages were signed via `ethers` using `TurnkeySigner` from `@turnkey/ethers`, with manual signer/provider wiring against the `@turnkey/sdk-react` client.
-
-**Typical Code:**
 
 ```tsx
 import { useTurnkey } from "@turnkey/sdk-react";
@@ -899,8 +938,6 @@ const signature = await signer.signMessage("Hello Turnkey");
 **New Approach**
 
 Use `useTurnkey()`'s `signMessage` to sign directly with a selected wallet account. For a modal-driven UX, `handleSignMessage` opens a confirmation dialog.
-
-**Typical Code:**
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-wallet-kit";
