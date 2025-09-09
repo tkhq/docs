@@ -46,10 +46,6 @@ sync-sdk-gen-docs:
 	@echo Generating docs and formatting output into mdx...
 	(cd $(JS_SDK_ROOT) && pnpm run generate-docs)
 
-	@echo Copying formatted docs to ./generated-docs/formatted...
-	cp -R $(JS_SDK_ROOT)/generated-docs/formatted/react-wallet-kit ./generated-docs/formatted
-	cp -R $(JS_SDK_ROOT)/generated-docs/formatted/core ./generated-docs/formatted
-
 	(cd $(JS_SDK_ROOT) && node $(JS_SDK_ROOT)/typedoc-theme/format-json-output.js \
 		--packages react-wallet-kit core \
 		--groups React "TypeScript | Frontend")
@@ -59,6 +55,10 @@ sync-sdk-gen-docs:
 
 	@echo Copying synced docs.json to root...
 	cp $(JS_SDK_ROOT)/generated-docs/docs.json docs.json
+
+	@echo Copying formatted docs to ./generated-docs/formatted...
+	cp -R $(JS_SDK_ROOT)/generated-docs/formatted/react-wallet-kit ./generated-docs/formatted
+	cp -R $(JS_SDK_ROOT)/generated-docs/formatted/core ./generated-docs/formatted
 
 	@echo Deleting temporary files...
 	rm -rf $(JS_SDK_ROOT)/generated-docs/sdks.json
