@@ -298,7 +298,7 @@ The provider handles proxy calls; you no longer need to stamp server-side with t
 Initialize (client):
 
 ```tsx
-const init = await httpClient?.proxyInitOtp({
+const init = await httpClient?.initOtp({
   otpType: "OTP_TYPE_EMAIL",
   contact: email,
 });
@@ -594,7 +594,6 @@ const {
   wallets: hookWallets,
   createWallet,
   createWalletAccounts,
-  refreshWallets,
   user,
   session,
 } = useTurnkey();
@@ -615,8 +614,6 @@ Key differences:
 
 Previously, creating wallets and accounts involved calling SDK methods directly (e.g., `createWallet`, `createWalletAccounts`) and then refetching wallets to reflect changes.
 Additionally, when creating a new Ethereum account you would often compute the next default account at a specific index via a helper (e.g., `defaultEthereumAccountAtIndex(index)`) and pass that into `createWalletAccounts`.
-
-**Typical Code:**
 
 ```tsx
 import { useTurnkey } from "@turnkey/sdk-react";
@@ -646,24 +643,22 @@ const { wallets } = await indexedDbClient.getWallets();
 
 **New Approach (Hook-Based: `useTurnkey()`)**
 
-Use `useTurnkey()` helpers `createWallet`, `createWalletAccounts`, and `refreshWallets`. The provider manages session and state; you only invoke the actions and refresh.
-
-**Typical Code:**
+Use `useTurnkey()` helpers `createWallet` and `createWalletAccounts`.
+The provider manages session and state and refreshing wallets; you only invoke the actions.
 
 ```tsx
 import React from "react";
 import { useTurnkey } from "@turnkey/react-wallet-kit";
 
 export function WalletActions() {
-  const { createWallet, createWalletAccounts, refreshWallets, wallets } =
-    useTurnkey();
+  const { createWallet, createWalletAccounts, wallets } = useTurnkey();
 
   const handleCreateWallet = async () => {
     const walletId = await createWallet({
       walletName: "Demo Wallet",
       accounts: ["ADDRESS_FORMAT_ETHEREUM"],
     });
-    await refreshWallets();
+
     console.log("Created wallet:", walletId);
   };
 
@@ -674,7 +669,7 @@ export function WalletActions() {
       walletId,
       accounts: ["ADDRESS_FORMAT_ETHEREUM"],
     });
-    await refreshWallets();
+
     console.log("Created account:", newAccountAddress);
   };
 
@@ -842,7 +837,7 @@ await handleImportPrivateKey({
 Previously, transactions were signed using `ethers` with `TurnkeySigner` from `@turnkey/ethers`, wired to the `@turnkey/sdk-react` client.
 You manually constructed the signer/provider and invoked `sendTransaction`.
 
-```tsx
+```ts
 import { ethers } from "ethers";
 import { TurnkeySigner } from "@turnkey/ethers";
 import { useTurnkey } from "@turnkey/sdk-react";
@@ -868,15 +863,20 @@ await signer.sendTransaction(tx);
 
 **New Approach**
 
-Use `useTurnkey()`'s `signAndSendTransaction` helper. The provider handles session state and request stamping; you pass a wallet account and an unsigned transaction.
-For more details, see: [/sdks/react/signing#signing-transactions](/sdks/react/signing#signing-transactions).
+Use `useTurnkey()`'s signing helpers:
+
+- `signTransaction`: signs and returns a signature (you broadcast separately).
+- `signAndSendTransaction`: signs and broadcasts, returning the on-chain transaction hash.
+
+The provider handles session state and request stamping; you pass a wallet account and an unsigned transaction.
+For more details, see: [Signing transactions](/sdks/react/signing#signing-transactions).
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-wallet-kit";
 import { parseEther, Transaction } from "ethers";
 
 function SignTransactionButton() {
-  const { signAndSendTransaction, wallets } = useTurnkey();
+  const { signAndSendTransaction, signTransaction, wallets } = useTurnkey();
 
   const doSignTransaction = async () => {
     const walletAccount = wallets[0]?.accounts[0];
@@ -894,16 +894,30 @@ function SignTransactionButton() {
 
     const unsignedTransaction = Transaction.from(tx).unsignedSerialized;
 
-    await signAndSendTransaction({
+    // sign the transaction
+    const signature = await signTransaction({
       walletAccount,
       unsignedTransaction,
       transactionType: "TRANSACTION_TYPE_ETHEREUM",
+    });
+
+    console.log("Transaction signed:", signature);
+
+    // OR sign and send the transaction (requires rpcUrl for embedded wallets)
+    const hash = await signAndSendTransaction({
+      walletAccount,
+      unsignedTransaction,
+      transactionType: "TRANSACTION_TYPE_ETHEREUM",
+      rpcUrl: "https://mainnet.infura.io/v3/YOUR_KEY",
     });
   };
 
   return <button onClick={doSignTransaction}>Sign Transaction</button>;
 }
 ```
+
+Note: `rpcUrl` is required when using embedded wallets (to broadcast via your chosen RPC).
+For external wallets (e.g., MetaMask, Phantom), `rpcUrl` is not required and will be ignored.
 
 Key differences:
 
