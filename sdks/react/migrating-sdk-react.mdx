@@ -4,4 +4,981 @@ description: "A guide to help you migrate your React applications from the legac
 sidebarTitle: "Migrating from @turnkey/sdk-react"
 ---
 
-Coming soon...
+## Install
+
+```bash
+pnpm add @turnkey/react-wallet-kit
+# or
+npm i @turnkey/react-wallet-kit
+```
+
+## New features and improvements
+
+- **Unified provider + modal flows**: Built-in UI for Passkey, Wallet, Email/SMS OTP, and OAuth (Google, Apple, Facebook, X, Discord).
+- **Automatic OAuth redirect handling**: The provider completes OAuth redirects on page load; no manual token injection.
+- **First-class export/import**: Secure export/import via Turnkey iframes with simple handlers.
+- **External wallet connection**: Connect MetaMask, Phantom, WalletConnect providers for Ethereum/Solana.
+- **Session lifecycle management**: Auto-refresh with `beforeSessionExpiry`/`onSessionExpired` callbacks.
+- **UI customization**: Theme overrides, dark mode, border radius/background blur, and modal placement.
+
+## Breaking changes
+
+### Provider and hooks
+
+**Old Approach (Manual SDK)**
+
+Previously, `@turnkey/sdk-react` exposed a `TurnkeyProvider` and a custom `TurnkeyContext`;
+you manually managed multiple clients (`passkeyClient`, `iframeClient`, `walletClient`, `indexedDbClient`).
+
+```tsx
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+```
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use `@turnkey/react-wallet-kit`'s `TurnkeyProvider` and `useTurnkey` hook, which returns state (`session`, `user`, `wallets`, etc.),
+high-level helpers (auth, export/import, signing, external wallets), and all `TurnkeyClientMethods` from `@turnkey/core`.
+
+```tsx
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+```
+
+Key differences:
+
+- Single provider + hook replaces multiple manually managed clients
+- High-level helpers for auth/export/import/signing/external wallets
+- All core client methods available via the hook
+
+### Configuration
+
+**Old Approach (Manual SDK iframe config)**
+
+Previously, auth flows used iframe-specific configuration (e.g., `iframeUrl`) and manual wiring for auth flows. OAuth often required redirect handling and token injection.
+
+**New Approach (Hook-Based Provider config)**
+
+Use the provider config with `auth`, `ui`, wallet configuration, and optional export/import iframe URLs. Built-in modal flows replace iframe-specific auth settings.
+
+```tsx
+<TurnkeyProvider
+  config={{
+    // Core config (same fields supported)
+    apiBaseUrl: "...",
+    organizationId: "...",
+    authProxyUrl: "...",
+    authProxyConfigId: "...",
+    passkeyConfig: { rpId: "...", timeout: 60000 },
+
+    // Optional iframe URLs for export/import
+    exportIframeUrl: "https://export.turnkey.com",
+    importIframeUrl: "https://import.turnkey.com",
+
+    // Auth controls
+    auth: {
+      methods: {
+        passkeyAuthEnabled: true,
+        walletAuthEnabled: true,
+        googleOauthEnabled: true,
+      },
+      oauthConfig: {
+        oauthRedirectUri: "https://your.app/callback",
+        googleClientId: "GOOGLE_CLIENT_ID",
+        openOauthInPage: false,
+      },
+      autoRefreshSession: true,
+    },
+
+    // Wallets and chains
+    walletConfig: {
+      features: { auth: true, connecting: true },
+      chains: {
+        ethereum: { native: true },
+        solana: { native: true },
+      },
+      // walletConnect: { projectId: "..." },
+    },
+
+    // UI customization
+    ui: { darkMode: true, renderModalInProvider: true },
+  }}
+>
+  {children}
+</TurnkeyProvider>
+```
+
+Key differences:
+
+- Replace iframe-specific auth settings with `auth.*` and built-in modal flows
+- Centralize OAuth settings via `auth.oauthConfig`; redirect handling is automatic
+- Configure wallets/chains and UI theming directly on the provider
+
+### Authentication
+
+- **Manual client selection/injection** has been replaced by a single modal-driven flow (`handleLogin`) and dedicated OAuth helpers. Stop calling `injectCredentialBundle` on iframes; the provider manages sessions and completes OAuth automatically.
+
+#### OAuth
+
+**Old Approach (Manual SDK)**
+
+Previously, you manually parsed `code/state` from the URL, exchanged for a token, and injected credentials into an iframe.
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use a dedicated helper to trigger the OAuth flow. The provider completes redirects automatically on load.
+
+```tsx
+const { handleGoogleOauth } = useTurnkey();
+await handleGoogleOauth({ openInPage: false }); // set true for redirect
+```
+
+Key differences:
+
+- No manual URL parsing/token exchange/injection
+- Single helper per provider; popup or full-page redirect
+- Redirect completion handled automatically by the provider
+
+The same applies for other OAuth providers such as Apple, Facebook. See [Configuring OAuth](/sdks/react/auth#configuring-oauth) for more details.
+
+#### Passkeys
+
+**Old Approach (Manual SDK)**
+
+Previously, passkey login used a read/write session with a freshly generated public key. Passkey signup first created a WebAuthn credential (challenge + attestation) and then created a new sub-organization/user using that credential.
+
+<CodeGroup>
+
+```tsx login.client.tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+import { SessionType } from "@turnkey/sdk-types";
+
+const { passkeyClient, indexedDbClient } = useTurnkey();
+
+await indexedDbClient?.resetKeyPair();
+const publicKey = await indexedDbClient!.getPublicKey();
+
+await passkeyClient?.loginWithPasskey({
+  sessionType: SessionType.READ_WRITE,
+  publicKey,
+});
+```
+
+```tsx signup.client.tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { passkeyClient } = useTurnkey();
+
+const { encodedChallenge, attestation } =
+  (await passkeyClient?.createUserPasskey({
+    publicKey: {
+      user: { name: email, displayName: email },
+    },
+  })) || {};
+
+// App/server helper that calls your Turnkey proxy to create sub-org + user
+const { subOrg, user } = await createUserSubOrg({
+  email,
+  passkey: { challenge: encodedChallenge, attestation },
+});
+```
+
+</CodeGroup>
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use the built-in helpers to trigger passkey login and sign-up flows.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { handlePasskeyLogin, handlePasskeySignUp } = useTurnkey();
+await handlePasskeyLogin();
+await handlePasskeySignUp();
+```
+
+Key differences:
+
+- No manual public key management or session type selection
+- WebAuthn challenge/attestation handled by helpers and proxy
+- Provider manages session creation and storage
+
+#### OTP (SMS & Email)
+
+**Old Approach (Manual SDK + Server Actions)**
+
+Previously, OTP auth required:
+
+- A server action to initialize OTP (and optionally create a sub-org if none exists) using the parent org API key.
+- A server action to verify OTP and exchange the verification token for a session (read/write), stamped by the server key.
+- Client code to fetch the device public key and then call those server actions.
+
+<CodeGroup>
+
+```tsx client.tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+import { initEmailAuth, otpLogin } from "./actions";
+
+const { indexedDbClient } = useTurnkey();
+await indexedDbClient?.resetKeyPair();
+const publicKey = await indexedDbClient!.getPublicKey();
+
+// Start OTP on server
+const init = await initEmailAuth({ email, targetPublicKey: publicKey });
+// Verify on server and exchange for session
+const session = await otpLogin({
+  email,
+  publicKey,
+  otpId: init.otpId,
+  otpCode: code,
+});
+
+await indexedDbClient?.loginWithSession(session);
+```
+
+```ts actions.ts
+import { OtpType } from "@turnkey/sdk-types";
+
+export async function initEmailAuth({
+  email,
+  targetPublicKey,
+}: {
+  email: string;
+  targetPublicKey: string;
+}) {
+  const subOrgId =
+    (await getSubOrgIdByEmail(email)) ||
+    (await createUserSubOrg({ email })).subOrg.subOrganizationId;
+
+  const magicLinkTemplate = getMagicLinkTemplate(
+    "auth",
+    email,
+    "email",
+    targetPublicKey
+  );
+
+  return client.initOtp({
+    userIdentifier: targetPublicKey,
+    otpType: OtpType.Email,
+    contact: email,
+    emailCustomization: { magicLinkTemplate },
+  });
+}
+
+export async function otpLogin({
+  email,
+  publicKey,
+  otpId,
+  otpCode,
+}: {
+  email: string;
+  publicKey: string;
+  otpId: string;
+  otpCode: string;
+}) {
+  const subOrgId = await getSubOrgIdByEmail(email);
+  if (!subOrgId) throw new Error("Could not find suborg by email");
+
+  const { verificationToken } = await client.verifyOtp({ otpId, otpCode });
+
+  const sessionResponse = await client.otpLogin({
+    verificationToken,
+    publicKey,
+    organizationId: subOrgId,
+  });
+
+  return sessionResponse.session;
+}
+```
+
+</CodeGroup>
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+The provider handles proxy calls; you no longer need to stamp server-side with the parent org key, nor manually exchange verification tokens. Client code initializes OTP and completes it with `completeOtp`.
+
+Initialize (client):
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { initOtp } = useTurnkey();
+
+const init = await initOtp({
+  otpType: "OTP_TYPE_EMAIL",
+  contact: email,
+});
+// navigate to verification page with init.otpId
+```
+
+Complete (client):
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+import { OtpType } from "@turnkey/sdk-types";
+
+const { completeOtp } = useTurnkey();
+
+await completeOtp({
+  otpId,
+  otpCode: code,
+  contact: email,
+  otpType: OtpType.Email,
+  // optional: create sub-org on first login
+  createSubOrgParams: {
+    customWallet,
+    userEmail: email,
+  },
+});
+```
+
+Key differences:
+
+- Server-stamped flows (parent org API key) are no longer required for standard OTP; the provider's proxy methods handle the secure exchange.
+- You call `proxyInitOtp` and `completeOtp` directly from the client; the SDK manages session creation and storage.
+- Optional sub-org creation can be passed via `createSubOrgParams` during completion.
+
+#### Wallet Authentication (Ethereum/Solana)
+
+**Old Approach (Manual SDK + Server Actions)**
+
+Previously, wallet authentication required:
+
+- Configuring Turnkey with a Wallet interface (e.g., `EthereumWallet`) and wrapping your app with the provider.
+- Deriving a public key from the user's external wallet (for Ethereum this involves a signMessage prompt).
+- Optionally creating a sub-organization (sign-up) on the server using the parent org API key pair.
+- Creating a read/write session via `loginWithWallet`, bound to a browser-managed IndexedDB API key.
+
+<CodeGroup>
+
+```ts config.ts
+import { EthereumWallet } from "@turnkey/wallet-stamper";
+
+export const turnkeyConfig = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+  wallet: new EthereumWallet(),
+};
+```
+
+```tsx app/TurnkeyClientProvider.tsx
+"use client";
+import { TurnkeyProvider } from "@turnkey/sdk-react";
+import { turnkeyConfig } from "./config";
+
+export function TurnkeyClientProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
+}
+```
+
+```tsx sign-in.client.tsx
+"use client";
+import { useTurnkey } from "@turnkey/sdk-react";
+import { SessionType } from "@turnkey/sdk-types";
+import { getSubOrgIdByPublicKey, createUserSubOrg } from "./actions";
+
+export default function WalletAuth() {
+  const { walletClient, indexedDbClient, turnkey } = useTurnkey();
+
+  const signIn = async () => {
+    const publicKey = await walletClient?.getPublicKey();
+    if (!publicKey) throw new Error("No public key");
+
+    await walletClient!.loginWithWallet({
+      sessionType: SessionType.READ_WRITE,
+      publicKey: apiKeyPublicKey!,
+    });
+  };
+
+  return <button onClick={signIn}>Sign In with Wallet</button>;
+}
+```
+
+```tsx sign-up.client.tsx
+"use client";
+import { useTurnkey } from "@turnkey/sdk-react";
+import { createUserSubOrg } from "./actions";
+
+export default function WalletSignUp() {
+  const { walletClient } = useTurnkey();
+
+  const signUp = async () => {
+    // 1) Derive wallet public key (for Ethereum this prompts a signMessage)
+    const publicKey = await walletClient?.getPublicKey();
+    if (!publicKey) throw new Error("No public key");
+
+    // 2) Create a sub-organization + user for first-time sign-up
+    await createUserSubOrg({
+      publicKey,
+      curveType: "API_KEY_CURVE_SECP256K1",
+      // You could also provision a default wallet here on the server
+    });
+  };
+
+  return <button onClick={signUp}>Sign Up with Wallet</button>;
+}
+```
+
+</CodeGroup>
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use the hook-based helpers to trigger wallet authentication flows. The provider abstracts provider discovery, public key derivation, and session creation/storage. A single call will prompt the external wallet for any required signatures and establish a Turnkey session.
+
+Key differences:
+
+- No manual `walletClient.getPublicKey()` or message signing to derive a public key
+- No `SessionType` or manual IndexedDB session management; the provider manages session lifecycle
+- One-liners for "Continue with Wallet" (auto sign in or sign up), or explicit Sign Up / Sign In
+- Works for Ethereum and Solana; pass `Chain.Ethereum` or `Chain.Solana` to `getWalletProviders` and choose a provider
+
+<CodeGroup>
+
+```tsx continue-with-wallet.client.tsx
+"use client";
+import { useTurnkey, Chain } from "@turnkey/react-wallet-kit";
+
+export default function ContinueWithWallet() {
+  const { getWalletProviders, loginOrSignupWithWallet } = useTurnkey();
+
+  const handleContinue = async () => {
+    const providers = await getWalletProviders(Chain.Solana); // or Chain.Ethereum
+    const provider = providers[0]; // pick the desired provider
+    await loginOrSignupWithWallet({ walletProvider: provider });
+  };
+
+  return <button onClick={handleContinue}>Continue with Wallet</button>;
+}
+```
+
+```tsx sign-up-with-wallet.client.tsx
+"use client";
+import { useTurnkey, Chain } from "@turnkey/react-wallet-kit";
+
+export default function SignUpWithWallet() {
+  const { getWalletProviders, signUpWithWallet } = useTurnkey();
+
+  const handleSignUp = async () => {
+    const providers = await getWalletProviders(Chain.Solana); // or Chain.Ethereum
+    const provider = providers[0];
+    await signUpWithWallet({ walletProvider: provider });
+  };
+
+  return <button onClick={handleSignUp}>Sign Up with Wallet</button>;
+}
+```
+
+```tsx sign-in-with-wallet.client.tsx
+"use client";
+import { useTurnkey, Chain } from "@turnkey/react-wallet-kit";
+
+export default function LoginWithWallet() {
+  const { getWalletProviders, loginWithWallet } = useTurnkey();
+
+  const handleLogin = async () => {
+    const providers = await getWalletProviders(Chain.Solana); // or Chain.Ethereum
+    const provider = providers[0];
+    await loginWithWallet({ walletProvider: provider });
+  };
+
+  return <button onClick={handleLogin}>Login with Wallet</button>;
+}
+```
+
+</CodeGroup>
+
+### Passkeys
+
+#### Add passkey
+
+Before:
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { passkeyClient, indexedDbClient, turnkey } = useTurnkey();
+const user = await turnkey?.getCurrentUser();
+const credential = await passkeyClient?.createUserPasskey({
+  publicKey: {
+    rp: { name: "Wallet Passkey" },
+    user: { name: user.username, displayName: user.username },
+  },
+});
+await indexedDbClient.createAuthenticators({
+  userId: user.userId,
+  authenticators: [
+    {
+      authenticatorName: "New Passkey",
+      challenge: credential.encodedChallenge,
+      attestation: credential.attestation,
+    },
+  ],
+});
+```
+
+After:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { handleAddPasskey, user } = useTurnkey();
+await handleAddPasskey({
+  userId: user?.userId,
+  displayName: "My device",
+});
+```
+
+#### Remove passkey
+
+Before:
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { indexedDbClient, turnkey } = useTurnkey();
+
+const user = await turnkey?.getCurrentUser();
+
+const resp = await indexedDbClient.getAuthenticators({
+  organizationId: user?.organizationId,
+  userId: user?.userId,
+});
+const authenticatorId = resp?.authenticators?.[0]?.authenticatorId;
+
+await indexedDbClient.deleteAuthenticators({
+  userId: user?.userId,
+  authenticatorIds: [authenticatorId],
+});
+```
+
+After:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { user, httpClient, handleRemovePasskey } = useTurnkey();
+
+const resp = await httpClient?.getAuthenticators({ userId: user?.userId });
+const authenticatorId = resp?.authenticators?.[0]?.authenticatorId;
+
+if (authenticatorId) {
+  await handleRemovePasskey({
+    authenticatorId,
+    userId: user?.userId,
+  });
+}
+```
+
+### Wallets
+
+#### List wallets
+
+**Old Approach (Manual SDK Calls)**
+
+Previously, wallet listing relied on manually instantiating a Turnkey client and invoking SDK methods to fetch both wallets and their accounts.
+
+```ts
+const { wallets } = await indexedDbClient.getWallets();
+const walletsWithAccounts = await Promise.all(
+  wallets.map(async (wallet) => {
+    const { accounts } = await indexedDbClient.getWalletAccounts({
+      walletId: wallet.walletId,
+    });
+    // ...merge accounts
+    return { ...wallet, accounts };
+  })
+);
+```
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+The new method utilizes the `useTurnkey` React hook, which abstracts data fetching, session management, and provides ready-to-use wallet/account lists and actions.
+
+```ts
+const {
+  wallets: hookWallets,
+  createWallet,
+  createWalletAccounts,
+  user,
+  session,
+} = useTurnkey();
+
+// Listing wallets is now as simple as using hookWallets
+const wallets = hookWallets ?? [];
+```
+
+Key differences:
+
+- No manual wallet/account fetch + merge
+- Hook provides wallets and accounts with provider-managed session
+- Simpler state consumption via `useTurnkey()`
+
+#### Creating Wallets and Accounts
+
+**Old Approach (Manual SDK Calls)**
+
+Previously, creating wallets and accounts involved calling SDK methods directly (e.g., `createWallet`, `createWalletAccounts`) and then refetching wallets to reflect changes.
+Additionally, when creating a new Ethereum account you would often compute the next default account at a specific index via a helper (e.g., `defaultEthereumAccountAtIndex(index)`) and pass that into `createWalletAccounts`.
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { indexedDbClient } = useTurnkey();
+
+// Create a new wallet with one Ethereum account
+const { walletId } = await indexedDbClient.createWallet({
+  walletName: "Demo Wallet",
+  accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+});
+
+// Compute a default Ethereum account at the next index to maintain derivation path ordering
+const newAccount = defaultEthereumAccountAtIndex(
+  state.selectedWallet.accounts.length + 1
+);
+
+// Add a new Ethereum account to the created wallet
+const newAccountAddress = await indexedDbClient.createWalletAccounts({
+  walletId,
+  accounts: [newAccount],
+});
+
+// Refresh/read wallets to update local state
+const { wallets } = await indexedDbClient.getWallets();
+```
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use `useTurnkey()` helpers `createWallet` and `createWalletAccounts`.
+The provider manages session and state and refreshing wallets; you only invoke the actions.
+
+```tsx
+import React from "react";
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+export function WalletActions() {
+  const { createWallet, createWalletAccounts, wallets } = useTurnkey();
+
+  const handleCreateWallet = async () => {
+    const walletId = await createWallet({
+      walletName: "Demo Wallet",
+      accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+    });
+
+    console.log("Created wallet:", walletId);
+  };
+
+  const handleCreateAccount = async () => {
+    if (!wallets?.length) return;
+    const walletId = wallets[0].walletId;
+    const newAccountAddress = await createWalletAccounts({
+      walletId,
+      accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+    });
+
+    console.log("Created account:", newAccountAddress);
+  };
+
+  return (
+    <div>
+      <button onClick={handleCreateWallet}>Create Wallet</button>
+      <button onClick={handleCreateAccount}>Create Wallet Account</button>
+    </div>
+  );
+}
+```
+
+#### Export
+
+**Old Approach (Manual SDK + iframe)**
+
+Previously, exporting required manually initializing an export iframe and orchestrating export API calls and decryption within the iframe.
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { turnkey, indexedDbClient } = useTurnkey();
+
+// 1) Create export iframe client
+const iframeClient = await turnkey?.iframeClient({
+  iframeContainer: document.getElementById(
+    "turnkey-export-iframe-container-id"
+  )!,
+  iframeUrl: "https://export.turnkey.com",
+});
+
+// 2a) Export a wallet (seed phrase)
+const walletExport = await indexedDbClient?.exportWallet({
+  walletId: selectedWallet.walletId,
+  targetPublicKey: iframeClient?.iframePublicKey,
+});
+const session = await turnkey?.getSession();
+await iframeClient?.injectWalletExportBundle(
+  walletExport!.exportBundle,
+  session?.organizationId
+);
+
+// 2b) Export a private key (by account address)
+const keyExport = await indexedDbClient?.exportWalletAccount({
+  address: selectedAccount.address,
+  targetPublicKey: iframeClient?.iframePublicKey,
+});
+await iframeClient?.injectKeyExportBundle(
+  keyExport!.exportBundle,
+  session?.organizationId
+);
+```
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+Use the built-in export handlers that open a modal and perform the export/iframe flow for you.
+
+```tsx
+const {
+  handleExportWallet,
+  handleExportPrivateKey,
+  handleExportWalletAccount,
+} = useTurnkey();
+
+await handleExportWallet({ walletId: "..." });
+// await handleExportPrivateKey({ privateKeyId: "...", keyFormat: KeyFormat.Hexadecimal });
+// await handleExportWalletAccount({ address: "0x...", keyFormat: KeyFormat.Hexadecimal });
+```
+
+Key differences:
+
+- Modal handlers replace manual iframe client orchestration
+- No direct bundle injection/extraction steps
+- Provider/session context handled automatically
+
+#### Import
+
+**Old Approach (Manual SDK + iframe)**
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { turnkey, indexedDbClient } = useTurnkey();
+
+// 1) Create import iframe client
+const iframeClient = await turnkey?.iframeClient({
+  iframeContainer: document.getElementById(
+    "turnkey-import-iframe-container-id"
+  )!,
+  iframeUrl: "https://import.turnkey.com",
+});
+
+// 2) Initialize import (wallet or private key) and inject bundle into iframe
+const session = await turnkey?.getSession();
+
+// Wallet
+const initWallet = await indexedDbClient?.initImportWallet({
+  userId: session?.userId,
+});
+await iframeClient?.injectImportBundle(
+  initWallet!.importBundle,
+  session?.organizationId,
+  session?.userId
+);
+
+// or Private Key
+const initKey = await indexedDbClient?.initImportPrivateKey({
+  userId: session?.userId,
+});
+await iframeClient?.injectImportBundle(
+  initKey!.importBundle,
+  session?.organizationId,
+  session?.userId
+);
+
+// 3) Extract encrypted bundle from iframe and submit import
+// Wallet
+const encryptedWalletBundle =
+  await iframeClient?.extractWalletEncryptedBundle();
+await indexedDbClient?.importWallet({
+  userId: session?.userId,
+  walletName: "Imported Wallet",
+  encryptedBundle: encryptedWalletBundle!,
+  accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+});
+
+// Private Key
+const encryptedKeyBundle = await iframeClient?.extractKeyEncryptedBundle();
+await indexedDbClient?.importPrivateKey({
+  userId: session?.userId,
+  privateKeyName: "Imported Key",
+  encryptedBundle: encryptedKeyBundle!,
+  curve: "CURVE_SECP256K1",
+  addressFormats: ["ADDRESS_FORMAT_ETHEREUM"],
+});
+```
+
+**New Approach (Hook-Based: `useTurnkey()`)**
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { handleImportWallet, handleImportPrivateKey } = useTurnkey();
+
+// Import a wallet (optionally pre-fill default accounts)
+await handleImportWallet({
+  // defaultWalletAccounts: ["ADDRESS_FORMAT_ETHEREUM"],
+  // successPageDuration: 2000,
+});
+
+// Import a private key (must pass curve and address formats)
+await handleImportPrivateKey({
+  curve: "CURVE_SECP256K1",
+  addressFormats: ["ADDRESS_FORMAT_ETHEREUM"],
+  // successPageDuration: 2000,
+});
+```
+
+### Signing
+
+#### Transactions
+
+**Old Approach**
+
+Previously, transactions were signed using `ethers` with `TurnkeySigner` from `@turnkey/ethers`, wired to the `@turnkey/sdk-react` client.
+You manually constructed the signer/provider and invoked `sendTransaction`.
+
+```ts
+import { ethers } from "ethers";
+import { TurnkeySigner } from "@turnkey/ethers";
+import { useTurnkey } from "@turnkey/sdk-react";
+
+const { turnkey, indexedDbClient } = useTurnkey();
+
+const provider = new ethers.JsonRpcProvider(<rpcUrl>);
+const currentUser = await turnkey.getCurrentUser();
+const signer = new TurnkeySigner({
+  client: indexedDbClient,
+  organizationId: currentUser.organization.organizationId,
+  signWith: "0xYourWalletAddress",
+}).connect(provider);
+
+const tx = {
+  to: "0x0000000000000000000000000000000000000000",
+  value: ethers.parseEther("0.001"),
+  type: 2,
+};
+
+await signer.sendTransaction(tx);
+```
+
+**New Approach**
+
+Use `useTurnkey()`'s signing helpers:
+
+- `signTransaction`: signs and returns a signature (you broadcast separately).
+- `signAndSendTransaction`: signs and broadcasts, returning the on-chain transaction hash.
+
+The provider handles session state and request stamping; you pass a wallet account and an unsigned transaction.
+For more details, see: [Signing transactions](/sdks/react/signing#signing-transactions).
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+import { parseEther, Transaction } from "ethers";
+
+function SignTransactionButton() {
+  const { signAndSendTransaction, signTransaction, wallets } = useTurnkey();
+
+  const doSignTransaction = async () => {
+    const walletAccount = wallets[0]?.accounts[0];
+    if (!walletAccount) return;
+
+    const tx = {
+      to: "0x0000000000000000000000000000000000000000",
+      value: parseEther("0.001"),
+      nonce: 0,
+      gasLimit: BigInt(21000),
+      maxFeePerGas: BigInt(1e9),
+      maxPriorityFeePerGas: BigInt(1e9),
+      chainId: 1,
+    };
+
+    const unsignedTransaction = Transaction.from(tx).unsignedSerialized;
+
+    // sign the transaction
+    const signature = await signTransaction({
+      walletAccount,
+      unsignedTransaction,
+      transactionType: "TRANSACTION_TYPE_ETHEREUM",
+    });
+
+    console.log("Transaction signed:", signature);
+
+    // OR sign and send the transaction (requires rpcUrl for embedded wallets)
+    const hash = await signAndSendTransaction({
+      walletAccount,
+      unsignedTransaction,
+      transactionType: "TRANSACTION_TYPE_ETHEREUM",
+      rpcUrl: "https://mainnet.infura.io/v3/YOUR_KEY",
+    });
+  };
+
+  return <button onClick={doSignTransaction}>Sign Transaction</button>;
+}
+```
+
+Note: `rpcUrl` is required when using embedded wallets (to broadcast via your chosen RPC).
+For external wallets (e.g., MetaMask, Phantom), `rpcUrl` is not required and will be ignored.
+
+Key differences:
+
+- No `TurnkeySigner` or manual provider wiring
+- Pass an unsigned transaction and account; SDK stamps and sends
+- Session/state handled by the provider
+
+#### Messages
+
+**Old Approach**
+
+Messages were signed via `ethers` using `TurnkeySigner` from `@turnkey/ethers`, with manual signer/provider wiring against the `@turnkey/sdk-react` client.
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react";
+import { TurnkeySigner } from "@turnkey/ethers";
+import { ethers } from "ethers";
+
+const { turnkey, indexedDbClient } = useTurnkey();
+
+const provider = new ethers.JsonRpcProvider(<rpcUrl>);
+const currentUser = await turnkey.getCurrentUser();
+const signer = new TurnkeySigner({
+  client: indexedDbClient,
+  organizationId: currentUser.organization.organizationId,
+  signWith: "0xYourWalletAddress",
+}).connect(provider);
+
+const signature = await signer.signMessage("Hello Turnkey");
+```
+
+**New Approach**
+
+Use `useTurnkey()`'s `signMessage` to sign directly with a selected wallet account. For a modal-driven UX, `handleSignMessage` opens a confirmation dialog.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function SignMessageButton() {
+  const { signMessage, wallets } = useTurnkey();
+
+  const doSignMessage = async () => {
+    const walletAccount = wallets[0]?.accounts[0];
+    if (!walletAccount) return;
+
+    const signature = await signMessage({
+      walletAccount,
+      message: "Hello, Turnkey!",
+    });
+    console.log("Message signed:", signature);
+  };
+
+  return <button onClick={doSignMessage}>Sign Message</button>;
+}
+```
+
+See Signing messages for more details: [Signing messages](/sdks/react/signing#signing-messages).
