@@ -70,6 +70,8 @@ export function parseApiEndpoints(
           path,
           method: method as HttpMethod,
           description: operation.description || "",
+           // <-- New line to capture operationId from the OpenAPI spec
+          operationId: operation.operationId || "",
           type: endpointType,
         };
 

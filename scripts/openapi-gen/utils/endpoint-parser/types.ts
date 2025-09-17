@@ -175,6 +175,10 @@ export interface ApiEndpoint {
    */
   requestBody?: ApiRequestBody;
 
+    /**
+   * Operation ID from the OpenAPI spec (used for SDK method naming)
+   */
+  operationId?: string;   // <-- Added
   /**
    * Possible responses this endpoint can return.
    */

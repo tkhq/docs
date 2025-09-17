@@ -354,6 +354,13 @@ function generateJsonPayloadRecursive(
 
 // --- Helper: Map endpoint path to SDK method name ---
 function getSdkMethodName(endpoint: ApiEndpoint): string {
+
+  // Prefer operationId if present
+  if (endpoint.operationId && endpoint.operationId.trim() !== "") {
+    const op = endpoint.operationId.trim();
+    // Lowercase only the very first character, keep the rest unchanged
+    return op.slice(0, 1).toLowerCase() + op.slice(1);
+  }
   const path = endpoint.path || "";
   
   // Extract the last part of the path (e.g., "approve_activity" from "/public/v1/submit/approve_activity")
