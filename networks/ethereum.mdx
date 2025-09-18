@@ -20,7 +20,7 @@ Turnkey has built an EVM parser which runs in a secure enclave, to parse unsigne
 
 As a bonus, Turnkey also takes care of combining the signature with the original payload if you use the `SIGN_TRANSACTION` activity types: the input is the unsigned payload (RLP encoded), and the output is the signed RLP encoded transaction, ready to be broadcast\!
 
-Additionally, Turnkey supports signing operations over EIP-712 Typed Data payloads, with an accompanying `eth.eip_712` namespace in our policy engine that can be used for gatekeeping.  Additional details can be found [here](https://docs.turnkey.com/networks/ethereum#eip-712).
+Additionally, Turnkey supports signing operations over EIP-712 Typed Data payloads, with an accompanying `eth.eip_712` namespace in our policy engine that can be used for gatekeeping. Additional details can be found [here](https://docs.turnkey.com/networks/ethereum#eip-712).
 
 ### Ethereum ABIs
 
@@ -69,20 +69,124 @@ Type 4 transaction support is also live for our policy engine. Details about our
 
 ### EIP-712
 
-You can use Turnkey's `SignRawPayload` endpoint to sign payloads encoded as EIP-712 Typed Data, while also writing Policy Conditions which directly reference the attributes of this Typed Data.
+At a high level, you can sign EIP-712 payloads using Turnkey in a few ways.
 
-This can be used to support integrations involving Hyperliquid, ERC-2612 Permits, or ERC-3009 Transfers, among many others.
+#### Raw digest
+
+You can pre-compute the hash of the EIP-712 payload body, and sign it directly using Turnkey. Here's an example in JavaScript pseudocode:
+
+```javascript
+const typedData = {
+    domain: {
+        name: "Ether Mail",
+        version: "1",
+        chainId: 1,
+        verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+    },
+    types: {
+        Person: [
+        { name: "name", type: "string" },
+        { name: "wallet", type: "address" },
+        ],
+        Mail: [
+        { name: "from", type: "Person" },
+        { name: "to", type: "Person" },
+        { name: "contents", type: "string" },
+        ],
+    },
+    primaryType: "Mail",
+    message: {
+        from: {
+        name: "Cow",
+        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
+        },
+        to: {
+        name: "Bob",
+        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+        },
+        contents: "Hello, Bob!",
+    },
+}
+
+// This simply hashes the typed data using keccak256, ultimately producing a signable digest
+const hashedPayload = hashTypedData(typedData);
+
+const { activity, r, s, v } = await turnkeyClient.signRawPayload({
+    organizationId: "<your org ID>",
+    signWith: "<your signing address">,
+    payload: hashedPayload,
+    encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+    hashFunction: "HASH_FUNCTION_NO_OP",
+});
+```
+
+The caveat with this approach is that Turnkey will receive a raw digest and only that; therefore, you cannot write policies enforcing rules against the fields of the EIP-712 payload body.
+
+#### Encoded
+
+If you _do_ want to write policies enforcing rules against the fields of the EIP-712 payload body, you will need to pass over the payload serialized (not hashed!), with the `payloadEncoding` type as `"PAYLOAD_ENCODING_EIP712"`. This way, you can write Policy Conditions which directly reference the attributes of this Typed Data. This can be used to support integrations involving Hyperliquid, ERC-2612 Permits, or ERC-3009 Transfers, among many others.
+
+Here's the same example, but with slight modifications in order to allow policies targeting attributes of the Typed Data:
+
+```javascript
+const typedData = {
+    domain: {
+        name: "Ether Mail",
+        version: "1",
+        chainId: 1,
+        verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+    },
+    types: {
+        Person: [
+        { name: "name", type: "string" },
+        { name: "wallet", type: "address" },
+        ],
+        Mail: [
+        { name: "from", type: "Person" },
+        { name: "to", type: "Person" },
+        { name: "contents", type: "string" },
+        ],
+    },
+    primaryType: "Mail",
+    message: {
+        from: {
+        name: "Cow",
+        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
+        },
+        to: {
+        name: "Bob",
+        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+        },
+        contents: "Hello, Bob!",
+    },
+}
+
+// This gets the typed data into a format to send over to Turnkey; note that this is *not* equivalent to generating a hash of the typed data
+const serializedPayload = serializeTypedData(typedData);
+
+const { activity, r, s, v } = await turnkeyClient.signRawPayload({
+    organizationId: "<your org ID>",
+    signWith: "<your signing address">,
+    payload: serializedPayload,
+    encoding: "PAYLOAD_ENCODING_EIP712", // this is crucial!
+    hashFunction: "HASH_FUNCTION_NO_OP",
+});
+```
+
+This is ultimately how our Viem and Ethers implementations pass Typed Data over to Turnkey for signing.
+
+#### Examples
 
 SDK examples demonstrating the signing side of the above-mentioned integrations can be found below:
 
 - Using `ethers`:
-    - [hyperliquid](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/src/eip712/hyperliquid.ts)
-    - [erc-2612](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/src/eip712/erc2612_permit.ts)
-    - [erc-3009](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/src/eip712/erc3009_transfer.ts)
+  - [hyperliquid](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/src/eip712/hyperliquid.ts)
+  - [erc-2612](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/src/eip712/erc2612_permit.ts)
+  - [erc-3009](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/src/eip712/erc3009_transfer.ts)
 - Using `viem`:
-    - [hyperliquid](https://github.com/tkhq/sdk/tree/main/examples/with-viem/src/eip712/hyperliquid.ts)
-    - [erc-2612](https://github.com/tkhq/sdk/tree/main/examples/with-viem/src/eip712/erc2612_permit.ts)
-    - [erc-3009](https://github.com/tkhq/sdk/tree/main/examples/with-viem/src/eip712/erc3009_transfer.ts)
+  - [hyperliquid](https://github.com/tkhq/sdk/tree/main/examples/with-viem/src/eip712/hyperliquid.ts)
+  - [erc-2612](https://github.com/tkhq/sdk/tree/main/examples/with-viem/src/eip712/erc2612_permit.ts)
+  - [erc-3009](https://github.com/tkhq/sdk/tree/main/examples/with-viem/src/eip712/erc3009_transfer.ts)
 
 You can also find examples of EIP-712-aware Policies associated with these integrations on [our policy examples page](https://docs.turnkey.com/concepts/policies/examples#allow-signing-for-hyperliquid-approveagent-eip-712-payloads).
 
