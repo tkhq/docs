@@ -178,7 +178,7 @@ export interface ApiEndpoint {
     /**
    * Operation ID from the OpenAPI spec (used for SDK method naming)
    */
-  operationId?: string;   // <-- Added
+  operationId?: string;
   /**
    * Possible responses this endpoint can return.
    */
