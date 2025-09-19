@@ -41,7 +41,7 @@ sync-sdk-gen-docs:
 
 	cp docs.json $(JS_SDK_ROOT)/generated-docs
 
-	@mkdir -p ./generated-docs/formatted
+	@mkdir -p ./generated-docs
 
 	@echo Generating docs and formatting output into mdx...
 	(cd $(JS_SDK_ROOT) && pnpm run generate-docs)
@@ -56,9 +56,12 @@ sync-sdk-gen-docs:
 	@echo Copying synced docs.json to root...
 	cp $(JS_SDK_ROOT)/generated-docs/docs.json docs.json
 
-	@echo Copying formatted docs to ./generated-docs/formatted...
-	cp -R $(JS_SDK_ROOT)/generated-docs/formatted/react-wallet-kit ./generated-docs/formatted
-	cp -R $(JS_SDK_ROOT)/generated-docs/formatted/core ./generated-docs/formatted
+	@echo Copying formatted docs to ./generated-docs...
+	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs
+	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs
 
 	@echo Deleting temporary files...
-	rm -rf $(JS_SDK_ROOT)/generated-docs/sdks.json
+	find $(JS_SDK_ROOT)/generated-docs -mindepth 1 \
+		! -name 'docs.json' \
+		! -name 'sdk-docs.json' \
+		-exec rm -rf {} +
