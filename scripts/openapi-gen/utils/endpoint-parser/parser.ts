@@ -70,6 +70,7 @@ export function parseApiEndpoints(
           path,
           method: method as HttpMethod,
           description: operation.description || "",
+          operationId: operation.operationId || "",
           type: endpointType,
         };
 
