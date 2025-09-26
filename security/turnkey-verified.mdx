@@ -12,23 +12,31 @@ For the first time we're exposing proofs produced by our TEEs to the outside wor
 * **Boot Proof**: a proof that a particular AWS Nitro Enclave has booted with a particular configuration. A boot proof contains:
   * An AWS attestation document, which contains AWS-level information: [PCR measurements](https://docs.aws.amazon.com/enclaves/latest/user/set-up-attestation.html#where), certificate chain, public key, and user data.
   * A signed [QOS manifest](https://github.com/tkhq/qos/blob/f773bb8fbe0b84c93c585f1ab10882fb570d8005/src/qos_core/src/protocol/services/boot.rs#L310-L327) which contains information about the application running in this particular enclave: binary hash and arguments, operator public keys, quorum public key, and more.
-* **App Proofs**: a signature produced by an enclave Ephemeral Key (more on this below) to prove application-specific facts about functionality
+* **App Proofs**: a signature produced by an enclave Ephemeral Key (more on this below) to prove application-specific facts about functionality.
 
 ### Use-cases
 
-Boot proofs are application-agnostic. They are here to prove 2 things:
-* **Prove that a particular machine is a legitimate AWS Nitro Enclave**. This is done by verifying the signature of the attestation and the associated certificate bundle: it contains a chain of certificates going up to the root certificate for the commercial AWS partitions (can be downloaded from https://aws-nitro-enclaves.amazonaws.com/AWS_NitroEnclaves_Root-G1.zip).
-* **Prove that a particular machine is running within Turnkey's AWS account**. This can be verified by looking at the `PCR3` measurement inside of the AWS attestation document. It should be `b798abfdbd591d5e1b7db6485a6de9e65100f5796d9e3a2bd7c179989cd663338b567162974974fbcc45d03847e70d8b` (this is the sha384 digest of the parent instance role: `arn:aws:iam::705331783682:role/talos-worker` -- yes, Turnkey uses a [Talos](https://www.talos.dev/)-based Kubernetes cluster to deploy software)
-* **Prove that a particular machine runs the correct, expected software**. This can be verified in a couple of steps:
+Boot proofs are application-agnostic. They prove 3 claims:
+* **A particular machine is a legitimate AWS Nitro Enclave**. This can be verified by checking the signature of the attestation and the associated certificate bundle: it contains a chain of certificates going up to the root certificate for the commercial AWS partitions (can be downloaded from https://aws-nitro-enclaves.amazonaws.com/AWS_NitroEnclaves_Root-G1.zip).
+* **A particular machine is running within Turnkey's AWS account**. This can be verified by looking at the `PCR3` measurement inside of the AWS attestation document. It should be `b798abfdbd591d5e1b7db6485a6de9e65100f5796d9e3a2bd7c179989cd663338b567162974974fbcc45d03847e70d8b` (this is the sha384 digest of the parent instance role: `arn:aws:iam::705331783682:role/talos-worker` -- yes, Turnkey uses a [Talos](https://www.talos.dev/)-based Kubernetes cluster to deploy software)
+* **A particular machine runs the correct, expected software**. This can be verified in a couple of steps:
   * Verify that PCR0, PCR1, and PCR2 values are correct and match a known QOS version (you can [reproduce these hashes yourself](https://github.com/tkhq/qos?tab=readme-ov-file#reproducing-builds) or look at our tkhq/core-enclaves repository for known good values)
   * Verify that the AWS attestation document's "user_data" is the digest of the QOS manifest
   * Parse the QOS manifest and inspect the application configuration to find the binary digest (and reference this digest against known good digests published in our tkhq/core-enclaves repository)
 
-App proofs are application-specific. Once an enclave boots, it creates a unique Ephemeral Key which never leaves the enclave. As a result, data signed by an Ephemeral key proves that it was signed in a particular machine. App proofs and Boot Proofs are linked together by the "public_key" field of the AWS attestation document. Verifying an app proof involves 2 steps:
+Upon boot, enclaves create a unique **Ephemeral Key** which never leaves the enclave. As a result, data signed by an Ephemeral key proves that it was signed by a particular machine.
+
+App Proofs are simply Ephemeral-Key-signed messages.
+
+App proofs and Boot Proofs are linked together by the "public key" field of the AWS attestation document. An App Proof is a signed message, and a Boot Proof attests to the fact that the public key signing the message is indeed the Ephemeral Key of a particular enclave, provisioned with a very specific configuration, operating system, and application.
+
+Verifying an app proof thus involves 2 steps:
 * Verify the app proof signature field against the public key field
 * Verify that the public key (which signed the app proof) is the public key in the boot proof.
 
-We envision applications need to prove many different types of facts about processed inputs, or about outputs, or both. For this reason we're standardizing app proof content to be strictly typed: each app proof has a well-defined type, and a well-defined schema. App proofs are JSON payloads, serialized and signed by enclave Ephemeral Keys.
+We envision applications need to prove many different types of facts about processed inputs, or about their outputs, or both. For this reason we're standardizing app proof content (the "message" that is signed by Ephemeral Keys) to be strictly typed: each app proof must have a well-defined type ("proof type"), and a well-defined schema for any data associated with that proof.
+
+To summarize: App proofs contain JSON payloads, serialized and signed by enclave Ephemeral Keys.
 
 The use-case we're starting with is **address derivation**. Here's a dummy App Proof payload:
 ```json
@@ -53,6 +61,6 @@ By combining App Proof and Boot Proof verification, Turnkey Verified guarantees 
 
 ### Verifying proofs
 
-We have written open-source code in our Rust and Typescript SDK to verify app proofs and boot proofs. This logic powers the "Verified" UI component you'll see when new address are derived on our Embedded Wallet Kit or through Turnkey's dashboard.
+We have written open-source code in our [Rust SDK](https://github.com/tkhq/rust-sdk/tree/main/proofs) and [Typescript SDK](https://github.com/tkhq/sdk/tree/main/packages/crypto/src) to verify app proofs and boot proofs. This logic powers the "Verified" UI component you'll see when new address are derived on our Embedded Wallet Kit or through Turnkey's dashboard.
 
 Feel free to inspect this code and run it locally on your own hardware, and reach out if you run into bugs or if you have further questions!
