@@ -1,0 +1,63 @@
+---
+title: "Migrating Wallets to Turnkey"
+description: "If you're coming to Turnkey from a different provider, we can help make it simple. Follow the custodial or non-custodial flows outlined below depending on your use case, and be sure to check the linked resources for some fully featured utilities. "
+sidebarTitle: "Migrating to Turnkey"
+---
+
+**The pattern for migrating a wallet to Turnkey is straightforward**: we want to export the wallet from the existing provider, and securely import it to Turnkey.
+
+No matter which approach, it is recommended to create a [sub-organization](/concepts/sub-organizations) for each user. Each suborg can have its own set of wallets, authenticators, and policies that govern access. These ["delegated access"](/concepts/policies/delegated-access) flows are key to enabling powerful and secure use, whose configuration is an important part of the migration to Turnkey.
+For further guidance continue in our docs, and don't hesitate to reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
+
+Additionally, familiarize yourself with Turnkey's [resource](/concepts/resource-limits) and [rate limits](/faq#limits). Ensure that finite suborg resources (like authenticators & private keys) and RPS limits are compatible with your migration approach.
+
+### Asset Availability
+
+In most circumstances user assets remain exactly as they were on-chain, belonging to the same key/address. However, if a provider does not meaningfully support export, you may have to instead create a new wallet in Turnkey and transfer assets to it.
+
+
+## Non-custodial wallets
+
+Migrating a non-custodial (user-owned) wallet to Turnkey follows the pattern described earlier. Within your application, we want to invoke the outgoing provider's user facing export method, and prompt the user to copy over the key or seed to Turnkey's importer iframe.
+
+This can be done **"just in time,"** creating the Turnkey user information (like suborg) on the spot when importing. This can also be done in a **batch** ahead of time, which might be preferable for larger migrations.
+
+### Export from existing provider
+
+This export typically takes the form of an export modal which displays the private key or seed phrase in plaintext to the user. The specifics depend on your provider, but popular choices typically have methods designed for the user to copy their key/seed to clipboard.
+* [Privy - `exportWallet`](https://docs.privy.io/wallets/wallets/export#react) (React)
+* [Dynamic - `exportPrivateKey`](https://www.dynamic.xyz/docs/global-wallets/export) (React)
+* [Fireblocks - `full key takeover`](https://ncw-developers.fireblocks.com/docs/full-key-takeover)
+* Other - some services like Para or web3auth lack embeddable key export functionality and may require users to export keys using the service dashboard
+
+### Import to Turnkey
+
+Setting up the import modal is easy. We maintain an embedded iframe element on `import.turnkey.com`, which ensures the mnemonics and keys travel securely directly to and from Turnkey's infrastructure (instead of through yours). This frame should appear after the user has copied (exported) their key/seed in the first step, and will guide them through importing it to Turnkey.
+
+We've created a package designed to help you insert this iframe and interact with it: `@turnkey/iframe-stamper`\
+This is covered completely in the [Import - Embedded iframe](/embedded-wallets/code-examples/import#embedded-iframe) docs section.
+Additional information on key transport is covered in our [Enclave to end-user secure channels](/security/enclave-secure-channels#import-flow) page.
+
+## Custodial wallets
+
+If instead you manage your users' wallets, the export/import pattern will be similar, but typically take the shape of a back-end service you control.
+
+### Export from existing provider
+
+The specifics will depend on the provider, but popular choices typically offer multiple programmatic wallet export options.
+The mnemonic key, or the private key + its format is all that is required to create a wallet bundle and import the account.
+* Privy: [Node](https://docs.privy.io/wallets/wallets/export#nodejs) and [API](https://docs.privy.io/wallets/wallets/export#rest-api)
+* Dfns: [API](https://docs.dfns.co/d/api-docs/keys/advanced-keys-apis/export-key)
+* Other - Database (e.g. Firebase): accessing private keys on a db instance may require special permission, but tend to be simple and efficient to fetch in large numbers
+* Other - Hosted platform: some services may require user auth on key export, check available documentation
+
+
+It is preferable for this migration script to not directly write/save these exported keys to the local filesystem, and instead directly pass them to the below import methods as keys are retrieved.
+
+### Import to Turnkey
+
+There are two options for importing wallets to Turnkey programmatically:
+* [Node](/embedded-wallets/code-examples/import#nodejs) (`@turnkey/sdk-server`) 
+* [Turnkey CLI ](/embedded-wallets/code-examples/import#cli)(`tkcli`)
+
+Please visit these linked resources for implementation-specific guides and code samples. 
