@@ -41,30 +41,32 @@ To sign with Schnorr, pass a taproot (P2TR) address inside of your activity's `s
 
 ##  Policy-Enabled Bitcoin Transaction Signing
 
-Turnkey has built a Bitcoin transaction parser which runs in a secure enclave, to enable bitcoin based policies in the policy engine. 
+Turnkey has built a Bitcoin transaction parser which runs in a secure enclave, to enable Bitcoin-based policies in the policy engine. 
 
-To enable more policy engine use cases, and facilitate transaction construction completely, policy-enabled bitcoin transactions requires passing a hex serialized representation of a Partially Signed Bitcoin Transaction (PSBT) to our `SIGN_TRANSACTION` endpoint using the transaction type `TRANSACTION_TYPE_BITCOIN`. 
+To enable more policy engine use cases, and facilitate transaction construction completely, policy-enabled Bitcoin transactions requires passing a hex serialized representation of a Partially Signed Bitcoin Transaction (PSBT) to our `SIGN_TRANSACTION` endpoint using the transaction type `TRANSACTION_TYPE_BITCOIN`. 
 
-### What are PSBT’s and why do we use them
+### What are PSBTs and why do we use them
 
-Partially signed bitcoin transaction or PSBT is a data format for passing around bitcoin transactions to signing services. The PSBT format contains raw unsigned transaction data, along with extra “context” data required to get the transaction signed. Most modern wallets support and use PSBT’s for transaction signing. 
+Partially Signed Bitcoin Transaction or PSBT is a data format for passing around Bitcoin transactions to signing services. The PSBT format contains raw unsigned transaction data, along with extra “context” data required to get the transaction signed. Most modern wallets support and use PSBTs for transaction signing. 
 
-For Turnkey’s policy-enabled bitcoin transaction signing flow, PSBT’s provide the context needed for the policy engine to make decisions based on transaction content, to generate the actual payloads that need to be signed (sighashes) and to reinsert those sighashes in the correct place. 
+For Turnkey’s policy-enabled Bitcoin transaction signing flow, PSBTs provide the context needed for the policy engine to make decisions based on transaction content, to generate the actual payloads that need to be signed (sighashes), and to reinsert those signed sighashes in the correct place. 
 
-For more information on PSBT’s look here: https://learnmeabitcoin.com/technical/transaction/psbt/
+For more information on PSBTs look here: https://learnmeabitcoin.com/technical/transaction/psbt/
 
 ### How to use Turnkey’s Policy-Enabled Bitcoin Transaction signing flow 
 
 The transaction signing flow works as follows: 
-* Client creates bitcoin policies for enabling or restriction transaction signing using the `bitcoin.tx` namespace. For reference look at the Policy Launguage documentation [language section](/concepts/policies/language#bitcoin) or the [Bitcoin policy examples](/concepts/policies/examples#bitcoin) documentation
-* Client constructs a PSBT (using a library like bitcoinjs-lib[https://github.com/bitcoinjs/bitcoinjs-lib]) representing the transaction they need signed, hex serializes it and passes in the string of the hex representation of the PSBT into Turnkey’s Sign Transaction Endpoint with type: TRANSACTION_TYPE_BITCOIN
+* Client creates Bitcoin policies for enabling or restriction transaction signing using the `bitcoin.tx` namespace. For reference look at the Policy Launguage documentation [language section](/concepts/policies/language#bitcoin) or the [Bitcoin policy examples](/concepts/policies/examples#bitcoin) documentation
+* Client constructs a PSBT (using a library like bitcoinjs-lib[https://github.com/bitcoinjs/bitcoinjs-lib]) representing the transaction they need signed, hex serializes it and passes in the string of the hex representation of the PSBT into Turnkey’s Sign Transaction endpoint with type: `TRANSACTION_TYPE_BITCOIN`
 * The `SIGN TRANSACTION` endpoint constructs the sighashes ONLY for inputs which are to be signed by the signing resource which was specified in the `SIGN TRANSACTION` request, and based on policy evaluation, signs these sighashes and reinserts them into the correct corresponding inputs in the PSBT. For more details on how reinsertion works across each address derivation type, look below. 
-* Client receives hex representation of PSBT with reinserted signatures, continues signing process for other inputs if needed, finalizes inputs and broadcasts. 
+* Client receives hex representation of PSBT with reinserted signatures, continues signing process for other inputs if needed, finalizes inputs, and broadcasts. 
 
 
 ### Technical Specifics on Turnkey's Bitcoin Transaction Signing Support
 
 Turnkey supports policy-enabled transaction signing for inputs on the following address derivation types: P2PKH, P2SH, P2WPKH, P2WSH and P2TR. Notably, we do not support reinsertion according to wrapped types like P2SH-P2WPKH and P2SH-P2WSH.
+
+Note: for use-cases involving signing wrapped inputs like P2SH-P2WPKH or P2SH-P2WSH you can use the `SIGN_RAW_PAYLOAD` endpoint to sign pre-generated sighashes, and use a library like using a library like bitcoinjs-lib[https://github.com/bitcoinjs/bitcoinjs-lib] to handle reinsertion as per your use-case.
 
 For specific technical context on how Turnkey does reinsertion across address types: 
 
@@ -72,17 +74,17 @@ For specific technical context on how Turnkey does reinsertion across address ty
 
 For Legacy and Segwit Bitcoin address derivation types, for each input corresponding to the Turnkey signing resource specified in the `SIGN TRANSACTION` call, Turnkey constructs the DER encoded signature of the sighash and reinserts it into the Partial Signatures field of each relevant input in the PSBT, corresponding to the public key of the signing resource. 
 
-NOTE: For constructing and reinserting sighashes for Legacy and Segwith Bitcoin address derivation types, by default, we use the sighash type SIGHASH_ALL as is the convention for these types. 
+NOTE: For constructing and reinserting sighashes for Legacy and Segwith Bitcoin address derivation types, by default, we use the sighash type `SIGHASH_ALL` as is the convention for these types. 
 
-Context on Sighash types, conventions, and how it affects signing can be found on learn me a bitcoin’s signature page: https://learnmeabitcoin.com/technical/keys/signature/
+Context on Sighash types, conventions, and how it affects signing can be found on Learn Me a Bitcoin’s signature page: https://learnmeabitcoin.com/technical/keys/signature/
 
 #### P2TR
 
-Turnkey supports transaction reinsertion bitcoin transactions with P2TR inputs for Key Path signing ONLY. At the moment we do not support reinsertion for Taproot script path signing. For Taproot Key Path signing, for each input corresponding to the Turnkey signing resource specified in the `SIGN TRANSACTION` call, Turnkey constructs the schnorr signature of the sighash and reinserts it into the Taproot Key Spend Signature field of each relevant input in the PSBT.
+Turnkey supports transaction reinsertion Bitcoin transactions with P2TR inputs for Key Path signing ONLY. At the moment we do not support reinsertion for Taproot script path signing. For Taproot Key Path signing, for each input corresponding to the Turnkey signing resource specified in the `SIGN TRANSACTION` call, Turnkey constructs the schnorr signature of the sighash and reinserts it into the Taproot Key Spend Signature field of each relevant input in the PSBT.
 
-NOTE: For constructing and reinserting sighashes for Taproot Bitcoin address derivation types, by default, we use the sighash type SIGHASH_DEFAULT type as is the convention.
+NOTE: For constructing and reinserting sighashes for Taproot Bitcoin address derivation types, by default, we use the sighash type `SIGHASH_DEFAULT` type as is the convention.
 
-Context on signing, and sighash conventions for Taproot can be found on learn me a bitcoin’s Taproot page: https://learnmeabitcoin.com/technical/upgrades/taproot/
+Context on signing, and sighash conventions for Taproot can be found on Learn Me a Bitcoin’s Taproot page: https://learnmeabitcoin.com/technical/upgrades/taproot/
 
 
 ## SDK example
@@ -90,6 +92,3 @@ Context on signing, and sighash conventions for Taproot can be found on learn me
 If you want to get started with Bitcoin we encourage you to look at the following SDK example: [`examples/with-bitcoin`](https://github.com/tkhq/sdk/tree/main/examples/with-bitcoin). It showcases transaction construction and signing with [`bitcoinjs-lib`](https://github.com/bitcoinjs/bitcoinjs-lib), a widely used JS library.
 
 This demo contains a client-side [signer](https://github.com/tkhq/sdk/blob/main/examples/with-bitcoin/src/signer.ts) which seamlessly integrates Turnkey signing with this library for both taproot and non-taproot output signatures. Let us know if you're interested in using it. We have not yet published it as a standalone NPM package, but could do it if we hear enough interest!
-
-
-
