@@ -1,0 +1,165 @@
+---
+title: "Client-side Delegated Access setup"
+description: "Step-by-step guide for adding Delegated Access users and policies entirely client-side"
+---
+
+A working example of client-side delegated access and policy validation can be found [here](https://github.com/tkhq/sdk/tree/main/examples/with-delegated).
+
+## Step-by-step implementation
+
+### Step 1: Create an embedded wallet 
+
+Use [@turnkey/react-wallet-kit](https://www.npmjs.com/package/@turnkey/react-wallet-kit) together with [Auth Proxy](https://docs.turnkey.com/sdks/react/getting-started).
+
+**Note:** For simplicity, this guide uses the Auth Proxy. If you prefer your own backend, see: [Advanced Backend Authentication](https://docs.turnkey.com/sdks/react/advanced-backend-authentication)
+
+- Customize sub-organization creation process in your React application by defining the following TurnkeyProvider configuration. This will add a new Ethereum wallet account alongside the sub-organization creation.
+
+```tsx proviers.tsx
+export function Providers({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  const suborgParams = useMemo<CreateSubOrgParams>(() => {
+    const ts = Date.now();
+    return {
+      userName: `User-${ts}`,
+      customWallet: {
+        walletName: `Wallet-${ts}`,
+        walletAccounts: [
+          {
+            curve: "CURVE_SECP256K1",
+            pathFormat: "PATH_FORMAT_BIP32",
+            path: "m/44'/60'/0'/0/0",
+            addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+          },
+        ],
+      },
+    };
+  }, []);
+
+  const turnkeyConfig: TurnkeyProviderConfig = {
+    organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+    authProxyConfigId: process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID!,
+    auth: {
+      createSuborgParams: {
+        emailOtpAuth: suborgParams,
+        smsOtpAuth: suborgParams,
+        walletAuth: suborgParams,
+        oauth: suborgParams,
+        passkeyAuth: {
+          ...suborgParams,
+          passkeyName: "My Passkey",
+        },
+      },
+    },
+  };
+```
+
+- Handle authentication is using the `handleLogin` function from the useTurnkey hook. It’s idempotent — existing users simply log in to their sub-org.
+
+
+```tsx page.tsx
+"use client";
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function LoginButton() {
+    const { handleLogin } = useTurnkey();
+    return <button onClick={handleLogin}>Login / Sign Up</button>;
+}
+export default function Home() {
+    return (
+        <LoginButton /> 
+  );
+}
+```
+
+### Step 2: Create a Delegated Access (DA) user
+
+Once authenticated, use the authenticated end-user session to create the DA user.
+This is an **API-only user** with a P-256 key you control.
+
+```tsx src/dashboard/page.tsx
+const handleDaSetup = async () => {
+    if (!isHexCompressedPubKey(daPublicKey)) {
+      setPublicKeyErr(
+        "Public key must be a 66-hex-character compressed key (no 0x prefix).",
+      );
+      return;
+    }
+    setPublicKeyErr(null);
+
+    try {
+      const res = await fetchOrCreateP256ApiKeyUser({
+        publicKey: daPublicKey,
+        createParams: {
+          userName: "Delegated Access",
+          apiKeyName: "Delegated User API Key",
+        },
+      });
+      setDaUser(res);
+    } catch (err) {
+      console.error("Error setting up DA user:", err);
+      setDaUser({ error: "Failed to set up DA user." });
+    }
+};
+```
+
+**Note:** At this stage the DA user is non-root, so all signing attempts will be denied until a policy is created.
+
+### Step 3: Add a restrictive policy
+
+Create a policy that allows the DA user to sign only to a specific Ethereum recipient.
+
+```tsx src/dashboard/page.tsx
+const handleBuildPolicyTemplate = () => {
+    if (!daUser?.userId) {
+      setPolicyError("Set up the Delegated Access user first.");
+      return;
+    }
+    if (!isEthAddress(recipientAddress)) {
+      setRecipientErr("Enter a valid 0x-prefixed, 40-hex Ethereum address.");
+      return;
+    }
+    setRecipientErr(null);
+    setPolicyError(null);
+
+    const template = [
+      {
+        policyName: `Allow user ${daUser.userId} to sign only to ${recipientAddress}`,
+        effect: "EFFECT_ALLOW",
+        consensus: `approvers.any(user, user.id == '${daUser.userId}')`,
+        condition: `eth.tx.to == '${recipientAddress}'`,
+        notes:
+          "Allow Delegated Access user to sign Ethereum transactions only to the specified recipient",
+      },
+    ];
+    setPolicyJson(JSON.stringify(template, null, 2));
+  };
+
+  // Keep in sync setToAllowed if recipientAddress changes manually
+  useEffect(() => {
+    if (recipientAddress) {
+      setToAllowed(recipientAddress);
+    }
+  }, [recipientAddress]);
+
+  const handleSubmitPolicies = async () => {
+    setPolicyError(null);
+    setPolicyResult(null);
+    setSubmittingPolicy(true);
+    try {
+      const parsed = JSON.parse(policyJson);
+      if (!Array.isArray(parsed)) {
+        throw new Error("JSON must be an array of policy objects.");
+      }
+      const res = await fetchOrCreatePolicies({ policies: parsed });
+      setPolicyResult(res);
+    } catch (e: any) {
+      setPolicyError(e?.message || "Failed to submit policies.");
+    } finally {
+      setSubmittingPolicy(false);
+    }
+  };
+```
+
+That's all ! At this point, your DA user is configured with an API key and governed by a restrictive policy. You can now validate by attempting two signatures: one that matches the allowed recipient (success) and one with a different recipient (denied).
