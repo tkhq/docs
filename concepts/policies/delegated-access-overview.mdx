@@ -16,31 +16,44 @@ Delegated access works by creating a specialized business-controlled user within
 
 You can implement Delegated Access for an embedded wallet in two ways, depending on whether the setup runs from the frontend (recommended) or the backend.
 
-**1. Frontend**
+### 1. Frontend
 
 This approach uses the **end-user’s authenticated session** to configure delegated access directly within their sub-organization. The flow is:
 - Create an **API-only user (Delegated User)** with a P-256 API key authenticator that you control. This key can then be used server-side to sign transactions on the user’s behalf.
 - Define **policies** for the Delegated User that strictly limit which transactions they are allowed to sign.
 
 **Why recommended:** 
-This avoids temporarily granting the Delegated User root access. Since you’re using the client-side authenticated session, the API-only user is created directly as a **non-root** user within the sub-organization.
+This avoids temporarily granting the Delegated User root access — see [Caution](#caution) for more details. Since you’re using the client-side authenticated session, the API-only user is created directly as a **non-root** user within the sub-organization.
+
+**Advantages:**
+- There’s no possibility of elevated (root-level) access for the delegated user.
+
+**Limitations:**
+- You can’t assume the delegated user or its policies already exist. Before referencing it, you’ll need to call `fetchOrCreateP256ApiKeyUser` and `fetchOrCreatePolicies` to ensure the user and permissions are properly set up.
 
 For a detailed step-by-step guide see [Client-side Delegated Access setup](concepts/policies/delegated-access-frontend).
 
-**2. Backend**
+### 2. Backend
 
 If you prefer to configure delegated access entirely server-side, the flow differs because the end-user in the embedded wallet model does not hold an API key. In this case, you must:
 - Create the sub-organization with **two root users**: the end-user and your Delegated User (API key authenticator).
 - Use the delegated access API key to add policies explicitly granting the DA user the limited actions you want them to perform.
 - Update the root quorum so that only the end-user remains a root user.
 
-**Caution:** 
+#### Caution !
 When the delegated access setup is performed from the backend, your service (not the end-user) initiates and approves the sub-organization creation, delegated user addition, and root quorum updates.
 This means the delegated user is temporarily added to the root quorum without direct end-user consent. If any of these operations fail — particularly the quorum update — the delegated user may unintentionally retain root privileges, effectively gaining unrestricted access to the user’s wallet.
 
-If you adopt this approach (common custodial flows), implement strict validation to confirm that:
+If you adopt this approach, implement strict validation to confirm that:
 - The root quorum was successfully updated; and
 - The delegated user no longer retains unintended permissions once setup completes.
+
+**Advantages:**
+- Guarantees that the delegated user exists and can perform the required actions without additional setup.
+
+**Limitations:**
+- Risk of elevated access if the delegated user isn’t successfully removed as a root user, it may retain unintended control.
+- Since all actions are service-initiated, there’s no explicit end-user approval in this flow.
 
 For most end-user applications, it’s recommended to perform delegated access setup client-side, where all actions are explicitly initiated and approved by the user.
 
