@@ -7,22 +7,22 @@ description: "With Turnkey you can create multi-user accounts with flexible co-o
 
 Delegated access works by creating a specialized business-controlled user within each end-user’s sub-organization that has carefully scoped permissions to perform only specific actions, such as signing transactions to designated addresses. This can enable your backend to do things like:
 
-- Automate common transactions (e.g., staking, redemptions)
+- Automate onchain actions such as staking, redemptions, or limit orders
 - Sign transactions to whitelisted addresses without user involvement
-- Perform scheduled operations
+- Perform scheduled operations (e.g. payouts, rebalances)
 - Respond to specific onchain events programmatically
 
 ## Implementation flow
 
 You can implement Delegated Access for an embedded wallet in two ways, depending on whether the setup runs from the frontend (recommended) or the backend.
 
-### 1. Frontend
+### 1. Frontend (recommended)
 
 This approach uses the **end-user’s authenticated session** to configure delegated access directly within their sub-organization. The flow is:
 - Create an **API-only user (Delegated User)** with a P-256 API key authenticator that you control. This key can then be used server-side to sign transactions on the user’s behalf.
 - Define **policies** for the Delegated User that strictly limit which transactions they are allowed to sign.
 
-**Why recommended:** 
+**Why this approach:** 
 This avoids temporarily granting the Delegated User root access — see [Caution](#caution) for more details. Since you’re using the client-side authenticated session, the API-only user is created directly as a **non-root** user within the sub-organization.
 
 **Advantages:**
@@ -40,7 +40,8 @@ If you prefer to configure delegated access entirely server-side, the flow diffe
 - Use the delegated access API key to add policies explicitly granting the DA user the limited actions you want them to perform.
 - Update the root quorum so that only the end-user remains a root user.
 
-#### Caution !
+
+<h4 id="caution">Caution ⚠️</h4>
 When the delegated access setup is performed from the backend, your service (not the end-user) initiates and approves the sub-organization creation, delegated user addition, and root quorum updates.
 This means the delegated user is temporarily added to the root quorum without direct end-user consent. If any of these operations fail — particularly the quorum update — the delegated user may unintentionally retain root privileges, effectively gaining unrestricted access to the user’s wallet.
 
