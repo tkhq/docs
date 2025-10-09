@@ -1,0 +1,317 @@
+---
+title: "Using embedded wallets"
+description: "Learn how to create and manage embedded wallets in your React Native application using Turnkey's Embedded Wallet Kit."
+sidebarTitle: "Using embedded wallets"
+---
+
+## Overview
+
+The Embedded Wallet Kit provides a straightforward way to create and manage embedded wallets in your React Native application. EWK offers function abstractions to easily create embedded wallets, derive accounts, import and export wallets and more.
+
+Before we start, ensure you're familiar with the concepts of [Wallets](/concepts/wallets) and [Wallet Accounts](/concepts/wallets#accounts).
+
+## Creating an embedded wallet
+
+After your user has authenticated, you can create an embedded wallet using the `createWallet` function from the `useTurnkey` hook.
+This will create a new wallet within the end-user's sub-organization with one Ethereum and one Solana wallet account.
+
+```tsx
+import { Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function CreateWalletButton() {
+  const { createWallet } = useTurnkey();
+
+  const handleCreateWallet = async () => {
+    try {
+      const walletId = await createWallet({
+        walletName: "My New Wallet",
+        accounts: ["ADDRESS_FORMAT_ETHEREUM", "ADDRESS_FORMAT_SOLANA"], // One Ethereum and one Solana account
+      });
+      console.log("Wallet created:", walletId);
+    } catch (error) {
+      console.error("Error creating wallet:", error);
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Create Wallet" onPress={handleCreateWallet} />
+    </View>
+  );
+}
+```
+
+This wallet can then be accessed through the `wallets` array in the `useTurnkey` hook, which contains all embedded wallets associated with the sub-organization and all linked external wallets. This array is updated automatically when wallets are created, updated or removed.
+
+```tsx
+import { Text, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function WalletList() {
+  const { wallets } = useTurnkey();
+  return (
+    <View style={{ padding: 16 }}>
+      {wallets.map((wallet) => (
+        <Text key={wallet.walletId}>
+          {wallet.walletName} - {wallet.walletId}
+        </Text>
+      ))}
+    </View>
+  );
+}
+```
+
+You can also manually refresh the wallets by calling the `refreshWallets` function from the `useTurnkey` hook.
+
+```tsx
+import { Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function RefreshWalletsButton() {
+  const { refreshWallets } = useTurnkey();
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Refresh Wallets" onPress={() => void refreshWallets()} />
+    </View>
+  );
+}
+```
+
+## Creating wallet accounts
+
+You can specify which accounts to create in the wallet by passing an array of account formats or account objects to the `accounts` parameter.
+
+### Using address formats
+
+You can use predefined account formats to create accounts in the wallet. The wallet account will be automatically created with the correct path and path index based on the existing wallet the sub-organization has.
+
+```tsx
+const ethereumOnlyWalletId = await createWallet({
+  walletName: "Ethereum Only Wallet",
+  accounts: ["ADDRESS_FORMAT_ETHEREUM"], // This will create one Ethereum account in the wallet
+});
+
+const solanaOnlyWalletId = await createWallet({
+  walletName: "Solana Only Wallet",
+  accounts: ["ADDRESS_FORMAT_SOLANA"], // This will create one Solana account in the wallet
+});
+
+const weirdWalletId = await createWallet({
+  walletName: "Weird Wallet",
+  accounts: [
+    // This will create one Cosmos, one Sei, one Sui, two Ethereum, and three Solana accounts in the wallet
+    "ADDRESS_FORMAT_COSMOS",
+
+    "ADDRESS_FORMAT_SEI",
+
+    "ADDRESS_FORMAT_SUI",
+
+    "ADDRESS_FORMAT_ETHEREUM",
+    "ADDRESS_FORMAT_ETHEREUM",
+
+    "ADDRESS_FORMAT_SOLANA",
+    "ADDRESS_FORMAT_SOLANA",
+    "ADDRESS_FORMAT_SOLANA",
+  ],
+});
+```
+
+### Using account objects
+
+You can also create accounts by passing an array of account objects. This allows you to specify the `curve`, `pathFormat`, `path`, and `addressFormat`.
+
+```tsx
+const customWalletId = await createWallet({
+  walletName: "My Custom Ethereum Wallet",
+  accounts: [
+    {
+      curve: "CURVE_SECP256K1",
+      pathFormat: "PATH_FORMAT_BIP32",
+      path: `m/44'/60'/0'/0/0`,
+      addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+    },
+  ],
+});
+```
+
+### After wallet creation
+
+You can use the `createWalletAccount` function to add more accounts to an _existing_ wallet.
+
+```tsx
+import { Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function AddAccountButton() {
+  const { createWalletAccounts, wallets } = useTurnkey();
+
+  const handleAddAccount = async () => {
+    try {
+      const addresses = await createWalletAccounts({
+        walletId: wallets[0]?.walletId,
+        accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+      });
+      console.log("Accounts created:", addresses);
+    } catch (error) {
+      console.error("Error creating account:", error);
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Add Account" onPress={handleAddAccount} />
+    </View>
+  );
+}
+```
+
+## Importing and exporting wallets
+
+React Native Wallet Kit lets you securely import/export wallets, accounts, and private keys using encrypted bundles you control, enabling backup, recovery, and migration.
+
+### Export
+
+By default, React Native Wallet Kit exports will decrypt locally and return the secret to you (mnemonic or raw private key) for easier developer workflows. To receive an encrypted `ExportBundle` instead, pass `decrypt: false` and provide a `targetPublicKey`.
+
+You can scope exports to a sub-organization via `organizationId` (otherwise the current session's organization is used) and choose an authentication stamper via `stampWith` (Passkey, ApiKey).
+
+#### Wallets
+
+Export the specified wallet and its accounts.
+
+- Default: returns the mnemonic (decrypted locally).
+- Advanced: set `decrypt: false` to receive an encrypted bundle for storage/transfer.
+
+```tsx
+import { Alert, Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function ExportWalletButton() {
+  const { exportWallet, wallets } = useTurnkey();
+
+  const handleExport = async () => {
+    try {
+      const walletId = wallets?.[0]?.walletId;
+      if (!walletId) {
+        Alert.alert("No wallet", "Create or select a wallet first");
+        return;
+      }
+
+      // Default: decrypts locally and returns the mnemonic
+      const mnemonic = await exportWallet({ walletId });
+      Alert.alert("Success", `Wallet exported.\nMnemonic: ${mnemonic}`);
+    } catch (error) {
+      console.error("Export failed:", error);
+      Alert.alert("Error", "Failed to export wallet");
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Export Wallet" onPress={handleExport} />
+    </View>
+  );
+}
+```
+
+Advanced (encrypted bundle):
+
+```tsx
+import { generateP256KeyPair } from "@turnkey/crypto";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { exportWallet } = useTurnkey();
+const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
+const targetPublicKey = publicKeyUncompressed;
+
+const bundle = await exportWallet({
+  walletId,
+  targetPublicKey,
+  decrypt: false,
+});
+// Decrypt later with decryptExportBundle({ exportBundle: bundle, embeddedKey: privateKey, ... })
+```
+
+#### Wallet accounts
+
+Export a single wallet account.
+
+- Default: returns the raw private key (decrypted locally). Do not display in production UIs.
+- Advanced: set `decrypt: false` to receive an encrypted bundle.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { exportWalletAccount, wallets } = useTurnkey();
+const address = wallets?.[0]?.accounts?.[0]?.address as string;
+if (address) {
+  // Default: returns raw private key (decrypted locally)
+  const rawPrivateKey = await exportWalletAccount({ address });
+  // Do not display secrets in production UIs
+}
+```
+
+#### Private keys
+
+Export a private key.
+
+- Default: returns the raw private key (decrypted locally). Do not display in production UIs.
+- Advanced: set `decrypt: false` to receive an encrypted bundle.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { exportPrivateKey } = useTurnkey();
+const rawPrivateKey = await exportPrivateKey({ privateKeyId: "<key-id>" });
+// Do not display secrets in production UIs
+```
+
+### Import
+
+Imports take plaintext material (mnemonic/private key) and the provider handles initialization and encryption behind the scenes.
+Resources are created under the current session's organization and user by default. You can override both with `organizationId` and `userId`, and optionally choose a stamper via `stampWith` (Passkey, ApiKey).
+
+#### Wallets
+
+Imports a wallet from a mnemonic. Optionally pre-create accounts; defaults may apply if not provided.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { importWallet, refreshWallets } = useTurnkey();
+
+const walletId = await importWallet({
+  mnemonic: "<mnemonic>",
+  walletName: "Imported Wallet",
+  // Optional: pre-create accounts on import
+  // accounts: ["ADDRESS_FORMAT_ETHEREUM", "ADDRESS_FORMAT_SOLANA"],
+});
+
+await refreshWallets();
+```
+
+#### Private keys
+
+Imports a private key from plaintext key material.
+You can optionally provide one or more address formats; the cryptographic curve is inferred from the address format and can be overridden via `curve`.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { importPrivateKey } = useTurnkey();
+
+const privateKeyId = await importPrivateKey({
+  privateKey: "<hex-or-base58-key>",
+  privateKeyName: "My Key",
+  // Provide at least one address format. Curve is inferred; can be specified.
+  addressFormats: ["ADDRESS_FORMAT_ETHEREUM"],
+  // keyFormat: "HEXADECIMAL" | "SOLANA",
+  // curve: "CURVE_SECP256K1",
+});
+```
+
+## Next steps
+
+Check out the [Signing](/sdks/react-native/signing) guide to learn how to sign transactions and messages with the embedded wallets you've created.

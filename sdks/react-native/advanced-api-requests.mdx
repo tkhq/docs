@@ -1,0 +1,97 @@
+---
+title: "Advanced API requests"
+description: "Learn how to make advanced API requests to Turnkey's infrastructure."
+sidebarTitle: "Advanced API requests"
+---
+
+## Overview
+
+The React Native Wallet Kit provides a wide variety of helper functions to abstract interactions with Turnkey's infrastructure.
+However, you can also make advanced API requests directly to Turnkey's endpoints if you need more control or want to implement custom features in your React Native app.
+
+## The HTTP client
+
+To make advanced API requests, use the `httpClient` from the `useTurnkey` hook in `@turnkey/react-native-wallet-kit`. This client is tied to the active session, so stamping and organization context are automatically handled for you.
+
+You can see the [API Reference](/api-reference/overview) for a complete list of available API endpoints and their parameters. All of these can be accessed through the `httpClient`.
+
+Here's how you can use the `httpClient` to make a `signRawPayload` request to Turnkey:
+
+```tsx
+import { Alert, Button, View } from "react-native";
+import { Buffer } from "buffer";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function SignRawPayloadButton() {
+  const { httpClient, wallets } = useTurnkey();
+
+  const doSignRawPayload = async () => {
+    try {
+      const signWith = wallets?.[0]?.accounts?.[0]?.address;
+      if (!signWith) {
+        Alert.alert("No account", "Create a wallet and account first");
+        return;
+      }
+
+      const message = "Hello, Turnkey!";
+      const payload = Buffer.from(message, "utf8").toString("hex");
+
+      const response = await httpClient.signRawPayload({
+        signWith,
+        payload,
+        encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+        hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+      });
+
+      const { r, s, v } = response;
+      console.log("Message signed:", { r, s, v });
+    } catch (error) {
+      console.error("Error signing message:", error);
+      Alert.alert("Error", "Failed to sign message");
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Sign Message" onPress={doSignRawPayload} />
+    </View>
+  );
+}
+```
+
+## Viewing the activity
+
+When creating, modifying, or using resources within Turnkey, an activity is created. You can learn more about activities in the [Activities](/api-reference/activities/overview) section.
+
+If you use the `httpClient`, you can view all the metadata of the activity you are performing. This includes the activity ID, votes list, status, and more.
+
+```tsx
+const response = await httpClient?.updateWallet({
+  walletId: "a-wallet-id-123",
+  walletName: "New wallet name",
+});
+
+const { id, votes, status } = response?.activity!;
+```
+
+## Using other stampers
+
+By default, the `httpClient` will use a securely stored API key to stamp requests to Turnkey.
+You can switch this to use a **passkey** by passing a `StamperType` to the `httpClient` functions.
+The user will be prompted to sign using the selected method before the request is made.
+
+For example, to use a passkey to stamp the `signRawPayload` request, pass `StamperType.Passkey` as the second argument:
+
+```tsx
+import { useTurnkey, StamperType } from "@turnkey/react-native-wallet-kit";
+
+const response = await httpClient.signRawPayload(
+  {
+    signWith,
+    payload: hashedMessage,
+    encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+    hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+  },
+  StamperType.Passkey // Use a passkey to stamp this request
+);
+```
