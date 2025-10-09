@@ -173,21 +173,23 @@ React Native Wallet Kit lets you securely import/export wallets, accounts, and p
 
 ### Export
 
-All export operations produce an encrypted `ExportBundle` using the target public key you provide.
+By default, React Native Wallet Kit exports will decrypt locally and return the secret to you (mnemonic or raw private key) for easier developer workflows. To receive an encrypted `ExportBundle` instead, pass `decrypt: false` and provide a `targetPublicKey`.
+
 You can scope exports to a sub-organization via `organizationId` (otherwise the current session's organization is used) and choose an authentication stamper via `stampWith` (Passkey, ApiKey).
 
 #### Wallets
 
-Export the specified wallet and its accounts as an encrypted bundle (suitable for backup or transfer).
-This example generates a P-256 key pair, uses the uncompressed public key for encryption, and decrypts the resulting bundle with the private key to retrieve the mnemonic for user confirmation.
+Export the specified wallet and its accounts.
+
+- Default: returns the mnemonic (decrypted locally).
+- Advanced: set `decrypt: false` to receive an encrypted bundle for storage/transfer.
 
 ```tsx
 import { Alert, Button, View } from "react-native";
 import { useTurnkey } from "@turnkey/react-native-wallet-kit";
-import { decryptExportBundle, generateP256KeyPair } from "@turnkey/crypto";
 
 export function ExportWalletButton() {
-  const { exportWallet, wallets, session } = useTurnkey();
+  const { exportWallet, wallets } = useTurnkey();
 
   const handleExport = async () => {
     try {
@@ -197,24 +199,9 @@ export function ExportWalletButton() {
         return;
       }
 
-      const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
-      const targetPublicKey = publicKeyUncompressed;
-
-      const bundle = await exportWallet({ walletId, targetPublicKey });
-      console.log("Export bundle:", bundle);
-
-      const mnemonic = await decryptExportBundle({
-        exportBundle: bundle,
-        embeddedKey: privateKey,
-        organizationId: session?.organizationId!,
-        returnMnemonic: true,
-        keyFormat: "HEXADECIMAL",
-      });
-
-      Alert.alert("Success", `Wallet exported.\nMnemonic: ${mnemonic}`, [
-        { text: "OK" },
-      ]);
-      // Persist bundle securely (e.g., file storage or your backend)
+      // Default: decrypts locally and returns the mnemonic
+      const mnemonic = await exportWallet({ walletId });
+      Alert.alert("Success", `Wallet exported.\nMnemonic: ${mnemonic}`);
     } catch (error) {
       console.error("Export failed:", error);
       Alert.alert("Error", "Failed to export wallet");
@@ -229,74 +216,66 @@ export function ExportWalletButton() {
 }
 ```
 
-#### Wallet accounts
-
-Export a single wallet account as an encrypted bundle and decrypt locally to reveal the private key (for demonstration only; never display sensitive material in production UIs).
+Advanced (encrypted bundle):
 
 ```tsx
-import { Alert } from "react-native";
+import { generateP256KeyPair } from "@turnkey/crypto";
 import { useTurnkey } from "@turnkey/react-native-wallet-kit";
-import { decryptExportBundle, generateP256KeyPair } from "@turnkey/crypto";
 
-const { exportWalletAccount, wallets, session } = useTurnkey();
+const { exportWallet } = useTurnkey();
+const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
+const targetPublicKey = publicKeyUncompressed;
 
+const bundle = await exportWallet({
+  walletId,
+  targetPublicKey,
+  decrypt: false,
+});
+// Decrypt later with decryptExportBundle({ exportBundle: bundle, embeddedKey: privateKey, ... })
+```
+
+#### Wallet accounts
+
+Export a single wallet account.
+
+- Default: returns the raw private key (decrypted locally). Do not display in production UIs.
+- Advanced: set `decrypt: false` to receive an encrypted bundle.
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { exportWalletAccount, wallets } = useTurnkey();
 const address = wallets?.[0]?.accounts?.[0]?.address as string;
-if (!address) {
-  Alert.alert("No account", "Create/select a wallet account first");
-} else {
-  const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
-  const targetPublicKey = publicKeyUncompressed;
-
-  const bundle = await exportWalletAccount({ address, targetPublicKey });
-  console.log("Account export bundle:", bundle);
-
-  const exportedPrivateKey = await decryptExportBundle({
-    exportBundle: bundle,
-    embeddedKey: privateKey,
-    organizationId: session?.organizationId!,
-    returnMnemonic: false,
-    keyFormat: "HEXADECIMAL",
-  });
-
-  Alert.alert("Success", `Private key: ${exportedPrivateKey}`);
+if (address) {
+  // Default: returns raw private key (decrypted locally)
+  const rawPrivateKey = await exportWalletAccount({ address });
+  // Do not display secrets in production UIs
 }
 ```
 
 #### Private keys
 
-Export a private key as an encrypted bundle for backup or transfer, then decrypt locally using the ephemeral private key.
+Export a private key.
+
+- Default: returns the raw private key (decrypted locally). Do not display in production UIs.
+- Advanced: set `decrypt: false` to receive an encrypted bundle.
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-native-wallet-kit";
-import { decryptExportBundle, generateP256KeyPair } from "@turnkey/crypto";
 
-const { exportPrivateKey, session } = useTurnkey();
-
-const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
-const targetPublicKey = publicKeyUncompressed;
-
-const bundle = await exportPrivateKey({
-  privateKeyId: "<private-key-id>",
-  targetPublicKey,
-});
-
-const rawPrivateKey = await decryptExportBundle({
-  exportBundle: bundle,
-  embeddedKey: privateKey,
-  organizationId: session?.organizationId!,
-  returnMnemonic: false,
-  keyFormat: "HEXADECIMAL",
-});
+const { exportPrivateKey } = useTurnkey();
+const rawPrivateKey = await exportPrivateKey({ privateKeyId: "<key-id>" });
+// Do not display secrets in production UIs
 ```
 
 ### Import
 
-Imports consume an encrypted bundle and create resources under the current session's organization and user by default.
-You can override both with `organizationId` and `userId`, and optionally choose a stamper via `stampWith` (Passkey, ApiKey).
+Imports take plaintext material (mnemonic/private key) and the provider handles initialization and encryption behind the scenes.
+Resources are created under the current session's organization and user by default. You can override both with `organizationId` and `userId`, and optionally choose a stamper via `stampWith` (Passkey, ApiKey).
 
 #### Wallets
 
-Imports a wallet from an encrypted bundle. Optionally pre-create accounts; defaults to standard Ethereum and Solana accounts if not provided.
+Imports a wallet from a mnemonic. Optionally pre-create accounts; defaults may apply if not provided.
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-native-wallet-kit";
@@ -304,7 +283,7 @@ import { useTurnkey } from "@turnkey/react-native-wallet-kit";
 const { importWallet, refreshWallets } = useTurnkey();
 
 const walletId = await importWallet({
-  encryptedBundle: "<export-bundle>",
+  mnemonic: "<mnemonic>",
   walletName: "Imported Wallet",
   // Optional: pre-create accounts on import
   // accounts: ["ADDRESS_FORMAT_ETHEREUM", "ADDRESS_FORMAT_SOLANA"],
@@ -315,7 +294,8 @@ await refreshWallets();
 
 #### Private keys
 
-Imports a private key from an encrypted bundle.
+Imports a private key from plaintext key material.
+You can optionally provide one or more address formats; the cryptographic curve is inferred from the address format and can be overridden via `curve`.
 
 ```tsx
 import { useTurnkey } from "@turnkey/react-native-wallet-kit";
@@ -323,18 +303,14 @@ import { useTurnkey } from "@turnkey/react-native-wallet-kit";
 const { importPrivateKey } = useTurnkey();
 
 const privateKeyId = await importPrivateKey({
-  encryptedBundle: "<export-bundle>",
+  privateKey: "<hex-or-base58-key>",
   privateKeyName: "My Key",
   // Provide at least one address format. Curve is inferred; can be specified.
   addressFormats: ["ADDRESS_FORMAT_ETHEREUM"],
+  // keyFormat: "HEXADECIMAL" | "SOLANA",
   // curve: "CURVE_SECP256K1",
 });
 ```
-
-Notes (import):
-
-- Provide one or more address formats; the cryptographic curve is inferred from the address format and can be overridden via `curve`.
-- Wallet state is refreshed after wallet/account import and (when applicable) after export; call `refreshWallets()` at any time to ensure state is up to date.
 
 ## Next steps
 
