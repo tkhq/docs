@@ -1,0 +1,263 @@
+---
+title: 'Use Turnkey wallets with Li.Fi'
+sidebarTitle: "Li.Fi integration"
+---
+
+## Overview
+
+[Li.Fi](https://li.fi) is a bridging platform that allows users to swap various tokens on different chains. In this guide, we'll walk through how to use **Turnkey** wallets to sign transactions that interact with Li.Fi and bridging between ETH and SOL.
+
+We'll demonstrate this using the [`with-lifi`](https://github.com/tkhq/sdk/tree/main/examples/with-lifi) example, which integrates **Turnkey**, **Ethereum**, **Solana**, and **LiFi**.
+
+---
+
+## Getting started
+
+Before you begin, make sure you’ve followed the [Turnkey Quickstart guide](/getting-started/quickstart).  
+You should have:
+
+- A Turnkey **organization** and **Auth Proxy Config ID** 
+- Once you generate an account with the example, the account funded with **ETH**
+
+Its not required, but it will be helpful to have a Li.Fi API key, it will prevent you from being rate limited (see the [Li.Fi Partner Portal](https://portal.li.fi/login/)).
+
+---
+
+## Install dependencies
+
+```bash
+npm install @turnkey/react-wallet-kit @turnkey/viem @turnkey/solana viem wagmi @solana/web3.js
+```
+
+## Setting up the Turnkey wallet
+
+We’ll use the @turnkey/react-wallet-kit package to authenticate and load a Turnkey wallet in the browser.
+
+```tsx
+"use client";
+
+import { useTurnkey, WalletAccount } from "@turnkey/react-wallet-kit";
+import { TurnkeySigner } from "@turnkey/solana";
+import { createAccount } from "@turnkey/viem";
+import { createWalletClient } from "viem";
+
+// public providers, you might want to use a dedicated provider like alchemy or infura in production
+const ETH_MAINNET_RPC_PROVIDER = "https://ethereum-rpc.publicnode.com";
+const SOL_MAINNET_RPC_PROVIDER = "https://solana-rpc.publicnode.com";
+
+export default function SwapPage() {
+  const { httpClient, session, fetchWalletAccounts, wallets } = useTurnkey();
+  const [viemWalletClient, setViemWalletClient] = useState<WalletClient | undefined>(undefined);
+
+  // obtain a users turnkey wallets
+  const walletAccountResponse = await fetchWalletAccounts({
+    wallet: wallets[0],
+  });
+
+  // create a viem account with the turnkey wallet
+  const turnkeyViemAccount = await createAccount({
+    client: httpClient!,
+    organizationId: walletAccountResponse[0].organizationId,
+    signWith: walletAccountResponse[0].address,
+    ethereumAddress: walletAccountResponse[0].address,
+  });
+
+  // create a viem wallet client to sign EVM transactions
+  const viemWalletClient = createWalletClient({
+    account: turnkeyAccount as Account,
+    chain: mainnet,
+    transport: http(MAINNET_RPC_PROVIDER),
+  })
+
+  // create a solana signer to sign SOL transactions
+  const turnkeySolSigner = new TurnkeySigner({
+    organizationId: walletAccountResponse[0].organizationId,
+    client: httpClient!,
+  });
+
+  // Render your login/logout and account selector UI here
+}
+```
+
+## Setting up Li.Fi
+
+We’ll make calls to the Li.Fi API to retrieve quotes for the bridge transaction. GetQuote is used for a price estimate and also responds with a transactionRequest which needs to be signed and broadcasted. GetStatus is used to retrieve the status and other information of the bridge transaction.
+
+```tsx
+"use server";
+
+export interface QuoteParams {
+  fromChain: string;
+  toChain: string;
+  fromToken: string;
+  toToken: string;
+  fromAmount: string;
+  fromAddress: string;
+  toAddress: string;
+}
+
+export interface StatusParams {
+  txHash: string;
+}
+
+export async function getQuote(quoteParams: QuoteParams) {
+  const params = new URLSearchParams({
+    fromChain: quoteParams.fromChain,
+    toChain: quoteParams.toChain,
+    fromToken: quoteParams.fromToken,
+    toToken: quoteParams.toToken,
+    fromAmount: quoteParams.fromAmount,
+    fromAddress: quoteParams.fromAddress,
+    toAddress: quoteParams.toAddress,
+  });
+
+  const quoteResponse = await fetch(
+    "https://li.quest/v1/quote?" + params.toString(),
+    process.env.LIFI_API_KEY
+      ? { headers: { "x-lifi-api-key": process.env.LIFI_API_KEY } }
+      : {}, // Get your live API key from the Li.Fi Partner Portal https://portal.li.fi/login
+  );
+
+  const response = await quoteResponse.json();
+
+  return response;
+}
+
+export async function getStatus(statusParams: StatusParams) {
+  const params = new URLSearchParams({
+    txHash: statusParams.txHash,
+  });
+
+  const statusResponse = await fetch(
+    "https://li.quest/v1/status?" + params.toString(),
+    process.env.LIFI_API_KEY
+      ? { headers: { "x-lifi-api-key": process.env.LIFI_API_KEY } }
+      : {}, // Get your live API key from the Li.Fi Partner Portal https://portal.li.fi/login
+  );
+
+  const response = await statusResponse.json();
+
+  return response;
+}
+```
+
+## Creating a EVM -> SVM swap
+
+```tsx
+import { parseEther } from "viem";
+import { mainnet } from "viem/chains";
+
+async function handleEVMSwap() {
+  const quoteParams: QuoteParams = {
+        fromChain: "ETH", // view the full list of chains here: https://docs.li.fi/introduction/chains
+        toChain: "SOL",
+        fromToken: "ETH", // view all available tokens for a chain here: https://docs.li.fi/api-reference/fetch-all-known-tokens
+        toToken: "SOL",
+        fromAmount: parseEther(value).toString(), // where value is a human-readable amount of ETH 1.0 == 1 ETH
+        fromAddress: ethAddress, // the sending ETH address
+        toAddress: solAddress, // the SOL address where the bridged SOL should be sent to
+      };
+
+      const getPriceResponse = await getQuote(quoteParams);
+
+      // build, sign, and broadcast the transaction
+      const sendTransactionResponse = await viemWalletClient?.sendTransaction({
+        to: getPriceResponse.transactionRequest.to,
+        value: getPriceResponse.transactionRequest.value,
+        data: getPriceResponse.transactionRequest.data,
+        chain: mainnet,
+        account: turnkeyViemAccount!,
+      });
+}
+```
+
+## Creating a SVM -> EVM swap
+
+You will need to set an allowance to swap ERC-20 tokens that are not ETH. 0x uses an [Allowance Holder Contract](https://0x.org/docs/introduction/0x-cheat-sheet#allowanceholder-recommended) to achieve this.
+
+This code snippet shows how to check and set the allowance for an address for USDC.
+
+```tsx
+"use client";
+
+import { Connection, LAMPORTS_PER_SOL, VersionedTransaction } from "@solana/web3.js";
+
+function solToLamports(sol: string | number): number {
+  return Math.floor(Number(sol) * LAMPORTS_PER_SOL);
+}
+
+async function handleSVMSwap() {
+  // get an initial price to display to the user
+  const quoteParams: QuoteParams = {
+    fromChain: "SOL", // view the full list of chains here: https://docs.li.fi/introduction/chains
+    toChain: "ETH",
+    fromToken: "SOL", // view all available tokens for a chain here: https://docs.li.fi/api-reference/fetch-all-known-tokens
+    toToken: "ETH",
+    fromAmount: solToLamports(value).toString(), // where value is a human-readable amount of SOL 1.0 == 1 SOL
+    fromAddress: solAddress, // the sending SOL address
+    toAddress: ethAddress, // the ETH address where the bridged ETH should be sent to
+  };
+
+  const getPriceResponse = await getQuote(quoteParams);
+
+  // construct the SOL transaction to send for the bridge
+  const txBuffer = Buffer.from(getPriceResponse.transactionRequest.data, "base64");
+  const hexTransaction = VersionedTransaction.deserialize(
+    new Uint8Array(txBuffer),
+  );
+
+  await turnkeySolanaSigner?.addSignature(hexTransaction, solAddress!);
+
+  // sign and broadcast the transaction
+  const connection = new Connection(SOL_MAINNET_RPC_PROVIDER);
+  const signature = await connection.sendTransaction(hexTransaction, {
+    skipPreflight: true,
+  });
+}
+```
+
+## Check the status of a bridge
+
+After a transaction has been sent to create a bridge transaction you can check the status of receiving the asset on the other side with this Li.Fi API endpoint: https://docs.li.fi/api-reference/check-the-status-of-a-cross-chain-transfer. This can be used to show different states in your application.
+
+```tsx
+"use client";
+
+import { Connection, LAMPORTS_PER_SOL, VersionedTransaction } from "@solana/web3.js";
+
+async function getStatus() {
+  let statusParams: StatusParams = {
+    txHash, // this should be the txHash of the sending transaction "sendTransactionResponse" in the EVM -> SVM bridge example or "signature" in the SVM -> EVM bridge example
+  };
+
+  // poll the status of the transaction
+  while (true) {
+    const getStatusResponse = await getStatus(statusParams);
+
+    // check if the status us "DONE"
+    if (getStatusResponse.status == "DONE") {
+      if (fromToken === "ETH") {
+        console.log("SOL Receiving Transaction:" + getStatusResponse.receiving.txHash);
+      } else if (fromToken === "SOL") {
+         console.log("ETH Receiving Transaction:" + getStatusResponse.receiving.txHash);
+      }
+      break;
+    }
+
+    // sleep for 2 seconds before re-checking the status of the bridge
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+```
+
+## Summary
+
+✅ You’ve now learned how to:
+
+- Authenticate with Turnkey via @turnkey/react-wallet-kit
+
+- Create EVM -> SVM swaps with Li.Fi
+
+- Create SVM -> EVM swaps with Li.Fi
+
+- Check the status of your Li.Fi bridge transaction
