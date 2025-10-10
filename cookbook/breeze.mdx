@@ -1,0 +1,233 @@
+---
+title: 'Use Turnkey wallets with Breeze'
+sidebarTitle: "Breeze integration"
+---
+
+## Overview
+
+[Breeze](https://breeze.baby) is a Solana-based yield platform that allows users to deposit and withdraw assets from managed yield funds via smart contracts and APIs.  
+In this guide, we’ll walk through how to use **Turnkey** wallets to sign transactions that interact with Breeze funds, including deposits, withdrawals, and balance queries. 
+We'll demonstrate this using the [`with-breeze`](https://github.com/tkhq/sdk/tree/main/examples/with-breeze) example, which integrates **Turnkey**, **Solana**, and **Breeze** for staking deposits/withdrawals.
+
+---
+
+## Getting started
+
+Before you begin, make sure you’ve followed the [Turnkey Quickstart guide](/getting-started/quickstart).  
+You should have
+
+- A Turnkey **organization** and **Auth Proxy Config ID** 
+- An account funded with **USDC** on **SOL**
+
+You’ll also need your **Breeze API key** (see the [Breeze Developer Portal](https://docs.breeze.baby)) and your fund ID.
+
+---
+
+## Install dependencies
+
+```bash
+npm install @turnkey/react-wallet-kit @turnkey/solana @breezebaby/breeze-sdk @solana/web3.js
+```
+
+## Setting up the Turnkey wallet
+
+We’ll use the @turnkey/react-wallet-kit package to authenticate and load a Turnkey wallet in the browser.
+
+```tsx
+"use client";
+
+import { useTurnkey, WalletAccount } from "@turnkey/react-wallet-kit";
+import { TurnkeySigner } from "@turnkey/solana";
+import { VersionedTransaction, PublicKey, Connection } from "@solana/web3.js";
+
+const connection = new Connection("https://solana-rpc.publicnode.com", "confirmed");
+
+export default function BreezePage() {
+  const { wallets, httpClient, handleLogin, logout, session } = useTurnkey();
+  const [activeWalletAccount, setActiveWalletAccount] = useState<WalletAccount | null>(null);
+
+  const signer = activeWalletAccount
+    ? new TurnkeySigner({
+        organizationId: activeWalletAccount.organizationId,
+        client: httpClient!,
+      })
+    : null;
+
+  // Render your login/logout and account selector UI here
+}
+```
+
+## Setting up the Breeze client
+
+We’ll use the Breeze SDK to interact with Breeze funds. Create a helper file actions/breeze.ts:
+
+```tsx
+"use server";
+
+import { BreezeSDK } from "@breezebaby/breeze-sdk";
+
+const breeze = new BreezeSDK({
+  apiKey: process.env.BREEZE_API_KEY!,
+  baseUrl: "https://api.breeze.baby",
+  timeout: 30000,
+});
+
+export async function createDepositTx({
+  payerKey,
+  userKey,
+  fundId,
+  amount,
+  mint,
+}: {
+  payerKey: string;
+  userKey: string;
+  fundId: string;
+  amount: number;
+  mint: string;
+}) {
+  return breeze.createDepositTransaction({
+    payerKey,
+    userKey,
+    fundId,
+    amount,
+    mint,
+  });
+}
+
+export async function createWithdrawTx({
+  payerKey,
+  userKey,
+  fundId,
+  amount,
+}: {
+  payerKey: string;
+  userKey: string;
+  fundId: string;
+  amount: number;
+}) {
+  return breeze.createWithdrawTransaction({
+    payerKey,
+    userKey,
+    fundId,
+    amount,
+  });
+}
+
+export async function getUserData(userId: string) {
+  const [balances, yieldInfo] = await Promise.all([
+    breeze.getUserBalances({ userId }),
+    breeze.getYieldInfo({ userId }),
+  ]);
+
+  return { balances, yieldInfo };
+}
+```
+
+## Depositing into a Breeze fund
+
+Here’s how you can use your Turnkey signer to submit a deposit transaction.
+
+```tsx
+"use client";
+
+import { useTurnkey, WalletAccount } from "@turnkey/react-wallet-kit";
+import { TurnkeySigner } from "@turnkey/solana";
+import { Connection, VersionedTransaction, PublicKey } from "@solana/web3.js";
+import { createDepositTx } from "../actions/breeze";
+
+const connection = new Connection("https://solana-rpc.publicnode.com", "confirmed");
+
+export default function DepositButton({
+  fundId,
+  mint,
+  amount,
+}: {
+  fundId: string;
+  mint: string;
+  amount: number;
+}) {
+  const { httpClient, wallets } = useTurnkey();
+  const [activeWalletAccount, setActiveWalletAccount] = useState<WalletAccount | null>(null);
+
+  const signer = activeWalletAccount
+    ? new TurnkeySigner({
+        organizationId: activeWalletAccount.organizationId,
+        client: httpClient!,
+      })
+    : null;
+
+  async function handleDeposit() {
+    if (!signer || !activeWalletAccount) return;
+
+    const txData = await createDepositTx({
+      payerKey: activeWalletAccount.address,
+      userKey: activeWalletAccount.address,
+      fundId,
+      amount,
+      mint,
+    });
+
+    const tx = VersionedTransaction.deserialize(
+      Buffer.from(txData.transaction, "base64"),
+    );
+
+    await signer.signTransaction(tx);
+    const sig = await connection.sendTransaction(tx);
+
+    console.log("Deposit transaction:", `https://solscan.io/tx/${sig}`);
+  }
+
+  return (
+    <button onClick={handleDeposit} className="bg-black text-white rounded-xl py-3">
+      Deposit
+    </button>
+  );
+}
+```
+
+## Withdrawing from a Breeze fund
+
+Withdrawals follow the same pattern using createWithdrawTx.
+
+```tsx
+async function handleWithdraw() {
+  if (!signer || !activeWalletAccount) return;
+
+  const txData = await createWithdrawTx({
+    payerKey: activeWalletAccount.address,
+    userKey: activeWalletAccount.address,
+    fundId,
+    amount,
+  });
+
+  const tx = VersionedTransaction.deserialize(
+    Buffer.from(txData.transaction, "base64"),
+  );
+
+  await signer.signTransaction(tx);
+  const sig = await connection.sendTransaction(tx);
+
+  console.log("Withdraw transaction:", `https://solscan.io/tx/${sig}`);
+}
+```
+
+## Checking balances and yield info
+```tsx
+import { getUserData } from "../actions/breeze";
+
+async function handleCheckData(userId: string) {
+  const { balances, yieldInfo } = await getUserData(userId);
+  console.log("Balances:", balances);
+  console.log("Yield Info:", yieldInfo);
+}
+```
+
+## Summary
+
+✅ You’ve now learned how to:
+
+- Authenticate with Turnkey via @turnkey/react-wallet-kit
+
+- Use a TurnkeySigner to sign Solana transactions
+
+- Interact with the Breeze API for deposits, withdrawals, and yield queries
