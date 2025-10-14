@@ -1,0 +1,224 @@
+---
+title: "Getting started with Turnkey's Embedded Wallet Kit"
+description: "Learn how to set up the Embedded Wallet Kit (EWK) in your React Native application. This page will guide you through the initial setup, including enabling Turnkey's Auth Proxy, installing the React Native SDK, and configuring your app."
+sidebarTitle: "Getting started"
+---
+
+## Turnkey organization setup
+
+To start, you must create a Turnkey organization via the [Turnkey dashboard](https://app.turnkey.com). The steps to do so are described in the [Account Setup](/getting-started/quickstart) section.
+
+For this setup, we will be using Turnkey's Auth Proxy to handle authentication. We can enable and configure this through the Turnkey dashboard.
+
+<Steps>
+  <Step title="Enable Auth Proxy">
+    Navigate to the **Wallet Kit** section in the Turnkey Dashboard and enable the
+    **Auth Proxy**.
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-toggle.png"
+      alt="Auth Proxy toggle"
+    />
+
+  </Step>
+
+    <Step title="Customize auth methods">
+
+    You can choose which auth methods to enable and customize various options from this screen. For this quickstart, let's enable **email OTP** and **passkeys**. When you're done, click **Save**.
+
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-options.png"
+      alt="Auth Proxy options"
+    />
+
+    <img
+      src="/images/getting-started/img/quickstart/wallet-kit-options.png"
+      alt="Wallet kit options"
+    />
+
+  </Step>
+
+  <Step title="Finish up">
+
+    Once you're finished with the auth proxy setup, you can copy the **auth proxy config ID**
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-id.png"
+      alt="Auth Proxy Config id"
+    />
+
+and your **organization ID** from the dashboard.
+
+  <img
+      src="/images/getting-started/img/quickstart/org-id.png"
+      alt="Organization id"
+    />
+  These will be used in the next steps to configure your app.
+</Step>
+</Steps>
+
+## Installation
+
+You can use `@turnkey/react-native-wallet-kit` in any React Native app (Expo or bare).
+
+For this guide, let's create a new Expo app. If you already have an existing app, you don't need to do this.
+
+```bash npx
+npx create-expo-app@latest with-react-native-wallet-kit
+```
+
+Now, install the Turnkey React Native Wallet Kit package and required peer dependencies:
+
+<CodeGroup>
+
+```bash npm
+npm install @turnkey/react-native-wallet-kit react-native-passkey react-native-gesture-handler react-native-safe-area-context react-native-svg @react-native-async-storage/async-storage react-native-get-random-values react-native-keychain
+```
+
+```bash pnpm
+pnpm add @turnkey/react-native-wallet-kit react-native-passkey react-native-gesture-handler react-native-safe-area-context react-native-svg @react-native-async-storage/async-storage react-native-get-random-values react-native-keychain
+```
+
+```bash yarn
+yarn add @turnkey/react-native-wallet-kit react-native-passkey react-native-gesture-handler react-native-safe-area-context react-native-svg @react-native-async-storage/async-storage react-native-get-random-values react-native-keychain
+```
+
+</CodeGroup>
+
+If you are using Expo, run a prebuild once to autolink native modules:
+
+```bash npx
+npx expo prebuild && npx expo run:ios
+```
+
+Finally, create a `.env` file within your app directory, and populate it with the IDs from before. Using `EXPO_PUBLIC_*` makes these available at build time in Expo apps.
+
+```bash .env
+EXPO_PUBLIC_ORGANIZATION_ID="here"
+EXPO_PUBLIC_AUTH_PROXY_CONFIG_ID="and_here"
+
+# Optional OAuth client IDs (configure in Turnkey Dashboard or here)
+EXPO_PUBLIC_GOOGLE_CLIENT_ID=""
+EXPO_PUBLIC_APPLE_CLIENT_ID=""
+EXPO_PUBLIC_FACEBOOK_CLIENT_ID=""
+EXPO_PUBLIC_X_CLIENT_ID=""
+EXPO_PUBLIC_DISCORD_CLIENT_ID=""
+```
+
+## Configure deep linking (required for OAuth on React Native)
+
+Add a link `scheme` to your Expo config and, if you plan to use passkeys on iOS with a custom `rpId`, add the associated domain:
+
+```json app.json
+{
+  "expo": {
+    "scheme": "myapp",
+    "ios": {
+      "bundleIdentifier": "com.example.myapp",
+      "associatedDomains": ["webcredentials:yourdomain.com"]
+    }
+  }
+}
+```
+
+The `scheme` must match the `auth.oauth.appScheme` you pass to the `TurnkeyProvider` config below.
+
+## Provider
+
+Set up a `TURNKEY_CONFIG` and callbacks, then wrap your app with `TurnkeyProvider`. The example below follows the Expo Router layout used in our sample app.
+
+```ts constants/turnkey.ts
+import type {
+  TurnkeyProviderConfig,
+  TurnkeyCallbacks,
+} from "@turnkey/react-native-wallet-kit";
+
+export const TURNKEY_CONFIG: TurnkeyProviderConfig = {
+  organizationId: process.env.EXPO_PUBLIC_ORGANIZATION_ID!,
+  authProxyConfigId: process.env.EXPO_PUBLIC_AUTH_PROXY_CONFIG_ID!,
+  passkeyConfig: {
+    // Use your domain if you are enabling passkeys (matches your iOS associated domain)
+    rpId: "yourdomain.com",
+  },
+  auth: {
+    otp: {
+      email: true,
+    },
+    passkey: true,
+    oauth: {
+      appScheme: "myapp",
+      google: { clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID },
+      apple: { clientId: process.env.EXPO_PUBLIC_APPLE_CLIENT_ID },
+      facebook: { clientId: process.env.EXPO_PUBLIC_FACEBOOK_CLIENT_ID },
+      x: { clientId: process.env.EXPO_PUBLIC_X_CLIENT_ID },
+      discord: { clientId: process.env.EXPO_PUBLIC_DISCORD_CLIENT_ID },
+    },
+    },
+    autoRefreshSession: true,
+  }
+};
+
+export const TURNKEY_CALLBACKS: TurnkeyCallbacks = {
+  beforeSessionExpiry: ({ sessionKey }) => {
+    console.log("[Turnkey] Session nearing expiry:", sessionKey);
+  },
+  onSessionExpired: ({ sessionKey }) => {
+    console.log("[Turnkey] Session expired:", sessionKey);
+  },
+  onAuthenticationSuccess: ({ action, method, identifier }) => {
+    console.log("[Turnkey] Auth success:", { action, method, identifier });
+  },
+  onError: (error) => {
+    console.error("[Turnkey] Error:", error);
+  },
+};
+```
+
+Then, wrap your app from the Expo Router root layout. Ensure polyfills are imported early and `Buffer` is defined for dependencies that expect it.
+
+```tsx app/_layout.tsx
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import "react-native-reanimated";
+
+// Polyfills must be early to satisfy crypto/random usage across dependencies
+import "react-native-get-random-values";
+import "react-native-url-polyfill/auto";
+import "@walletconnect/react-native-compat";
+import { Buffer } from "buffer";
+(global as any).Buffer = (global as any).Buffer || Buffer;
+
+import { TurnkeyProvider } from "@turnkey/react-native-wallet-kit";
+import { TURNKEY_CONFIG, TURNKEY_CALLBACKS } from "@/constants/turnkey";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+
+  return (
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <TurnkeyProvider config={TURNKEY_CONFIG} callbacks={TURNKEY_CALLBACKS}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(main)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: "modal", title: "Modal" }}
+          />
+        </Stack>
+        <StatusBar style="auto" />
+      </TurnkeyProvider>
+    </ThemeProvider>
+  );
+}
+```
+
+## Next steps
+
+Ready to start building your app? Check out the [Authentication](/sdks/react-native/auth) guide to learn how to set up login or signup in React Native!
