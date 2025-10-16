@@ -1,0 +1,130 @@
+---
+title: "Signing"
+description: "Learn how to sign messages and transactions in your React Native app using Turnkey's Embedded Wallets."
+sidebarTitle: "Signing"
+---
+
+## Overview
+
+The Embedded Wallet Kit provides a simple way to sign messages and transactions in your React Native application using Turnkey's Embedded Wallets.
+
+## Signing messages
+
+To sign messages, use the `signMessage` function from the `useTurnkey` hook. First pick a wallet account from `wallets` (for example, the first wallet's first account), then sign your message.
+
+```tsx
+import { Alert, Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function SignMessageButton() {
+  const { signMessage, wallets } = useTurnkey();
+
+  const doSignMessage = async () => {
+    try {
+      const wallet = wallets?.[0];
+      const walletAccount = wallet?.accounts?.[0];
+      if (!walletAccount) {
+        Alert.alert("No account", "Create a wallet and account before signing");
+        return;
+      }
+
+      const message = "Hello, Turnkey!";
+      const signature = await signMessage({ walletAccount, message });
+      console.log("Message signed:", signature);
+    } catch (error) {
+      console.error("Error signing message:", error);
+      Alert.alert("Error", "Failed to sign message");
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Sign Message" onPress={doSignMessage} />
+    </View>
+  );
+}
+```
+
+## Signing transactions
+
+To sign transactions, use the `signTransaction` function. Select a wallet account, prepare an unsigned transaction, and specify a transaction type (for example, `TRANSACTION_TYPE_ETHEREUM`).
+
+```tsx
+import { Alert, Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function SignTransactionButton() {
+  const { signTransaction, wallets } = useTurnkey();
+
+  const doSignTransaction = async () => {
+    try {
+      const wallet = wallets?.[0];
+      const walletAccount = wallet?.accounts?.[0];
+      if (!walletAccount) {
+        Alert.alert("No account", "Create a wallet and account before signing");
+        return;
+      }
+
+      const unsignedTransaction = "0x..."; // Replace with your unsigned transaction data
+      const signature = await signTransaction({
+        walletAccount,
+        unsignedTransaction,
+        transactionType: "TRANSACTION_TYPE_ETHEREUM",
+      });
+      console.log("Transaction signed:", signature);
+    } catch (error) {
+      console.error("Error signing transaction:", error);
+      Alert.alert("Error", "Failed to sign transaction");
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Sign Transaction" onPress={doSignTransaction} />
+    </View>
+  );
+}
+```
+
+## Sign and send transactions
+
+If you want Turnkey to submit the transaction on your behalf, use `signAndSendTransaction`. Provide an RPC URL if needed.
+
+```tsx
+import { Alert, Button, View } from "react-native";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export function SignAndSendTransactionButton() {
+  const { signAndSendTransaction, wallets } = useTurnkey();
+
+  const doSignAndSend = async () => {
+    try {
+      const wallet = wallets?.[0];
+      const walletAccount = wallet?.accounts?.[0];
+      if (!walletAccount) {
+        Alert.alert("No account", "Create a wallet and account before sending");
+        return;
+      }
+
+      const unsignedTransaction = "0x..."; // Replace with your unsigned tx
+      const txId = await signAndSendTransaction({
+        walletAccount,
+        unsignedTransaction,
+        transactionType: "TRANSACTION_TYPE_ETHEREUM",
+        // Optionally provide a custom RPC endpoint
+        // rpcUrl: "https://mainnet.infura.io/v3/<key>",
+      });
+      console.log("Transaction broadcasted:", txId);
+    } catch (error) {
+      console.error("Error sending transaction:", error);
+      Alert.alert("Error", "Failed to send transaction");
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button title="Sign & Send" onPress={doSignAndSend} />
+    </View>
+  );
+}
+```

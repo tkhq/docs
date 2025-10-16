@@ -1,0 +1,150 @@
+---
+title: "Passkey authentication"
+description: "Set up and implement passkey authentication using @turnkey/react-native-wallet-kit with Expo."
+sidebarTitle: "Passkeys"
+---
+
+## Overview
+
+This guide shows how to implement passkey authentication in a React Native app using `@turnkey/react-native-wallet-kit`.
+You'll add the necessary platform configuration, set up the provider with a proper `rpId`, and call `loginWithPasskey` and `signUpWithPasskey` from your UI.
+
+## Passkey Setup
+
+To enable passkeys, you must configure your app's `app.json` file and set up an associated domain.
+For details on setting up Apple's Associated Domains, refer to [Apple's Documentation](https://developer.apple.com/documentation/xcode/supporting-associated-domains).
+For Android, you must configure Digital Asset Links by setting up an `assetlinks.json` file. Refer to [Google's Documentation](https://developer.android.com/training/app-links/verify-android-applinks).
+
+### 1. Update `app.json` with associated domains
+
+```json
+{
+  "ios": {
+    "supportsTablet": true,
+    "bundleIdentifier": "<your_bundle_identifier>",
+    "associatedDomains": ["webcredentials:<your_domain>"]
+  },
+  "android": {
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "category": ["BROWSABLE", "DEFAULT"],
+        "data": {
+          "scheme": "https",
+          "host": "<your_domain>"
+        }
+      }
+    ]
+  }
+}
+```
+
+### 2. Ensure `rpId` is set correctly in your Turnkey provider configuration
+
+Set the `passkeyConfig.rpId` to the domain you've associated (for example, `yourdomain.com`). This should match the domain configured in Associated Domains (iOS) and Digital Asset Links (Android).
+
+```ts constants/turnkey.ts
+import type { TurnkeyProviderConfig } from "@turnkey/react-native-wallet-kit";
+
+export const TURNKEY_CONFIG: TurnkeyProviderConfig = {
+  organizationId: process.env.EXPO_PUBLIC_ORGANIZATION_ID!,
+  authProxyConfigId: process.env.EXPO_PUBLIC_AUTH_PROXY_CONFIG_ID!,
+  passkeyConfig: {
+    rpId: "yourdomain.com",
+  },
+  auth: {
+    passkey: true,
+    otp: { email: true },
+    oauth: {
+      appScheme: "myapp", // for OAuth deep links if also using socials
+    },
+  },
+};
+```
+
+## Usage
+
+Below are examples based on the sample app to sign up and log in with passkeys using Expo Router.
+
+### Sign up with passkey
+
+```tsx app/index.tsx
+import { useState } from "react";
+import { Alert, Button, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export default function LoginScreen() {
+  const router = useRouter();
+  const { signUpWithPasskey } = useTurnkey();
+  const [loading, setLoading] = useState(false);
+
+  const handleSignUpWithPasskey = async () => {
+    try {
+      setLoading(true);
+      await signUpWithPasskey();
+      router.replace("/(main)");
+    } catch (error) {
+      console.error("Error signing up with passkey", error);
+      Alert.alert("Error", "Failed to sign up with passkey");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button
+        title="Sign up with passkey"
+        onPress={handleSignUpWithPasskey}
+        disabled={loading}
+      />
+    </View>
+  );
+}
+```
+
+### Log in with passkey
+
+```tsx app/index.tsx
+import { useState } from "react";
+import { Alert, Button, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+export default function LoginScreen() {
+  const router = useRouter();
+  const { loginWithPasskey } = useTurnkey();
+  const [loading, setLoading] = useState(false);
+
+  const handleLoginWithPasskey = async () => {
+    try {
+      setLoading(true);
+      await loginWithPasskey();
+      router.replace("/(main)");
+    } catch (error) {
+      console.error("Error logging in with passkey", error);
+      Alert.alert("Error", "Failed to log in with passkey");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ padding: 16 }}>
+      <Button
+        title="Login with passkey"
+        onPress={handleLoginWithPasskey}
+        disabled={loading}
+      />
+    </View>
+  );
+}
+```
+
+## Tips
+
+- Ensure your `rpId` matches the domain configured in your platform setup; otherwise passkey operations may fail.
+- On iOS, confirm your provisioning profile includes Associated Domains and your app build contains the entitlements.
+- On Android, deploy a valid `assetlinks.json` at `https://<your_domain>/.well-known/assetlinks.json` that grants your application signature permission.
+- Consider setting a dynamic `passkeyDisplayName` on sign-up (e.g., `${AppName}-${timestamp}`) if you want to help users identify authenticators later.

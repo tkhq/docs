@@ -1,0 +1,277 @@
+---
+title: 'Use Turnkey wallets with Jupiter'
+sidebarTitle: "Jupiter integration"
+---
+
+## Overview
+
+[Jupiter](https://station.jup.ag/) is Solana’s leading liquidity aggregator, enabling users to execute optimal token swaps across multiple DEXs through its [Ultra API](https://station.jup.ag/docs/apis/ultra-api).
+
+This cookbook shows how to integrate **Turnkey** wallets with **Jupiter Ultra Swap** using the [`with-jupiter`](https://github.com/tkhq/sdk/tree/main/examples/with-jupiter) example.  
+You’ll learn how to authenticate with Turnkey, load a wallet, and use it to create, sign, and send Solana swap transactions directly through the Jupiter API.
+
+---
+
+## Getting started
+
+Before you begin, make sure you’ve followed the [Turnkey Quickstart guide](/getting-started/quickstart).  
+You should have:
+
+- A Turnkey **organization** and **Auth Proxy Config ID** 
+- An account funded with **SOL** and optionally **USDC**
+
+You’ll also need:
+- Access to the **Jupiter API** (Ultra API)
+- Access to a Solana RPC Provider (e.g., `https://solana-rpc.publicnode.com`)
+
+---
+
+## Install dependencies
+
+```bash
+npm install @turnkey/react-wallet-kit @turnkey/solana @solana/web3.js
+```
+
+## Setting up the Turnkey wallet
+
+We’ll use the @turnkey/react-wallet-kit package to authenticate and manage a wallet session.
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { useTurnkey, WalletAccount } from "@turnkey/react-wallet-kit";
+import { TurnkeySigner } from "@turnkey/solana";
+import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
+
+const connection = new Connection("https://solana-rpc.publicnode.com", "confirmed");
+
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+function LoginButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full mt-6 bg-black hover:bg-gray-800 text-white font-semibold py-4 rounded-xl transition-all active:scale-98"
+    >
+      Login / Sign Up
+    </button>
+  );
+}
+
+function LogoutButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full mt-6 bg-gray-200 hover:bg-gray-300 text-black font-semibold py-4 rounded-xl transition-all active:scale-98"
+    >
+      Logout
+    </button>
+  );
+}
+
+export default function JupiterSwapPage() {
+  const { wallets, httpClient, handleLogin, logout } = useTurnkey();
+  const [activeWalletAccount, setActiveWalletAccount] = useState<WalletAccount | null>(null);
+  const [status, setStatus] = useState<string>("");
+
+  const signer = activeWalletAccount
+    ? new TurnkeySigner({
+        organizationId: activeWalletAccount.organizationId,
+        client: httpClient!,
+      })
+    : null;
+
+  return (
+    <div className="p-6 max-w-lg mx-auto">
+      {!activeWalletAccount ? (
+        <LoginButton onClick={handleLogin} />
+      ) : (
+        <LogoutButton onClick={logout} />
+      )}
+      <div className="mt-4 text-sm text-gray-500">{status}</div>
+    </div>
+  );
+}
+```
+
+## Fetching a swap quote from Jupiter Ultra
+
+You can query Jupiter’s Ultra API for a swap quote between two tokens.
+
+```tsx
+export async function getUltraQuote({
+  inputMint,
+  outputMint,
+  amount,
+  userPublicKey,
+}: {
+  inputMint: string;
+  outputMint: string;
+  amount: number;
+  userPublicKey: string;
+}) {
+  const response = await fetch("https://lite-api.jup.ag/ultra/v1/quote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      inputMint,
+      outputMint,
+      amount,
+      userPublicKey,
+      swapMode: "ExactIn",
+    }),
+  });
+
+  if (!response.ok) throw new Error("Failed to fetch quote");
+  return response.json();
+}
+```
+
+## Creating and executing a swap transaction
+
+Once you’ve selected a quote, you can request a transaction from Jupiter and sign it using your Turnkey signer.
+
+```tsx
+export async function createUltraOrder({
+  inputMint,
+  outputMint,
+  amount,
+  userPublicKey,
+}: {
+  inputMint: string;
+  outputMint: string;
+  amount: number;
+  userPublicKey: string;
+}) {
+  const response = await fetch("https://lite-api.jup.ag/ultra/v1/swap", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userPublicKey,
+      inputMint,
+      outputMint,
+      amount,
+      computeUnitPriceMicroLamports: 1,
+    }),
+  });
+
+  if (!response.ok) throw new Error("Failed to create swap transaction");
+  return response.json();
+}
+
+export async function executeUltraOrder({
+  encodedTx,
+  signer,
+  connection,
+}: {
+  encodedTx: string;
+  signer: TurnkeySigner;
+  connection: Connection;
+}) {
+  const transaction = VersionedTransaction.deserialize(
+    Buffer.from(encodedTx, "base64"),
+  );
+  await signer.signTransaction(transaction);
+  const txSig = await connection.sendTransaction(transaction);
+  return txSig;
+}
+```
+
+## Putting it all together
+
+Here’s an example component that performs a USDC → SOL swap.
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { useTurnkey, WalletAccount } from "@turnkey/react-wallet-kit";
+import { TurnkeySigner } from "@turnkey/solana";
+import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { createUltraOrder, executeUltraOrder, getUltraQuote } from "../actions/jupiter";
+
+const connection = new Connection("https://solana-rpc.publicnode.com", "confirmed");
+
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+export default function JupiterSwap() {
+  const { wallets, httpClient, handleLogin, logout } = useTurnkey();
+  const [activeWalletAccount, setActiveWalletAccount] = useState<WalletAccount | null>(null);
+  const [status, setStatus] = useState<string>("");
+
+  const signer = activeWalletAccount
+    ? new TurnkeySigner({
+        organizationId: activeWalletAccount.organizationId,
+        client: httpClient!,
+      })
+    : null;
+
+  async function handleSwap() {
+    if (!signer || !activeWalletAccount) return;
+
+    setStatus("Fetching quote...");
+    const quote = await getUltraQuote({
+      inputMint: USDC_MINT,
+      outputMint: SOL_MINT,
+      amount: 1000000, // 1 USDC (6 decimals)
+      userPublicKey: activeWalletAccount.address,
+    });
+
+    setStatus("Creating swap transaction...");
+    const { swapTransaction } = await createUltraOrder({
+      inputMint: USDC_MINT,
+      outputMint: SOL_MINT,
+      amount: 1000000,
+      userPublicKey: activeWalletAccount.address,
+    });
+
+    setStatus("Signing and sending...");
+    const txSig = await executeUltraOrder({
+      encodedTx: swapTransaction,
+      signer,
+      connection,
+    });
+
+    setStatus(`Swap sent! View on Solscan: https://solscan.io/tx/${txSig}`);
+  }
+
+  return (
+    <div className="p-6 max-w-md mx-auto">
+      <button
+        onClick={handleSwap}
+        className="w-full bg-black text-white font-semibold py-4 rounded-xl hover:bg-gray-800 transition-all active:scale-98"
+      >
+        Swap 1 USDC → SOL
+      </button>
+      <div className="mt-4 text-sm text-gray-500">{status}</div>
+    </div>
+  );
+}
+```
+
+## Checking balances
+
+You can fetch a user’s token balances directly from the Jupiter Ultra API.
+
+```tsx
+const balancesResponse = await fetch(
+  `https://lite-api.jup.ag/ultra/v1/balances/${activeWalletAccount?.address}`,
+).then((res) => res.json());
+
+console.log("User balances:", JSON.stringify(balancesResponse, null, 2));
+```
+
+## Summary
+
+✅ You’ve now learned how to:
+
+- Authenticate a user with Turnkey
+
+- Use a TurnkeySigner to sign Solana transactions
+
+- Interact with Jupiter Ultra API for token swaps
+
+- Retrieve balances and verify swap transactions on Solscan

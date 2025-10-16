@@ -1,0 +1,227 @@
+---
+title: 'Use Turnkey wallets with 0x'
+sidebarTitle: "0x integration"
+---
+
+## Overview
+
+[0x](https://0x.org) is a swap platform that allows users to swap various tokens on different chains. In this guide, we’ll walk through how to use **Turnkey** wallets to sign transactions that interact with 0x, adding an allowance with the [Allowance Holder Contract](https://0x.org/docs/introduction/0x-cheat-sheet#allowanceholder-recommended) and swapping ETH and USDC.
+
+We'll demonstrate this using the [`with-0x`](https://github.com/tkhq/sdk/tree/main/examples/with-0x) example, which integrates **Turnkey**, **Ethereum**, and **0x** for EVM swaps.
+
+---
+
+## Getting started
+
+Before you begin, make sure you’ve followed the [Turnkey Quickstart guide](/getting-started/quickstart).  
+You should have:
+
+- A Turnkey **organization** and **Auth Proxy Config ID** 
+- Once you generate an account with the example, the account funded with **ETH**
+
+You’ll also need your **0X API key** (see the [Breeze Developer Portal](https://dashboard.0x.org/)).
+
+---
+
+## Install dependencies
+
+```bash
+npm install @turnkey/react-wallet-kit @turnkey/viem viem wagmi
+```
+
+## Setting up the Turnkey wallet
+
+We’ll use the @turnkey/react-wallet-kit package to authenticate and load a Turnkey wallet in the browser.
+
+```tsx
+"use client";
+
+import { useTurnkey, WalletAccount } from "@turnkey/react-wallet-kit";
+import { createAccount } from "@turnkey/viem";
+
+export default function SwapPage() {
+  const { httpClient, session, fetchWalletAccounts, wallets } = useTurnkey();
+  const [viemWalletClient, setViemWalletClient] = useState<WalletClient | undefined>(undefined);
+
+  // obtain a users turnkey wallets
+  const walletAccountResponse = await fetchWalletAccounts({
+    wallet: wallets[0],
+  });
+
+  // create a viem account with the turnkey wallet
+  const turnkeyViemAccount = await createAccount({
+    client: httpClient!,
+    organizationId: walletAccountResponse[0].organizationId,
+    signWith: walletAccountResponse[0].address,
+    ethereumAddress: walletAccountResponse[0].address,
+  });
+
+  const viemWalletClient = createWalletClient({
+    account: turnkeyAccount as Account,
+    chain: mainnet,
+    transport: http(MAINNET_RPC_PROVIDER),
+  })
+  // Render your login/logout and account selector UI here
+}
+```
+
+## Setting up 0x
+
+We’ll make calls to the 0x API to retrieve soft prices and firm quotes for the swap transaction. GetPrice is used for a price estimate, where GetQuote signifies to the opposite party that you are committing to the swap and they should reserve these funds.
+
+```tsx
+"use server";
+
+export interface PriceParams {
+  chainId: string;
+  sellToken: string;
+  buyToken: string;
+  sellAmount: string;
+  taker: string;
+}
+
+export async function getPrice(priceParams: PriceParams) {
+  const params = new URLSearchParams({
+    chainId: priceParams.chainId,
+    sellToken: priceParams.sellToken,
+    buyToken: priceParams.buyToken,
+    sellAmount: priceParams.sellAmount,
+    taker: priceParams.taker,
+  });
+
+  const headers = {
+    "0x-api-key": process.env.ZEROX_API_KEY!, // Get your live API key from the 0x Dashboard (https://dashboard.0x.org/apps)
+    "0x-version": "v2",
+  };
+
+  const priceResponse = await fetch(
+    "https://api.0x.org/swap/allowance-holder/price?" + params.toString(),
+    {
+      headers,
+    },
+  );
+
+  const response = await priceResponse.json();
+
+  return response;
+}
+
+// Quotes and Prices use the same parameters
+export async function getQuote(quoteParams: PriceParams) {
+  const params = new URLSearchParams({
+    chainId: quoteParams.chainId,
+    sellToken: quoteParams.sellToken,
+    buyToken: quoteParams.buyToken,
+    sellAmount: quoteParams.sellAmount,
+    taker: quoteParams.taker,
+  });
+
+  const headers = {
+    "0x-api-key": process.env.ZEROX_API_KEY!, // Get your live API key from the 0x Dashboard (https://dashboard.0x.org/apps)
+    "0x-version": "v2",
+  };
+
+  const quoteResponse = await fetch(
+    "https://api.0x.org/swap/allowance-holder/quote?" + params.toString(),
+    {
+      headers,
+    },
+  );
+
+  const response = await quoteResponse.json();
+
+  return response;
+}
+```
+
+## Creating a Swap after receiving a quote
+
+```tsx
+import { parseEther } from "viem";
+import { mainnet } from "viem/chains";
+
+const ETH_TOKEN_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const USDC_MAINNET_TOKEN_ADDRESS = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+
+async function handleSwap() {
+  const quoteParams: PriceParams = {
+    chainId: mainnet.id.toString(),
+    sellToken: ETH_TOKEN_ADDRESS, // the token address of the sending token
+    buyToken: USDC_MAINNET_TOKEN_ADDRESS, // the token address of the asset to receive
+    sellAmount: parseEther(fromAmount).toString() // the amount of ETH in human readable form 1.0 == 1 ETH
+    taker: address, // the receiving address of the swap
+  };
+
+  const getQuoteResponse = await getQuote(quoteParams);
+
+  const sendTransactionResponse = await viemWalletClient?.sendTransaction({
+    to: getQuoteResponse?.transaction.to,
+    data: getQuoteResponse?.transaction.data,
+    // value is only used when the sending token is ETH
+    value: getQuoteResponse?.transaction.value  ? BigInt(getQuoteResponse.transaction.value) : undefined,
+    account: turnkeyViemAccount!, // initialized in "Setting up Turnkey Wallet"
+    chain: mainnet,
+  });
+}
+```
+
+## Setting Allowances
+
+You will need to set an allowance to swap ERC-20 tokens that are not ETH. 0x uses an [Allowance Holder Contract](https://0x.org/docs/introduction/0x-cheat-sheet#allowanceholder-recommended) to achieve this.
+
+This code snippet shows how to check and set the allowance for an address for USDC.
+
+```tsx
+"use client";
+
+import { createPublicClient, erc20Abi, maxUint256, parseUnits } from "viem";
+import { mainnet } from "viem/chains";
+
+const USDC_MAINNET_TOKEN_ADDRESS = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // ETH MAINNET USDC token contract address 
+const MAINNET_0X_ALLOWANCE_HOLDER_ADDRESS = "0x0000000000001fF3684f28c67538d4D072C22734"; // 0x Allowance Holder contract address
+
+const address = "<end user wallet address>"; // this should be the address sending the USDC to swap
+const fromAmount = "<human readable amount of USDC to swap>" // 1 == 1 USDC
+
+const viemPublicClient = createPublicClient({
+  chain: mainnet,
+  transport: http(MAINNET_RPC_PROVIDER),
+});
+
+// get the current allowance
+const currentAllowance = await viemPublicClient?.readContract({
+  address: USDC_MAINNET_TOKEN_ADDRESS,
+  abi: erc20Abi,
+  functionName: "allowance",
+  args: [address, MAINNET_0X_ALLOWANCE_HOLDER_ADDRESS],
+});
+
+// check if allowance is greater than the requested swap amount
+if (currentAllowance < parseUnits(fromAmount, 6)) {
+  // update allowance if its too little
+  const approveAllowanceHash = await viemWalletClient?.writeContract({
+    address: USDC_MAINNET_TOKEN_ADDRESS,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [MAINNET_0X_ALLOWANCE_HOLDER_ADDRESS, maxUint256], //setting the allowance to max int, but can set it to parseUnits(fromAmount, 6) to approve exactly the desired amount for this transaction
+    chain: mainnet,
+    account: turnkeyViemAccount!, // initialized in "Setting up Turnkey Wallet"
+  });
+
+  // wait for the approval to be successful
+  const receipt = await viemPublicClient!.waitForTransactionReceipt({
+    hash: approveAllowanceHash!,
+  });
+}
+
+```
+
+## Summary
+
+✅ You’ve now learned how to:
+
+- Authenticate with Turnkey via @turnkey/react-wallet-kit
+
+- Set allowances on ERC-20 tokens
+
+- Interact with 0x to retrieve quotes and swap EVM tokens

@@ -1,0 +1,138 @@
+---
+title: "Email and SMS OTP authentication"
+description: "Set up and implement email OTP authentication using @turnkey/react-native-wallet-kit with Expo Router."
+sidebarTitle: "Email & SMS"
+---
+
+## Overview
+
+This guide shows how to implement email OTP authentication using `@turnkey/react-native-wallet-kit` in an Expo app.
+We'll trigger an OTP to a user's email address, navigate to a verification screen, and verify the 6-digit code.
+
+Before you begin:
+
+- Ensure you've completed the provider setup from Getting Started and enabled the **Auth Proxy** with **Email OTP** in the Turnkey Dashboard.
+- In your `TurnkeyProvider` config, make sure `auth.otp.email` is enabled (or enabled via dashboard). See Getting Started for the full provider example.
+
+## Request an OTP (email)
+
+Create or update your login screen to request an email OTP using `initOtp`. The snippet below uses Expo Router to navigate to an `otp` screen with the returned `otpId` and the email address.
+
+```tsx app/index.tsx expandable
+import { useState } from "react";
+import { Alert, Button, TextInput, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+import { OtpType } from "@turnkey/core";
+
+export default function LoginScreen() {
+  const router = useRouter();
+  const { initOtp } = useTurnkey();
+  const [email, setEmail] = useState("");
+
+  const handleEmailSubmit = async () => {
+    if (!email || !email.includes("@")) {
+      Alert.alert("Invalid Email", "Please enter a valid email address");
+      return;
+    }
+
+    const otpId = await initOtp({
+      otpType: OtpType.Email,
+      contact: email,
+    });
+
+    if (!otpId) {
+      Alert.alert("Error", "Failed to initialize OTP");
+      return;
+    }
+
+    router.push({ pathname: "/otp", params: { email, otpId } });
+  };
+
+  return (
+    <View style={{ padding: 24 }}>
+      <TextInput
+        value={email}
+        onChangeText={setEmail}
+        placeholder="you@example.com"
+        autoCapitalize="none"
+        keyboardType="email-address"
+        style={{ borderWidth: 1, padding: 12, marginBottom: 12 }}
+      />
+      <Button title="Continue with email" onPress={handleEmailSubmit} />
+    </View>
+  );
+}
+```
+
+## Verify the OTP code
+
+On a separate `otp` screen, read the `email` and `otpId` from the route and call `completeOtp` with the user-entered 6-digit code.
+
+```tsx app/otp.tsx
+import { useState } from "react";
+import { Alert, Button, TextInput, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+import { OtpType } from "@/types/types"; // or import { OtpType } from "@turnkey/core"
+
+export default function OtpScreen() {
+  const router = useRouter();
+  const { completeOtp } = useTurnkey();
+  const { email, otpId } = useLocalSearchParams<{
+    email: string;
+    otpId: string;
+  }>();
+  const [otpCode, setOtpCode] = useState("");
+
+  const handleVerify = async () => {
+    if (!otpId) {
+      Alert.alert(
+        "Missing OTP",
+        "We could not find your OTP session. Please try again."
+      );
+      return;
+    }
+    // Note: The default OTP length is 6 but can be up to 9 digits
+    // Adjust this conditional guard accordingly
+    if (otpCode.length !== 6) {
+      Alert.alert("Invalid Code", "Please enter a 6-digit code");
+      return;
+    }
+
+    await completeOtp({
+      otpId,
+      otpCode,
+      contact: String(email),
+      otpType: OtpType.Email,
+    });
+
+    // Navigate to the main app once the OTP is verified successfully
+    router.replace("/(main)");
+  };
+
+  return (
+    <View style={{ padding: 24 }}>
+      <TextInput
+        value={otpCode}
+        onChangeText={setOtpCode}
+        placeholder="Enter 6-digit code"
+        keyboardType="number-pad"
+        maxLength={6}
+        style={{
+          borderWidth: 1,
+          padding: 12,
+          marginBottom: 12,
+          letterSpacing: 4,
+        }}
+      />
+      <Button title="Verify" onPress={handleVerify} />
+    </View>
+  );
+}
+```
+
+### Notes
+
+- Default OTP length is 6; if you've customized OTP in the dashboard, validate accordingly.
+- If you need to resend a code, you can call `initOtp` again with the same email.
