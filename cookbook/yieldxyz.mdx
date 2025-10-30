@@ -1,0 +1,284 @@
+---
+title: 'Building on Yield.xyz with Turnkey'
+sidebarTitle: "Yield.xyz integration"
+---
+
+## Overview
+
+[Yield.xyz](https://yield.xyz/) is the ultimate yield infrastructure for Web3, providing one unified API for every yield across 75+ networks. Instead of building and maintaining your own vaults or integrating directly with individual DeFi protocols like Morpho, Aave, or Lido, you can integrate Yield.xyz once and unlock 1,000+ standardized opportunities across staking, lending, and DeFivaults.
+
+Yield.xyz’s API is self-custodial by design: it constructs ready-to-sign transactions for yield actions but leaves execution and signing entirely in your control. You fetch opportunities and action flows from Yield.xyz, and have Turnkey sign and broadcast them under your policy-controlled keys.
+
+### Why Yield.xyz instead direct protocol integrations?
+
+- **No protocol maintenance** – skip deploying/managing your own vaults or building dozens of one-off integrations.
+- **Unified API** – discover, enter, exit, manage, and track positions across 75+ chains and 1,500+ yields with one interface.
+- **Web2 Style UX** — full abstraction of Web3 complexity via Optimized Allocator Vaults (OAVs) which automatically offramp and reinvest any incentive token issued by any protocol. Additional features include charging of deposit, management, and/or performance fees, as well as modules for e.g. cross chain routing.
+- **Pre-configured OAVs** – instantly offer access to 10–20 standardized and pre-configured Optimized Allocator Vaults (“grab-off-the-shelf”) across popular assets.
+- **Custom OAVs** – request dedicated OAVs for specific strategies or branded products.
+- **Monetization** – ability to layer on additional user-level fees per OAV as well as revenue sharing from validators on all staking integrations
+    - *Note: Yield.xyz enforces a minimum 10% fee*
+    - *Note: the validator revenue share is applicable only to PVN members (>30 of the largest validator service providers)*
+- **Security & control** – Turnkey enforces transaction policies so client keys can only interact with the exact vaults/tokens you allow.
+
+By combining Yield.xyz and Turnkey, you deliver a production-ready yield experience in your app with minimal effort: your users can discover, deposit, track, manage, and withdraw – all signed securely with Turnkey.
+
+## Getting started
+
+Follow the [Turnkey Quickstart](https://docs.turnkey.com/getting-started/quickstart) to set up:
+
+- **Turnkey Root API Keys & Org ID** – a root user with API key pair and your Organization ID.
+- **Turnkey Non-Root User & Wallet** – a secondary user (with its own API key) outside the root quorum.
+- **Turnkey Client & Signer** – initialize a Turnkey client (`TurnkeyClient`) with your API key pair and connect a signer (`TurnkeySigner`) from `@turnkey/ethers` to your RPC provider.
+
+Once configured, you’ll be able to:
+
+1. **Discover** available yields with `GET /v1/yields`.
+2. **Act** on them with `POST /v1/actions/{enter|exit|manage}`.
+3. **Track** balances and status with `GET /v1/yields/{id}/balances` 
+
+---
+
+## **Discover a yield (with metadata)**
+
+Discovery is just a read to the Yield.xyz API — Turnkey doesn’t change this step. You’ll typically do it server-side (to keep your Yield API key secret), then surface the results to your app where you’ll later enter using your Turnkey signer.
+
+**Example: USDC yields on Base** 
+
+```tsx
+const res = await fetch(
+  'https://api.yield.xyz/v1/yields?network=base&token=USDC&limit=10',
+  { headers: { 'X-API-KEY': process.env.YIELD_API_KEY! } }
+);
+const items: any[] = await res.json();
+
+// pick one yield
+const selected = items[0];
+const YIELD_ID = selected.id;
+
+// metadata is included in the object
+const apy = selected.rewardRate;
+const token = selected.token;
+const metadata = selected.metadata;
+```
+
+---
+
+## Exemplary Yields
+
+To simplify integration, we provide a set of **ready-to-use yields** across both **Stablecoins**/**DeFi** and **staking** — designed to offer clean UX, consistent APIs, and monetization support. These yields are already live and have seen significant adoption across our clients.
+
+---
+
+**Stablecoin/DeFi Yields**
+
+The Stablecoin/DeFi yields provided here are wrapped using **Optimized Allocator Vaults (OAVs)**, which automatically handle:
+
+- Incentive off-ramping & reinvestment
+- Asset wrapping (where applicable)
+- Fee charging (performance, management, deposit)
+
+This makes OAVs unique: they **enable fee capture for partners while simultaneously simplifying the user experience**, ensuring yield products feel as seamless as mainstream fintech offerings. 
+
+We’ve deployed two sets of OAVs with pre-configured fees — available via API Keys:
+
+- 10% fee OAVs: `4bea9274-7cef-4e43-995b-f35147469ede`
+- 20% fee OAVs: `e35de2d4-93e2-4cf8-b016-b0838fec1f20`
+
+For reference, the expanded list of yields most popular among existing clients (already wrapped into OAVs) can be found **[here](https://docs.yield.xyz/docs/off-the-shelf-oavs#/).** 
+
+| Yield ID | Yield Name | Protocol | Monetization |
+| --- | --- | --- | --- |
+| arbitrum-usdc-gtusdcc-0x7e97fa6893871A2751B5fE961978DCCb2c201E65-4626-vault | Gauntlet USDC Core | Morpho | Available deposit, performance, management fees |
+| ethereum-usds-susds-0xa3931d71877c0e7a3148cb7eb4463524fec27fbd-4626-vault | USDS Sky Savings Rate | Sky | Available deposit, performance, management fees |
+| ethereum-usdc-fusdc-0x9Fb7b4477576Fe5B32be4C1843aFB1e55F251B33-4626-vault | Fluid USDC Vault | Fluid | Available deposit, performance, management fees |
+| base-usdc-smusdc-0x616a4e1db48e22028f6bbf20444cd3b8e3273738-4626-vault | Seamless USDC Vault | Morpho | Available deposit, performance, management fees |
+| base-usdc-aave-v3-lending | USDC Aave Lending | Aave | Available deposit, performance, management fees |
+
+**Staking Yields**
+
+These staking yields are accessible via Yield.xyz, which:
+
+- Enables delegations to any active validator
+- Supports **validator revenue sharing** (50–85% of validator fees) with preferred validators
+- Standardizes interactions across networks (undelegation, cooldowns, reward tracking)
+
+| Yield ID | Network | Exemplary Validator | Validator Address | Monetization |
+| --- | --- | --- | --- | --- |
+| solana-sol-native-multivalidator-staking | Solana | Meria | H2tJNyMHnRF6ahCQLQ1sSycM4FGchymuzyYzUqKEuydk | Deposit fees and revenue share |
+| tron-trx-native-staking | Tron | Luganodes | TGyrSc9ZmTdbYziuk1SKEmdtCdETafewJ9 | Revenue share |
+| bsc-bnb-native-staking | Binance | Figment | 0x477cB5d87144b2a6d93f72e32f5E01a459260D68 | Revenue share |
+| ethereum-eth-everstake-staking | Ethereum | Everstake | N/A | Revenue share |
+| ethereum-eth-figment-staking | Ethereum | Figment | N/A | Revenue share |
+| hyperevm-hype-native-staking | Hyperliquid | Meria | 0x950f8dd5e5030e1fa6ad2cdc4295809d185925d0 | Revenue share |
+| cosmos-atom-native-staking | Cosmos | Chorus One | cosmosvaloper15urq2dtp9qce4fyc85m6upwm9xul3049e02707 | Deposit fees and revenue share |
+
+The full list of staking yields can be found [in the Yield.xyz docs](https://docs.yield.xyz/docs/staking-yields#/).
+
+**Full Yield List**
+
+For the full list of live yields (DeFi + staking), you can:
+
+→ View the [Yield.xyz Dashboard](https://yields-dashboard.yield.xyz/)
+
+→ Query via the [Yield API](https://docs.yield.xyz/reference/yieldscontroller_getyield) as showcased in the above “Discover a yield” section.
+
+---
+
+## Enter the yield (deposit via Yield.xyz)
+
+First, we’ll call the Yield.xyz `POST /v1/actions/enter` endpoint to get the transactions required to enter the Morpho USDC vault on Base. We need to specify the yield ID for this vault, the amount to deposit, and our wallet address. For example, Yield.xyz’s identifier for Morpho’s Base USDC vault might be `"base-usdc-gtusdcf-0x236919f11ff9ea9550a4287696c2fc9e18e6e890-4626-vault"`(you can discover yield IDs via the Yield.xyz API or docs). We’ll deposit 0.5 USDC in this example.
+
+The code below calls the Yield.xyz API (using a fetch request; you could also use Yield.xyz’s SDK) and retrieves the transactions. It then uses the Turnkey signer (connectedSigner from `@turnkey/ethers`) to send each transaction in sequence:
+
+```tsx
+import { ethers } from "ethers";
+import { TurnkeySigner } from "@turnkey/ethers";
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+// initialize Turnkey client and signer
+const turnkeyClient = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_PUBLIC_KEY!,
+    apiPrivateKey: process.env.TURNKEY_PRIVATE_KEY!,
+  })
+);
+
+const turnkeySigner = new TurnkeySigner({
+  client: turnkeyClient,
+  organizationId: process.env.TURNKEY_ORG_ID!,
+  signWith: turnkeyAccount.address,
+});
+
+const provider = new ethers.providers.JsonRpcProvider("<RPC_URL>");
+const connectedSigner = turnkeySigner.connect(provider);
+
+// Prepare entry via Yield.xyz
+const depositAmount = "0.5";
+const enterPayload = {
+  yieldId: '',
+  address: turnkeyAccount.address,
+  arguments: { amount: depositAmount },
+};
+
+const enterRes = await fetch("https://api.yield.xyz/v1/actions/enter", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": process.env.YIELD_API_KEY!,
+  },
+  body: JSON.stringify(enterPayload),
+});
+const action = await enterRes.json();
+
+// Sign and broadcast each transaction step
+for (const tx of action.transactions) {
+  const sent = await connectedSigner.sendTransaction(tx);
+  console.log("Broadcasted tx:", sent.hash);
+}
+```
+
+In the above flow, the first transaction is an ERC-20 approval allowing the vault contract to spend 0.5 USDC on our behalf, and the second is the actual deposit into the vault. Yield.xyz figured out these steps for us – we didn’t have to manually craft the token `approve` or vault `deposit` call (no need to find contract ABIs or addresses ourselves). After executing these, our USDC is now deposited and earning yield in the vault.
+
+## Check user balance
+
+After depositing, we can query the Yield.xyz API to confirm our position and even fetch the current yield stats. Yield.xyz provides a portfolio endpoint to get a unified view of a user’s balances in any yield.
+
+```tsx
+const balanceRes = await fetch(
+  `https://api.yield.xyz/v1/yields/${yieldId}/balances`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.YIELD_API_KEY!,
+    },
+    body: JSON.stringify({ address: turnkeyAccount.address }),
+  }
+);
+const balances = await balanceRes.json();
+console.log("Vault balances:", JSON.stringify(balances, null, 2));
+```
+
+The response will include the amount of USDC we have active in the vault (and any pending yield or rewards). For instance, it might show an active balance of ~0.5 USDC, and possibly any claimable rewards if applicable, all in one payload. Yield.xyz normalizes these outputs across all yields, so even if we were querying a staking position or another DeFi protocol, the format would be consistent.
+
+## Exit the yield (withdraw funds)
+
+Yield.xyz’s `POST /v1/actions/exit` endpoint returns the transaction(s) needed to withdraw. Like with enter, we provide the yield ID, our address, and how much we want to withdraw.
+
+```tsx
+const exitPayload = {
+  yieldId,
+  address: turnkeyAccount.address,
+  arguments: { amount: "0.1" },
+};
+
+const exitRes = await fetch("https://api.yield.xyz/v1/actions/exit", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": process.env.YIELD_API_KEY!,
+  },
+  body: JSON.stringify(exitPayload),
+});
+const exitAction = await exitRes.json();
+
+for (const tx of exitAction.transactions) {
+  const sent = await connectedSigner.sendTransaction(tx);
+  console.log("Withdraw tx:", sent.hash);
+}
+```
+
+In the first step, we requested to withdraw 0.1 USDC. Yield.xyz returned the appropriate transaction (a call to the vault’s `withdraw` function under the hood). We sent it with our Turnkey signer, and once mined, ~0.1 USDC would be back in our wallet.
+
+---
+
+## Monetization
+
+Monetization of yield interactions is possible on multiple levels depending on the yield type:
+
+- **Staking.**
+    - **Deposit Fees**: Leverage **FeeWrapper contracts** (EVM) and **atomic fee transfer mechanisms** (non-EVM) to deduct a percentage of the deposit and transfer it to the recipient in the same transaction.
+    - **Revenue Share:** [Yield.xyz](http://yield.xyz/) has agreements with 30+ validator service providers, entitling clients to a portion of validator revenues (typically 50%–85%).
+        - [Validator revenue share overview](https://www.notion.so/2695318e934e80cea8b1ccb00ac835c0?pvs=21)
+- **DeFi.**
+    - **Revenue Share:** Some major protocols and curators provide revenue share on deposits via the [Yield.xyz](http://yield.xyz/) API.
+        - [DeFi revenue share overview](https://www.notion.so/25b5318e934e803eab5cccfc941a6ba8?pvs=21)
+    - **User-Facing Fees via OAVs:**
+        - **Optimized Allocator Vaults (OAVs)** allow deposit, performance, and management fees to be configured at the user level.
+        - **Performance Fees:** Charged on realized profits.
+        - **Management Fees:** Flat annualized rate applied on AUM.
+        - **Deposit Fees:** Automatically deducted at the time of deposit.
+
+You can identify which monetization options apply to a given yield in the yield metadata, specifically the `possibleFeeTakingMechanisms` object → [API Reference](https://docs.yield.xyz/reference/yieldscontroller_getyield#/)
+
+### **Web2 UX via OAVs**
+
+Beyond monetization, **OAVs deliver a Web2-grade experience for Web3 yields.**
+
+- **Automatic Off-Ramping & Reinvestment:** Incentive tokens are automatically off-ramped into the deposit asset and reinvested, ensuring users earn pure yield in their deposit token.
+- **Automatic Wrapping/Swapping:** Complex asset flows are handled automatically, reducing friction and mirroring the simplicity of Web2 fintech apps.
+- **Unified UX:** End-users interact only with their deposit asset — no juggling of dozens of reward tokens, no manual reinvestments.
+
+This makes OAVs unique: they **enable fee capture for partners while simultaneously simplifying the user experience**, ensuring yield products feel as seamless as mainstream fintech offerings.For reference, the yields most popular among existing clients (already wrapped into OAVs) can be found [**here](https://docs.google.com/spreadsheets/d/1_GphMivV3ebN4-SHlviYx9eyweceI7ple6KmpAajcMY/edit?gid=524025543#gid=524025543).** We’ve deployed two sets of OAVs with pre-configured fees — available via API Keys:
+
+- 10% fee OAVs: `4bea9274-7cef-4e43-995b-f35147469ede`
+- 20% fee OAVs: `e35de2d4-93e2-4cf8-b016-b0838fec1f20`
+
+---
+
+## **Conclusion**
+
+With this integration you can:
+
+- **Discover** yield opportunities across 70+ networks.
+- **Enter** and **Exit** with standardized transactions.
+- **Track** balances and rewards.
+
+All transactions are constructed by Yield.xyz for the selected yield opportunities and signed with Turnkey — no need to write custom contract logic or manage ABIs.
+
+Partners can start with baseline access to public validator delegation and curated OAVs, then request custom OAVs with client-specific fee structures (in addition to the minimum 10% platform fee).
+
+This lets you go to market with yield in days, not months — with more revenue, less engineering overhead, and stronger security guarantees than building and maintaining protocol integrations yourself.
