@@ -1,0 +1,156 @@
+---
+title: "Overview"
+description: "Learn how to set up, log in, or sign up easily in your Flutter app using Turnkey's Flutter SDK."
+sidebarTitle: "Overview"
+---
+
+Turnkey's Flutter SDK makes authentication simple. You can call specific login and signup functions (email/SMS OTP, passkeys, or social logins) to build your own UI and auth flow.
+
+## Authentication state
+
+In Flutter, you access auth state via the `TurnkeyProvider` (a `ChangeNotifier`). The presence of a `session` indicates the user is authenticated.
+
+```dart title=lib/widgets/auth_status.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class AuthStatus extends StatelessWidget {
+  const AuthStatus({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<TurnkeyProvider>(
+      builder: (context, tk, _) {
+        final session = tk.session; // null when not authenticated
+        final user = tk.user;       // may be null until fetched
+
+        if (session != null) {
+          return Text('Welcome back, ${user?.userName ?? 'user'}!');
+        }
+
+        return ElevatedButton(
+          onPressed: () {
+            // Navigate to your login screen or trigger your chosen auth flow
+            // e.g., email OTP, passkey, or social login
+            Navigator.of(context).pushNamed('/login');
+          },
+          child: const Text('Log in'),
+        );
+      },
+    );
+  }
+}
+```
+
+You can also set up an `onSessionSelected` callback in `TurnkeyConfig` to handle post-authentication logic, such as redirecting.
+
+```dart title=snippet (in main.dart where you construct TurnkeyProvider)
+final turnkeyProvider = TurnkeyProvider(
+  config: TurnkeyConfig(
+    // ... your existing config ...
+    onSessionSelected: (session) {
+      // User authenticated — perform navigation or data preloads
+      navigatorKey.currentState?.pushReplacementNamed('/dashboard');
+    },
+  ),
+);
+```
+
+## Listening to provider updates
+
+`TurnkeyProvider` is a `ChangeNotifier`, so you can attach listeners to respond to internal state changes (e.g., when wallets/users are fetched). This pattern is useful when you want to mirror provider data into local widget state.
+
+Below is an example (adapted from the [demo app](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app)) that keeps a local `selectedWallet`/`selectedAccount` in sync with the provider:
+
+```dart title=lib/screens/dashboard.dart (excerpt)
+class DashboardScreenState extends State<DashboardScreen> {
+  Wallet? _selectedWallet;
+  v1WalletAccount? _selectedAccount;
+
+  late final TurnkeyProvider _turnkeyProvider;
+  late final VoidCallback _providerListener;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Capture provider once; no context in listener later.
+    _turnkeyProvider = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    _providerListener = _handleProviderUpdate;
+    _turnkeyProvider.addListener(_providerListener);
+
+    // Initialize local selections from provider.
+    _updateSelectedWalletFromProvider(_turnkeyProvider);
+  }
+
+  @override
+  void dispose() {
+    // Always remove listeners to avoid calling setState on a disposed widget.
+    _turnkeyProvider.removeListener(_providerListener);
+    super.dispose();
+  }
+
+  void _handleProviderUpdate() {
+    if (!context.mounted) return;
+    _updateSelectedWalletFromProvider(_turnkeyProvider);
+  }
+
+  void _updateSelectedWalletFromProvider(TurnkeyProvider provider) {
+    final wallets = provider.wallets;
+    final user = provider.user;
+
+    if (user == null || wallets == null || wallets.isEmpty) return;
+    if (wallets.first.accounts.isEmpty) return;
+
+    if (!context.mounted) return;
+    setState(() {
+      _selectedWallet = wallets.first;
+      _selectedAccount = wallets.first.accounts.first;
+    });
+  }
+}
+```
+
+> **Tips**
+>
+> * Use `addListener/removeListener` for one-off reactions to state changes.
+> * Use `Consumer`, `Selector`, or `context.select` when you want automatic rebuilds based on specific slices of provider state.
+> * Avoid calling `setState` inside your listener after the widget is disposed — always guard with `if (!mounted) return;` or `if (!context.mounted) return;`.
+
+## Customize sub-organization creation
+
+Need to configure default user names, passkey names, wallet creations or anything sub-org related? You can learn more about customizing the sub-orgs you create in the [Sub-Organization Customization](/sdks/flutter/sub-organization-customization).
+
+Follow the guides below to learn how to set up email and SMS authentication, passkey authentication, and social logins in your Flutter app.
+
+<CardGroup>
+  <Card
+    title="Email & SMS"
+    href="/sdks/flutter/email-sms-otp-auth"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to set up email and SMS authentication in your Flutter app.
+  </Card>
+  <Card
+    title="Passkey Authentication"
+    href="/sdks/flutter/passkey-auth"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to set up passkey authentication in your Flutter app.
+  </Card>
+  <Card
+    title="Social Logins"
+    href="/sdks/flutter/social-logins"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Discover how to add social logins (Google, Apple, X, Discord) and handle wallet creation and account derivation.
+  </Card>
+</CardGroup>

@@ -1,0 +1,154 @@
+---
+
+title: "Passkey authentication"
+description: "Set up and implement passkey authentication using Turnkey's Flutter SDK."
+sidebarTitle: "Passkeys"
+---
+
+## Overview
+
+This guide shows how to implement passkey authentication in a Flutter app using `turnkey_sdk_flutter`.
+You'll add the necessary platform configuration, set up the provider with a proper `rpId`, and call `signUpWithPasskey` and `loginWithPasskey` from your UI.
+
+## Passkey setup (platform)
+
+Passkeys require an **Relying Party ID (rpId)** that matches a domain you control and a verified association between your app and that domain.
+
+### iOS — Associated Domains
+
+1. **Enable the entitlement** in Xcode for your iOS target:
+
+   * Select your app target → **Signing & Capabilities** → **+ Capability** → **Associated Domains**.
+   * Add an entry: `webcredentials:yourdomain.com` (replace with your domain).
+
+2. **Entitlements file** (if editing manually): `ios/Runner/Runner.entitlements`
+
+```xml title=ios/Runner/Runner.entitlements
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.developer.associated-domains</key>
+  <array>
+    <string>webcredentials:yourdomain.com</string>
+  </array>
+</dict>
+</plist>
+```
+
+> Ensure your provisioning profile includes **Associated Domains**. The domain must serve a valid **Apple App Site Association (AASA)** file.
+
+3. **AASA file** hosted by your domain at `https://yourdomain.com/.well-known/apple-app-site-association`.
+   The file should include your app's team/app identifiers. Refer to Apple's documentation for the exact structure.
+
+### Android — Digital Asset Links
+
+1. Host a **Digital Asset Links** statement at:
+   `https://yourdomain.com/.well-known/assetlinks.json`
+
+2. Include your app's package name and signing certificate SHA‑256 fingerprint.
+
+```json title=public/.well-known/assetlinks.json
+[
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.myapp",
+      "sha256_cert_fingerprints": [
+        "AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90"
+      ]
+    }
+  }
+]
+```
+
+> Make sure the file is served with `Content-Type: application/json` and no redirects.
+
+## Provider configuration
+
+Set `passkeyConfig.rpId` to the domain you associated above (e.g., `yourdomain.com`). This must match the iOS/Android domain setup.
+
+```dart title=lib/main.dart (excerpt)
+final turnkeyProvider = TurnkeyProvider(
+  config: TurnkeyConfig(
+    //  ... your existing config ...
+    passkeyConfig: PasskeyConfig(
+      rpId: 'yourdomain.com',   // Note: You can also manually pass the rpId into the login/signUp methods
+    ),
+  ),
+);
+```
+
+## Usage
+
+Below are minimal examples to sign up and log in with passkeys.
+
+### Sign up with passkey
+
+```dart title=lib/screens/login.dart (excerpt)
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ElevatedButton(
+          onPressed: () async {
+            await tk.signUpWithPasskey();   // rpId can be passed here optionally instead of in the TurnkeyProvider config
+            // onSessionSelected will handle navigation on success
+          },
+          child: const Text('Sign up with passkey'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+### Log in with passkey
+
+```dart title=lib/screens/login.dart (excerpt)
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ElevatedButton(
+          onPressed: () async {
+            await tk.loginWithPasskey();    // rpId can be passed here optionally instead of in the TurnkeyProvider config
+            // onSessionSelected will handle navigation on success
+          },
+          child: const Text('Log in with passkey'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+## Tips
+
+* `rpId` **must** match the domain configured in your platform setup, otherwise passkey operations will fail.
+* iOS: confirm your build includes **Associated Domains** and the AASA file is reachable.
+* Android: confirm `assetlinks.json` is valid and your app's package name + signing certificate fingerprint are correct.
+* Consider setting a dynamic display name for passkeys on sign-up so users can identify authenticators later.
