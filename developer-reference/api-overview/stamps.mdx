@@ -6,91 +6,94 @@ description: "Every request made to Turnkey must include a signature over the PO
 ### API Keys
 
 To create a valid, API key stamped request follow these steps:
+
 <Steps>
-   <Step>
-      Sign the JSON-encoded POST body with your API key to produce a `signature` (DER-encoded)
-   </Step>
-   <Step>
-      Hex encode the `signature`
+  <Step>
+    Sign the JSON-encoded POST body with your API key to produce a `signature` (DER-encoded)
+  </Step>
+  <Step>
+    Hex encode the `signature`
+  </Step>
+  <Step>
+    Create a JSON-encoded stamp:
 
-   </Step>
-   <Step>
-      Create a JSON-encoded stamp:
-
-         * `publicKey`: the public key of API key, note that only P-256 keys (API_KEY_CURVE_P256) are currenlty supported
-         * `signature`: the signature produced by the API key
-         * `scheme`: `SIGNATURE_SCHEME_TK_API_P256`
-   </Step>
-   <Step>
-      Base64URL encode the stamp
-   </Step>
-   <Step>
-      Attach the encoded string to your request as a `X-Stamp` header
-   </Step>
-   <Step>
-      Submit the stamped request to Turnkey's API
-   </Step>
+    - `publicKey`: the public key of API key, note that only P-256 keys (API_KEY_CURVE_P256) are currently supported
+    - `signature`: the signature produced by the API key
+    - `scheme`: `SIGNATURE_SCHEME_TK_API_P256`
+  </Step>
+  <Step>
+    Base64URL encode the stamp
+  </Step>
+  <Step>
+    Attach the encoded string to your request as a `X-Stamp` header
+  </Step>
+  <Step>
+    Submit the stamped request to Turnkey's API
+  </Step>
 </Steps>
 
 ### WebAuthn
 
 To create a valid, Webauthn authenticator stamped request follow these steps:
+
 <Steps>
-   <Step>
-      Compute the webauthn challenge by hashing the POST body bytes (JSON encoded) with SHA256. For example, if the POST body is `{"organization_id": "1234", "type": "ACTIVITY_TYPE_CREATE_API_KEYS", "params": {"for": "example"}`, the webauthn challenge is the string `7e8b4653fc7e51dc119cea031942f4693b4742ceca4dda269b925802b38b2147`
-   </Step>
-   <Step>
-      Include the challenge amongst WebAuthn signing options. Refer to the existing stamper implementations in the [following section](#stampers)) for examples
+  <Step>
+    Compute the webauthn challenge by hashing the POST body bytes (JSON encoded) with SHA256. For example, if the POST body is `{"organization_id": "1234", "type": "ACTIVITY_TYPE_CREATE_API_KEYS", "params": {"for": "example"}`, the webauthn challenge is the string `7e8b4653fc7e51dc119cea031942f4693b4742ceca4dda269b925802b38b2147`
+  </Step>
+  <Step>
+    Include the challenge amongst WebAuthn signing options. Refer to the existing stamper implementations in the [following section](#stampers)) for examples
 
+    - Note that if you need to pass the challenge as bytes, you'll need to utf8-encode the challenge string (in JS, the challenge bytes will be `TextEncoder().encode("7e8b4653fc7e51dc119cea031942f4693b4742ceca4dda269b925802b38b2147")`)
+    - Additional note for React Native contexts: the resulting string should then additionally be base64-encoded. See [implementation](https://github.com/tkhq/sdk/blob/b52db566e79a65eec8d8e7066053d6a3ac5f3943/packages/react-native-passkey-stamper/src/util.ts#L5-L10)
+  </Step>
+  <Step>
+    Create a JSON-encoded stamp:
 
-      * Note that if you need to pass the challenge as bytes, you'll need to utf8-encode the challenge string (in JS, the challenge bytes will be `TextEncoder().encode("7e8b4653fc7e51dc119cea031942f4693b4742ceca4dda269b925802b38b2147")`)
-      * Additional note for React Native contexts: the resulting string should then additionally be base64-encoded. See [implementation](https://github.com/tkhq/sdk/blob/b52db566e79a65eec8d8e7066053d6a3ac5f3943/packages/react-native-passkey-stamper/src/util.ts#L5-L10)
+    - `credentialId`: the id of the webauthn authenticator
+    - `authenticatorData`: the authenticator data produced by Webauthn assertion
+    - `clientDataJson`: the client data produced by the Webauthn assertion
+    - `signature`: the signature produced by the Webauthn assertion
+  </Step>
+  <Step>
+    Attach the JSON-encoded stamp to your request as a `X-Stamp-Webauthn` header
 
-   </Step>
-
-   <Step>
-      Create a JSON-encoded stamp:
-
-      * `credentialId`: the id of the webauthn authenticator
-      * `authenticatorData`: the authenticator data produced by Webauthn assertion
-      * `clientDataJson`: the client data produced by the Webauthn assertion
-      * `signature`: the signature produced by the Webauthn assertion
-   </Step>
-
-   <Step>
-      Attach the JSON-encoded stamp to your request as a `X-Stamp-Webauthn` header
-
-         * Header names are case-insensitive (so `X-Stamp-Webauthn` and `X-Stamp-WebAuthn` are considered equivalent)
-
-         * Unlike API key stamps, the format is just JSON; no base64URL encoding necessary! For example: `X-Stamp-Webauthn: {"authenticatorData":"UaQZ...","clientDataJson":"eyJ0...","credentialId":"Grf...","signature":"MEQ..."}`
-   </Step>
-
-   <Step>
-      Submit the stamped request to Turnkey's API. If you would like your client request to be proxied through a backend, refer to the patterns mentioned [here](/authentication/passkeys/integration#proxying-signed-requests). An example application that uses this pattern can be found at wallet.tx.xyz (code [here](https://github.com/tkhq/demo-embedded-wallet/))
-   </Step>
+    - Header names are case-insensitive (so `X-Stamp-Webauthn` and `X-Stamp-WebAuthn` are considered equivalent)
+    - Unlike API key stamps, the format is just JSON; no base64URL encoding necessary! For example: `X-Stamp-Webauthn: {"authenticatorData":"UaQZ...","clientDataJson":"eyJ0...","credentialId":"Grf...","signature":"MEQ..."}`
+  </Step>
+  <Step>
+    Submit the stamped request to Turnkey's API. If you would like your client request to be proxied through a backend, refer to the patterns mentioned [here](/authentication/passkeys/integration#proxying-signed-requests). An example application that uses this pattern can be found at wallet.tx.xyz (code [here](https://github.com/tkhq/demo-embedded-wallet/))
+  </Step>
 </Steps>
 
 ### Stampers
 
 Our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) abstract request stamping for you. If you choose to use an independent client, you will need to implement this yourself. For reference, check out our implementations:
 
-<CardGroup>
-   <Card title="API Key Stamper" href="https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper" icon="github" iconType="solid" horizontal/>
-
-   <Card title="WebAuthn Stamper" href="https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper" icon="github" iconType="solid" horizontal/>
-
-   <Card title="React Native Stamper" href="https://github.com/tkhq/sdk/tree/main/packages/react-native-passkey-stamper" icon="github" iconType="solid" horizontal/>
-
-   <Card title="iFrame Stamper" href="https://github.com/tkhq/sdk/tree/main/packages/iframe-stamper" icon="github" iconType="solid" horizontal/>
-
-   <Card title="Telegram Cloud Storage Stamper" href="https://github.com/tkhq/sdk/tree/main/packages/telegram-cloud-storage-stamper" icon="github" iconType="solid" horizontal/>
-   
-   <Card title="IndexedDb Stamper" href="https://github.com/tkhq/sdk/tree/main/packages/indexed-db-stamper" icon="github" iconType="solid" horizontal/>
-
-   <Card title="CLI" href="https://github.com/tkhq/tkcli/blob/main/src/cmd/turnkey/pkg/request.go" icon="github" iconType="solid" horizontal/>
-
-   <Card title="Wallet Stamper" href="https://github.com/tkhq/sdk/tree/main/packages/wallet-stamper" icon="github" iconType="solid" horizontal/>
-
+<CardGroup cols={2}>
+  <Card title="API Key Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper">
+    
+  </Card>
+  <Card title="WebAuthn Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/blob/main/packages/webauthn-stamper">
+    
+  </Card>
+  <Card title="React Native Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/tree/main/packages/react-native-passkey-stamper">
+    
+  </Card>
+  <Card title="iFrame Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/tree/main/packages/iframe-stamper">
+    
+  </Card>
+  <Card title="Telegram Cloud Storage Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/tree/main/packages/telegram-cloud-storage-stamper">
+    
+  </Card>
+  <Card title="IndexedDb Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/tree/main/packages/indexed-db-stamper">
+    
+  </Card>
+  <Card title="CLI" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/tkcli/blob/main/src/cmd/turnkey/pkg/request.go">
+    
+  </Card>
+  <Card title="Wallet Stamper" icon="github" iconType="solid" horizontal href="https://github.com/tkhq/sdk/tree/main/packages/wallet-stamper">
+    
+  </Card>
 </CardGroup>
 
 Our CLI has a `--no-post` option to generate stamps without sending anything over the network. This is a useful tool should you have trouble with debugging stamping-related logic. A sample command might look something like:
