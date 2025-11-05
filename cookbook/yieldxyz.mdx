@@ -5,7 +5,7 @@ sidebarTitle: "Yield.xyz integration"
 
 ## Overview
 
-[Yield.xyz](https://yield.xyz/) is the ultimate yield infrastructure for Web3, providing one unified API for every yield across 75+ networks. Instead of building and maintaining your own vaults or integrating directly with individual DeFi protocols like Morpho, Aave, or Lido, you can integrate Yield.xyz once and unlock 1,000+ standardized opportunities across staking, lending, and DeFivaults.
+[Yield.xyz](https://yield.xyz/) is the ultimate yield infrastructure for Web3, providing one unified API for every yield across 75+ networks. Instead of building and maintaining your own vaults or integrating directly with individual DeFi protocols like Morpho, Aave, or Lido, you can integrate Yield.xyz once and unlock 1,000+ standardized opportunities across staking, lending, and DeFivaults.
 
 Yield.xyz’s API is self-custodial by design: it constructs ready-to-sign transactions for yield actions but leaves execution and signing entirely in your control. You fetch opportunities and action flows from Yield.xyz, and have Turnkey sign and broadcast them under your policy-controlled keys.
 
@@ -21,7 +21,10 @@ Yield.xyz’s API is self-custodial by design: it constructs ready-to-sign tran
     - *Note: the validator revenue share is applicable only to PVN members (>30 of the largest validator service providers)*
 - **Security & control** – Turnkey enforces transaction policies so client keys can only interact with the exact vaults/tokens you allow.
 
-By combining Yield.xyz and Turnkey, you deliver a production-ready yield experience in your app with minimal effort: your users can discover, deposit, track, manage, and withdraw – all signed securely with Turnkey.
+By combining Yield.xyz and Turnkey, you deliver a production-ready yield experience in your app with minimal effort: your users can discover, deposit, track, manage, and withdraw – all signed securely with Turnkey.  
+The working example can be found [here](https://github.com/tkhq/sdk/tree/main/examples/with-yield-xyz).
+
+---
 
 ## Getting started
 
@@ -50,7 +53,8 @@ const res = await fetch(
   'https://api.yield.xyz/v1/yields?network=base&token=USDC&limit=10',
   { headers: { 'X-API-KEY': process.env.YIELD_API_KEY! } }
 );
-const items: any[] = await res.json();
+const result = (await res.json()) as any; 
+const items = result.items 
 
 // pick one yield
 const selected = items[0];
@@ -139,12 +143,16 @@ import { ApiKeyStamper } from "@turnkey/api-key-stamper";
 
 // initialize Turnkey client and signer
 const turnkeyClient = new TurnkeyClient(
-  { baseUrl: "https://api.turnkey.com" },
+  { baseUrl: process.env.TURNKEY_BASE_URL! },
   new ApiKeyStamper({
-    apiPublicKey: process.env.TURNKEY_PUBLIC_KEY!,
-    apiPrivateKey: process.env.TURNKEY_PRIVATE_KEY!,
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
   })
 );
+
+const turnkeyAccount = {
+  address: process.env.TURNKEY_WALLET_ADDRESS!,
+ };
 
 const turnkeySigner = new TurnkeySigner({
   client: turnkeyClient,
@@ -152,13 +160,13 @@ const turnkeySigner = new TurnkeySigner({
   signWith: turnkeyAccount.address,
 });
 
-const provider = new ethers.providers.JsonRpcProvider("<RPC_URL>");
+const provider = new ethers.JsonRpcProvider("<RPC_URL>");
 const connectedSigner = turnkeySigner.connect(provider);
 
 // Prepare entry via Yield.xyz
 const depositAmount = "0.5";
 const enterPayload = {
-  yieldId: '',
+  yieldId: process.env.YIELD_ID!, 
   address: turnkeyAccount.address,
   arguments: { amount: depositAmount },
 };
@@ -175,8 +183,15 @@ const action = await enterRes.json();
 
 // Sign and broadcast each transaction step
 for (const tx of action.transactions) {
-  const sent = await connectedSigner.sendTransaction(tx);
+	const unsignedTx = JSON.parse(tx.unsignedTransaction);
+  const sent = await connectedSigner.sendTransaction({
+        to: unsignedTx.to,
+        data: unsignedTx.data,
+        value: unsignedTx.value ?? '0x0',
+        chainId: unsignedTx.chainId
+      });
   console.log("Broadcasted tx:", sent.hash);
+  await sent.wait(); //waiting for the approve transaction to be mined
 }
 ```
 
@@ -226,7 +241,13 @@ const exitRes = await fetch("https://api.yield.xyz/v1/actions/exit", {
 const exitAction = await exitRes.json();
 
 for (const tx of exitAction.transactions) {
-  const sent = await connectedSigner.sendTransaction(tx);
+	const unsignedTx = JSON.parse(tx.unsignedTransaction);
+  const sent = await connectedSigner.sendTransaction({
+        to: unsignedTx.to,
+        data: unsignedTx.data,
+        value: unsignedTx.value ?? '0x0',
+        chainId: unsignedTx.chainId
+      });
   console.log("Withdraw tx:", sent.hash);
 }
 ```
