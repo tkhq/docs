@@ -1,6 +1,6 @@
 ---
-title: "Sign transaction"
-description: "Sign a transaction."
+title: "Delete wallet accounts"
+description: "Delete wallet accounts for an organization."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="sign_transaction" />
+<EndpointPath type="submit" path="delete_wallet_accounts" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`
+Enum options: `ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,16 +32,15 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
-    A Wallet account address, Private Key address, or Private Key identifier.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="unsignedTransaction" type="string" required={true} default="">
-    Raw unsigned transaction to be signed
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="type" type="enum<string>" required={true} default="">
-    Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTION_TYPE_TRON`, `TRANSACTION_TYPE_BITCOIN`
+    <ParamField body="walletAccountIds" type="array" required={true} path="parameters.walletAccountIds">
+      <p>List of unique identifiers for wallet accounts within an organization</p>
+      <Expandable title="item details">
+            <p>Array item type: <code>string</code></p>
+            <p>item field</p>
+      </Expandable>
+    </ParamField>
+    <NestedParam parentKey="parameters" childKey="deleteWithoutExport" type="boolean" required={false} default="">
+    Optional parameter for deleting the wallet accounts, even if any have not been previously exported. If they have been exported, this field is ignored.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -67,20 +66,20 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="signTransactionIntentV2" type="object" required={true}>
-      The signTransactionIntentV2 object
-      <Expandable title="signTransactionIntentV2 details">
-        <NestedParam parentKey="activity.intent.signTransactionIntentV2" childKey="signWith" type="string" required={true}>
-A Wallet account address, Private Key address, or Private Key identifier.
+        <NestedParam parentKey="activity.intent" childKey="deleteWalletAccountsIntent" type="object" required={true}>
+      The deleteWalletAccountsIntent object
+      <Expandable title="deleteWalletAccountsIntent details">
+        <NestedParam parentKey="activity.intent.deleteWalletAccountsIntent" childKey="walletAccountIds" type="array" required={true}>
+      List of unique identifiers for wallet accounts within an organization
+      <Expandable title="walletAccountIds details">
+        <NestedParam parentKey="activity.intent.deleteWalletAccountsIntent.walletAccountIds" childKey="item" type="string" required={true}>
+item field
 </NestedParam>
-<NestedParam parentKey="activity.intent.signTransactionIntentV2" childKey="unsignedTransaction" type="string" required={true}>
-Raw unsigned transaction to be signed
-</NestedParam>
-<NestedParam parentKey="activity.intent.signTransactionIntentV2" childKey="type" type="enum" required={true}>
-type field
-  
-Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTION_TYPE_TRON`, `TRANSACTION_TYPE_BITCOIN`
 
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.deleteWalletAccountsIntent" childKey="deleteWithoutExport" type="boolean" required={false}>
+Optional parameter for deleting the wallet accounts, even if any have not been previously exported. If they have been exported, this field is ignored.
 </NestedParam>
 
       </Expandable>
@@ -91,12 +90,18 @@ Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTI
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="signTransactionResult" type="object" required={true}>
-      The signTransactionResult object
-      <Expandable title="signTransactionResult details">
-        <NestedParam parentKey="activity.result.signTransactionResult" childKey="signedTransaction" type="string" required={true}>
-signedTransaction field
+        <NestedParam parentKey="activity.result" childKey="deleteWalletAccountsResult" type="object" required={true}>
+      The deleteWalletAccountsResult object
+      <Expandable title="deleteWalletAccountsResult details">
+        <NestedParam parentKey="activity.result.deleteWalletAccountsResult" childKey="walletAccountIds" type="array" required={true}>
+      A list of wallet account unique identifiers that were removed
+      <Expandable title="walletAccountIds details">
+        <NestedParam parentKey="activity.result.deleteWalletAccountsResult.walletAccountIds" childKey="item" type="string" required={true}>
+item field
 </NestedParam>
+
+      </Expandable>
+    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -129,18 +134,19 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/sign_transaction \
+  --url https://api.turnkey.com/public/v1/submit/delete_wallet_accounts \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "signWith": "<string>",
-        "unsignedTransaction": "<string>",
-        "type": "<TRANSACTION_TYPE_ETHEREUM>"
+        "walletAccountIds": [
+            "<string>"
+        ],
+        "deleteWithoutExport": "<boolean>"
     }
 }'
 ```
@@ -155,10 +161,9 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().signTransaction({
-  signWith: "<string> (A Wallet account address, Private Key address, or Private Key identifier.)",
-  unsignedTransaction: "<string> (Raw unsigned transaction to be signed)",
-  type: "<TRANSACTION_TYPE_ETHEREUM>" // type field
+const response = await turnkeyClient.apiClient().deleteWalletAccounts({
+  walletAccountIds: ["<string>"] // List of unique identifiers for wallet accounts within an organization,
+  deleteWithoutExport: true // Optional parameter for deleting the wallet accounts, even if any have not been previously exported. If they have been exported, this field is ignored.
 });
 ```
 
@@ -171,7 +176,7 @@ const response = await turnkeyClient.apiClient().signTransaction({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -181,15 +186,18 @@ const response = await turnkeyClient.apiClient().signTransaction({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "signTransactionIntentV2": {
-            "signWith": "<string>",
-            "unsignedTransaction": "<string>",
-            "type": "<TRANSACTION_TYPE_ETHEREUM>"
+          "deleteWalletAccountsIntent": {
+            "walletAccountIds": [
+              "<string>"
+            ],
+            "deleteWithoutExport": "<boolean>"
           }
         },
         "result": {
-          "signTransactionResult": {
-            "signedTransaction": "<string>"
+          "deleteWalletAccountsResult": {
+            "walletAccountIds": [
+              "<string>"
+            ]
           }
         },
         "votes": "<array>",

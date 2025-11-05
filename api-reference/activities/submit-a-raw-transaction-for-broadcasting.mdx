@@ -1,6 +1,6 @@
 ---
-title: "Sign transaction"
-description: "Sign a transaction."
+title: "Submit a raw transaction for broadcasting."
+description: "Submit a raw transaction (serialized and signed) for broadcasting to the network."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="sign_transaction" />
+<EndpointPath type="submit" path="eth_send_raw_transaction" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`
+Enum options: `ACTIVITY_TYPE_ETH_SEND_RAW_TRANSACTION`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,16 +32,12 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
-    A Wallet account address, Private Key address, or Private Key identifier.
+    <NestedParam parentKey="parameters" childKey="signedTransaction" type="string" required={true} default="">
+    The raw, signed transaction to be sent.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="unsignedTransaction" type="string" required={true} default="">
-    Raw unsigned transaction to be signed
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="type" type="enum<string>" required={true} default="">
-    Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTION_TYPE_TRON`, `TRANSACTION_TYPE_BITCOIN`
+    <NestedParam parentKey="parameters" childKey="caip2" type="enum<string>" required={true} default="">
+    Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -67,19 +63,16 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="signTransactionIntentV2" type="object" required={true}>
-      The signTransactionIntentV2 object
-      <Expandable title="signTransactionIntentV2 details">
-        <NestedParam parentKey="activity.intent.signTransactionIntentV2" childKey="signWith" type="string" required={true}>
-A Wallet account address, Private Key address, or Private Key identifier.
+        <NestedParam parentKey="activity.intent" childKey="ethSendRawTransactionIntent" type="object" required={true}>
+      The ethSendRawTransactionIntent object
+      <Expandable title="ethSendRawTransactionIntent details">
+        <NestedParam parentKey="activity.intent.ethSendRawTransactionIntent" childKey="signedTransaction" type="string" required={true}>
+The raw, signed transaction to be sent.
 </NestedParam>
-<NestedParam parentKey="activity.intent.signTransactionIntentV2" childKey="unsignedTransaction" type="string" required={true}>
-Raw unsigned transaction to be signed
-</NestedParam>
-<NestedParam parentKey="activity.intent.signTransactionIntentV2" childKey="type" type="enum" required={true}>
-type field
+<NestedParam parentKey="activity.intent.ethSendRawTransactionIntent" childKey="caip2" type="enum" required={true}>
+CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).
   
-Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTION_TYPE_TRON`, `TRANSACTION_TYPE_BITCOIN`
+Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`
 
 </NestedParam>
 
@@ -91,11 +84,11 @@ Enum options: `TRANSACTION_TYPE_ETHEREUM`, `TRANSACTION_TYPE_SOLANA`, `TRANSACTI
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="signTransactionResult" type="object" required={true}>
-      The signTransactionResult object
-      <Expandable title="signTransactionResult details">
-        <NestedParam parentKey="activity.result.signTransactionResult" childKey="signedTransaction" type="string" required={true}>
-signedTransaction field
+        <NestedParam parentKey="activity.result" childKey="ethSendRawTransactionResult" type="object" required={true}>
+      The ethSendRawTransactionResult object
+      <Expandable title="ethSendRawTransactionResult details">
+        <NestedParam parentKey="activity.result.ethSendRawTransactionResult" childKey="transactionHash" type="string" required={true}>
+The transaction hash of the sent transaction
 </NestedParam>
 
       </Expandable>
@@ -129,18 +122,17 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/sign_transaction \
+  --url https://api.turnkey.com/public/v1/submit/eth_send_raw_transaction \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_ETH_SEND_RAW_TRANSACTION",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "signWith": "<string>",
-        "unsignedTransaction": "<string>",
-        "type": "<TRANSACTION_TYPE_ETHEREUM>"
+        "signedTransaction": "<string>",
+        "caip2": "<eip155:1>"
     }
 }'
 ```
@@ -155,10 +147,9 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().signTransaction({
-  signWith: "<string> (A Wallet account address, Private Key address, or Private Key identifier.)",
-  unsignedTransaction: "<string> (Raw unsigned transaction to be signed)",
-  type: "<TRANSACTION_TYPE_ETHEREUM>" // type field
+const response = await turnkeyClient.apiClient().ethSendRawTransaction({
+  signedTransaction: "<string> (The raw, signed transaction to be sent.)",
+  caip2: "<eip155:1>" // CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).
 });
 ```
 
@@ -171,7 +162,7 @@ const response = await turnkeyClient.apiClient().signTransaction({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_ETH_SEND_RAW_TRANSACTION",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -181,15 +172,14 @@ const response = await turnkeyClient.apiClient().signTransaction({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "signTransactionIntentV2": {
-            "signWith": "<string>",
-            "unsignedTransaction": "<string>",
-            "type": "<TRANSACTION_TYPE_ETHEREUM>"
+          "ethSendRawTransactionIntent": {
+            "signedTransaction": "<string>",
+            "caip2": "<eip155:1>"
           }
         },
         "result": {
-          "signTransactionResult": {
-            "signedTransaction": "<string>"
+          "ethSendRawTransactionResult": {
+            "transactionHash": "<string>"
           }
         },
         "votes": "<array>",
