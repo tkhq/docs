@@ -4,135 +4,122 @@ description: "This is a guide to implementing Fiat Onramps within a Turnkey-powe
 mode: wide
 ---
 
-## Using @turnkey/sdk-react
+## Using @turnkey/react-wallet-kit
 
-Setting up Fiat Onramp with [@turnkey/sdk-react](https://www.npmjs.com/package/@turnkey/sdk-react) using the `<Auth/>` component is straightforward.
+Setting up Fiat Onramp with [@turnkey/react-wallet-kit](https://www.npmjs.com/package/@turnkey/react-wallet-kit) is straightforward.
 
-### .initFiatOnRamp()
+### handleOnRamp
 
-The response to `initFiatOnRamp({...})` contains an `onRampUrl` which is used to load the Onramp Widget UI of the selected provider. The URL can be served in a popup, new tab, or an iFrame.
+The `handleOnRamp()` helper abstracts the process of initializing and launching a fiat on-ramp flow as well as polling transaction status.  
 
-```js
-  const response = await indexedDbClient?.initFiatOnRamp({
-    organizationId: session?.organizationId!,
-    ...,
+```ts
+import { handleOnRamp } from "@turnkey/react-wallet-kit";
+
+  const handleAddFunds = async () => {
+    try {
+      await handleOnRamp({
+        onrampProvider: "FIAT_ON_RAMP_PROVIDER_MOONPAY",
+        walletAccount: selectedWalletAccount!,
+        sandboxMode: true,
+      });
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
+```
+
+## White Label Implementation
+
+If you prefer a more **white label** approach, you can replicate the behavior of `handleOnRamp()` directly in your own app.  
+This allows full control over how you open the provider's UI, manage state, and poll transaction status.
+
+The general flow is:
+
+1. Call `initFiatOnRamp()` with your desired parameters to receive the `onRampUrl` and `onRampTransactionId`.
+2. Open the `onRampUrl` in a popup or new tab for the user to complete their purchase.
+3. Poll `getOnRampTransactionStatus()` periodically until the transaction is `COMPLETED`, `FAILED`, or `CANCELLED`.
+4. Handle cleanup and UI updates accordingly.
+
+Below is a simplified example inspired by the internal `handleOnRamp()` implementation:
+
+```ts
+import { useState, useRef, useEffect } from "react";
+import {
+  FiatOnRampCryptoCurrency,
+  FiatOnRampBlockchainNetwork,
+} from "@turnkey/sdk-types";
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+async function whiteLabelOnRamp(walletAccount, organizationId) {
+  const { client } = useTurnkey();
+  let cryptoCurrencyCode;
+  let network;
+
+  switch (true) {
+    case walletAccount.addressFormat === "ADDRESS_FORMAT_ETHEREUM":
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.ETHEREUM;
+      network = FiatOnRampBlockchainNetwork.ETHEREUM;
+      break;
+    case walletAccount.addressFormat?.includes("ADDRESS_FORMAT_BITCOIN"):
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.BITCOIN;
+      network = FiatOnRampBlockchainNetwork.BITCOIN;
+      break;
+    case walletAccount.addressFormat === "ADDRESS_FORMAT_SOLANA":
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.SOLANA;
+      network = FiatOnRampBlockchainNetwork.SOLANA;
+      break;
+    default:
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.ETHEREUM;
+      network = FiatOnRampBlockchainNetwork.ETHEREUM;
+      break;
+  }
+
+  // Step 1: Initialize the on-ramp
+  const result = await client.httpClient.initFiatOnRamp({
+    onrampProvider: "FIAT_ON_RAMP_PROVIDER_MOONPAY",
+    organizationId,
+    walletAddress: walletAccount.address,
+    network,
+    cryptoCurrencyCode,
+    sandboxMode: true,
   });
-```
 
-<Steps>
-<Step title="Initialize the React Provider">
-
-```js
-import { TurnkeyProvider } from "@turnkey/sdk-react";
-
-const turnkeyConfig = {
-  apiBaseUrl: "https://api.turnkey.com",
-  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-};
-
-<div className="App">
-  <TurnkeyProvider config={turnkeyConfig}>
-    <YourAppComponent />
-  </TurnkeyProvider>
-</div>;
-```
-
-</Step>
-
-<Step title="Login with a Passkey and Create a Session">
-
-```js
-import { useTurnkey } from "@turnkey/sdk-react";
-
-const { passkeyClient, indexedDbClient } = useTurnkey();
-
-await indexedDbClient.init();
-const publicKey = await indexedDbClient.getPublicKey();
-
-await passkeyClient.loginWithPasskey({
-  publicKey,
-  sessionType: "SESSION_TYPE_READ_WRITE",
-  expirationSeconds: 900,
-});
-```
-
-</Step>
-
-<Step title="Coinbase - Init Fiat Onramp Flow">
-
-```js
-const { turnkey, indexedDbClient } = useTurnkey();
-
-const generateCoinbaseUrl = async () => {
-  try {
-    const session = await turnkey?.getSession();
-
-    const response = await indexedDbClient?.initFiatOnRamp({
-      organizationId: session?.organizationId!,
-      onrampProvider: "FIAT_ON_RAMP_PROVIDER_COINBASE",
-      walletAddress: ethAddress,
-      network: "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_ETHEREUM",
-      cryptoCurrencyCode: "FIAT_ON_RAMP_CRYPTO_CURRENCY_ETH",
-      fiatCurrencyCode: "FIAT_ON_RAMP_CURRENCY_USD",
-      fiatCurrencyAmount: "10.00",
-      paymentMethod: "FIAT_ON_RAMP_PAYMENT_METHOD_CREDIT_DEBIT_CARD",
-      countryCode: "US",
-      countrySubdivisionCode: "ME",
-      sandboxMode: true,
-    });
-
-    if (response?.onRampUrl) {
-      window.open(
-        response.onRampUrl,
-        "_blank",
-        "popup,width=500,height=700,scrollbars=yes,resizable=yes",
-      );
-    }
-  } catch (error) {
-    console.error("Failed to init Coinbase on-ramp:", error);
+  if (!result?.onRampUrl || !result?.onRampTransactionId) {
+    throw new Error("Invalid onramp initialization response");
   }
-};
-```
 
-</Step>
+  // Step 2: Open the on-ramp URL
+  const popup = window.open(result.onRampUrl, "_blank", "width=500,height=600");
+  if (!popup) throw new Error("Failed to open on-ramp window");
 
-<Step title="MoonPay - Init Fiat Onramp Flow">
+  // Step 3: Poll the transaction status
+  const pollInterval = setInterval(async () => {
+    try {
+      const statusResp = await client.httpClient.getOnRampTransactionStatus({
+        transactionId: result.onRampTransactionId,
+        refresh: true,
+      });
+      const status = statusResp?.transactionStatus;
 
-```js
-const { turnkey, indexedDbClient } = useTurnkey();
-
-const generateMoonPayUrl = async () => {
-  try {
-    const session = await turnkey?.getSession();
-
-    const response = await indexedDbClient?.initFiatOnRamp({
-      organizationId: session?.organizationId!,
-      onrampProvider: "FIAT_ON_RAMP_PROVIDER_MOONPAY",
-      walletAddress: ethAddress,
-      network: "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_ETHEREUM",
-      cryptoCurrencyCode: "FIAT_ON_RAMP_CRYPTO_CURRENCY_ETH",
-      fiatCurrencyCode: "FIAT_ON_RAMP_CURRENCY_USD",
-      fiatCurrencyAmount: "10.00",
-      paymentMethod: "FIAT_ON_RAMP_PAYMENT_METHOD_CREDIT_DEBIT_CARD",
-      sandboxMode: true,
-    });
-
-    if (response?.onRampUrl) {
-      window.open(
-        response.onRampUrl,
-        "_blank",
-        "popup,width=500,height=700,scrollbars=yes,resizable=yes",
-      );
+      if (["COMPLETED", "FAILED", "CANCELLED"].includes(status ?? "")) {
+        clearInterval(pollInterval);
+        popup.close();
+        console.log("On-ramp status:", status);
+      }
+    } catch (err) {
+      console.warn("Polling error:", err);
     }
-  } catch (error) {
-    console.error("Failed to init MoonPay on-ramp:", error);
-  }
-};
+  }, 3000);
+}
 ```
 
-</Step>
-</Steps>
+This approach gives you:
 
-## Activity Parameters
+- Full control over the UI and provider window handling.
+- The ability to customize polling intervals, completion logic, and error handling.
+- A foundation for integrating custom analytics, logging, or notifications.
 
-See the [Init Fiat Onramp Activity API Reference](/api-reference/activities/init-fiat-on-ramp) for the complete request and response definitions.
+## Example
+
+See our example app leveraging `handleOnRamp` [here](https://wallets.turnkey.com/) and the code [here](https://github.com/tkhq/sdk/blob/81884b2ae57f6054d45eb8009f191793c3c46aa8/examples/react-wallet-kit/src/components/demo/DemoPanel.tsx#L116)
