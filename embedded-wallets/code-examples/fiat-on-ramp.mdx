@@ -29,9 +29,96 @@ import { handleOnRamp } from "@turnkey/react-wallet-kit";
 
 ```
 
-## Activity Parameters
+## White Label Implementation
 
-See the [Init Fiat Onramp Activity API Reference](/api-reference/activities/init-fiat-on-ramp) for the complete request and response definitions if you're looking for a more white label solution.
+If you prefer a more **white label** approach, you can replicate the behavior of `handleOnRamp()` directly in your own app.  
+This allows full control over how you open the provider's UI, manage state, and poll transaction status.
+
+The general flow is:
+
+1. Call `initFiatOnRamp()` with your desired parameters to receive the `onRampUrl` and `onRampTransactionId`.
+2. Open the `onRampUrl` in a popup or new tab for the user to complete their purchase.
+3. Poll `getOnRampTransactionStatus()` periodically until the transaction is `COMPLETED`, `FAILED`, or `CANCELLED`.
+4. Handle cleanup and UI updates accordingly.
+
+Below is a simplified example inspired by the internal `handleOnRamp()` implementation:
+
+```ts
+import { useState, useRef, useEffect } from "react";
+import {
+  FiatOnRampCryptoCurrency,
+  FiatOnRampBlockchainNetwork,
+} from "@turnkey/sdk-types";
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+async function whiteLabelOnRamp(walletAccount, organizationId) {
+  const { client } = useTurnkey();
+  let cryptoCurrencyCode;
+  let network;
+
+  switch (true) {
+    case walletAccount.addressFormat === "ADDRESS_FORMAT_ETHEREUM":
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.ETHEREUM;
+      network = FiatOnRampBlockchainNetwork.ETHEREUM;
+      break;
+    case walletAccount.addressFormat?.includes("ADDRESS_FORMAT_BITCOIN"):
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.BITCOIN;
+      network = FiatOnRampBlockchainNetwork.BITCOIN;
+      break;
+    case walletAccount.addressFormat === "ADDRESS_FORMAT_SOLANA":
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.SOLANA;
+      network = FiatOnRampBlockchainNetwork.SOLANA;
+      break;
+    default:
+      cryptoCurrencyCode = FiatOnRampCryptoCurrency.ETHEREUM;
+      network = FiatOnRampBlockchainNetwork.ETHEREUM;
+      break;
+  }
+
+  // Step 1: Initialize the on-ramp
+  const result = await client.httpClient.initFiatOnRamp({
+    onrampProvider: "FIAT_ON_RAMP_PROVIDER_MOONPAY",
+    organizationId,
+    walletAddress: walletAccount.address,
+    network,
+    cryptoCurrencyCode,
+    sandboxMode: true,
+  });
+
+  if (!result?.onRampUrl || !result?.onRampTransactionId) {
+    throw new Error("Invalid onramp initialization response");
+  }
+
+  // Step 2: Open the on-ramp URL
+  const popup = window.open(result.onRampUrl, "_blank", "width=500,height=600");
+  if (!popup) throw new Error("Failed to open on-ramp window");
+
+  // Step 3: Poll the transaction status
+  const pollInterval = setInterval(async () => {
+    try {
+      const statusResp = await client.httpClient.getOnRampTransactionStatus({
+        transactionId: result.onRampTransactionId,
+        refresh: true,
+      });
+      const status = statusResp?.transactionStatus;
+
+      if (["COMPLETED", "FAILED", "CANCELLED"].includes(status ?? "")) {
+        clearInterval(pollInterval);
+        popup.close();
+        console.log("On-ramp status:", status);
+      }
+    } catch (err) {
+      console.warn("Polling error:", err);
+    }
+  }, 3000);
+}
+```
+
+This approach gives you:
+
+- Full control over the UI and provider window handling.
+- The ability to customize polling intervals, completion logic, and error handling.
+- A foundation for integrating custom analytics, logging, or notifications.
 
 ## Example
 
