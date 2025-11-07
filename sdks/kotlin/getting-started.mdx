@@ -1,0 +1,167 @@
+---
+title: "Getting started with Turnkey's Kotlin SDK"
+description: "Learn how to set up Turnkey in your Kotlin application. This page will guide you through the initial setup, including enabling Turnkey's Auth Proxy, installing the Kotlin SDK, and configuring your app."
+sidebarTitle: "Getting started"
+---
+
+## Turnkey organization setup
+
+To start, you must create a Turnkey organization via the [Turnkey dashboard](https://app.turnkey.com). The steps to do so are described in the [Account Setup](/getting-started/quickstart) section.
+
+For this setup, we will be using Turnkey's Auth Proxy to handle authentication. We can enable and configure this through the Turnkey dashboard.
+
+<Steps>
+  <Step title="Enable Auth Proxy">
+    Navigate to the **Wallet Kit** section in the Turnkey Dashboard and enable the
+    **Auth Proxy**.
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-toggle.png"
+      alt="Auth Proxy toggle"
+    />
+
+  </Step>
+
+    <Step title="Customize auth methods">
+
+    You can choose which auth methods to enable and customize various options from this screen. For this quickstart, let's enable **email OTP** and **passkeys**. When you're done, click **Save**.
+
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-options.png"
+      alt="Auth Proxy options"
+    />
+
+    <img
+      src="/images/getting-started/img/quickstart/wallet-kit-options.png"
+      alt="Wallet kit options"
+    />
+
+  </Step>
+
+  <Step title="Finish up">
+
+    Once you're finished with the auth proxy setup, you can copy the **auth proxy config ID**
+
+    <img
+      src="/images/getting-started/img/quickstart/auth-proxy-id.png"
+      alt="Auth Proxy Config id"
+    />
+
+and your **organization ID** from the dashboard.
+
+  <img
+      src="/images/getting-started/img/quickstart/org-id.png"
+      alt="Organization id"
+    />
+  These will be used in the next steps to configure your app.
+</Step>
+</Steps>
+
+## Install the Kotlin SDK
+
+To install the Turnkey Kotlin SDK, add the following dependency to your `build.gradle` file:
+
+```kotlin
+dependencies {
+    implementation("com.turnkey:sdk-kotlin:<version>")
+}
+```
+
+Replace `<version>` with the latest version of the SDK, which you can find on [Maven Central]().
+
+## Configure your application
+
+In order to catch OAuth and Passkey redirects, you'll need to add the `OAuthRedirectActivity` to your `AndroidManifest.xml`:
+
+```xml
+<activity
+    android:name="com.turnkey.core.OAuthRedirectActivity"
+    android:launchMode="singleTop"
+    android:noHistory="true"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="<your-app-scheme>" />
+    </intent-filter>
+</activity>
+```
+
+> To configure your app scheme, choose a unique string (e.g., `com.yourcompany.yourapp`) and replace `<your-app-scheme>` with it. Make sure to use the same app scheme when initializing the Turnkey SDK.
+
+Create a `TurnkeyConfig` and initialize the singleton `TurnkeyContext` from your `Application`.
+
+```kotlin
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        // optional params to pass in on sub-org creation
+        // in this case, we are creating our sub-orgs with a wallet named "Wallet 1" and two wallet accounts (Ethereum & Solana)
+        val createSubOrgParams = CreateSubOrgParams(
+            customWallet = CustomWallet(
+                walletName = "Wallet 1",
+                walletAccounts = listOf(
+                    V1WalletAccountParams(
+                        addressFormat = V1AddressFormat.ADDRESS_FORMAT_ETHEREUM,
+                        curve = V1Curve.CURVE_SECP256K1,
+                        path = "m/44'/60'/0'/0/0",
+                        pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                    ),
+                    V1WalletAccountParams(
+                        addressFormat = V1AddressFormat.ADDRESS_FORMAT_SOLANA,
+                        curve = V1Curve.CURVE_ED25519,
+                        path = "m/44'/501'/0'/0'",
+                        pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                    )
+                )
+            )
+        )
+
+        TurnkeyContext.init(
+            app = this,
+            config = TurnkeyConfig(
+                apiBaseUrl = "https://api.turnkey.com",
+                authProxyBaseUrl = "https://authproxy.turnkey.com",
+                authProxyConfigId = "<your-auth-proxy-config-id>",
+                organizationId = "<your-parent-organization-id>",
+                appScheme = "<your-app-scheme>",
+                authConfig = AuthConfig(
+                    rpId = "<your-rp-id>",
+                    createSubOrgParams = MethodCreateSubOrgParams(
+                        emailOtpAuth = createSubOrgParams,
+                        smsOtpAuth = createSubOrgParams,
+                        passkeyAuth = createSubOrgParams,
+                        oAuth = createSubOrgParams
+                    )
+                )
+            )
+        )
+    }
+}
+```
+
+> Replace `<your-auth-proxy-config-id>`, `<your-parent-organization-id>`, `<your-app-scheme>`, and `<your-rp-id>` with the appropriate values from your Turnkey dashboard and app configuration.
+
+You can now start using the Turnkey Kotlin SDK in your application!
+
+---
+
+Optional client readiness:
+```kotlin
+lifecycleScope.launch {
+    TurnkeyContext.awaitReady()
+    // client available via TurnkeyContext.client
+}
+```
+
+--- 
+
+## Next steps
+
+Now that you have set up the Turnkey Kotlin SDK in your application, you can explore the following guides to implement authentication and wallet functionalities:
+- [Authentication Guide](/sdks/kotlin/authentication)
+- [Wallet Management Guide](/sdks/kotlin/wallet-management)
+- [Signing Guides](/sdks/kotlin/signing)

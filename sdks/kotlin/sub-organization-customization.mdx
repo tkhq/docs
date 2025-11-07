@@ -1,0 +1,159 @@
+---
+title: "Sub-organization customization"
+adescription: "Learn how to customize the sub-organization creation process in your Kotlin app."
+sidebarTitle: "Sub-organization customization"
+---
+
+## Overview
+
+The Kotlin SDK allows you to customize the sub-organization creation process in your Kotlin application. This is useful if you want to create a more tailored experience for your users, including automatically creating wallets, having multiple authentication methods, default usernames, and more. These can be individually configured for each authentication method.
+
+## Customization
+
+You can customize the `createSuborgParams` object inside the `authConfig` object in the `TurnkeyContext.init` configuration. This object allows you to set various parameters for the sub-organization creation process.
+
+Each authentication method can have its own set of parameters. For example, you can set a different default `userName` for `emailOtpAuth` and `passkeyAuth` methods, or create different wallets for each authentication method.
+
+```kotlin
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        TurnkeyContext.init(
+            app = this,
+            config = TurnkeyConfig(
+                // ... your existing configuration
+                authConfig = AuthConfig(
+                    rpId = "your-relying-party-id",
+                    createSubOrgParams = MethodCreateSubOrgParams(
+                        emailOtpAuth = CreateSubOrgParams(
+                            userName = "An email user",
+                            customWallet = CustomWallet(
+                                walletName = "Email Wallet",
+                                walletAccounts = listOf(
+                                    // This will create one Ethereum wallet account for users that sign up with email OTP
+                                    V1WalletAccountParams(
+                                        curve = V1Curve.CURVE_SECP256K1,
+                                        pathFormat = V1PathFormat.PATH_FORMAT_BIP32,
+                                        path = "m/44'/60'/0'/0/0",
+                                        addressFormat = V1AddressFormat.ADDRESS_FORMAT_ETHEREUM
+                                    )
+                                )
+                            )
+                        ),
+                        passkeyAuth = CreateSubOrgParams(
+                            userName = "A passkey user",
+                            customWallet = CustomWallet(
+                                walletName = "Passkey Wallet",
+                                walletAccounts = listOf(
+                                    // This will create one Solana wallet account for users that sign up with passkeys
+                                    V1WalletAccountParams(
+                                        curve = V1Curve.CURVE_ED25519,
+                                        pathFormat = V1PathFormat.PATH_FORMAT_BIP32,
+                                        path = "m/44'/501'/0'/0'",
+                                        addressFormat = V1AddressFormat.ADDRESS_FORMAT_SOLANA
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    }
+}
+```
+
+Or, you can set the same parameters for all authentication methods:
+
+```kotlin
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        val createSubOrgParams = CreateSubOrgParams(
+            userName = "User-${System.currentTimeMillis()}",
+            customWallet = CustomWallet(
+                walletName = "Wallet-${System.currentTimeMillis()}",
+                walletAccounts = listOf(
+                    V1WalletAccountParams(
+                        addressFormat = V1AddressFormat.ADDRESS_FORMAT_ETHEREUM,
+                        curve = V1Curve.CURVE_SECP256K1,
+                        path = "m/44'/60'/0'/0/0",
+                        pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                    )
+                )
+            )
+        )
+
+        TurnkeyContext.init(
+            app = this,
+            config = TurnkeyConfig(
+                // ... your existing configuration
+                authConfig = AuthConfig(
+                    rpId = "your-relying-party-id",
+                    createSubOrgParams = MethodCreateSubOrgParams(
+                        emailOtpAuth = createSubOrgParams,
+                        smsOtpAuth = createSubOrgParams,
+                        passkeyAuth = createSubOrgParams,
+                        oAuth = createSubOrgParams
+                    )
+                )
+            )
+        )
+    }
+}
+```
+
+The complete list of customizable parameters:
+
+### `CreateSubOrgParams`
+
+| Property            | Type                               | Required | Default | Description                                                                                        |
+| ------------------- | ---------------------------------- | -------: | ------- | -------------------------------------------------------------------------------------------------- |
+| `userName`          | `String?`                          |       no | `null`  | Display name for the user being created.                                                           |
+| `subOrgName`        | `String?`                          |       no | `null`  | Name for the new sub-organization.                                                                 |
+| `userEmail`         | `String?`                          |      no* | `null`  | Email for OTP flow. **If set**, you must also supply a valid `verificationToken`.                  |
+| `userTag`           | `String?`                          |       no | `null`  | Arbitrary label for the user (e.g., CRM tag, cohort).                                              |
+| `authenticators`    | `List<CreateSubOrgAuthenticator>?` |       no | `null`  | Seed passkey(s)/WebAuthn authenticators at creation time.                                          |
+| `userPhoneNumber`   | `String?`                          |      no* | `null`  | Phone number for SMS OTP. **If set**, also provide `verificationToken`.                            |
+| `verificationToken` | `String?`                          |      no* | `null`  | Token proving ownership of `userEmail`/`userPhoneNumber` (returned by your OTP verification step). |
+| `apiKeys`           | `List<CreateSubOrgApiKey>?`        |       no | `null`  | Create API keys for the sub-org on day one.                                                        |
+| `customWallet`      | `CustomWallet?`                    |       no | `null`  | Provision a wallet and accounts immediately.                                                       |
+| `oauthProviders`    | `List<V1OauthProviderParams>?`     |       no | `null`  | Attach OAuth identities the user authenticated with.                                               |
+
+> *“Required” depends on flow:
+> * Email OTP → userEmail + verificationToken
+> * SMS OTP → userPhoneNumber + verificationToken
+> * Passkey → authenticators (or you’ll register after)
+> * OAuth → oauthProviders
+
+### `CreateSubOrgAuthenticator`
+
+Represents a passkey/WebAuthn authenticator to attach at sub-org creation.
+
+| Property            | Type            | Required | Description                                                                          |
+| ------------------- | --------------- | -------: | ------------------------------------------------------------------------------------ |
+| `authenticatorName` | `String?`       |       no | Friendly label. If omitted, the SDK can generate one.                                |
+| `challenge`         | `String`        |      yes | Attestation challenge you verified during registration.                              |
+| `attestation`       | `V1Attestation` |      yes | WebAuthn attestation payload (format depends on your API types).                     |
+
+### `CreateSubOrgApiKey`
+
+Creates an API key scoped to the new sub-org.
+
+| Property            | Type             | Required | Default | Description                                                                                             |
+| ------------------- | ---------------- | -------: | ------- | ------------------------------------------------------------------------------------------------------- |
+| `apiKeyName`        | `String?`        |       no | `null`  | Display name for the key.                                                                               |
+| `publicKey`         | `String`         |      yes |   —     | Hex-encoded public key.                                                                                 |
+| `expirationSeconds` | `String?`        |       no | `null`  | TTL in seconds (as string).                                                                             |
+| `curveType`         | `V1ApiKeyCurve?` |       no | `null`  | Curve for the key pair (e.g., `API_KEY_CURVE_P256`, `API_KEY_CURVE_SECP256K1`, `API_KEY_CURVE_ED25519`) |
+
+### `CustomWallet`
+
+Create a wallet (container) plus one or more accounts at signup.
+
+| Property         | Type                          | Required | Description                                                                                              |
+| ---------------- | ----------------------------- | -------: | -------------------------------------------------------------------------------------------------------- |
+| `walletName`     | `String`                      |      yes | Friendly name for the new wallet.                                                                        |
+| `walletAccounts` | `List<V1WalletAccountParams>` |      yes | At least one account. See `V1WalletAccountParams` fields (curve, derivation path, address format, etc.). |

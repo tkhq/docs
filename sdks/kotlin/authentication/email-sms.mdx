@@ -1,0 +1,78 @@
+---
+title: "Email and SMS OTP authentication"
+description: "Set up and implement email OTP authentication using the Turnkey Kotlin SDK."
+sidebarTitle: "Email & SMS"
+---
+
+## Overview
+
+This guide shows how to implement email OTP authentication using the Turnkey Kotlin SDK.
+We'll trigger an OTP to a user's email address and verify the 6-digit code.
+
+Before you being:
+
+- Ensure you've completed the provider setup from Getting Started and enabled the **Auth Proxy** with **Email OTP** in the Turnkey Dashboard.
+- In your Turnkey SDK initialization, make sure `authConfig.methods.emailOtpAuthEnabled` is set to true (or enabled via dashboard). See Getting Started for the full provider example.
+
+## Request an OTP (email)
+
+Create or update your login screen to request an email OTP using `initOtp`. The snippet below demonstrates how to trigger the OTP and verify the 6-digit code to log in.
+
+> For a full flow example, see the [Kotlin SDK Example App](https://github.com/tkhq/kotlin-sdk/tree/main/examples/kotlin-demo-wallet)
+
+```kotlin
+private val _otpId = MutableStateFlow<String?>(null)
+val otpId: StateFlow<String?> = _otpId.asStateFlow()
+
+lifecycleScope.launch {
+    try {
+        val email = "user@example.com"
+        val ( otpId ) = TurnkeyContext.initOtp(
+            otpType = OtpType.OTP_TYPE_EMAIL,
+            contact = email
+        )
+
+        println("OTP sent to email: $email")
+
+        // Store otpId for verification step
+        _otpId.value = otpId
+    } catch (e: Exception) {
+        println("Error sending OTP: ${e.message}")
+    }
+}
+```
+
+## Verify the OTP code
+
+To verify the OTP code entered by the user, use the `loginOrSignUpWithOtp` function with the `otpId`, `otpCode`, and contact email.
+This will automatically log in or sign up the user based on whether they already own an existing sub-org.
+
+```kotlin
+private val _otpId = MutableStateFlow<String?>(null)
+val otpId: StateFlow<String?> = _otpId.asStateFlow()
+
+lifecycleScope.launch {
+    try {
+        val email = "user@example.com"
+        val code = "abc123" // Get this from user input
+
+        val otpId = otpId.value ?: throw IllegalStateException("OTP ID is null")
+
+        TurnkeyContext.loginOrSignUpWithOtp(
+            otpId = otpId,
+            otpCode = code,
+            contact = email,
+            otpType = OtpType.OTP_TYPE_EMAIL
+        )
+
+        println("OTP verified successfully")
+    } catch (e: Exception) {
+        println("Error verifying OTP: ${e.message}")
+    }
+}
+```
+
+### Notes
+
+- Default OTP length is 6; if you've customized OTP in the dashboard, validate accordingly.
+- If you need to resend a code, you can call `initOtp` again with the same email.

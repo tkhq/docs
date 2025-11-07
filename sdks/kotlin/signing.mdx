@@ -1,0 +1,54 @@
+---
+title: "Signing"
+description: "Learn how to sign messages and transactions in your Kotlin app using Turnkey's Embedded Wallets."
+sidebarTitle: "Signing"
+---
+
+## Overview
+
+The Kotlin SDK provides a simple way to sign messages and transactions in your Kotlin application using Turnkey's Embedded Wallets.
+
+## Signing messages
+
+To sign messages, use the `signMessage` function from the `TurnkeyContext`. First pick a wallet account from `wallets` (for example, the first wallet's first account), then sign your message.
+
+```kotlin
+lifecycleScope.launch {
+    val wallets = TurnkeyContext.wallets.value
+    val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
+        ?: throw Exception("No account found. Create a wallet and account before signing.")
+
+    val signature = TurnkeyContext.signMessage(
+        signWith = selectedWalletAccount.address,
+        addressFormat = selectedWalletAccount.addressFormat,
+        message = "Hello Turnkey!"
+    )
+
+    println("${signature.r}${signature.s}${signature.v}")
+}
+```
+
+## Signing transactions
+
+To sign transactions, use the `signTransaction` function from the `TurnkeyContext.client`. Select a wallet account, prepare an unsigned transaction, and specify a transaction type (for example, `TRANSACTION_TYPE_ETHEREUM`).
+
+```kotlin
+lifecycleScope.launch {
+    val selectedWalletAccount = adapter.getSelected() ?: return@launch // Error handling omitted for brevity
+    val organizationId = TurnkeyContext.session.value?.organizationId ?: return@launch
+
+    val unsignedTransaction = "0x..."; // Replace with your unsigned transaction data
+    val res = TurnkeyContext.client.signTransaction(
+        TSignTransactionBody(
+            organizationId = organizationId,
+            signWith = selectedWalletAccount.address,
+            unsignedTransaction = unsignedTransaction,
+            type = V1TransactionType.TRANSACTION_TYPE_ETHEREUM
+        )
+    )
+
+    val signedTransaction = res.activity.result.signTransactionResult?.signedTransaction ?: return@launch
+
+    println(signedTransaction)
+}
+```
