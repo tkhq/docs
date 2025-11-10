@@ -34,7 +34,7 @@ Follow the [Turnkey Quickstart](https://docs.turnkey.com/getting-started/quicks
 - **Organization ID** – logical grouping of resources( e.g. users, wallets, policies).
 - **Root quorum user** – a root user with an API key pair.
 - **[Non-Root User](https://docs.turnkey.com/concepts/overview#users)** – a secondary user (with its own API key) outside the root quorum.
-- **Wallet** – hierarchical deterministic (HD) wallet.
+- **Wallet** – hierarchical deterministic (HD) wallet having at least an Ethereum wallet account.
 - **Turnkey Client & Signer** – initialize a Turnkey client (`TurnkeyClient`) with your API key pair and connect a signer (`TurnkeySigner`) from `@turnkey/ethers` to your RPC provider.
 
 After creating a non-root user with a different API key, the next step is to remove it from the root quorum. You can do this from the Turnkey [dashboard](https://app.turnkey.com/dashboard/security/updateRootQuorum) or [API](https://docs.turnkey.com/api-reference/activities/update-root-quorum). Here’s a simple [script](https://github.com/tkhq/sdk/blob/main/examples/kitchen-sink/src/sdk-server/updateRootQuorum.ts) that shows how to update the root quorum using `@turnkey/sdk-server`.
@@ -55,7 +55,8 @@ Once configured, you’ll be able to:
 
 ## Setting up the policies for the non-root user
 
-Now, we want to use the non-root user for signing transactions to Yield.xyz and restrict it to only be able to interact with the USDC and Yield vault smart contracts. We'll define a new API client that uses the organization’s root user to create the required policy:
+Now, we want to use the non-root user for signing transactions to Yield.xyz and restrict it to only be able to interact with the USDC and Yield vault smart contracts. We'll define a new API client that uses the organization’s root user to create the required policies.   
+Each policy uses the `eth.tx.data` field to identify which smart contract function is being called. The first four bytes of this field represent the function selector. For the `approve` function, the selector is `0x095ea7b3`; for `deposit` it is `0x6e553f65`; and for `withdraw`, it’s `0xba087652`. This allows the policies to precisely restrict the non-root user to only those permitted contract calls.
 
 ```tsx
 import { Turnkey } from "@turnkey/sdk-server";
@@ -77,7 +78,6 @@ async function main() {
   const userId = process.env.NONROOT_USER_ID!;
 
   //approval policy
-
   const approvalPolicy = {
     policyName:
       "Allow API key user to call the approve function on the USDC_ADDRESS",
@@ -103,7 +103,6 @@ async function main() {
   );
 
   //deposit policy
-
   const depositPolicy = {
     policyName:
       "Allow API key user to call the deposit function on the gtUSDCf_VAULT_ADDRESS",
@@ -129,7 +128,6 @@ async function main() {
   );
 
   //withdraw policy
-
   const withdrawPolicy = {
     policyName:
       "Allow API key user to call the withdraw function on the gtUSDCf_VAULT_ADDRESS",
@@ -163,7 +161,7 @@ main().catch((error) => {
 
 ---
 
-## **Discover a yield (with metadata)**
+## Discover a yield (with metadata)
 
 Discovery is just a read to the Yield.xyz API — Turnkey doesn’t change this step. You’ll typically do it server-side (to keep your Yield API key secret), then surface the results to your app where you’ll later enter using your Turnkey signer.
 
@@ -254,7 +252,7 @@ For the full list of live yields (DeFi + staking), you can:
 
 First, we’ll call the Yield.xyz `POST /v1/actions/enter` endpoint to get the transactions required to enter the Morpho USDC vault on Base. We need to specify the yield ID for this vault, the amount to deposit, and our wallet address. For example, Yield.xyz’s identifier for Morpho’s Base USDC vault might be `"base-usdc-gtusdcf-0x236919f11ff9ea9550a4287696c2fc9e18e6e890-4626-vault"`(you can discover yield IDs via the Yield.xyz API or docs). We’ll deposit 0.5 USDC in this example.
 
-The code below calls the Yield.xyz API (using a fetch request; you could also use Yield.xyz’s [SDK](https://www.npmjs.com/package/@stakekit/api-hooks)) and retrieves the transactions. It then uses the Turnkey signer (`connectedSigner` from `@turnkey/ethers`) to send each transaction in sequence:
+The code below calls the Yield.xyz API (using a fetch request; you could also use Yield.xyz’s [SDK](https://www.npmjs.com/package/@stakekit/api-hooks)) and retrieves the transactions. It then uses the non-root Turnkey user to sign and send each transaction in sequence:
 
 ```tsx
 import * as path from "path";
@@ -426,6 +424,7 @@ With this integration you can:
 - **Discover** yield opportunities across 70+ networks.
 - **Enter** and **Exit** with standardized transactions.
 - **Track** balances and rewards.
+- Use Turnkey’s **policy engine** to ensure signing operations can only interact with the intended smart contracts.
 
 All transactions are constructed by Yield.xyz for the selected yield opportunities and signed with Turnkey — no need to write custom contract logic or manage ABIs.
 
