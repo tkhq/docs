@@ -22,6 +22,7 @@ Yield.xyz’s API is self-custodial by design: it constructs ready-to-sign tran
 - **Security & control** – Turnkey enforces transaction policies so client keys can only interact with the exact vaults/tokens you allow.
 
 By combining Yield.xyz and Turnkey, you deliver a production-ready yield experience in your app with minimal effort: your users can discover, deposit, track, manage, and withdraw – all signed securely with Turnkey.  
+
 The working example can be found [here](https://github.com/tkhq/sdk/tree/main/examples/with-yield-xyz).
 
 ---
@@ -30,9 +31,15 @@ The working example can be found [here](https://github.com/tkhq/sdk/tree/main/ex
 
 Follow the [Turnkey Quickstart](https://docs.turnkey.com/getting-started/quickstart) to set up:
 
-- **Turnkey Root API Keys & Org ID** – a root user with API key pair and your Organization ID.
-- **[Turnkey Non-Root User](https://docs.turnkey.com/concepts/overview#users) & Wallet** – a secondary user (with its own API key) outside the root quorum.
+- **Organization ID** – logical grouping of resources( e.g. users, wallets, policies).
+- **Root quorum user** – a root user with an API key pair.
+- **[Non-Root User](https://docs.turnkey.com/concepts/overview#users)** – a secondary user (with its own API key) outside the root quorum.
+- **Wallet** – hierarchical deterministic (HD) wallet.
 - **Turnkey Client & Signer** – initialize a Turnkey client (`TurnkeyClient`) with your API key pair and connect a signer (`TurnkeySigner`) from `@turnkey/ethers` to your RPC provider.
+
+After creating a non-root user with a different API key, the next step is to remove it from the root quorum. You can do this from the Turnkey [dashboard](https://app.turnkey.com/dashboard/security/updateRootQuorum) or [API](https://docs.turnkey.com/api-reference/activities/update-root-quorum). Here’s a simple [script](https://github.com/tkhq/sdk/blob/main/examples/kitchen-sink/src/sdk-server/updateRootQuorum.ts) that shows how to update the root quorum using `@turnkey/sdk-server`.
+
+Also, make sure you have a wallet with an Ethereum account created within this organization and have it funded with some ETH and USDC on Base Mainnet.
 
 Follow the [Yield Project Setup](https://docs.yield.xyz/docs/creating-an-api-key) to create:
 
@@ -43,6 +50,116 @@ Once configured, you’ll be able to:
 1. **Discover** available yields with `GET /v1/yields`.
 2. **Act** on them with `POST /v1/actions/{enter|exit|manage}`.
 3. **Track** balances and status with `GET /v1/yields/{id}/balances` 
+
+---
+
+## Setting up the policies for the non-root user
+
+Now, we want to use the non-root user for signing transactions to Yield.xyz and restrict it to only be able to interact with the USDC and Yield vault smart contracts. We'll define a new API client that uses the organization’s root user to create the required policy:
+
+```tsx
+import { Turnkey } from "@turnkey/sdk-server";
+import * as dotenv from "dotenv";
+import * as path from "path";
+
+// Load environment variables from `.env.local`
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+
+async function main() {
+  const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  }).apiClient();
+
+  // The id of the non-root user that you'll be using to sign the Yield related transactions
+  const userId = process.env.NONROOT_USER_ID!;
+
+  //approval policy
+
+  const approvalPolicy = {
+    policyName:
+      "Allow API key user to call the approve function on the USDC_ADDRESS",
+    effect: "EFFECT_ALLOW" as const,
+    consensus: `approvers.any(user, user.id == '${userId}')`,
+    condition: `eth.tx.to == '${process.env.USDC_ADDRESS}' && eth.tx.data[0..10] == '0x095ea7b3'`,
+    notes: "",
+  };
+
+  const { policyId: approvalPolicyId } =
+    await turnkeyClient.createPolicy(approvalPolicy);
+
+  console.log(
+    [
+      `Created approval policy:`,
+      `- Name: ${approvalPolicy.policyName}`,
+      `- Policy ID: ${approvalPolicyId}`,
+      `- Effect: ${approvalPolicy.effect}`,
+      `- Consensus: ${approvalPolicy.consensus}`,
+      `- Condition: ${approvalPolicy.condition}`,
+      ``,
+    ].join("\n"),
+  );
+
+  //deposit policy
+
+  const depositPolicy = {
+    policyName:
+      "Allow API key user to call the deposit function on the gtUSDCf_VAULT_ADDRESS",
+    effect: "EFFECT_ALLOW" as const,
+    consensus: `approvers.any(user, user.id == '${userId}')`,
+    condition: `eth.tx.to == '${process.env.gtUSDCf_VAULT_ADDRESS}' && eth.tx.data[0..10] == '0x6e553f65'`,
+    notes: "",
+  };
+
+  const { policyId: depositPolicyId } =
+    await turnkeyClient.createPolicy(depositPolicy);
+
+  console.log(
+    [
+      `Created deposit policy:`,
+      `- Name: ${depositPolicy.policyName}`,
+      `- Policy ID: ${depositPolicyId}`,
+      `- Effect: ${depositPolicy.effect}`,
+      `- Consensus: ${depositPolicy.consensus}`,
+      `- Condition: ${depositPolicy.condition}`,
+      ``,
+    ].join("\n"),
+  );
+
+  //withdraw policy
+
+  const withdrawPolicy = {
+    policyName:
+      "Allow API key user to call the withdraw function on the gtUSDCf_VAULT_ADDRESS",
+    effect: "EFFECT_ALLOW" as const,
+    consensus: `approvers.any(user, user.id == '${userId}')`,
+    condition: `eth.tx.to == '${process.env.gtUSDCf_VAULT_ADDRESS}' && eth.tx.data[0..10] == '0xba087652'`,
+    notes: "",
+  };
+
+  const { policyId: withdrawPolicyId } =
+    await turnkeyClient.createPolicy(withdrawPolicy);
+
+  console.log(
+    [
+      `Created withdraw policy:`,
+      `- Name: ${withdrawPolicy.policyName}`,
+      `- Policy ID: ${withdrawPolicyId}`,
+      `- Effect: ${withdrawPolicy.effect}`,
+      `- Consensus: ${withdrawPolicy.consensus}`,
+      `- Condition: ${withdrawPolicy.condition}`,
+      ``,
+    ].join("\n"),
+  );
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+```
 
 ---
 
@@ -74,7 +191,7 @@ const metadata = selected.metadata;
 
 ## Exemplary Yields
 
-To simplify integration, we provide a set of **ready-to-use yields** across both **Stablecoins**/**DeFi** and **staking** — designed to offer clean UX, consistent APIs, and monetization support. These yields are already live and have seen significant adoption across our clients.
+To simplify integration, Yield.xyz provides a set of **ready-to-use yields** across both **Stablecoins**/**DeFi** and **staking** — designed to offer clean UX, consistent APIs, and monetization support. These yields are already live and have seen significant adoption across our clients.
 
 ---
 
@@ -137,66 +254,74 @@ For the full list of live yields (DeFi + staking), you can:
 
 First, we’ll call the Yield.xyz `POST /v1/actions/enter` endpoint to get the transactions required to enter the Morpho USDC vault on Base. We need to specify the yield ID for this vault, the amount to deposit, and our wallet address. For example, Yield.xyz’s identifier for Morpho’s Base USDC vault might be `"base-usdc-gtusdcf-0x236919f11ff9ea9550a4287696c2fc9e18e6e890-4626-vault"`(you can discover yield IDs via the Yield.xyz API or docs). We’ll deposit 0.5 USDC in this example.
 
-The code below calls the Yield.xyz API (using a fetch request; you could also use Yield.xyz’s SDK) and retrieves the transactions. It then uses the Turnkey signer (connectedSigner from `@turnkey/ethers`) to send each transaction in sequence:
+The code below calls the Yield.xyz API (using a fetch request; you could also use Yield.xyz’s [SDK](https://www.npmjs.com/package/@stakekit/api-hooks)) and retrieves the transactions. It then uses the Turnkey signer (`connectedSigner` from `@turnkey/ethers`) to send each transaction in sequence:
 
 ```tsx
+import * as path from "path";
+import * as dotenv from "dotenv";
 import { ethers } from "ethers";
 import { TurnkeySigner } from "@turnkey/ethers";
-import { TurnkeyClient } from "@turnkey/http";
-import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
 
-// initialize Turnkey client and signer
-const turnkeyClient = new TurnkeyClient(
-  { baseUrl: process.env.TURNKEY_BASE_URL! },
-  new ApiKeyStamper({
-    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
-    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
-  })
-);
+// Load environment variables from `.env.local`
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
-const turnkeyAccount = {
-  address: process.env.SIGN_WITH!,
- };
+async function main() {
+  // Initialize the Turnkey client
+  const turnkeyClient = new TurnkeyServerSDK({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: process.env.NONROOT_API_PUBLIC_KEY!,
+    apiPrivateKey: process.env.NONROOT_API_PRIVATE_KEY!,
+    defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  });
 
-const turnkeySigner = new TurnkeySigner({
-  client: turnkeyClient,
-  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
-  signWith: turnkeyAccount.address,
-});
+  // Initialize the Turnkey Signer
+  const turnkeySigner = new TurnkeySigner({
+    client: turnkeyClient.apiClient(),
+    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    signWith: process.env.SIGN_WITH!,
+  });
 
-const provider = new ethers.JsonRpcProvider("<RPC_URL>");
-const connectedSigner = turnkeySigner.connect(provider);
+  const provider = new ethers.JsonRpcProvider(process.env.RPC_URL!);
+  const connectedSigner = turnkeySigner.connect(provider);
 
-// Prepare entry via Yield.xyz
-const depositAmount = "0.5";
-const enterPayload = {
-  yieldId: process.env.YIELD_ID!, 
-  address: turnkeyAccount.address,
-  arguments: { amount: depositAmount },
-};
+  // Prepare entry via Yield.xyz
+  const depositAmount = "0.5";
+  const enterPayload = {
+    yieldId: process.env.YIELD_ID!, // e.g."base-usdc-gtusdcf-0x236919f11ff9ea9550a4287696c2fc9e18e6e890-4626-vault"
+    address: process.env.SIGN_WITH!,
+    arguments: { amount: depositAmount },
+  };
 
-const enterRes = await fetch("https://api.yield.xyz/v1/actions/enter", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "x-api-key": process.env.YIELD_API_KEY!,
-  },
-  body: JSON.stringify(enterPayload),
-});
-const action = await enterRes.json();
+  const enterRes = await fetch("https://api.yield.xyz/v1/actions/enter", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.YIELD_API_KEY!,
+    },
+    body: JSON.stringify(enterPayload),
+  });
+  const action = await enterRes.json();
+  console.log("Yield API response:", JSON.stringify(action, null, 2));
 
-// Sign and broadcast each transaction step
-for (const tx of action.transactions) {
-	const unsignedTx = JSON.parse(tx.unsignedTransaction);
-  const sent = await connectedSigner.sendTransaction({
-        to: unsignedTx.to,
-        data: unsignedTx.data,
-        value: unsignedTx.value ?? '0x0',
-        chainId: unsignedTx.chainId
-      });
-  console.log("Broadcasted tx:", sent.hash);
-  await sent.wait(); //waiting for the approve transaction to be mined
+  // Sign and broadcast each transaction step
+  for (const tx of action.transactions) {
+    const unsignedTx = JSON.parse(tx.unsignedTransaction);
+    const sent = await connectedSigner.sendTransaction({
+      to: unsignedTx.to,
+      data: unsignedTx.data,
+      value: unsignedTx.value ?? "0x0",
+      chainId: unsignedTx.chainId,
+    });
+    console.log("Broadcasted tx:", sent.hash);
+    await sent.wait(); //waiting for the approve transaction to be mined
+  }
 }
+
+main().catch((err) => {
+  console.error("Error running Yield deposit example:", err);
+  process.exit(1);
+});
 ```
 
 In the above flow, the first transaction is an ERC-20 approval allowing the vault contract to spend 0.5 USDC on our behalf, and the second is the actual deposit into the vault. Yield.xyz figured out these steps for us – we didn’t have to manually craft the token `approve` or vault `deposit` call (no need to find contract ABIs or addresses ourselves). After executing these, our USDC is now deposited and earning yield in the vault.
@@ -225,12 +350,12 @@ The response will include the amount of USDC we have active in the vault (and an
 
 ## Exit the yield (withdraw funds)
 
-Yield.xyz’s `POST /v1/actions/exit` endpoint returns the transaction(s) needed to withdraw. Like with enter, we provide the yield ID, our address, and how much we want to withdraw.
+Yield.xyz’s `POST /v1/actions/exit` endpoint returns the transaction data required to perform a withdrawal. Similar to the enter action, you specify the yield ID, your wallet address, and the withdrawal amount.
 
 ```tsx
 const exitPayload = {
   yieldId: process.env.YIELD_ID! ,
-  address: turnkeyAccount.address,
+  address: process.env.SIGN_WITH!,
   arguments: { amount: "0.1" },
 };
 
