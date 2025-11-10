@@ -18,30 +18,51 @@ You can see the [API Reference](/api-reference/overview) for a complete list of 
 Here's how you can use the `client` to make a `signRawPayload` request to Turnkey:
 
 ```kotlin
-lifecycleScope.launch {
-    try {
-        val wallets = TurnkeyContext.wallets.value
-        val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
-            ?: throw Exception("No account found. Create a wallet and account before signing.")
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.types.TSignRawPayloadBody
+import com.turnkey.types.V1HashFunction
+import com.turnkey.types.V1PayloadEncoding
+import kotlinx.coroutines.launch
 
-        val message = "Hello, Turnkey!"
-        val payload = message.toByteArray().toHexString()
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        val response = TurnkeyContext.client.signRawPayload(
-            TSignRawPayloadBody(
-                organizationId = TurnkeyContext.session.value?.organizationId
-                    ?: throw Exception("No active session"),
-                signWith = selectedWalletAccount.address,
-                payload = payload,
-                encoding = V1PayloadEncoding.PAYLOAD_ENCODING_HEXADECIMAL,
-                hashFunction = V1HashFunction.HASH_FUNCTION_NOT_APPLICABLE
-            )
-        )
+        val button = findViewById<Button>(R.id.button)
+        
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val wallets = TurnkeyContext.wallets.value
+                    val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
+                        ?: throw Exception("No account found. Create a wallet and account before signing.")
 
-        val (r, s, v) = response.activity.result.signRawPayloadResult!!
-        println("Message signed: r=$r, s=$s, v=$v")
-    } catch (e: Exception) {
-        println("Error signing message: ${e.message}")
+                    val message = "Hello, Turnkey!"
+                    val payload = message.toByteArray().toHexString()
+
+                    val response = TurnkeyContext.client.signRawPayload(
+                        TSignRawPayloadBody(
+                            organizationId = TurnkeyContext.session.value?.organizationId
+                                ?: throw Exception("No active session"),
+                            signWith = selectedWalletAccount.address,
+                            payload = payload,
+                            encoding = V1PayloadEncoding.PAYLOAD_ENCODING_HEXADECIMAL,
+                            hashFunction = V1HashFunction.HASH_FUNCTION_NOT_APPLICABLE
+                        )
+                    )
+
+                    val (r, s, v) = response.activity.result.signRawPayloadResult!!
+                    println("Message signed: r=$r, s=$s, v=$v")
+                } catch (e: Exception) {
+                    println("Error signing message: ${e.message}")
+                }
+            }
+        }
     }
 }
 ```

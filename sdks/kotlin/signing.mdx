@@ -13,18 +13,42 @@ The Kotlin SDK provides a simple way to sign messages and transactions in your K
 To sign messages, use the `signMessage` function from the `TurnkeyContext`. First pick a wallet account from `wallets` (for example, the first wallet's first account), then sign your message.
 
 ```kotlin
-lifecycleScope.launch {
-    val wallets = TurnkeyContext.wallets.value
-    val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
-        ?: throw Exception("No account found. Create a wallet and account before signing.")
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import kotlinx.coroutines.launch
 
-    val signature = TurnkeyContext.signMessage(
-        signWith = selectedWalletAccount.address,
-        addressFormat = selectedWalletAccount.addressFormat,
-        message = "Hello Turnkey!"
-    )
+class MainActivity : AppCompatActivity() {
+    private val activity = this
 
-    println("${signature.r}${signature.s}${signature.v}")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+
+        button.setOnClickListener {
+            try {
+                lifecycleScope.launch {
+                    val wallets = TurnkeyContext.wallets.value
+                    val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
+                        ?: throw Exception("No account found. Create a wallet and account before signing.")
+
+                    val signature = TurnkeyContext.signMessage(
+                        signWith = selectedWalletAccount.address,
+                        addressFormat = selectedWalletAccount.addressFormat,
+                        message = "Hello Turnkey!"
+                    )
+
+                    println("${signature.r}${signature.s}${signature.v}")
+                }
+            } catch (t: Throwable) {
+                println(t)
+            }
+        }
+    }
 }
 ```
 
@@ -33,22 +57,53 @@ lifecycleScope.launch {
 To sign transactions, use the `signTransaction` function from the `TurnkeyContext.client`. Select a wallet account, prepare an unsigned transaction, and specify a transaction type (for example, `TRANSACTION_TYPE_ETHEREUM`).
 
 ```kotlin
-lifecycleScope.launch {
-    val selectedWalletAccount = adapter.getSelected() ?: return@launch // Error handling omitted for brevity
-    val organizationId = TurnkeyContext.session.value?.organizationId ?: return@launch
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.types.TSignTransactionBody
+import com.turnkey.types.V1TransactionType
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 
-    val unsignedTransaction = "0x..."; // Replace with your unsigned transaction data
-    val res = TurnkeyContext.client.signTransaction(
-        TSignTransactionBody(
-            organizationId = organizationId,
-            signWith = selectedWalletAccount.address,
-            unsignedTransaction = unsignedTransaction,
-            type = V1TransactionType.TRANSACTION_TYPE_ETHEREUM
-        )
-    )
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-    val signedTransaction = res.activity.result.signTransactionResult?.signedTransaction ?: return@launch
+        val button = findViewById<Button>(R.id.button)
 
-    println(signedTransaction)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val wallets = TurnkeyContext.wallets.value
+                    val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
+                        ?: throw Exception("No account found. Create a wallet and account before signing.")
+                    val organizationId = TurnkeyContext.session.value?.organizationId
+                        ?: throw Exception("No session found")
+
+                    val unsignedTransaction =
+                        "0x..."; // Replace with your unsigned transaction data
+                    val res = TurnkeyContext.client.signTransaction(
+                        TSignTransactionBody(
+                            organizationId = organizationId,
+                            signWith = selectedWalletAccount.address,
+                            unsignedTransaction = unsignedTransaction,
+                            type = V1TransactionType.TRANSACTION_TYPE_ETHEREUM
+                        )
+                    )
+
+                    val signedTransaction =
+                        res.activity.result.signTransactionResult?.signedTransaction
+                            ?: return@launch
+
+                    println(signedTransaction)
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
 }
 ```

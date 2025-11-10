@@ -21,23 +21,46 @@ Create or update your login screen to request an email OTP using `initOtp`. The 
 > For a full flow example, see the [Kotlin SDK Example App](https://github.com/tkhq/kotlin-sdk/tree/main/examples/kotlin-demo-wallet)
 
 ```kotlin
-private val _otpId = MutableStateFlow<String?>(null)
-val otpId: StateFlow<String?> = _otpId.asStateFlow()
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.models.OtpType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 
-lifecycleScope.launch {
-    try {
-        val email = "user@example.com"
-        val ( otpId ) = TurnkeyContext.initOtp(
-            otpType = OtpType.OTP_TYPE_EMAIL,
-            contact = email
-        )
+class MainActivity : AppCompatActivity() {
+    private val _otpId = MutableStateFlow<String?>(null)
+    val otpId: StateFlow<String?> = _otpId.asStateFlow()
 
-        println("OTP sent to email: $email")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_main)
 
-        // Store otpId for verification step
-        _otpId.value = otpId
-    } catch (e: Exception) {
-        println("Error sending OTP: ${e.message}")
+        val button = findViewById<Button>(R.id.button)
+
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val email = "user@example.com"
+                    val ( otpId ) = TurnkeyContext.initOtp(
+                        otpType = OtpType.OTP_TYPE_EMAIL,
+                        contact = email
+                    )
+
+                    println("OTP sent to email: $email")
+
+                    // Store otpId for verification step
+                    _otpId.value = otpId
+                } catch (e: Exception) {
+                    println("Error sending OTP: ${e.message}")
+                }
+            }
+        }
     }
 }
 ```
@@ -48,26 +71,49 @@ To verify the OTP code entered by the user, use the `loginOrSignUpWithOtp` funct
 This will automatically log in or sign up the user based on whether they already own an existing sub-org.
 
 ```kotlin
-private val _otpId = MutableStateFlow<String?>(null)
-val otpId: StateFlow<String?> = _otpId.asStateFlow()
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.models.OtpType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 
-lifecycleScope.launch {
-    try {
-        val email = "user@example.com"
-        val code = "abc123" // Get this from user input
+class MainActivity : AppCompatActivity() {
+    private val _otpId = MutableStateFlow<String?>(null)
+    val otpId: StateFlow<String?> = _otpId.asStateFlow()
 
-        val otpId = otpId.value ?: throw IllegalStateException("OTP ID is null")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_main)
 
-        TurnkeyContext.loginOrSignUpWithOtp(
-            otpId = otpId,
-            otpCode = code,
-            contact = email,
-            otpType = OtpType.OTP_TYPE_EMAIL
-        )
+        val button = findViewById<Button>(R.id.button)
 
-        println("OTP verified successfully")
-    } catch (e: Exception) {
-        println("Error verifying OTP: ${e.message}")
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val email = "user@example.com"
+                    val code = "abc123" // Get this from user input
+
+                    val otpId = otpId.value ?: throw IllegalStateException("OTP ID is null")
+
+                    TurnkeyContext.loginOrSignUpWithOtp(
+                        otpId = otpId,
+                        otpCode = code,
+                        contact = email,
+                        otpType = OtpType.OTP_TYPE_EMAIL
+                    )
+
+                    println("OTP verified successfully")
+                } catch (e: Exception) {
+                    println("Error verifying OTP: ${e.message}")
+                }
+            }
+        }
     }
 }
 ```

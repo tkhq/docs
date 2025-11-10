@@ -1,0 +1,143 @@
+---
+title: "Passkey authentication"
+description: "Set up and implement passkey authentication using Turnkey's Kotlin SDK."
+sidebarTitle: "Passkeys"
+---
+
+## Overview
+
+This guide shows how to implement passkey authentication using the Turnkey Kotlin SDK.
+You'll add the necessary platform configuration, set up the provider with a proper `rpId`, and call `loginWithPasskey` and `signUpWithPasskey` from your UI.
+
+## Passkey Setup
+
+To enable passkeys, you must configure your app's relaying party ID (`rpId`) correctly.
+For Android, you must configure a Digital Asset Links by setting up an `assetlinks.json` file. Refer to [Google's Documentation](https://developer.android.com/training/app-links/verify-android-applinks).
+
+### 1. Ensure `rpId` is set correctly in your Turnkey SDK initialization
+
+Set the `rpId` to the domain you've associated (for example, `yourdomain.com`). This should match the domain configured in Digital Asset Links.
+
+```kotlin
+package com.example.test_app
+
+import android.app.Application
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.models.AuthConfig
+import com.turnkey.models.TurnkeyConfig
+
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        TurnkeyContext.init(
+            app = this,
+            config = TurnkeyConfig(
+                // other config params...
+                authConfig = AuthConfig(
+                    rpId = "<your-rp-id>",
+                )
+            )
+        )
+    }
+}
+```
+
+## Usage
+
+You can now call `loginWithPasskey` and `signUpWithPasskey` from your UI to handle passkey authentication.
+
+### Sign up with passkey
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    private val activity = this // Reference to the activity for use in passkey flows
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    TurnkeyContext.signUpWithPasskey(activity = activity)
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+### Log in with passkey
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    private val activity = this // Reference to the activity for use in passkey flows
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    TurnkeyContext.loginWithPasskey(activity = activity)
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+## Tips
+
+- Ensure your `rpId` matches the domain configured in your Digital Asset Links otherwise authentication may fail.
+- For local testing, the simplest way to deploy a valid Digital Asset Links file is to set up a simple static file server and use a tunneling service like [ngrok](https://ngrok.com/) and [LiveServer](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) to expose it over HTTPS.
+- For use in `Fragments` you use `requireActivity()` to get the activity reference.
+
+```kotlin
+import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import com.example.kotlin_demo_wallet.R
+import com.turnkey.core.TurnkeyContext
+import kotlinx.coroutines.launch
+
+class MyFragment : Fragment(R.layout.fragment_main) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+
+        val button = view.findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    TurnkeyContext.loginWithPasskey(activity = requireActivity())
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
