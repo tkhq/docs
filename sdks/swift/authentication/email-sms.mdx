@@ -1,0 +1,154 @@
+---
+title: "Email and SMS OTP authentication"
+description: "Set up and implement email and SMS OTP authentication using the Turnkey Swift SDK (iOS) with SwiftUI."
+sidebarTitle: "Email & SMS"
+---
+
+## Overview
+
+This guide shows how to implement email or SMS OTP authentication using the Turnkey Swift SDK on iOS.  
+You'll trigger an OTP to a user's contact, present a verification screen, and complete the flow with a single call that handles login vs signup.
+
+Before you begin:
+
+- Ensure you've completed the setup in [Getting Started](/sdks/swift/getting-started) and enabled the Auth Proxy with Email/SMS OTP in the Turnkey Dashboard.
+- Make sure your app is configured with `TurnkeyConfig` and `TurnkeyContext.configure(...)`.
+
+## Request an OTP (email)
+
+Create or update your login screen to request an email OTP using `initOtp(contact:otpType:)`.  
+Navigate to your OTP screen with the returned `otpId` and the email address.
+
+```swift LoginView.swift
+import SwiftUI
+import TurnkeySwift
+
+struct LoginView: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+    @State private var email = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            TextField("you@example.com", text: $email)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .frame(height: 48)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+
+            Button("Continue with email") {
+                Task {
+                    guard email.contains("@") else {
+                        errorMessage = "Please enter a valid email"
+                        return
+                    }
+                    do {
+                        let result = try await turnkey.initOtp(contact: email, otpType: .email)
+                        // Navigate to your OTP screen with `email` and `result.otpId`
+                        // Example: OtpScreen(email: email, otpId: result.otpId)
+                    } catch {
+                        errorMessage = "Failed to initialize OTP"
+                    }
+                }
+            }
+            .disabled(!email.contains("@"))
+        }
+        .padding()
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+}
+```
+
+## Verify the OTP code
+
+On your OTP screen, call `completeOtp(...)` with the user-entered code.  
+This will verify the code and automatically complete login or signup as needed.
+
+```swift OtpScreen.swift
+import SwiftUI
+import TurnkeySwift
+
+struct OtpScreen: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+    @Environment(\.dismiss) private var dismiss
+
+    let email: String
+    let otpId: String
+
+    @State private var code = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            TextField("Enter 6-digit code", text: $code)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+                .multilineTextAlignment(.center)
+                .frame(height: 48)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+                .onChange(of: code) { newValue in
+                    code = String(newValue.prefix(6))
+                }
+
+            Button("Verify") {
+                Task {
+                    guard code.count == 6 else {
+                        errorMessage = "Please enter a 6-digit code"
+                        return
+                    }
+                    do {
+                        _ = try await turnkey.completeOtp(
+                            otpId: otpId,
+                            otpCode: code,
+                            contact: email,
+                            otpType: .email
+                        )
+                        // Navigate to your main app upon success
+                        dismiss()
+                    } catch {
+                        errorMessage = "Invalid code. Please try again."
+                    }
+                }
+            }
+            .disabled(code.count != 6)
+        }
+        .padding()
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+}
+```
+
+### SMS OTP
+
+For SMS, pass an E.164-formatted phone number and use `otpType: .sms`:
+
+```swift
+let result = try await turnkey.initOtp(contact: "+15551234567", otpType: .sms)
+// Navigate to your OTP screen with `contact` (phone) and `result.otpId`
+```
+
+Tip: You can use a library like PhoneNumberKit to normalize user input to E.164.
+
+### Notes
+
+- Default OTP length is 6; if you’ve customized the OTP length in the dashboard, validate accordingly (up to 9 digits).
+- To resend a code, call `initOtp(contact:otpType:)` again with the same contact.
+- `completeOtp(...)` internally verifies the code and then decides whether to log in or sign up:
+  - Login path uses `loginWithOtp(verificationToken:publicKey:organizationId:invalidateExisting:sessionKey:)`.
+  - Signup path uses `signUpWithOtp(verificationToken:contact:otpType:createSubOrgParams:invalidateExisting:sessionKey:)` then logs in.
+
+Next steps:
+
+- [Passkeys](/sdks/swift/authentication/passkey)
+- [Social Logins](/sdks/swift/authentication/social-logins)
+- [Proxy Middleware](/sdks/swift/proxy-middleware)
+- [Signing](/sdks/swift/signing)

@@ -1,0 +1,112 @@
+---
+title: "Passkey authentication"
+description: "Set up and implement passkey authentication using the Turnkey Swift SDK (iOS)."
+sidebarTitle: "Passkeys"
+---
+
+## Overview
+
+This guide shows how to implement passkey authentication in an iOS app using the Turnkey Swift SDK.  
+You'll add the required platform configuration, set `rpId`, and call `loginWithPasskey` and `signUpWithPasskey` from your SwiftUI UI.
+
+## Passkey setup (iOS)
+
+To enable passkeys on iOS, configure Associated Domains and provide an `rpId` that matches your domain.
+
+- Add Associated Domains in Xcode (Signing & Capabilities → Associated Domains):
+  - `webcredentials:<your_domain>` (for example, `webcredentials:yourdomain.com`)
+- For details, see Apple's docs on Associated Domains: `https://developer.apple.com/documentation/xcode/supporting-associated-domains`
+
+### Set `rpId` in your SDK configuration
+
+Ensure `TurnkeyConfig` has an `rpId` matching your Associated Domain, and set `organizationId` for login.
+
+```swift
+import TurnkeySwift
+
+let config = TurnkeyConfig(
+  rpId: "yourdomain.com",
+  organizationId: "<your_organization_id>",
+  authProxyConfigId: "<your_auth_proxy_config_id>" // required for passkey sign-up
+)
+TurnkeyContext.configure(config)
+```
+
+## Usage
+
+Below are SwiftUI examples based on the demo app for signing up and logging in with passkeys.
+
+### Log in with passkey
+
+```swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct LoginWithPasskeyButton: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Button("Log in with passkey") {
+      Task {
+        if let anchor = defaultAnchor() {
+          try? await turnkey.loginWithPasskey(anchor: anchor)
+        }
+      }
+    }
+  }
+}
+
+private func defaultAnchor() -> ASPresentationAnchor? {
+  UIApplication.shared
+    .connectedScenes
+    .compactMap { $0 as? UIWindowScene }
+    .first(where: { $0.activationState == .foregroundActive })?
+    .windows
+    .first(where: { $0.isKeyWindow })
+}
+```
+
+Notes:
+
+- `loginWithPasskey` requires `rpId` and an `organizationId` (set in `TurnkeyConfig` or passed to the method).
+- No Auth Proxy is required for login.
+
+### Sign up with passkey
+
+```swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct SignUpWithPasskeyButton: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Button("Sign up with passkey") {
+      Task {
+        if let anchor = defaultAnchor() {
+          try? await turnkey.signUpWithPasskey(anchor: anchor)
+        }
+      }
+    }
+  }
+}
+```
+
+Notes:
+
+- `signUpWithPasskey` requires the Auth Proxy to be configured (`authProxyConfigId`), since signup creates a new sub-organization and user.
+- You can customize the passkey display name during signup:
+
+```swift
+try await turnkey.signUpWithPasskey(
+  anchor: anchor,
+  passkeyDisplayName: "passkey-\(Int(Date().timeIntervalSince1970))"
+)
+```
+
+## Tips
+
+- Ensure your `rpId` exactly matches the domain configured in Associated Domains; otherwise passkey operations will fail.
+- Confirm your provisioning profile includes Associated Domains and your build contains the entitlements.

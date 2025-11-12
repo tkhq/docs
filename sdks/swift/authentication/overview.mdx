@@ -1,0 +1,108 @@
+---
+title: "Overview"
+description: "Learn how to set up, log in, or sign up in your iOS app using the Turnkey Swift SDK."
+sidebarTitle: "Overview"
+---
+
+The Turnkey Swift SDK makes authentication simple.  
+You can compose your own SwiftUI screens and call focused functions for each method (Email/SMS OTP, Passkeys, or Social Logins) to build the exact experience you want [[memory:10136240]].
+
+## Authentication state
+
+Use the shared `TurnkeyContext` to observe authentication and react in your UI.
+
+```swift
+import SwiftUI
+import TurnkeySwift
+
+struct AuthStatusView: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Group {
+      switch turnkey.authState {
+      case .authenticated:
+        Text("Welcome back!")
+      case .loading:
+        ProgressView()
+      default:
+        Button("Log in") {
+          // Navigate to your auth flow (OTP, Passkey, or OAuth)
+        }
+      }
+    }
+    .onChange(of: turnkey.authState) { newState in
+      if newState == .authenticated {
+        // e.g., navigate to dashboard
+      }
+    }
+  }
+}
+```
+
+The context publishes key pieces of state (e.g., `authState`, `session`, `user`, `wallets`), so your views can stay reactive and minimal.
+
+## Configuration
+
+Before implementing any specific method, make sure you've:
+
+- Completed the Swift SDK [Getting started](/sdks/swift/getting-started) guide
+- Configured `TurnkeyContext` with your `organizationId` and (if using Auth Proxy) `authProxyConfigId`
+- Set `rpId` and Associated Domains if you plan to use Passkeys
+- Optionally enabled managed auto-refresh for session state (`autoRefreshManagedState`)
+
+Sessions created by the SDK's auth flows are securely stored and selected automatically; you can also switch or clear sessions via `TurnkeyContext` APIs when needed.
+
+## Sessions
+
+The Swift SDK generates an on-device API key pair to back your session:
+
+- When available, keys are created in the Secure Enclave and the private key material remains non-exportable and hardware-backed. Signing operations occur inside the enclave.
+- If the Secure Enclave isn't available on the device, the SDK falls back to secure storage using the iOS Keychain with appropriate access control.
+
+This design aligns with Apple's guidance on Secure Enclave and Keychain Services. For terminology and security properties, see Apple documentation:
+
+- [Secure Enclave](https://developer.apple.com/documentation/security/certificate_key_and_trust_services/keys/storing_keys_in_the_secure_enclave)
+- [Keychain Services](https://developer.apple.com/documentation/security/keychain_services)
+
+## Customize sub-organization creation
+
+You can tailor default user and wallet creation settings by:
+
+- Passing `CreateSubOrgParams` to signup helpers (e.g., OTP or passkey signup), or
+- Providing defaults via `TurnkeyConfig.Auth.createSuborgParams`
+
+For concepts and recommended defaults, see [Sub-organizations](/concepts/sub-organizations#creating-sub-organizations).
+
+Follow the guides below to implement Email/SMS authentication, Passkey authentication, and Social Logins in your iOS app.
+
+<CardGroup>
+  <Card
+    title="Email & SMS"
+    href="/sdks/swift/authentication/email-sms"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to set up email and SMS authentication using the Auth Proxy.
+  </Card>
+  <Card
+    title="Passkey Authentication"
+    href="/sdks/swift/authentication/passkey"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to set up passkey authentication with system UI and secure sessions.
+  </Card>
+  <Card
+    title="Social Logins"
+    href="/sdks/swift/authentication/social-logins"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Implement OAuth-based logins (Google, Apple, Discord, X) and complete auth via Auth Proxy.
+  </Card>
+
+</CardGroup>

@@ -1,0 +1,190 @@
+---
+title: "Sub-organization customization"
+description: "Learn how to customize sub-organization creation in your iOS app using the Turnkey Swift SDK."
+sidebarTitle: "Sub-organization customization"
+---
+
+## Overview
+
+You can customize how new sub-organizations (and users) are created during signup.  
+There are three levels of customization:
+
+1. Global defaults in `TurnkeyConfig` (applies to all auth methods)
+2. Per-auth-method defaults in `TurnkeyConfig`
+3. Per-call overrides passed to signup helpers (OTP, Passkey, OAuth)
+
+All customizations use the `CreateSubOrgParams` type.
+
+## 1) Configure defaults for all auth methods (global)
+
+Set defaults in `TurnkeyConfig.auth.createSuborgParams`, applying the same parameters across methods.
+
+```swift DemoWalletApp.swift
+import SwiftUI
+import TurnkeySwift
+import TurnkeyTypes
+
+@main
+struct DemoWalletApp: App {
+    @StateObject private var turnkey: TurnkeyContext
+
+    init() {
+        // One example wallet config (Ethereum)
+        let ethAccount = v1WalletAccountParams(
+            addressFormat: .address_format_ethereum,
+            curve: .curve_secp256k1,
+            path: "m/44'/60'/0'/0/0",
+            pathFormat: .path_format_bip32
+        )
+
+        var suborgParams = CreateSubOrgParams()
+        suborgParams.userName = "User-\(Int(Date().timeIntervalSince1970))"
+        suborgParams.customWallet = v1WalletParams(
+            accounts: [ethAccount],
+            walletName: "Wallet-\(Int(Date().timeIntervalSince1970))"
+        )
+
+        let config = TurnkeyConfig(
+            // ... your base config (apiUrl, authProxyUrl, rpId, organizationId, etc.)
+            auth: .init(
+                createSuborgParams: .init(
+                    emailOtpAuth: suborgParams,
+                    smsOtpAuth: suborgParams,
+                    passkeyAuth: suborgParams,
+                    oauth: suborgParams
+                )
+            )
+        )
+        TurnkeyContext.configure(config)
+        _turnkey = StateObject(wrappedValue: TurnkeyContext.shared)
+    }
+
+    var body: some Scene {
+        WindowGroup { /* ... */ }
+    }
+}
+```
+
+## 2) Customize per authentication method
+
+Provide different parameters for each auth method in `TurnkeyConfig.auth.createSuborgParams`.
+
+```swift DemoWalletApp.swift
+import TurnkeySwift
+import TurnkeyTypes
+
+// Example: Ethereum account for email OTP users
+let emailAccount = v1WalletAccountParams(
+    addressFormat: .address_format_ethereum,
+    curve: .curve_secp256k1,
+    path: "m/44'/60'/0'/0/0",
+    pathFormat: .path_format_bip32
+)
+
+// Example: Solana account for passkey users
+let solanaAccount = v1WalletAccountParams(
+    addressFormat: .address_format_solana,
+    curve: .curve_ed25519,
+    path: "m/44'/501'/0'/0'",
+    pathFormat: .path_format_bip32
+)
+
+var emailParams = CreateSubOrgParams()
+emailParams.userName = "Email User"
+emailParams.customWallet = v1WalletParams(
+    accounts: [emailAccount],
+    walletName: "Email Wallet"
+)
+
+var passkeyParams = CreateSubOrgParams()
+passkeyParams.userName = "Passkey User"
+passkeyParams.customWallet = v1WalletParams(
+    accounts: [solanaAccount],
+    walletName: "Passkey Wallet"
+)
+
+let config = TurnkeyConfig(
+    auth: .init(
+        createSuborgParams: .init(
+            emailOtpAuth: emailParams,
+            passkeyAuth: passkeyParams
+            // You can also set smsOtpAuth, oauth, walletAuth as needed
+        )
+    )
+)
+TurnkeyContext.configure(config)
+```
+
+## 3) Customize at the function call (per signup)
+
+You can override defaults at runtime by passing `createSubOrgParams` into signup helpers.  
+This takes precedence over config-level defaults.
+
+### OTP (Email or SMS)
+
+Use `completeOtp(...)` or `signUpWithOtp(...)` with `createSubOrgParams`.
+
+```swift OtpFlow.swift
+import TurnkeySwift
+import TurnkeyTypes
+
+var params = CreateSubOrgParams()
+params.userName = "OTP User"
+params.customWallet = v1WalletParams(
+    accounts: [
+        v1WalletAccountParams(
+            addressFormat: .address_format_ethereum,
+            curve: .curve_secp256k1,
+            path: "m/44'/60'/0'/0/0",
+            pathFormat: .path_format_bip32
+        )
+    ],
+    walletName: "OTP Wallet"
+)
+
+// After verifying code (otpId/otpCode), complete the flow with custom params:
+let result = try await turnkey.completeOtp(
+    otpId: "<otp_id>",
+    otpCode: "<otp_code>",
+    contact: "<email_or_phone>",
+    otpType: .email, // or .sms
+    createSubOrgParams: params
+)
+```
+
+### Passkeys
+
+Use `signUpWithPasskey(...)` with `createSubOrgParams`.
+
+```swift PasskeySignup.swift
+import AuthenticationServices
+import TurnkeySwift
+import TurnkeyTypes
+
+var params = CreateSubOrgParams()
+params.userName = "Passkey User"
+params.customWallet = v1WalletParams(
+    accounts: [
+        v1WalletAccountParams(
+            addressFormat: .address_format_solana,
+            curve: .curve_ed25519,
+            path: "m/44'/501'/0'/0'",
+            pathFormat: .path_format_bip32
+        )
+    ],
+    walletName: "Passkey Wallet"
+)
+
+try await turnkey.signUpWithPasskey(
+    anchor: anchor,
+    createSubOrgParams: params
+)
+```
+
+## Next steps
+
+- [Authentication overview](/sdks/swift/authentication/overview)
+- [Email & SMS](/sdks/swift/authentication/email-sms)
+- [Passkeys](/sdks/swift/authentication/passkey)
+- [Social logins](/sdks/swift/authentication/social-logins)
+- [Advanced API requests](/sdks/swift/advanced-api-requests)
