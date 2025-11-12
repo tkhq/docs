@@ -4,14 +4,34 @@ description: "Learn how to set up, log in, or sign up in your iOS app using the 
 sidebarTitle: "Overview"
 ---
 
-The Turnkey Swift SDK makes authentication simple.  
-You can compose your own SwiftUI screens and call focused functions for each method (Email/SMS OTP, Passkeys, or Social Logins) to build the exact experience you want [[memory:10136240]].
+## Configuration
+
+Before implementing any specific method, make sure you've:
+
+- Completed the Swift SDK [Getting started](/sdks/swift/getting-started) guide
+- Configured `TurnkeyContext` with your `organizationId` and (if using Auth Proxy) `authProxyConfigId`
+- Set `rpId` and Associated Domains if you plan to use Passkeys
+- Optionally enabled managed auto-refresh for session state (`autoRefreshManagedState`)
+
+Sessions created by the SDK's auth flows are securely stored and selected automatically; you can also switch or clear sessions via `TurnkeyContext` APIs when needed.
+
+## Sessions
+
+The Swift SDK generates an on-device API key pair to back your session:
+
+- When available, keys are created in the Secure Enclave and the private key material remains non-exportable and hardware-backed. Signing operations occur inside the enclave.
+- If the Secure Enclave isn't available on the device, the SDK falls back to secure storage using the iOS Keychain with appropriate access control.
+
+This design aligns with Apple's guidance on Secure Enclave and Keychain Services. For terminology and security properties, see Apple documentation:
+
+- [Secure Enclave](https://developer.apple.com/documentation/security/certificate_key_and_trust_services/keys/storing_keys_in_the_secure_enclave)
+- [Keychain Services](https://developer.apple.com/documentation/security/keychain_services)
 
 ## Authentication state
 
-Use the shared `TurnkeyContext` to observe authentication and react in your UI.
+Use the shared `TurnkeyContext` to observe authentication and react in your UI by observing the `authState` property.
 
-```swift
+```swift focus={5,9-10,12,20-24}
 import SwiftUI
 import TurnkeySwift
 
@@ -42,29 +62,6 @@ struct AuthStatusView: View {
 
 The context publishes key pieces of state (e.g., `authState`, `session`, `user`, `wallets`), so your views can stay reactive and minimal.
 
-## Configuration
-
-Before implementing any specific method, make sure you've:
-
-- Completed the Swift SDK [Getting started](/sdks/swift/getting-started) guide
-- Configured `TurnkeyContext` with your `organizationId` and (if using Auth Proxy) `authProxyConfigId`
-- Set `rpId` and Associated Domains if you plan to use Passkeys
-- Optionally enabled managed auto-refresh for session state (`autoRefreshManagedState`)
-
-Sessions created by the SDK's auth flows are securely stored and selected automatically; you can also switch or clear sessions via `TurnkeyContext` APIs when needed.
-
-## Sessions
-
-The Swift SDK generates an on-device API key pair to back your session:
-
-- When available, keys are created in the Secure Enclave and the private key material remains non-exportable and hardware-backed. Signing operations occur inside the enclave.
-- If the Secure Enclave isn't available on the device, the SDK falls back to secure storage using the iOS Keychain with appropriate access control.
-
-This design aligns with Apple's guidance on Secure Enclave and Keychain Services. For terminology and security properties, see Apple documentation:
-
-- [Secure Enclave](https://developer.apple.com/documentation/security/certificate_key_and_trust_services/keys/storing_keys_in_the_secure_enclave)
-- [Keychain Services](https://developer.apple.com/documentation/security/keychain_services)
-
 ## Customize sub-organization creation
 
 You can tailor default user and wallet creation settings by:
@@ -72,7 +69,11 @@ You can tailor default user and wallet creation settings by:
 - Passing `CreateSubOrgParams` to signup helpers (e.g., OTP or passkey signup), or
 - Providing defaults via `TurnkeyConfig.Auth.createSuborgParams`
 
-For concepts and recommended defaults, see [Sub-organizations](/concepts/sub-organizations#creating-sub-organizations).
+For more information, see [Sub-organization customization](/sdks/swift/sub-organization-customization) and for concepts, see [Sub-organizations](/concepts/sub-organizations).
+
+---
+
+## Next steps
 
 Follow the guides below to implement Email/SMS authentication, Passkey authentication, and Social Logins in your iOS app.
 
