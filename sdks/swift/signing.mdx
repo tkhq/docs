@@ -88,18 +88,117 @@ Notes:
 To sign and broadcast Ethereum transactions you can use Web3.swift alongside the Turnkey HTTP client.  
 This is typically done in a server or other trusted environment. See the full walkthrough in the Swift SDK repo.
 
-```swift
-// 1) Build the unsigned EIP-1559 transaction (using Web3.swift)
-// 2) Serialize to hex string (e.g. "02" + RLP-encoded fields)
-// 3) Sign with Turnkey HTTP client
-import TurnkeyHttp
+### Prerequisite: initialize TurnkeyContext
 
-let client = TurnkeyClient()
-let response = try await client.signTransaction(
-    organizationId: "<organization_id>",
-    signWith: "<private_key_id> or <wallet_address>",
-    unsignedTransaction: "<rlp_hex_string>",
-    _type: .TRANSACTION_TYPE_ETHEREUM
+```swift App.swift
+import SwiftUI
+import TurnkeySwift
+
+@main
+struct MyApp: App {
+  @StateObject private var turnkey: TurnkeyContext
+
+  init() {
+    let config = TurnkeyConfig(
+      authProxyConfigId: "<your_auth_proxy_config_id>",
+      rpId: "<your_rp_id>",
+      organizationId: "<your_organization_id>"
+    )
+    TurnkeyContext.configure(config)
+    _turnkey = StateObject(wrappedValue: TurnkeyContext.shared)
+  }
+
+  var body: some Scene {
+    WindowGroup {
+      ContentView()
+        .environmentObject(turnkey)
+    }
+  }
+}
+```
+
+### Step 1: Setup Web3 and Ethereum address
+
+```swift
+import Web3
+
+let infuraAPIKey = "<infura_api_key>"
+let walletFromAddress = "<wallet_from_address>"
+let web3 = Web3(rpcURL: "https://holesky.infura.io/v3/\(infuraAPIKey)")
+let from = try EthereumAddress(hex: walletFromAddress, eip55: true)
+```
+
+### Step 2: Get transaction count (nonce)
+
+```swift
+let nonce = try await web3.eth.getTransactionCount(address: from)
+```
+
+### Step 3: Build the EIP-1559 transaction
+
+```swift
+let transaction = EthereumTransaction(
+    nonce: nonce,
+    maxFeePerGas: EthereumQuantity(quantity: 21.gwei),
+    maxPriorityFeePerGas: EthereumQuantity(quantity: 1.gwei),
+    gasLimit: 29000,
+    to: try EthereumAddress(hex: "0xRecipientAddress", eip55: true),
+    value: EthereumQuantity(quantity: 1000.gwei),
+    transactionType: .eip1559
 )
-// 4) Send the signed tx via your RPC provider (eth_sendRawTransaction)
+```
+
+### Step 4: Serialize the transaction to hex (RLP preimage)
+
+```swift
+let rlpItem: RLPItem = RLPItem.array([
+    .bigUInt(EthereumQuantity(integerLiteral: 17000).quantity), // Holesky chain id
+    .bigUInt(nonce.quantity),
+    .bigUInt(transaction.maxPriorityFeePerGas?.quantity ?? 0),
+    .bigUInt(transaction.maxFeePerGas?.quantity ?? 0),
+    .bigUInt(transaction.gasLimit?.quantity ?? 0),
+    .bytes(transaction.to?.rawAddress ?? Bytes()),
+    .bigUInt(transaction.value?.quantity ?? 0),
+    .bytes(Bytes()), // input data
+    .array([]) // Access list
+])
+
+let serializedTransaction = try RLPEncoder().encode(rlpItem)
+let transactionHexString = "02" + serializedTransaction.map { String(format: "%02x", $0) }.joined()
+```
+
+### Step 5: Sign the transaction with Turnkey
+
+Use the same wallet-selection pattern shown in the message signing example to pick which account to sign with, then call the Turnkey HTTP client.
+
+```swift
+import TurnkeySwift
+import TurnkeyTypes
+
+// Select a wallet account (customize this selection for your app)
+guard
+    let account = turnkey.wallets?.first?.accounts.first
+else {
+    fatalError("No account available")
+}
+
+let signedTransaction = try await turnkey.signTransaction(
+    signWith: account,
+    unsignedTransaction: transactionHexString,
+    type: .transaction_type_ethereum
+)
+```
+
+### Step 6: Send the signed transaction
+
+```swift
+let request = BasicRPCRequest(
+    id: 0,
+    jsonrpc: Web3.jsonrpc,
+    method: "eth_sendRawTransaction",
+    params: ["0x" + signedTransaction]
+)
+
+let hash = try await web3.provider.send(request: request)
+print("Transaction hash: \(hash.hex())")
 ```
