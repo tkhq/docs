@@ -1,0 +1,256 @@
+---
+title: "Using embedded wallets"
+description: "Learn how to create and manage embedded wallets in your Flutter application using Turnkey's Embedded Wallet Kit."
+sidebarTitle: "Using embedded wallets"
+---
+
+## Overview
+
+Turnkey's Flutter SDK provides a straightforward way to create and manage embedded wallets in your Flutter application. You can create wallets, derive accounts, import wallets, and keep local UI state in sync with provider data.
+
+Before starting, review the concepts of **[Wallets](/concepts/wallets)** and **[Wallet Accounts](/concepts/wallets#accounts)**.
+
+## Creating an embedded wallet
+
+After the user authenticates (i.e., a `session` exists on `TurnkeyProvider`), you can create an embedded wallet and specify which accounts to create within it.
+
+```dart title=lib/widgets/create_wallet_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class CreateWalletButton extends StatelessWidget {
+  const CreateWalletButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> handleCreateWallet() async {
+      try {
+        final walletId = await tk.createWallet(
+          walletName: 'My New Wallet',
+          accounts: [
+            // One Ethereum account
+            v1WalletAccountParams(
+              curve: v1Curve.curve_secp256k1,
+              pathFormat: v1PathFormat.path_format_bip32,
+              path: "m/44'/60'/0'/0/0",
+              addressFormat: v1AddressFormat.address_format_ethereum,
+            ),
+            // One Solana account
+            v1WalletAccountParams(
+              curve: v1Curve.curve_ed25519,
+              pathFormat: v1PathFormat.path_format_bip32,
+              path: "m/44'/501'/0'/0'",
+              addressFormat: v1AddressFormat.address_format_solana,
+            ),
+          ],
+        );
+        debugPrint('Wallet created: $walletId');
+      } catch (e) {
+        debugPrint('Error creating wallet: $e');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: handleCreateWallet,
+      child: const Text('Create Wallet'),
+    );
+  }
+}
+```
+
+## Listing and refreshing wallets
+
+`TurnkeyProvider.wallets` contains all embedded wallets for the current sub-organization. It updates automatically when wallets change.
+
+```dart title=lib/widgets/wallet_list.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class WalletList extends StatelessWidget {
+  const WalletList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<TurnkeyProvider>(
+      builder: (_, tk, __) {
+        final wallets = tk.wallets ?? [];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final w in wallets)
+              Text('${w.name} — ${w.id}'),
+          ],
+        );
+      },
+    );
+  }
+}
+```
+
+To refresh explicitly:
+
+```dart title=lib/widgets/refresh_wallets_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class RefreshWalletsButton extends StatelessWidget {
+  const RefreshWalletsButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+    return ElevatedButton(
+      onPressed: () => tk.refreshWallets(),
+      child: const Text('Refresh Wallets'),
+    );
+  }
+}
+```
+
+## Creating wallet accounts (after wallet creation)
+
+To add accounts to an **existing** wallet, use the `createWalletAccounts` method from the underlying `client`.
+
+```dart title=lib/widgets/add_account_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class AddAccountButton extends StatelessWidget {
+  const AddAccountButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> handleAddAccount() async {
+      try {
+        final wallet = tk.wallets?.first;
+        if (wallet == null) return;
+
+        await tk.client.createWalletAccounts(
+          CreateWalletAccountsParams(
+            walletId: wallet.walletId,
+            accounts: [
+              v1WalletAccountParams(
+                curve: v1Curve.curve_secp256k1,
+                pathFormat: v1PathFormat.path_format_bip32,
+                path: "m/44'/60'/1'/0/0", // next index
+                addressFormat: v1AddressFormat.address_format_ethereum,
+              ),
+            ],
+          ),
+        );
+
+        debugPrint('Account created');
+      } catch (e) {
+        debugPrint('Error creating account: $e');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: handleAddAccount,
+      child: const Text('Add Ethereum Account'),
+    );
+  }
+}
+```
+
+## Importing wallets
+
+You can import a wallet from a mnemonic using the `importWallet` method and optionally specify accounts to pre-create.
+
+```dart title=lib/widgets/import_wallet_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class ImportWalletButton extends StatelessWidget {
+  const ImportWalletButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> handleImport() async {
+      try {
+        final walletId = await tk.importWallet(
+          mnemonic: '<mnemonic>',   // The user will enter this
+          walletName: 'Imported Wallet',
+          accounts: [
+            v1WalletAccountParams(
+              curve: v1Curve.curve_secp256k1,
+              pathFormat: v1PathFormat.path_format_bip32,
+              path: "m/44'/60'/0'/0/0",
+              addressFormat: v1AddressFormat.address_format_ethereum,
+            ),
+          ],
+        );
+        debugPrint('Imported wallet: $walletId');
+      } catch (e) {
+        debugPrint('Import failed: $e');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: handleImport,
+      child: const Text('Import Wallet (mnemonic)'),
+    );
+  }
+}
+```
+
+## Exporting wallets
+
+You can export a wallet's mnemonic using the `exportWallet` method. This method will automatically decrypt the mnemonic for you.
+
+```dart title=lib/widgets/export_wallet_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class ExportWalletButton extends StatelessWidget {
+  const ExportWalletButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> handleExport() async {
+      try {
+        final wallet = tk.wallets?.first;
+        if (wallet == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No wallet available to export')),
+          );
+          return;
+        }
+
+        // Default: returns decrypted mnemonic for development workflows
+        final mnemonic = await tk.exportWallet(walletId: wallet.walletId);
+        debugPrint('Wallet mnemonic: $mnemonic');
+
+      } catch (e) {
+        debugPrint('Export failed: $e');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: handleExport,
+      child: const Text('Export Wallet'),
+    );
+  }
+}
+```
+
+## Next steps
+
+Continue to **[Signing](/sdks/flutter/signing)** to learn how to sign messages and transactions with your embedded wallets.
+
+
+

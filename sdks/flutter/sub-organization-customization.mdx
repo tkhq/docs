@@ -1,0 +1,99 @@
+---
+
+title: "Sub-organization customization"
+description: "Learn how to customize the sub-organization creation process in your Flutter app."
+sidebarTitle: "Sub-organization customization"
+---
+
+## Overview
+
+Turnkey's Flutter SDK allows you to customize the sub-organization creation process in your Flutter application. This is useful if you want to tailor the onboarding experience — such as automatically creating wallets, configuring authentication method-specific settings, setting default usernames, or naming passkeys.
+
+These customization options can be applied differently for each authentication method.
+
+## Customization
+
+You can customize sub-org creation through `authConfig.createSubOrgParams` inside your `TurnkeyConfig`.
+
+Each authentication method can have its own configuration. For example, you can assign a default username for users who sign up via email OTP and a separate wallet setup for passkey users.
+
+```dart title=lib/main.dart (excerpt)
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+final turnkeyProvider = TurnkeyProvider(
+  config: TurnkeyConfig(
+    // ... your existing configuration
+    authConfig: AuthConfig(
+      createSubOrgParams: MethodCreateSubOrgParams(
+        emailOtpAuth: CreateSubOrgParams(
+          userName: 'An email user',
+          customWallet: CustomWallet(
+            walletName: 'Email Wallet',
+            walletAccounts: [
+              v1WalletAccountParams(
+                curve: v1Curve.curve_secp256k1,
+                pathFormat: v1PathFormat.path_format_bip32,
+                path: "m/44'/60'/0'/0/0",
+                addressFormat: v1AddressFormat.address_format_ethereum,
+              ),
+            ],
+          ),
+        ),
+        passkeyAuth: CreateSubOrgParams(
+          userName: 'A passkey user',
+          customWallet: CustomWallet(
+            walletName: 'Passkey Wallet',
+            walletAccounts: [
+              v1WalletAccountParams(
+                curve: v1Curve.curve_ed25519,
+                pathFormat: v1PathFormat.path_format_bip32,
+                path: "m/44'/501'/0'/0'",
+                addressFormat: v1AddressFormat.address_format_solana,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+```
+
+You may also define a single set of parameters to apply across all authentication methods:
+
+```dart title=lib/main.dart (excerpt)
+final subOrgParams = CreateSubOrgParams(
+  userName: 'User-${DateTime.now().millisecondsSinceEpoch}',
+  customWallet: CustomWallet(
+    walletName: 'Wallet-${DateTime.now().millisecondsSinceEpoch}',
+    walletAccounts: [
+      v1WalletAccountParams(
+        curve: v1Curve.curve_secp256k1,
+        pathFormat: v1PathFormat.path_format_bip32,
+        path: "m/44'/60'/0'/0/0",
+        addressFormat: v1AddressFormat.address_format_ethereum,
+      ),
+    ],
+  ),
+);
+
+final turnkeyProvider = TurnkeyProvider(
+  config: TurnkeyConfig(
+    // ... your existing configuration
+    authConfig: AuthConfig(
+      createSubOrgParams: MethodCreateSubOrgParams(
+        emailOtpAuth: subOrgParams,
+        smsOtpAuth: subOrgParams,
+        oAuth: subOrgParams,
+        passkeyAuth: subOrgParams,
+      ),
+    ),
+  ),
+);
+```
+
+For a full list of parameters available, inspect the `CreateSubOrgParams` class in the Flutter SDK.
+
+## Next steps
+
+Now that you can customize sub-org creation in Flutter, check out the [Using Embedded Wallets](/sdks/flutter/using-embedded-wallets) guide next to learn how to create and manage wallets within your app!

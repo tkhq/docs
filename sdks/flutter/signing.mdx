@@ -1,0 +1,95 @@
+---
+
+title: "Signing"
+description: "Learn how to sign messages and transactions in your Flutter app using Turnkey's Embedded Wallets."
+sidebarTitle: "Signing"
+---
+
+## Overview
+
+Turnkey's Flutter SDK makes it simple to sign messages and transactions using embedded wallets managed by the `TurnkeyProvider`.
+
+
+## Signing messages
+
+To sign a message, select a wallet account and call `signMessage` from the `TurnkeyProvider`. You can optionally pass in the payload's `encoding` and `hashFunction` if needed.
+
+```dart title=lib/widgets/sign_message_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class SignMessageButton extends StatelessWidget {
+  const SignMessageButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> doSignMessage() async {
+      try {
+        final wallet = tk.wallets?.first;
+        final account = wallet?.accounts.first;
+
+
+        final message = 'Hello, Turnkey!';
+        final signature = await tk.signMessage(
+          walletAccount: account,
+          message: message,
+        );
+
+        debugPrint('Message signature: $signature');
+      } catch (e) {
+        debugPrint('Sign message failed: $e');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: doSignMessage,
+      child: const Text('Sign Message'),
+    );
+  }
+}
+```
+
+## Signing transactions
+
+To sign transactions, use the `signTransaction` function. Select a wallet account's address, prepare an unsigned transaction, and specify a transaction type.
+
+```dart title=lib/widgets/sign_transaction_button.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class SignTransactionButton extends StatelessWidget {
+  const SignTransactionButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> doSignTransaction() async {
+      try {
+        final wallet = tk.wallets?.first;
+        final account = wallet?.accounts.first;
+
+        final unsignedTx = '0x...'; // unsigned transaction hex
+        final signature = await tk.signTransaction(
+          signWith: account.address,    // use the address of the wallet account
+          unsignedTransaction: unsignedTx,
+          transactionType: v1TransactionType.transaction_type_ethereum,
+        );
+
+        debugPrint('Tx signature: $signature');
+      } catch (e) {
+        debugPrint('Sign transaction failed: $e');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: doSignTransaction,
+      child: const Text('Sign Transaction'),
+    );
+  }
+}
+```
