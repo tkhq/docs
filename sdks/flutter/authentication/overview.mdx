@@ -8,7 +8,14 @@ Turnkey's Flutter SDK makes authentication simple. You can call specific login a
 
 ## Authentication state
 
-In Flutter, you access auth state via the `TurnkeyProvider` (a `ChangeNotifier`). The presence of a `session` indicates the user is authenticated.
+To check if a user is authenticated, you can use the `authState` variable from the `TurnkeyProvider`.
+
+`authState` can be one of the following:
+- `AuthState.authenticated`: The user has a stored session.
+- `AuthState.unauthenticated`: The user does not have a stored session.
+- `AuthState.loading`: The provider is initializing. Turnkey is checking for any existing stored sessions or restoring state. UI should show a splash or progress indicator.
+
+You can consume `authState` in any widget using a `Consumer<TurnkeyProvider>`:
 
 ```dart title=lib/widgets/auth_status.dart
 import 'package:flutter/material.dart';
@@ -22,21 +29,25 @@ class AuthStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<TurnkeyProvider>(
       builder: (context, tk, _) {
-        final session = tk.session; // null when not authenticated
-        final user = tk.user;       // may be null until fetched
+        switch (tk.authState) {
+          case AuthState.loading:
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
 
-        if (session != null) {
-          return Text('Welcome back, ${user?.userName ?? 'user'}!');
+          case AuthState.unauthenticated:
+            return ElevatedButton(
+              onPressed: () {
+                // Navigate to your login screen or trigger your chosen auth flow
+                Navigator.of(context).pushNamed('/login');
+              },
+              child: const Text('Log in'),
+            );
+
+          case AuthState.authenticated:
+            final user = tk.user;
+            return Text('Welcome back, ${user?.userName ?? 'user'}!');
         }
-
-        return ElevatedButton(
-          onPressed: () {
-            // Navigate to your login screen or trigger your chosen auth flow
-            // e.g., email OTP, passkey, or social login
-            Navigator.of(context).pushNamed('/login');
-          },
-          child: const Text('Log in'),
-        );
       },
     );
   }
@@ -59,7 +70,7 @@ final turnkeyProvider = TurnkeyProvider(
 
 ## Listening to provider updates
 
-`TurnkeyProvider` is a `ChangeNotifier`, so you can attach listeners to respond to internal state changes (e.g., when wallets/users are fetched). This pattern is useful when you want to mirror provider data into local widget state.
+`TurnkeyProvider` is a `ChangeNotifier`, so you can attach listeners to respond to internal state changes (e.g., when user/wallets are fetched or when `authState` changes). This pattern is useful when you want to mirror provider data into local widget state.
 
 Below is an example (adapted from the [demo app](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app)) that keeps a local `selectedWallet`/`selectedAccount` in sync with the provider:
 
@@ -128,7 +139,7 @@ Follow the guides below to learn how to set up email and SMS authentication, pas
 <CardGroup>
   <Card
     title="Email & SMS"
-    href="/sdks/flutter/email-sms-otp-auth"
+    href="/sdks/flutter/authentication/email-sms"
     icon="file-lines"
     iconType="solid"
     horizontal
@@ -137,7 +148,7 @@ Follow the guides below to learn how to set up email and SMS authentication, pas
   </Card>
   <Card
     title="Passkey Authentication"
-    href="/sdks/flutter/passkey-auth"
+    href="/sdks/flutter/authentication/passkey"
     icon="file-lines"
     iconType="solid"
     horizontal
@@ -146,7 +157,7 @@ Follow the guides below to learn how to set up email and SMS authentication, pas
   </Card>
   <Card
     title="Social Logins"
-    href="/sdks/flutter/social-logins"
+    href="/sdks/flutter/authentication/social-logins"
     icon="file-lines"
     iconType="solid"
     horizontal
