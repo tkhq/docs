@@ -9,27 +9,18 @@ sidebarTitle: "Social logins"
 This guide shows how to implement social logins with the Turnkey Swift SDK.  
 The SDK launches the provider in the system browser, retrieves an OIDC token, and (by default) completes login or signup through the Auth Proxy. The examples below use SwiftUI, but the SDK works with any Swift framework.
 
+Turnkey supports any OIDC provider. The SDK provides convenience helpers for popular providers (Google, Apple, Discord, X).
+For other providers, run your own OAuth flow to obtain an OIDC token and complete authentication with `completeOAuth(oidcToken:publicKey:...)`.
+
 Before you begin:
 
 - Ensure you've completed the setup in [Getting Started](/sdks/swift/getting-started).
 - Set provider client IDs and `appScheme` in your `TurnkeyConfig`; configure `redirectUri` in the Turnkey Dashboard (Auth Proxy).
 - Add your app scheme to iOS URL Types (Info.plist) so the OAuth redirect returns to your app.
 
-## Configure providers (client IDs)
+## Configure providers
 
-Define your app scheme and provider client IDs, then pass them into `TurnkeyConfig`:
-
-```swift Constants.swift
-enum Constants {
-  enum App {
-    static let scheme = "your-app-scheme"
-  }
-  enum Google { static let clientId = "<your_google_client_id>" }
-  enum Apple  { static let clientId = "<your_apple_client_id>" }
-  enum X      { static let clientId = "<your_x_client_id>" }
-  enum Discord{ static let clientId = "<your_discord_client_id>" }
-}
-```
+Define your app scheme and provider client IDs directly in `TurnkeyConfig`:
 
 ```swift DemoWalletApp.swift
 import SwiftUI
@@ -48,12 +39,12 @@ struct DemoWalletApp: App {
             organizationId: "<your_organization_id>",
             auth: .init(
                 oauth: .init(
-                    appScheme: Constants.App.scheme,
+                    appScheme: "<your-app-scheme>",
                     providers: .init(
-                        google: .init(clientId: Constants.Google.clientId),
-                        apple: .init(clientId: Constants.Apple.clientId),
-                        x: .init(clientId: Constants.X.clientId),
-                        discord: .init(clientId: Constants.Discord.clientId)
+                        google: .init(clientId: "<your_google_client_id>"),
+                        apple: .init(clientId: "<your_apple_client_id>"),
+                        x: .init(clientId: "<your_x_client_id>"),
+                        discord: .init(clientId: "<your_discord_client_id>")
                     )
                 )
             )
@@ -86,7 +77,7 @@ func defaultAnchor() -> ASPresentationAnchor? {
 }
 ```
 
-## Google and Apple (OIDC)
+## OIDC: Google and Apple
 
 Use `handleGoogleOAuth` or `handleAppleOAuth`.
 
@@ -124,7 +115,7 @@ Optional parameters:
 - `sessionKey`: Store the resulting session under a custom key.
 - `additionalState`: Append extra key-value pairs to the OAuth request state.
 
-## Discord and X (OAuth2 PKCE)
+## OAuth2 PKCE: Discord and X
 
 Use `handleDiscordOAuth` or `handleXOauth`.
 
@@ -158,7 +149,8 @@ struct LoginView: View {
 
 ## Advanced: onOAuthSuccess callback
 
-If you pass `onOAuthSuccess`, the helper returns early with the `oidcToken` and the `publicKey` associated with the session. You can then call `completeOAuth(...)` yourself (for example, to customize `sessionKey` or sub-organization creation). Wrap async work in a `Task` since the callback is not `async`.
+If you pass `onOAuthSuccess`, the helper returns early with the `oidcToken` and the `publicKey` associated with the session.
+You can then call `completeOAuth(...)` yourself (for example, to customize `sessionKey` or sub-organization creation).
 
 ```swift LoginView.swift
 import SwiftUI
@@ -192,10 +184,16 @@ struct LoginView: View {
 }
 ```
 
+<Note>Wrap async work in a `Task` since the callback is not `async`.</Note>
+
 ## Using completeOAuth directly
 
-If you already obtained an OIDC token from your own OAuth flow, call `completeOAuth(oidcToken:publicKey:...)` to finish authentication via the Auth Proxy.  
-The `publicKey` must match the key used to compute the nonce included in the OIDC token.
+If you already obtained an OIDC token from your own OAuth flow, call `completeOAuth(oidcToken:publicKey:...)` to finish authentication via the Auth Proxy.
+
+<Note>
+  The `publicKey` must match the key used to compute the nonce included in the
+  OIDC token.
+</Note>
 
 ```swift
 let result = try await turnkey.completeOAuth(
@@ -206,8 +204,20 @@ let result = try await turnkey.completeOAuth(
 // result.session is stored automatically when completeOAuth succeeds
 ```
 
+For more information, refer to the [Social Logins](/authentication/social-logins) guide.
+
 ---
 
 ## Next steps
 
-- [Signing](/sdks/swift/signing)
+<CardGroup>
+  <Card
+    title="Signing"
+    href="/sdks/swift/signing"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to sign transactions and messages using wallets and accounts.
+  </Card>
+</CardGroup>

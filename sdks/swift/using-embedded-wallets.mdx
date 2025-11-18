@@ -1,18 +1,25 @@
 ---
-title: "Using embedded wallets"
-description: "Learn how to create and manage embedded wallets in your Swift app using the Turnkey Swift SDK."
-sidebarTitle: "Using embedded wallets"
+title: "Using wallets"
+description: "Learn how to create and manage wallets in your Swift app using the Turnkey Swift SDK."
+sidebarTitle: "Using wallets"
 ---
 
 ## Overview
 
-The Turnkey Swift SDK provides a straightforward way to create and manage embedded wallets in your Swift application. You can create wallets, derive accounts, import/export, and refresh wallet state from `TurnkeyContext`.
+The Turnkey Swift SDK provides a straightforward way to create and manage wallets in your Swift application. You can create wallets, derive accounts, import/export, and refresh wallet state from `TurnkeyContext`.
 
 Before you start, make sure you're familiar with [Wallets](/concepts/wallets) and [Wallet Accounts](/concepts/wallets#accounts).
 
-## Creating an embedded wallet
+## Creation
 
-After your user has authenticated, create an embedded wallet by calling `createWallet` on `TurnkeyContext`. The example below creates a wallet with one Ethereum account.
+There are two ways to create wallets and accounts:
+
+- During signup (sub-organization creation): Configure default wallet/accounts in your signup parameters so users get a wallet at account creation time. See [Sub-organization customization](/sdks/swift/sub-organization-customization) for how to set `CreateSubOrgParams` globally or per auth method.
+- After authentication (active session): Create wallets programmatically using the `TurnkeyContext` once the user is authenticated.
+
+### Wallet
+
+Create a wallet with one Ethereum account using an active session:
 
 ```swift CreateWalletButton.swift focus={2,5,11-22}
 import SwiftUI
@@ -46,6 +53,40 @@ struct CreateWalletButton: View {
 }
 ```
 
+### Wallet accounts
+
+You can derive additional addresses for an existing wallet using the HTTP client:
+
+```swift
+import TurnkeyHttp
+import TurnkeyTypes
+import TurnkeySwift
+
+guard
+  let client = TurnkeyContext.shared.client,
+  let orgId = TurnkeyContext.shared.session?.organizationId
+else { return }
+
+let newAccounts: [WalletAccountParams] = [
+  WalletAccountParams(
+    addressFormat: .address_format_ethereum,
+    curve: .curve_secp256k1,
+    path: "m/44'/60'/0'/0/1",
+    pathFormat: .path_format_bip32
+  )
+]
+
+_ = try await client.createWalletAccounts(TCreateWalletAccountsBody(
+  organizationId: orgId,
+  accounts: newAccounts,
+  walletId: "<wallet_id_here>"
+))
+```
+
+### Private keys
+
+Private keys are typically created when creating wallet accounts or by importing existing key material. See Importing → Private key.
+
 ## Listing wallets in the UI
 
 The `TurnkeyContext` maintains `wallets` for the active session. You can render them in your views:
@@ -78,41 +119,11 @@ Task {
 }
 ```
 
-## Creating wallet accounts
-
-You can derive additional addresses for an existing wallet using the HTTP client:
-
-```swift
-import TurnkeyHttp
-import TurnkeyTypes
-import TurnkeySwift
-
-guard
-  let client = TurnkeyContext.shared.client,
-  let orgId = TurnkeyContext.shared.session?.organizationId
-else { return }
-
-let newAccounts: [WalletAccountParams] = [
-  WalletAccountParams(
-    addressFormat: .address_format_ethereum,
-    curve: .curve_secp256k1,
-    path: "m/44'/60'/0'/0/1",
-    pathFormat: .path_format_bip32
-  )
-]
-
-_ = try await client.createWalletAccounts(TCreateWalletAccountsBody(
-  organizationId: orgId,
-  accounts: newAccounts,
-  walletId: "<wallet_id_here>"
-))
-```
-
-## Importing and exporting wallets
+## Exporting
 
 The Swift SDK lets you securely import/export wallets, accounts, and private keys. You can return decrypted values for developer workflows or handle encrypted bundles explicitly.
 
-### Export (wallet)
+### Wallet
 
 Default: decrypt locally and return the mnemonic (developer-friendly).
 
@@ -123,38 +134,7 @@ let mnemonic = try await turnkey.exportWallet(walletId: "<wallet_id>")
 // Do not display secrets in production UIs
 ```
 
-Advanced (encrypted bundle): call the HTTP client directly and store or decrypt later.
-
-```swift
-import TurnkeyHttp
-import TurnkeyCrypto
-import TurnkeySwift
-
-let (targetPublicKey, _, embeddedPrivateKey) = TurnkeyCrypto.generateP256KeyPair()
-
-guard
-  let client = TurnkeyContext.shared.client,
-  let orgId = TurnkeyContext.shared.session?.organizationId
-else { throw NSError(domain: "Turnkey", code: -1) }
-
-let exportResp = try await client.exportWallet(TExportWalletBody(
-  organizationId: orgId,
-  targetPublicKey: targetPublicKey,
-  walletId: "<wallet_id>"
-))
-
-let bundle = exportResp.exportBundle
-// Decrypt later if needed:
-// let decrypted = try TurnkeyCrypto.decryptExportBundle(
-//   exportBundle: bundle,
-//   organizationId: orgId,
-//   embeddedPrivateKey: embeddedPrivateKey,
-//   dangerouslyOverrideSignerPublicKey: nil,
-//   returnMnemonic: true
-// )
-```
-
-### Export (wallet account)
+### Wallet account
 
 ```swift
 import TurnkeyHttp
@@ -177,7 +157,7 @@ let resp = try await client.exportWalletAccount(TExportWalletAccountBody(
 let exportBundle = resp.exportBundle
 ```
 
-### Export (private key)
+### Private key
 
 ```swift
 import TurnkeyHttp
@@ -200,7 +180,9 @@ let resp = try await client.exportPrivateKey(TExportPrivateKeyBody(
 let exportBundle = resp.exportBundle
 ```
 
-### Import (wallet)
+## Importing
+
+### Wallet
 
 Imports a wallet from a mnemonic and automatically refreshes local state.
 
@@ -223,7 +205,9 @@ let walletId = try await turnkey.importWallet(
 )
 ```
 
-### Import (private key)
+### Private key
+
+Imports a private key from plaintext key material and automatically refreshes local state.
 
 ```swift
 import TurnkeyHttp
@@ -241,4 +225,75 @@ let resp = try await client.importPrivateKey(TImportPrivateKeyBody(
   addressFormats: [.address_format_ethereum]
 ))
 let privateKeyId = resp.privateKeyId
+```
+
+## Deleting
+
+<Note>
+  If a wallet, wallet account, or private key has not been exported, you must
+  either export it first or pass the `deleteWithoutExport: true` flag in the
+  delete request.
+</Note>
+
+### Wallet
+
+```swift
+import TurnkeyHttp
+import TurnkeyTypes
+import TurnkeySwift
+
+guard
+  let client = TurnkeyContext.shared.client,
+  let orgId = TurnkeyContext.shared.session?.organizationId
+else { return }
+
+let deleteResp = try await client.deleteWallets(TDeleteWalletsBody(
+  organizationId: orgId,
+  deleteWithoutExport: true, // set to true if the wallet hasn't been exported
+  walletIds: ["<wallet_id_1>", "<wallet_id_2>"]
+))
+
+let removedWalletIds = deleteResp.walletIds
+```
+
+### Wallet accounts
+
+```swift
+import TurnkeyHttp
+import TurnkeyTypes
+import TurnkeySwift
+
+guard
+  let client = TurnkeyContext.shared.client,
+  let orgId = TurnkeyContext.shared.session?.organizationId
+else { return }
+
+let deleteResp = try await client.deleteWalletAccounts(TDeleteWalletAccountsBody(
+  organizationId: orgId,
+  deleteWithoutExport: true, // set to true if the accounts haven't been exported
+  walletAccountIds: ["<wallet_account_id_1>", "<wallet_account_id_2>"]
+))
+
+let removedAccountIds = deleteResp.walletAccountIds
+```
+
+### Private keys
+
+```swift
+import TurnkeyHttp
+import TurnkeyTypes
+import TurnkeySwift
+
+guard
+  let client = TurnkeyContext.shared.client,
+  let orgId = TurnkeyContext.shared.session?.organizationId
+else { return }
+
+let deleteResp = try await client.deletePrivateKeys(TDeletePrivateKeysBody(
+  organizationId: orgId,
+  deleteWithoutExport: true, // set to true if the keys haven't been exported
+  privateKeyIds: ["<private_key_id_1>", "<private_key_id_2>"]
+))
+
+let removedKeyIds = deleteResp.privateKeyIds
 ```

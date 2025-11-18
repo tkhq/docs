@@ -1,18 +1,21 @@
 ---
 title: "Signing"
-description: "Learn how to sign messages (and optionally transactions) in your Swift app using the Turnkey Swift SDK."
+description: "Learn how to sign messages and transactions in your Swift app using the Turnkey Swift SDK"
 sidebarTitle: "Signing"
 ---
 
 ## Overview
 
 This page shows how to sign messages using the Turnkey Swift SDK.  
-You must be authenticated and have an active session in `TurnkeyContext`. The examples below use SwiftUI, but the SDK works with any Swift framework.
+The examples below use SwiftUI, but the SDK works with any Swift framework.
+
+<Note>
+  You must be authenticated and have an active session in `TurnkeyContext`.
+</Note>
 
 ## Signing messages
 
-Use `signMessage(signWith:addressFormat:message:...)`.  
-Pick a wallet account (for example, the first account) and sign your message.
+To sign a transaction using a specific wallet account, use `signMessage(signWith:addressFormat:message:...)`.
 
 ```swift SignMessageView.swift
 import SwiftUI
@@ -38,10 +41,7 @@ struct SignMessageView: View {
             Button("Sign message") {
                 Task {
                     do {
-                        // Select a wallet account (customize this selection for your app)
-                        guard
-                            let account = turnkey.wallets?.first?.accounts.first
-                        else {
+                        guard let account = turnkey.wallets?.first?.accounts.first else {
                             error = "No account available"
                             return
                         }
@@ -88,34 +88,9 @@ Notes:
 To sign and broadcast Ethereum transactions you can use Web3.swift alongside the Turnkey HTTP client.  
 This is typically done in a server or other trusted environment. See the full walkthrough in the Swift SDK repo.
 
-### Prerequisite: initialize TurnkeyContext
+### Prerequisite
 
-```swift App.swift
-import SwiftUI
-import TurnkeySwift
-
-@main
-struct MyApp: App {
-  @StateObject private var turnkey: TurnkeyContext
-
-  init() {
-    let config = TurnkeyConfig(
-      authProxyConfigId: "<your_auth_proxy_config_id>",
-      rpId: "<your_rp_id>",
-      organizationId: "<your_organization_id>"
-    )
-    TurnkeyContext.configure(config)
-    _turnkey = StateObject(wrappedValue: TurnkeyContext.shared)
-  }
-
-  var body: some Scene {
-    WindowGroup {
-      ContentView()
-        .environmentObject(turnkey)
-    }
-  }
-}
-```
+Ensure `TurnkeyContext` is already configured and provided to your views (e.g., via `@EnvironmentObject`). The examples below assume an authenticated session is active.
 
 ### Step 1: Setup Web3 and Ethereum address
 
@@ -148,7 +123,7 @@ let transaction = EthereumTransaction(
 )
 ```
 
-### Step 4: Serialize the transaction to hex (RLP preimage)
+### Step 4: Serialize the transaction to hex
 
 ```swift
 let rlpItem: RLPItem = RLPItem.array([
@@ -189,16 +164,4 @@ let signedTransaction = try await turnkey.signTransaction(
 )
 ```
 
-### Step 6: Send the signed transaction
-
-```swift
-let request = BasicRPCRequest(
-    id: 0,
-    jsonrpc: Web3.jsonrpc,
-    method: "eth_sendRawTransaction",
-    params: ["0x" + signedTransaction]
-)
-
-let hash = try await web3.provider.send(request: request)
-print("Transaction hash: \(hash.hex())")
-```
+Once you have the signed transaction, broadcast it with your Web3 client (e.g., `eth_sendRawTransaction`).

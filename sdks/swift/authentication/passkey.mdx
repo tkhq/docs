@@ -38,6 +38,15 @@ Below are examples for signing up and logging in with passkeys:
 
 ### Log in with passkey
 
+Before calling `loginWithPasskey`, you must provide an `ASPresentationAnchor`.
+Apple requires a presentation context so the system can display the passkey UI in the correct window.
+We use a helper (`defaultAnchor()`) to resolve the active key window for this purpose.
+
+- Does not use Auth Proxy: `loginWithPasskey` runs entirely on-device and talks directly to Turnkey's API using a stamp; no Auth Proxy involvement.
+- Session expiration: You can pass `expirationSeconds` to set the session lifetime. If omitted, the SDK resolves it in this order:
+  1. Dashboard setting (when an Auth Proxy config is present and `sessionExpirationSeconds` is set), else
+  2. Default of 900 seconds (15 minutes).
+
 ```swift
 import SwiftUI
 import AuthenticationServices
@@ -50,7 +59,11 @@ struct LoginWithPasskeyButton: View {
     Button("Log in with passkey") {
       Task {
         if let anchor = defaultAnchor() {
-          try? await turnkey.loginWithPasskey(anchor: anchor)
+          // Optionally override session lifetime via `expirationSeconds`, e.g. "1800"
+          try? await turnkey.loginWithPasskey(
+            anchor: anchor
+            // , expirationSeconds: "1800"
+          )
         }
       }
     }
@@ -110,4 +123,14 @@ try await turnkey.signUpWithPasskey(
 
 ## Next steps
 
-- [Social Logins](/sdks/swift/authentication/social-logins)
+<CardGroup>
+  <Card
+    title="Social Logins"
+    href="/sdks/swift/authentication/social-logins"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Set up OAuth-based logins (Google, Apple, Discord, X).
+  </Card>
+</CardGroup>
