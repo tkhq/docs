@@ -1,6 +1,6 @@
 ---
-title: "Getting started with the Turnkey Swift SDK (iOS)"
-description: "Learn how to configure the Turnkey Swift SDK in your iOS app. This page covers organization setup, Swift Package Manager installation, and basic app configuration with SwiftUI."
+title: "Getting started with the Turnkey Swift SDK"
+description: "Learn how to configure the Turnkey Swift SDK in your Swift app. This page covers organization setup, Swift Package Manager installation, and basic app configuration."
 sidebarTitle: "Getting started"
 ---
 
@@ -60,7 +60,7 @@ For this setup, we will be using Turnkey's Auth Proxy to handle authentication. 
 
 ## Installation (Swift Package Manager)
 
-You can add the Turnkey Swift SDK to any iOS app using Swift Package Manager (SPM). iOS 17+ and Xcode 15+ are required.
+You can add the Turnkey Swift SDK to any Swift app using Swift Package Manager (SPM). iOS 17+ and Xcode 15+ are required.
 
 ### Xcode UI
 
@@ -86,15 +86,14 @@ targets: [
 ]
 ```
 
-## Configure URL scheme and passkeys (iOS)
+## Configure URL scheme and passkeys
 
-- Add a URL scheme in your app that matches your app scheme (e.g., `myapp`). This is used for OAuth redirects if you enable OAuth later.
-- If you plan to use passkeys with a custom `rpId`, add an Associated Domain capability (Signing & Capabilities → Associated Domains) with `webcredentials:yourdomain.com`.
-- For detailed passkey setup (entitlements, RP ID, UX), see the upcoming [Passkeys](/sdks/swift/authentication/passkey) guide.
+- If you are using OAuth, add your app scheme (e.g., `myapp`) so it can be used for OAuth redirects
+- If you plan to use passkeys, add an Associated Domain capability (Signing & Capabilities → Associated Domains) with `webcredentials:yourdomain.com`. For detailed passkey setup (entitlements, RP ID, UX), see the [Passkeys](/sdks/swift/authentication/passkey) guide.
 
-## SDK configuration (SwiftUI)
+## SDK configuration
 
-Set up a minimal configuration and provide the shared context to your SwiftUI app.
+Set up a minimal configuration and provide the shared context to your app. The example below shows a SwiftUI setup:
 
 ```swift Constants.swift
 enum Constants {
@@ -140,7 +139,50 @@ struct MyApp: App {
 }
 ```
 
-In your SwiftUI views, you can access the context via `@EnvironmentObject var turnkey: TurnkeyContext` to read authentication state and, later, perform wallet operations.
+In SwiftUI, you can access the context via `@EnvironmentObject var turnkey: TurnkeyContext` to read authentication state and, later, perform wallet operations:
+
+```swift ContentView.swift
+import SwiftUI
+import TurnkeySwift
+
+struct ContentView: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+
+    var body: some View {
+        Group {
+            switch turnkey.authState {
+            case .authenticated:
+                Text("Welcome!")
+            case .loading:
+                ProgressView()
+            default:
+                Text("Please log in")
+            }
+        }
+    }
+}
+```
+
+For UIKit or AppKit, access `TurnkeyContext.shared` directly:
+
+```swift ViewController.swift
+import UIKit
+import TurnkeySwift
+
+class ViewController: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        // Access the shared context
+        let turnkey = TurnkeyContext.shared
+
+        // Check authentication state
+        if turnkey.authState == .authenticated {
+            // User is authenticated
+        }
+    }
+}
+```
 
 ## Next steps
 
