@@ -1,0 +1,112 @@
+---
+
+title: "Advanced API requests"
+description: "Learn how to make advanced API requests to Turnkey's infrastructure."
+sidebarTitle: "Advanced API requests"
+---
+
+## Overview
+
+Turnkey's Flutter SDK provides a wide variety of helper functions to abstract interactions with Turnkey's infrastructure.
+However, you can also make advanced API requests directly to Turnkey's endpoints if you need more control or want to implement custom features in your Flutter app.
+
+## The underlying client
+
+To make advanced API requests, use the `client` retrieved from the `TurnkeyProvider`.
+This client is tied to the active session, so stamping, authentication, and organization context are automatically handled for you.
+
+You can see the [API Reference](/api-reference/overview) for a complete list of available API endpoints and their parameters. All of these can be accessed through the `client`.
+
+Here's how you can use the `client` to make a `signRawPayload` request to Turnkey:
+
+```dart title=lib/widgets/sign_raw_payload_button.dart
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class SignRawPayloadButton extends StatelessWidget {
+  const SignRawPayloadButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    Future<void> doSignRawPayload() async {
+      try {
+        final wallet = tk.wallets?.first;
+        final account = wallet?.accounts.first;
+        if (account == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No account available to sign with')),
+          );
+          return;
+        }
+
+        final message = 'Hello, Turnkey!';
+        final payload = utf8
+            .encode(message)
+            .fold('', (s, byte) => s + byte.toRadixString(16).padLeft(2, '0'));
+
+        final response = await tk.client.signRawPayload(
+          SignRawPayloadParams(
+            signWith: account.address,
+            payload: payload,
+            encoding: v1PayloadEncoding.payload_encoding_hexadecimal,
+            hashFunction: v1HashFunction.hash_function_not_applicable,
+          ),
+        );
+
+        debugPrint('Message signed: ${response.signature}');
+      } catch (error) {
+        debugPrint('Error signing message: $error');
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: doSignRawPayload,
+      child: const Text('Sign Message'),
+    );
+  }
+}
+```
+
+## Viewing the activity
+
+When creating, modifying, or using resources within Turnkey, an activity is created. You can learn more about activities in the [Activities](/api-reference/activities/overview) section.
+
+If you use the `client`, you can view all the metadata of the activity you are performing.
+This includes the activity ID, status, and more.
+
+```dart
+final response = await tk.client.updateWallet(
+  UpdateWalletParams(
+    walletId: 'a-wallet-id-123',
+    walletName: 'New wallet name',
+  ),
+);
+
+final activity = response.activity;
+if (activity != null) {
+  debugPrint('Activity ID: ${activity.id}');
+  debugPrint('Status: ${activity.status}');
+}
+```
+
+
+## Stamping with a passkey
+
+You can create a client that uses a passkey for stamping instead of using securely stored api keys. Use the `createPasskeyClient` method from the `TurnkeyProvider` to create a new client instance configured for passkey stamping. 
+
+An `rpId` is required to use passkey stamping; you can either pass it directly when creating the client or set it in the `TurnkeyProvider` config.
+
+```dart
+final passkeyClient = await tk.createPasskeyClient(
+  passkeyStamperConfig: PasskeyStamperConfig(   // You can pass this into the TurnkeyProvider config instead
+    rpId: 'example.com',   
+  ),
+);
+```
+
+To learn more about using passkeys in your Flutter app, check out the [Passkey Authentication](/sdks/flutter/authentication/passkey) guide.
+

@@ -1,0 +1,179 @@
+---
+title: "Getting started with Turnkey's Flutter SDK"
+description: "Learn how to setup Turnkey's Flutter SDK into your application. This guide walks you through enabling Turnkey's Auth Proxy, installing the SDK, and configuring the provider."
+sidebarTitle: "Getting started"
+---
+
+## Turnkey organization setup
+
+To start, you must create a Turnkey organization via the [Turnkey dashboard](https://app.turnkey.com). The steps to do so are described in the [Account Setup](/getting-started/quickstart) section.
+
+For this setup, we will be using Turnkey's Auth Proxy to handle authentication. We can enable and configure this through the Turnkey dashboard.
+
+<Steps>
+  <Step title="Enable Auth Proxy">
+    Navigate to the **Wallet Kit** section in the Turnkey Dashboard and enable the
+    **Auth Proxy**.
+
+
+        <img
+        src="/images/getting-started/img/quickstart/auth-proxy-toggle.png"
+        alt="Auth Proxy toggle"
+        />
+
+
+  </Step>
+
+  <Step title="Customize auth methods">
+
+
+You can choose which auth methods to enable and customize various options from this screen. For this quickstart, let's enable **email OTP** and **passkeys**. When you're done, click **Save**.
+
+<img
+  src="/images/getting-started/img/quickstart/auth-proxy-options.png"
+  alt="Auth Proxy options"
+/>
+
+<img
+  src="/images/getting-started/img/quickstart/wallet-kit-options.png"
+  alt="Wallet kit options"
+/>
+
+
+  </Step>
+
+  <Step title="Finish up">
+
+
+Once you're finished with the auth proxy setup, you can copy the **auth proxy config ID**
+
+<img
+  src="/images/getting-started/img/quickstart/auth-proxy-id.png"
+  alt="Auth Proxy Config id"
+/>
+
+and your **organization ID** from the dashboard.
+
+<img
+  src="/images/getting-started/img/quickstart/org-id.png"
+  alt="Organization id"
+/>
+
+These will be used in the next steps to configure your app.
+
+
+  </Step>
+</Steps>
+
+## Installation
+
+You can use `turnkey_sdk_flutter` in any Flutter application.
+
+If you're starting fresh, create a new Flutter app:
+
+```bash
+flutter create my_turnkey_app
+cd my_turnkey_app
+```
+
+Add the Turnkey Flutter SDK and supporting packages:
+
+<CodeGroup>
+
+```bash dart
+flutter pub add turnkey_sdk_flutter provider flutter_inappwebview
+```
+
+</CodeGroup>
+
+
+## Provider
+
+Wrap your app with `ChangeNotifierProvider` and configure `TurnkeyProvider`.
+
+
+```dart lib/main.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Optional: define some callbacks
+    void onSessionSelected(Session session) {
+        // Do something when the user logs in, e.g. navigate to home screen
+    }
+
+    void onSessionCleared(Session session) {
+        // Do something when the user logs out, e.g. navigate to login screen
+    }
+
+    void onInitialized(Object? error) {
+        // Do something when the SDK is initialized
+    }
+
+    final turnkeyProvider = TurnkeyProvider(
+        config: TurnkeyConfig(
+            authProxyConfigId: "<YOUR_AUTH_PROXY_CONFIG_ID>",   
+            organizationId: "<YOUR_ORGANIZATION_ID>",
+
+            // Optional: attach some callbacks
+            onSessionSelected: onSessionSelected,
+            onSessionCleared: onSessionCleared,
+            onInitialized: onInitialized,
+        ),
+    );
+
+    runApp(
+        ChangeNotifierProvider(
+            create: (_) => turnkeyProvider,
+            child: const MyApp(),
+        ),
+    );
+}
+
+class MyApp extends StatelessWidget {
+    const MyApp({super.key});
+
+    @override
+    Widget build(BuildContext context) {
+        return MaterialApp(
+            navigatorKey: navigatorKey,
+            title: 'My Turnkey App',
+            theme: ThemeData(useMaterial3: true),
+            home: const MyApp(), // Replace with your app's screen
+        );
+    }
+}
+```
+
+## Optional: Ready state & error surfacing
+
+You can await `turnkeyProvider.ready` during startup to surface initialization errors to the user:
+
+```dart
+turnkeyProvider.ready.then((_) {
+  debugPrint('Turnkey is ready');
+}).catchError((error) {
+  debugPrint('Error during Turnkey initialization: $error');
+  // Show a snackbar/toast after the current frame
+});
+```
+
+
+## Demo app
+
+You can check out a complete demo app that uses Turnkey's Flutter SDK on [GitHub](https://github.com/tkhq/dart-sdk/tree/main/examples/flutter-demo-app). Feel free to clone and modify it to get started quickly!
+
+  <img
+    src="https://github.com/tkhq/dart-sdk/blob/main/assets/demo.gif?raw=true"
+  />
+
+
+## Next steps
+
+Ready to start building your app? Check out the **Authentication** guide to learn how to set up login/signup in your Flutter application.
