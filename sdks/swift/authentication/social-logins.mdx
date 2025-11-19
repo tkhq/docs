@@ -1,0 +1,223 @@
+---
+title: "Social logins (OAuth)"
+description: "Implement Google, Apple, Discord, and X OAuth using the Turnkey Swift SDK."
+sidebarTitle: "Social logins"
+---
+
+## Overview
+
+This guide shows how to implement social logins with the Turnkey Swift SDK.  
+The SDK launches the provider in the system browser, retrieves an OIDC token, and (by default) completes login or signup through the Auth Proxy. The examples below use SwiftUI, but the SDK works with any Swift framework.
+
+Turnkey supports any OIDC provider. The SDK provides convenience helpers for popular providers (Google, Apple, Discord, X).
+For other providers, run your own OAuth flow to obtain an OIDC token and complete authentication with `completeOAuth(oidcToken:publicKey:...)`.
+
+Before you begin:
+
+- Ensure you've completed the setup in [Getting Started](/sdks/swift/getting-started).
+- Set provider client IDs and `appScheme` in your `TurnkeyConfig`; configure `redirectUri` in the Turnkey Dashboard (Auth Proxy).
+- Add your app scheme to iOS URL Types (Info.plist) so the OAuth redirect returns to your app.
+
+## Configure providers
+
+Define your app scheme and provider client IDs directly in `TurnkeyConfig`:
+
+```swift DemoWalletApp.swift
+import SwiftUI
+import TurnkeySwift
+
+@main
+struct DemoWalletApp: App {
+    @StateObject private var turnkey: TurnkeyContext
+
+    init() {
+        let config = TurnkeyConfig(
+            apiUrl: "https://api.turnkey.com",
+            authProxyUrl: "https://authproxy.turnkey.com",
+            authProxyConfigId: "<your_auth_proxy_config_id>",
+            rpId: "<your_rp_id>",
+            organizationId: "<your_organization_id>",
+            auth: .init(
+                oauth: .init(
+                    appScheme: "<your-app-scheme>",
+                    providers: .init(
+                        google: .init(clientId: "<your_google_client_id>"),
+                        apple: .init(clientId: "<your_apple_client_id>"),
+                        x: .init(clientId: "<your_x_client_id>"),
+                        discord: .init(clientId: "<your_discord_client_id>")
+                    )
+                )
+            )
+        )
+        TurnkeyContext.configure(config)
+        _turnkey = StateObject(wrappedValue: TurnkeyContext.shared)
+    }
+
+    var body: some Scene {
+        WindowGroup { /* ... */ }
+    }
+}
+```
+
+## Helper: presentation anchor
+
+All OAuth helpers require an `ASPresentationAnchor` to present the system web auth session:
+
+```swift Anchor.swift
+import SwiftUI
+import AuthenticationServices
+
+func defaultAnchor() -> ASPresentationAnchor? {
+    UIApplication.shared
+        .connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .first(where: { $0.activationState == .foregroundActive })?
+        .windows
+        .first(where: { $0.isKeyWindow })
+}
+```
+
+## OIDC: Google and Apple
+
+Use `handleGoogleOAuth` or `handleAppleOAuth`.
+
+```swift LoginView.swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct LoginView: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Button("Continue with Google") {
+                Task {
+                    guard let anchor = defaultAnchor() else { return }
+                    try await turnkey.handleGoogleOAuth(anchor: anchor)
+                }
+            }
+            Button("Continue with Apple") {
+                Task {
+                    guard let anchor = defaultAnchor() else { return }
+                    try await turnkey.handleAppleOAuth(anchor: anchor)
+                }
+            }
+        }
+        .padding()
+    }
+}
+```
+
+Optional parameters:
+
+- `clientId`: Override the configured client ID.
+- `sessionKey`: Store the resulting session under a custom key.
+- `additionalState`: Append extra key-value pairs to the OAuth request state.
+
+## OAuth2 PKCE: Discord and X
+
+Use `handleDiscordOAuth` or `handleXOauth`.
+
+```swift LoginView.swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct LoginView: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Button("Continue with Discord") {
+                Task {
+                    guard let anchor = defaultAnchor() else { return }
+                    try await turnkey.handleDiscordOAuth(anchor: anchor)
+                }
+            }
+            Button("Continue with X") {
+                Task {
+                    guard let anchor = defaultAnchor() else { return }
+                    try await turnkey.handleXOauth(anchor: anchor)
+                }
+            }
+        }
+        .padding()
+    }
+}
+```
+
+## Advanced: onOAuthSuccess callback
+
+If you pass `onOAuthSuccess`, the helper returns early with the `oidcToken` and the `publicKey` associated with the session.
+You can then call `completeOAuth(...)` yourself (for example, to customize `sessionKey` or sub-organization creation).
+
+```swift LoginView.swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct LoginView: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+
+    var body: some View {
+        Button("Continue with Google") {
+            Task {
+                guard let anchor = defaultAnchor() else { return }
+                try await turnkey.handleGoogleOAuth(
+                    anchor: anchor,
+                    sessionKey: "main",
+                    onOAuthSuccess: { success in
+                        // success.oidcToken, success.publicKey, success.providerName
+                        Task {
+                            _ = try await turnkey.completeOAuth(
+                                oidcToken: success.oidcToken,
+                                publicKey: success.publicKey,
+                                sessionKey: "main"
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+```
+
+<Note>Wrap async work in a `Task` since the callback is not `async`.</Note>
+
+## Using completeOAuth directly
+
+If you already obtained an OIDC token from your own OAuth flow, call `completeOAuth(oidcToken:publicKey:...)` to finish authentication via the Auth Proxy.
+
+<Note>
+  The `publicKey` must match the key used to compute the nonce included in the
+  OIDC token.
+</Note>
+
+```swift
+let result = try await turnkey.completeOAuth(
+    oidcToken: "<oidc_token_from_provider>",
+    publicKey: "<matching_public_key>",
+    sessionKey: "main"
+)
+// result.session is stored automatically when completeOAuth succeeds
+```
+
+For more information, refer to the [Social Logins](/authentication/social-logins) guide.
+
+---
+
+## Next steps
+
+<CardGroup>
+  <Card
+    title="Signing"
+    href="/sdks/swift/signing"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to sign transactions and messages using wallets and accounts.
+  </Card>
+</CardGroup>

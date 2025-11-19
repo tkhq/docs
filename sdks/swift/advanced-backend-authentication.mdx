@@ -1,0 +1,247 @@
+---
+title: "Advanced backend authentication (Swift)"
+description: "Use your own backend with the Swift SDK for OTP/OAuth/signup, and manage sessions on-device."
+sidebarTitle: "Advanced backend authentication"
+---
+
+## Overview
+
+Use this guide if you want to run authentication through your own server instead of Turnkey's Auth Proxy. Your backend will call Turnkey's public API for OTP, OAuth, and signup. The Swift SDK will:
+
+- Generate and protect the on-device API key pair
+- Create or resume sessions
+- Persist and expose session/user/wallet state via `TurnkeyContext`
+
+If you prefer a no-backend setup, use the [Auth Proxy](/reference/auth-proxy) instead.
+
+## What you can't use
+
+The following high-level helpers on `TurnkeyContext` are designed for the Auth Proxy and will throw `missingAuthProxyConfiguration` when the proxy is disabled:
+
+- `initOtp`, `verifyOtp`, `completeOtp`
+- `handleGoogleOAuth`, `handleAppleOAuth`, `handleDiscordOAuth`, `handleXOauth`
+- `signUpWithPasskey`
+
+For a backend flow, your app talks to your server for OTP/OAuth/signup and only stores the resulting session locally.
+
+## Disable the Auth Proxy
+
+Omit `authProxyConfigId` when configuring the SDK:
+
+```swift
+import TurnkeySwift
+
+TurnkeyContext.configure(TurnkeyConfig(
+  organizationId: "<your_org_id>",
+  rpId: "<your_app_domain>" // required for passkeys
+  // Do not set authProxyConfigId when using your own backend
+))
+```
+
+With the proxy disabled, `TurnkeyContext.client` will be stamper-only after you create/store a session.
+
+## On your backend
+
+Implement endpoints that forward to Turnkey's public API. Depending on your flow, you'll typically use:
+
+- [`createSubOrganization`](/api-reference/activities/create-sub-organization) — signup
+- [`initGenericOtp`](/api-reference/activities/init-generic-otp)
+- [`verifyGenericOtp`](/api-reference/activities/verify-generic-otp)
+- [`loginWithOtp`](/api-reference/activities/login-with-otp)
+- [`loginWithOauth`](/api-reference/activities/login-with-oauth)
+
+Notes:
+
+- Passkey and external wallet login happen on-device via [`login-with-a-stamp`](/api-reference/activities/login-with-a-stamp). Signup still requires `createSubOrganization` on your backend.
+- You may apply custom validation, logging, and rate limiting in your server.
+
+For a complete server example, see the Swift demo wallet's example server in the Swift SDK repo: [swift-sdk/Examples/legacy-swift-demo-wallet/example-server](https://github.com/tkhq/swift-sdk/tree/main/Examples/legacy-swift-demo-wallet/example-server).
+
+### Minimal Node/Express signup endpoint
+
+```ts
+import express, { Request, Response } from "express";
+import bodyParser from "body-parser";
+import { Turnkey } from "@turnkey/sdk-server";
+
+const app = express();
+app.use(bodyParser.json());
+
+const turnkey = new Turnkey({
+  apiBaseUrl: process.env.TURNKEY_API_URL ?? "",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID ?? "",
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY ?? "",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY ?? "",
+}).apiClient();
+
+// SIGNUP (example: email-based)
+app.post("/signup", async (req: Request, res: Response) => {
+  const {
+    userEmail,
+    apiKeys = [],
+    authenticators = [],
+    oauthProviders = [],
+  } = req.body;
+  const result = await turnkey.createSubOrganization({
+    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    subOrganizationName: `Sub Org - ${new Date().toISOString()}`,
+    rootUsers: [
+      {
+        userName: userEmail,
+        userEmail,
+        authenticators,
+        oauthProviders,
+        apiKeys,
+      },
+    ],
+    rootQuorumThreshold: 1,
+  });
+  res.json({ subOrganizationId: result.subOrganizationId });
+});
+
+app.listen(3000, () => console.log("Auth backend listening on :3000"));
+```
+
+Turnkey also offers [Rust](https://github.com/tkhq/rust-sdk) and [Go](https://github.com/tkhq/go-sdk) SDKs that can be used to implement the backend endpoints. You can also use any other backend language you prefer as long as it can make HTTP requests to the Turnkey API.
+
+## On your iOS app
+
+In your iOS app, you will need to implement your own authentication flows that interact with your backend endpoints.
+
+### Create a key pair
+
+Login endpoints like `otpLogin` and `oauthLogin` will require a public key to be passed in the request.
+
+You can use `createKeyPair` from the `TurnkeyContext` to generate a keypair for this purpose.
+
+```swift
+import SwiftUI
+import TurnkeySwift
+
+struct CreateKeyPairExample: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  func createPublicKey() throws -> String {
+    try turnkey.createKeyPair()
+  }
+}
+```
+
+The private key will be generated in the Secure Enclave if available, otherwise it will be generated then securely stored within the Keychain. The public key will be returned and can be passed to your backend.
+
+### Store the session returned by your backend
+
+Your backend will return a session JWT. Store it locally so the SDK can manage future stamps automatically:
+
+```swift
+import SwiftUI
+import TurnkeySwift
+
+struct StoreSessionExample: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  func store(sessionToken: String) async throws {
+    try await turnkey.storeSession(jwt: sessionToken)
+  }
+}
+```
+
+After that, `TurnkeyContext.shared.client` is ready for signed API calls, and `authState` will be `.authenticated`.
+
+If you have `autoRefreshSession` enabled under the auth object in the `TurnkeyConfig` configuration, the SDK will automatically refresh the session token when it expires.
+You can also use the `authState` variable from the `TurnkeyContext` to check if the user is authenticated.
+
+```swift
+import SwiftUI
+import TurnkeySwift
+
+struct ContentView: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Group {
+      switch turnkey.authState {
+      case .authenticated:
+        Text("Welcome back!")
+      case .loading:
+        ProgressView()
+      default:
+        Text("Please log in")
+      }
+    }
+  }
+}
+```
+
+### Example: OTP login
+
+Putting it all together, you can implement an OTP login flow like this:
+
+```swift OtpLoginView.swift expandable focus={3,22,24,31,34,41-65}
+import Foundation
+import SwiftUI
+import TurnkeySwift
+
+struct OtpInitRequest: Codable { let otpType: String; let contact: String }
+struct OtpInitResponse: Codable { let otpId: String }
+struct OtpVerifyRequest: Codable { let otpId: String; let otpCode: String }
+struct OtpVerifyResponse: Codable { let verificationToken: String }
+struct OtpLoginRequest: Codable { let verificationToken: String; let publicKey: String }
+struct OtpLoginResponse: Codable { let sessionToken: String }
+
+func postJSON<T: Encodable, U: Decodable>(_ url: URL, body: T) async throws -> U {
+  var req = URLRequest(url: url)
+  req.httpMethod = "POST"
+  req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  req.httpBody = try JSONEncoder().encode(body)
+  let (data, _) = try await URLSession.shared.data(for: req)
+  return try JSONDecoder().decode(U.self, from: data)
+}
+
+struct OtpLoginView: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+  @State private var contact: String = ""
+  @State private var otpCode: String = ""
+
+  let baseURL: String
+
+  var body: some View {
+    VStack {
+      TextField("Email or phone", text: $contact)
+      TextField("OTP code", text: $otpCode)
+      Button("Log in with OTP") {
+        Task {
+          try? await otpLogin()
+        }
+      }
+    }
+  }
+
+  @MainActor
+  func otpLogin() async throws {
+    // 1) Init OTP
+    let initResp: OtpInitResponse = try await postJSON(
+      URL(string: "\(baseURL)/otp/init")!,
+      body: OtpInitRequest(otpType: contact.contains("@") ? "OTP_TYPE_EMAIL" : "OTP_TYPE_SMS", contact: contact)
+    )
+
+    // 2) Verify OTP -> verificationToken
+    let verifyResp: OtpVerifyResponse = try await postJSON(
+      URL(string: "\(baseURL)/otp/verify")!,
+      body: OtpVerifyRequest(otpId: initResp.otpId, otpCode: otpCode)
+    )
+
+    // 3) Generate public key for the session
+    let publicKey = try turnkey.createKeyPair()
+
+    // 4) Login -> sessionToken
+    let loginResp: OtpLoginResponse = try await postJSON(
+      URL(string: "\(baseURL)/otp-login")!,
+      body: OtpLoginRequest(verificationToken: verifyResp.verificationToken, publicKey: publicKey)
+    )
+
+    // 5) Store session locally
+    try await turnkey.storeSession(jwt: loginResp.sessionToken)
+  }
+}
+```

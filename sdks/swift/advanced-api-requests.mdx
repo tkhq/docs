@@ -1,0 +1,106 @@
+---
+title: "Advanced API requests"
+description: "Use the Turnkey Swift SDK to sign raw payloads and configure custom Stampers for advanced request flows."
+sidebarTitle: "Advanced API requests"
+---
+
+## Overview
+
+This guide shows how to:
+
+- Sign a raw payload and read the resulting signature
+- Access the `activity` returned by the API
+- Use custom Stampers (e.g., passkey) with `TurnkeyClient`
+
+## The HTTP client
+
+To make advanced API requests, use the `TurnkeyClient` exposed by `TurnkeyContext`.  
+This client is tied to the active session, so stamping and organization context are automatically handled for you.
+
+You can see the [API Reference](/api-reference/overview) for a complete list of available API endpoints and their parameters. All of these can be accessed through the `TurnkeyClient`.
+
+## Sign a raw payload
+
+Use `signRawPayload` with a `TSignRawPayloadBody`. The response includes the `activity` and the ECDSA signature components `r`, `s`, and `v`. Below, we call it using the session‑bound client from `TurnkeyContext` (no extra configuration needed).
+
+```swift
+import TurnkeyHttp
+import TurnkeyTypes
+import TurnkeySwift
+
+guard let client = TurnkeyContext.shared.client else {
+  // Not authenticated; initialize auth first
+  throw NSError(domain: "Turnkey", code: -1)
+}
+
+// Example message in hex to match HEXADECIMAL encoding
+let message = "Hello, Turnkey!"
+let payload = Data(message.utf8).map { String(format: "%02x", $0) }.joined()
+
+let body = TSignRawPayloadBody(
+  organizationId: TurnkeyContext.shared.session?.organizationId,
+  encoding: .payload_encoding_hexadecimal,
+  hashFunction: .hash_function_not_applicable,
+  payload: payload,
+  signWith: "<wallet_account_or_key_id>"
+)
+
+let resp = try await client.signRawPayload(body)
+// Signature parts
+let r = resp.r
+let s = resp.s
+let v = resp.v
+```
+
+### Access the activity
+
+When creating, modifying, or using resources within Turnkey, an activity is created. You can learn more about activities in the [Activities](/api-reference/activities/overview) section.
+
+If you use the `TurnkeyClient`, you can view all the metadata of the activity you are performing. This includes the activity ID, votes list, status, and more.
+
+```swift
+let activity = resp.activity
+print("Activity ID:", activity.id)
+print("Status:", activity.status.rawValue)
+print("Type:", activity.type.rawValue)
+```
+
+## Using other stampers: Passkey
+
+By default, the session-bound `TurnkeyClient` handles stamping for you.  
+If you want to stamp a request using a passkey explicitly, instantiate a passkey `Stamper`, create a `TurnkeyClient` with it, and sign a payload:
+
+```swift
+import AuthenticationServices
+import TurnkeyHttp
+import TurnkeyTypes
+import TurnkeyStamper
+
+let anchor: ASPresentationAnchor = /* your UI window */
+let stamper = Stamper(
+  rpId: "yourdomain.com",
+  presentationAnchor: anchor
+)
+
+let client = TurnkeyClient(
+  stamper: stamper
+)
+
+let message = "Hello, Turnkey!"
+let payload = Data(message.utf8).map { String(format: "%02x", $0) }.joined()
+let resp = try await client.signRawPayload(TSignRawPayloadBody(
+  organizationId: "<your_organization_id>",
+  encoding: .payload_encoding_hexadecimal,
+  hashFunction: .hash_function_not_applicable,
+  payload: payload,
+  signWith: "<wallet_account_or_key_id>"
+))
+let (r, s, v) = (resp.r, resp.s, resp.v)
+```
+
+With a configured `TurnkeyClient`, you can call any signing or activity endpoint (e.g., `signRawPayload`, `signTransaction`) and the client will handle stamping under the hood using your chosen stamper.
+
+<Note>
+  When using the passkey stamper, the user will be prompted to sign using the
+  passkey before every request is made.
+</Note>
