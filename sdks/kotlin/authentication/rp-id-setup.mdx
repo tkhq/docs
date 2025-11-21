@@ -1,0 +1,79 @@
+---
+title: "Relying Party ID (rpId) Setup for Android"
+description: "Set up the relying party ID (rpId) for passkey authentication in your Android app."
+sidebarTitle: "Relying Party ID (rpId) Setup"
+---
+
+## Overview
+
+This guide explains how to set up the relying party ID (`rpId`) for passkey authentication in your Android app.
+
+<Steps>
+    <Step title="Create or locate your debug keystore">
+        Most Android development environments automatically create a debug keystore for you. It is typically located at:
+        ```bash
+         ~/.android/debug.keystore
+        ```
+    </Step>
+    <Step title="Extract the SHA-256 fingerprint from your debug keystore">
+        Use the following command to extract the SHA-256 fingerprint:
+        ```bash
+        keytool -list -v \
+            -keystore ~/.android/debug.keystore \
+            -alias androiddebugkey \
+            -storepass android \
+            -keypass android
+        ```
+        Look for the line that starts with `SHA256:` and copy the fingerprint.
+    </Step>
+    <Step title="Create the assetlinks.json file">
+        Create a file named `assetlinks.json` with the following content, replacing `<YOUR_SHA256_FINGERPRINT>` with the fingerprint you extracted in the previous step and `<YOUR_PACKAGE_NAME>` with your app's package name:
+        ```json
+        [
+          {
+            "relation": [
+                "delegate_permission/common.handle_all_urls",
+                "delegate_permission/common.get_login_creds"
+            ],
+            "target": {
+              "namespace": "android_app",
+              "package_name": "android.package.name",
+              "sha256_cert_fingerprints": [
+                "<YOUR_SHA256_FINGERPRINT>"
+              ]
+            }
+          }
+        ]
+        ```
+        
+        Replace: 
+        * `android.package.name` with your actual package name.
+        * `<YOUR_SHA256_FINGERPRINT>` with the SHA-256 fingerprint you obtained earlier.
+    </Step>
+    <Step title="Host the assetlinks.json file">
+        Host the `assetlinks.json` file at the following URL on your domain:
+        ```
+        https://<your-domain>/.well-known/assetlinks.json
+        ```
+        Ensure that the file is publicly accessible.
+
+        <Note>
+            The simplest way to deploy your Digital Asset Links file for local development is to set up a simple static file server and use a tunneling service like [ngrok](https://ngrok.com/) and [LiveServer](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) to expose it over HTTPS.
+            For production, you can deploy the file on a platform like Vercel, Netlify, or any static file hosting service that supports HTTPS.
+        </Note>
+    </Step>
+    <Step title="Verify the setup">
+        You can verify that your `assetlinks.json` file is correctly set up by visiting the following URL in your browser:
+        ```
+        https://<your-domain>/.well-known/assetlinks.json
+        ```
+        You should see the contents of your `assetlinks.json` file. Additionally, you can use online tools to validate your Digital Asset Links setup.
+    </Step>
+    <Step title="Link your app to the domain">
+        Once the file is publicly available, Android will verify your app's association with the domain by matching your app's package name and certificate fingerprint to the values listed in the `assetlinks.json` file.
+
+        <Note>
+            The **domain** in `https://<domain>` is your relying party ID (`rpId`). Ensure that this domain matches the `rpId` you set in your Turnkey SDK config.
+        </Note>
+    </Step>
+</Steps>

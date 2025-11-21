@@ -1,0 +1,397 @@
+---
+title: "Using embedded wallets"
+description: "Learn how to create and manage embedded wallets in your Android application using Turnkey's Kotlin SDK."
+sidebarTitle: "Using embedded wallets"
+---
+
+## Overview
+
+The Kotlin SDK allows you to create and manage embedded wallets in your Android application. This includes creating wallets, deriving wallet accounts, and accessing wallet information.
+
+Before we start, ensure you're familiar with the concepts of [Wallets](/concepts/wallets) and [Wallet Accounts](/concepts/wallets#accounts).
+
+## Creating a wallet
+
+After a user authenticates, you can create an embedded wallet for them using the `createWallet` function from the `TurnkeyContext`. You need to provide the wallet parameters, such as the wallet name and the accounts to derive.
+
+This example creates a wallet named "Wallet-`<timestamp>`" with both an Ethereum and a Solana account:
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.types.V1AddressFormat
+import com.turnkey.types.V1Curve
+import com.turnkey.types.V1PathFormat
+import com.turnkey.types.V1WalletAccountParams
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val accounts = listOf(
+                        V1WalletAccountParams(
+                            addressFormat = V1AddressFormat.ADDRESS_FORMAT_ETHEREUM,
+                            curve = V1Curve.CURVE_SECP256K1,
+                            path = "m/44'/60'/0'/0/0",
+                            pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                        ),
+                        V1WalletAccountParams(
+                            addressFormat = V1AddressFormat.ADDRESS_FORMAT_SOLANA,
+                            curve = V1Curve.CURVE_ED25519,
+                            path = "m/44'/501'/0'/0'",
+                            pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                        )
+                    )
+                    TurnkeyContext.createWallet(
+                        walletName = "Wallet-${System.currentTimeMillis()}",
+                        accounts = accounts,
+                        mnemonicLength = 12
+                    )
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+This wallet can then be accessed through the `wallets` property in the `TurnkeyContext`. This property is a `StateFlow` that updates whenever wallets are created or modified.
+
+```kotlin
+val wallets = TurnkeyContext.wallets.value
+```
+
+You can also manually refresh the list of wallets by calling the `refreshWallets` function from the `TurnkeyContext`:
+
+```kotlin
+lifecycleScope.launch {
+    TurnkeyContext.refreshWallets()
+}
+```
+
+## Creating wallet accounts
+
+You can specify which accounts to derive when creating a wallet using the `accounts` parameter in the `createWallet` function, as shown in the previous section. Each account is defined using the `V1WalletAccountParams` class, where you can set properties
+
+### `V1WalletAccountParams`
+
+Configuration used to derive a single wallet account (curve + derivation path + address format).
+
+| Property        | Type              | Required | Description                                                                                                                 |
+| --------------- | ----------------- | -------: | --------------------------------------------------------------------------------------------------------------------------- |
+| `addressFormat` | `V1AddressFormat` |      yes | Output address format for the chain (e.g., `ADDRESS_FORMAT_ETHEREUM`, `ADDRESS_FORMAT_SOLANA`, `ADDRESS_FORMAT_TRON`).      |
+| `curve`         | `V1Curve`         |      yes | Curve used to derive the key (e.g., `CURVE_SECP256K1` or `CURVE_ED25519`). Must match the chain.                            |
+| `path`          | `String`          |      yes | Derivation path (e.g., `"m/44'/60'/0'/0/0"` for Ethereum).                                                                  |
+| `pathFormat`    | `V1PathFormat`    |      yes | Path syntax, always `PATH_FORMAT_BIP32`                                                                                     |
+
+
+### After wallet creation
+
+You can use the `createWalletAccount` function from the `TurnkeyContext.client` to add additional accounts to an existing wallet after it has been created.
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.types.TCreateWalletAccountsBody
+import com.turnkey.types.V1AddressFormat
+import com.turnkey.types.V1Curve
+import com.turnkey.types.V1PathFormat
+import com.turnkey.types.V1WalletAccountParams
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val organizationId = TurnkeyContext.session.value?.organizationId
+                        ?: throw Exception("No session found")
+                    val selectedWallet = TurnkeyContext.wallets.value?.firstOrNull() ?: throw Exception(
+                        "No wallet account found"
+                    )
+
+                    val accounts = listOf(
+                        V1WalletAccountParams(
+                            addressFormat = V1AddressFormat.ADDRESS_FORMAT_ETHEREUM,
+                            curve = V1Curve.CURVE_SECP256K1,
+                            path = "m/44'/60'/1'/0/0",
+                            pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                        ),
+                        V1WalletAccountParams(
+                            addressFormat = V1AddressFormat.ADDRESS_FORMAT_SOLANA,
+                            curve = V1Curve.CURVE_ED25519,
+                            path = "m/44'/501'/1'/0'",
+                            pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                        )
+                    )
+
+                    val res = TurnkeyContext.client.createWalletAccounts(
+                        TCreateWalletAccountsBody(
+                            organizationId = organizationId,
+                            walletId = selectedWallet.id,
+                            accounts = accounts
+                        )
+                    )
+
+                    val createdAddresses = res.activity.result.createWalletAccountsResult!!.addresses
+                    println(createdAddresses)
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+## Importing and exporting wallets
+
+The Kotlin SDK lets you securely import/export wallets, accounts, and private keys using bundles you control, enabling backup, recovery, and migration.
+
+## Export
+
+#### Wallets
+
+Export a specified wallet and its accounts.
+
+> The Kotlin SDK wallet export will decrypt locally and return the secret to you (mnemonic).
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val wallets = TurnkeyContext.wallets.value.orEmpty()
+                    val selectedWallet = wallets.getOrNull(0) ?: return@launch
+
+                    // Key material (mnemonic) will be returned here
+                    val res = TurnkeyContext.exportWallet(
+                        walletId = selectedWallet.id
+                    )
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+To receive an encrypted `ExportBundle` instead, use the lower-level client method:
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.crypto.generateP256KeyPair
+import com.turnkey.types.TExportWalletBody
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                val organizationId = TurnkeyContext.session.value?.organizationId ?: throw Exception("No session found")
+                val wallets = TurnkeyContext.wallets.value.orEmpty()
+                val selectedWallet = wallets.firstOrNull() ?: throw Exception("No wallet found")
+
+                val (targetPublicKey, _, _) = generateP256KeyPair() // Import from com.turnkey.crypto
+
+                try {
+                    val res = TurnkeyContext.client.exportWallet(
+                        TExportWalletBody(
+                            organizationId = organizationId,
+                            walletId = selectedWallet.id,
+                            targetPublicKey = targetPublicKey,
+                        )
+                    )
+
+                    val exportBundle = res.activity.result.exportWalletResult!!.exportBundle
+                    // Store or transmit the exportBundle securely
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+#### Wallet accounts
+
+Export a specific wallet account.
+
+> The Kotlin SDK does currently provide helpers for exporting individual accounts. Use the lower-level client method:
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.crypto.decryptExportBundle
+import com.turnkey.crypto.generateP256KeyPair
+import com.turnkey.types.TExportWalletAccountBody
+import com.turnkey.utils.KeyFormat
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                val organizationId = TurnkeyContext.session.value?.organizationId ?: throw Exception("No session found")
+                val wallets = TurnkeyContext.wallets.value.orEmpty()
+                val selectedWallet = wallets.firstOrNull() ?: throw Exception("No wallet found")
+                val selectedAccount = selectedWallet.accounts.firstOrNull() ?: throw Exception("No wallet account found")
+
+                val (targetPublicKey, _, embeddedPriv) = generateP256KeyPair() // Import from com.turnkey.crypto
+
+                try {
+                    val res = TurnkeyContext.client.exportWalletAccount(
+                        TExportWalletAccountBody(
+                            organizationId = organizationId,
+                            address = selectedAccount.address,
+                            targetPublicKey = targetPublicKey,
+                        )
+                    )
+
+                    val exportBundle = res.activity.result.exportWalletAccountResult!!.exportBundle
+
+                    val keyMaterial = decryptExportBundle(
+                        exportBundle = exportBundle,
+                        organizationId = organizationId,
+                        embeddedPrivateKey = embeddedPriv,
+                        dangerouslyOverrideSignerPublicKey = null,
+                        keyFormat = KeyFormat.other, // or KeyFormat.solana for solana accounts
+                        returnMnemonic = false
+                    )
+                    // Store or transmit the key material securely
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+## Import
+
+Imports take plaintext material (mnemonic or raw private key) and the SDK handles initialization and encryption behind the scenes.
+
+#### Wallets
+
+Imports a wallet from a mnemonic. Optionally pre-create accounts.
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.doOnTextChanged
+import androidx.lifecycle.lifecycleScope
+import com.google.android.material.textfield.TextInputEditText
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.types.V1AddressFormat
+import com.turnkey.types.V1Curve
+import com.turnkey.types.V1PathFormat
+import com.turnkey.types.V1WalletAccountParams
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    private val mnemonic = MutableStateFlow<String?>(null)
+    private val name = MutableStateFlow<String?>(null)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val mnemonicInput = findViewById<TextInputEditText>(R.id.mnemonicInput)
+        mnemonicInput.doOnTextChanged { text, start, before, count ->
+            mnemonic.value = text.toString()
+        }
+
+        val nameInput = findViewById<TextInputEditText>(R.id.nameInput)
+        nameInput.doOnTextChanged { text, start, before, count ->
+            name.value = text.toString()
+        }
+
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val m = mnemonic.value ?: throw Exception("No mnemonic entered") // Your user's mnemonic string from StateFlow
+                    val walletName = name.value ?: "Wallet-${System.currentTimeMillis()}"
+
+                    // Optionally define accounts to derive upon import
+                    val accounts = listOf(
+                        V1WalletAccountParams(
+                            addressFormat = V1AddressFormat.ADDRESS_FORMAT_ETHEREUM,
+                            curve = V1Curve.CURVE_SECP256K1,
+                            path = "m/44'/60'/0'/0/0",
+                            pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                        ),
+                        V1WalletAccountParams(
+                            addressFormat = V1AddressFormat.ADDRESS_FORMAT_SOLANA,
+                            curve = V1Curve.CURVE_ED25519,
+                            path = "m/44'/501'/0'/0'",
+                            pathFormat = V1PathFormat.PATH_FORMAT_BIP32
+                        )
+                    )
+
+                    TurnkeyContext.importWallet(
+                        walletName = walletName,
+                        mnemonic = m,
+                        accounts = accounts
+                    )
+                } catch (t: Throwable) {
+                    println(t)
+                }
+            }
+        }
+    }
+}
+```
+
+## Next steps
+
+Check out the [Signing](/sdks/kotlin/signing) guide to learn how to sign transactions and messages with the embedded wallets you've created.

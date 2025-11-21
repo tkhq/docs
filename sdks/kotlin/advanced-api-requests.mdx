@@ -1,0 +1,120 @@
+---
+title: "Advanced API requests"
+description: "Learn how to make advanced API requests in Kotlin to Turnkey's infrastructure."
+sidebarTitle: "Advanced API requests"
+---
+
+## Overview
+
+The Kotlin SDK provides a variety of helper functions to abstract interactions with Turnkey's infrastructure.
+However, you can also make advanced API requests directly to Turnkey's endpoints if you need more control or want to implement custom features in your Android app.
+
+## The HTTP client
+
+To make advanced API requests, use the `client` from the `TurnkeyContext`.
+
+You can see the [API Reference](/api-reference/overview) for a complete list of available API endpoints and their parameters. All of these can be accessed through the `client`.
+
+Here's how you can use the `client` to make a `signRawPayload` request to Turnkey:
+
+```kotlin
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.turnkey.core.TurnkeyContext
+import com.turnkey.types.TSignRawPayloadBody
+import com.turnkey.types.V1HashFunction
+import com.turnkey.types.V1PayloadEncoding
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val button = findViewById<Button>(R.id.button)
+        
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val wallets = TurnkeyContext.wallets.value
+                    val selectedWalletAccount = wallets?.firstOrNull()?.accounts?.firstOrNull()
+                        ?: throw Exception("No account found. Create a wallet and account before signing.")
+
+                    val message = "Hello, Turnkey!"
+                    val payload = message.toByteArray().toHexString()
+
+                    val response = TurnkeyContext.client.signRawPayload(
+                        TSignRawPayloadBody(
+                            organizationId = TurnkeyContext.session.value?.organizationId
+                                ?: throw Exception("No active session"),
+                            signWith = selectedWalletAccount.address,
+                            payload = payload,
+                            encoding = V1PayloadEncoding.PAYLOAD_ENCODING_HEXADECIMAL,
+                            hashFunction = V1HashFunction.HASH_FUNCTION_NOT_APPLICABLE
+                        )
+                    )
+
+                    val (r, s, v) = response.activity.result.signRawPayloadResult!!
+                    println("Message signed: r=$r, s=$s, v=$v")
+                } catch (e: Exception) {
+                    println("Error signing message: ${e.message}")
+                }
+            }
+        }
+    }
+}
+```
+
+## Viewing the activity
+
+When creating, modifying, or using resources within Turnkey, an activity is created. You can learn more about activities in the [Activities](/api-reference/activities/overview) section.
+
+If you use the `client`, you can view all the metadata of the activity you are performing. This includes the activity ID, votes list, status, and more.
+
+```kotlin
+val response = TurnkeyContext.client.updateUserName(
+    TUpdateUserNameBody(
+        organizationId = TurnkeyContext.session.value?.organizationId ?: throw Exception("No active session"),
+        userId = TurnkeyContext.user.value?.userId ?: throw Exception("No active user"),
+        userName = "New user name"
+    )
+)
+
+val (id, votes, status) = response.activity
+```
+
+## Using other stampers
+
+A **stamper** signs your Turnkey requests (think: authenticated request signer).
+By default the `TurnkeyClient` uses an API-key stamper that securely signs on device.
+You can swap in other stampers—e.g., a passkey stamper—to prompt the user to sign.
+
+Passkey stamper (minimal)
+
+```kotlin
+import androidx.activity.ComponentActivity
+import com.turnkey.http.TurnkeyClient
+import com.turnkey.passkey.PasskeyStamper
+
+// In an Activity (or something with a valid Activity reference)
+val client = TurnkeyClient(
+    apiBaseUrl = config.apiBaseUrl,
+    stamper = PasskeyStamper(
+        activity = this,
+        rpId = "your-rp-id.example.com" // must match your WebAuthn RP ID
+    )
+)
+
+// Use this client to make requests that will prompt the user to sign with a passkey
+```
+
+Notes that matter
+
+* **RP ID must match** what you pass into your `TurnkeyConfig` / your WebAuthn config (often your domain, no scheme/port).
+* **The passkey stamper will prompt** the user when a request requires a signature.
+* **Keep the Activity you pass in alive/foreground** during the prompt so the system sheet can show.
+
+> If your app is primarily passkey-oriented, consider providing a small “client provider” (DI or a singleton) that constructs a `TurnkeyClient` with a `PasskeyStamper` and exposes it via your app container. 
+> That keeps Activity references and lifecycle in one place.
