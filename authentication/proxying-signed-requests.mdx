@@ -8,3 +8,45 @@ How should you decide what to do? Here are some considerations:
 * A backend proxy can be useful if you need to inspect and persist activity results. For example: if your users are creating wallets, you might want to persist the addresses. If your users are signing transactions, you might want to broadcast on their behalf.
 * Another reason why a backend server could be beneficial is monitoring, feature toggles, and validation: with a proxy you're able to control which requests are proxied and which aren't. You can also perform additional validation before signed requests are forwarded to Turnkey.
 * POSTing signed requests directly from your app frontend to Turnkey saves you the burden of running a proxy server, and takes you out of the loop so that your end-users interact directly with Turnkey. This is a "hands-off" approach that can work well if you want to give your end-users maximum flexibility and ownership over their sub-organization.
+
+Here's a practical example of how you could use [@turnkey/react-wallet-kit](https://docs.turnkey.com/sdks/react/advanced-api-requests#the-http-client) to stamp a `signRawPayload` request on the client side, and then send that signed request to Turnkey — typically through your backend before reaching Turnkey’s API:
+
+```ts
+import { useTurnkey } from '@turnkey/react-wallet-kit';
+import axios from 'axios';
+
+const { httpClient } = useTurnkey();
+
+const signed = await httpClient.stampSignRawPayload({
+    organizationId: session.organizationId,
+    signWith: <wallet_account_address>,
+    payload: 'hello',
+    encoding: 'PAYLOAD_ENCODING_TEXT_UTF8',
+    hashFunction: 'HASH_FUNCTION_SHA256',
+});
+
+if (!signed) throw new Error('No signed request (missing stamper?)');
+
+const { body, stamp, url } = signed;
+
+const xStamp =
+    typeof stamp === 'string' ? stamp : stamp?.stampHeaderValue;
+
+if (!xStamp) throw new Error('Missing X-Stamp header value');
+
+// Pass body as-is
+const { data } = await axios.post(url, body, {
+    headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Stamp': xStamp,
+    },
+});
+
+// Extract r, s, v -> signature
+const { r, s, v } = data?.activity?.result?.signRawPayloadResult ?? {};
+const sig = r && s && v ? (`0x${r}${s}${v}` as `0x${string}`) : undefined;
+setSignature(sig ?? '(no signature returned)');
+
+console.log('Signature:', sig);
+```
