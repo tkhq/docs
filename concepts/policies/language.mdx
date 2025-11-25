@@ -150,10 +150,10 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                                 | parsed_instruction_data | Option\<SolanaParsedInstructionData\> | IDL related field specifying all additional information for an instruction calling a program for which an IDL has been uploaded                                               |
 | **Transfer**                    | from                    | string                                | A Solana account (public key) representing the sender of the transfer                                                                                                         |
 |                                 | to                      | string                                | A Solana account (public key) representing the recipient of the transfer                                                                                                      |
-|                                 | amount                  | int                                   | The native SOL amount for the transfer (lamports)                                                                                                                             |
+|                                 | amount                  | int                                   | The native SOL amount for the transfer (lamports). Only transfers executed by direct calls to system programs are recognized, transfers performed indirectly inside other programs or via unsupported System Program instructions are not included. |
 | **SPLTransfer**                 | from                    | string                                | A Solana account (public key) representing the token account that is sending tokens in this SPL transfer                                                                      |
 |                                 | to                      | string                                | A Solana account (public key) representing the token account that is receiving tokens in this SPL transfer                                                                    |
-|                                 | amount                  | int                                   | The amount (noted in raw atomic units) of this SPL transfer                                                                                                                   |
+|                                 | amount                  | int                                   | The amount (noted in raw atomic units) of this SPL transfer. Only parsed for top-level SPL transfers using `Transfer`, `TransferChecked`, or `TransferCheckedWithFee`. Transfers performed through other Token / Token-2022 instructions are not included. |
 |                                 | owner                   | string                                | A Solana account (public key) representing the owner of the sending token account for this SPL transfer                                                                       |
 |                                 | signers                 | list\<string\>                        | A list of Solana accounts (public keys) representing the multisig signers (if they exist) for this SPL transfer                                                               |
 |                                 | token_mint              | string                                | A Solana account (public key) representing the token mint of the token being transferred in this SPL transfer                                                                 |
@@ -287,11 +287,18 @@ See the [Ethereum policy examples](/concepts/policies/examples/ethereum) for sam
 
 ### Solana
 
-Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure. Notably, within our policy engine, a Solana transaction contains a list of Transfers, currently corresponding to native SOL transfers. Each transfer within a transaction is considered a separate entity. Here are some approaches you might take to govern native SOL transfers:
+Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure.
 
-- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-include-a-transfer-with-only-one-specific-recipient))
+Notably, within our policy engine, a Solana transaction contains a list of Transfers, currently corresponding to native SOL transfers. Each transfer within a transaction is considered a separate entity. Each entity represents only top-level transfers that directly invoke supported System Program transfer instructions and do not include transfers performed indirectly inside other programs, or via unsupported System Program instructions.
+
+Similarly, the policy engine exposes `solana.tx.spl_transfers`, which contains only top-level SPL transfers using the supported Token and Token-2022 instructions `Transfer`, `TransferChecked`, and `TransferCheckedWithFee`. SPL transfers performed indirectly inside other programs or via unsupported Token and Token-2022 instructions are not detected and do not appear in this list.
+
+Here are some approaches you might take to govern transfers:
+
+- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-include-a-transfer-to-only-one-specific-recipient))
 - _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/concepts/policies/examples/solana#deny-all-solana-transactions-transferring-to-an-undesired-address))
-- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer-with-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
+- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
+
 
 See the [Solana policy examples](/concepts/policies/examples/solana) for sample scenarios.
 
