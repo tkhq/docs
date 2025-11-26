@@ -1,0 +1,172 @@
+---
+
+title: "Email and SMS OTP authentication"
+description: "Set up and implement email or SMS OTP authentication using Turnkey's Flutter SDK."
+sidebarTitle: "Email & SMS"
+---
+
+## Overview
+
+This guide shows how to implement OTP authentication using `turnkey_sdk_flutter`. You'll trigger an OTP to a user's email address (or phone number), navigate to a verification screen, and verify the 6-digit code.
+
+Before you begin:
+
+* Complete the provider setup from **Getting Started** and enable **Auth Proxy** with **Email OTP** and/or **SMS OTP** in the Turnkey Dashboard.
+* Ensure your `TurnkeyConfig` is pointing at the correct `authProxyConfigId` (OTP settings are controlled in the dashboard).
+
+## Request an OTP (email)
+
+Create or update your login screen to request an email OTP using `initOtp`. The snippet below navigates to an OTP screen with the returned `otpId` and the email address.
+
+```dart title=lib/screens/login.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+import 'otp.dart';
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Login')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(hintText: 'you@example.com'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () async {
+                final email = _emailController.text.trim();
+                if (email.isEmpty || !email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter a valid email')),
+                  );
+                  return;
+                }
+
+                // Request OTP from Turnkey
+                final otpId = await tk.initOtp(
+                  otpType: OtpType.Email,
+                  contact: email,
+                );
+
+                if (!context.mounted) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OTPScreen(
+                      otpId: otpId,
+                      contact: email,
+                      otpType: OtpType.Email,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Continue with email'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Verify the OTP code
+
+On the OTP screen, pass `contact` and `otpId` via the constructor and call `loginOrSignUpWithOtp` with the 6-digit code.
+
+```dart title=lib/screens/otp.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:turnkey_sdk_flutter/turnkey_sdk_flutter.dart';
+
+class OTPScreen extends StatefulWidget {
+  final String otpId;
+  final String contact; // email or phone number
+  final OtpType otpType; // OtpType.Email or OtpType.Sms
+
+  const OTPScreen({
+    super.key,
+    required this.otpId,
+    required this.contact,
+    required this.otpType,
+  });
+
+  @override
+  State<OTPScreen> createState() => _OTPScreenState();
+}
+
+class _OTPScreenState extends State<OTPScreen> {
+  final _otpController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final tk = Provider.of<TurnkeyProvider>(context, listen: false);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Verify code')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _otpController,
+              keyboardType: TextInputType.number,
+              maxLength: 6, // default OTP length is 6
+              decoration: const InputDecoration(hintText: 'Enter 6-digit code', counterText: ''),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () async {
+                final code = _otpController.text.trim();
+                if (code.length != 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter the 6-digit code')),
+                  );
+                  return;
+                }
+
+                // Verify OTP and log in/sign up
+                await tk.loginOrSignUpWithOtp(
+                  otpId: widget.otpId,
+                  otpCode: code,
+                  contact: widget.contact,
+                  otpType: widget.otpType,
+                );
+
+                // Success will trigger onSessionSelected in your TurnkeyConfig
+                if (!mounted) return;
+                Navigator.pop(context);
+              },
+              child: const Text('Verify'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Notes
+
+* The default OTP length is **6**; if you customized OTP settings in the dashboard, validate accordingly.
+* To resend a code, call `initOtp` again with the same contact.
+* For SMS, replace `OtpType.Email` with `OtpType.Sms` and pass a phone number in `contact`.

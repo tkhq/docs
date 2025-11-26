@@ -1,0 +1,136 @@
+---
+title: "Overview"
+description: "Learn how to set up, log in, or sign up in your Swift app using the Turnkey Swift SDK."
+sidebarTitle: "Overview"
+---
+
+## Choose your authentication path
+
+Decide whether you'll use Turnkey's managed Auth Proxy (no backend required) or route auth through your own server.
+
+- **No backend (Auth Proxy)**
+
+  - Your app talks directly to Turnkey's Auth Proxy for OTP, OAuth, and signup.
+  - Origin validation, CORS, session lifetimes, and templates are centrally managed in the Dashboard.
+  - Proxy keys are HPKE-encrypted and decrypted only in-memory per request inside Turnkey's enclave.
+  - The frontend calls Auth Proxy endpoints directly — no backend endpoints needed for OTP, OAuth, or signup flows.
+  - See the full details in the [Auth Proxy reference](/reference/auth-proxy).
+
+- **Your backend**
+  - Implement OTP, OAuth, and signup on your server using Turnkey's public API.
+  - Keep custom validations, logging, and rate-limiting in your control; store user metadata alongside sub-orgs.
+  - Enable co-signing patterns (e.g., 2/2) from your backend.
+  - Follow the Swift guide: [Advanced backend authentication](/sdks/swift/authentication/advanced-backend-authentication).
+
+Note: The Swift SDK's high-level auth helpers on `TurnkeyContext` (e.g., `initOtp`, `verifyOtp`, `completeOtp`, `handleGoogleOAuth`, `handleAppleOAuth`, `handleDiscordOAuth`, `handleXOauth`, and `signUpWithPasskey`) call the Auth Proxy and require an `authProxyConfigId`.
+If you are using your own backend, omit `authProxyConfigId` in `TurnkeyContext.configure` and use your server endpoints; after your server returns a session JWT, store it via `TurnkeyContext.storeSession(...)`.
+
+## Configuration
+
+Before implementing any specific method, make sure you've:
+
+- Completed the Swift SDK [Getting started](/sdks/swift/getting-started) guide
+- Configured `TurnkeyContext` with your `organizationId` and (if using Auth Proxy) `authProxyConfigId`
+- Set `rpId` and Associated Domains if you plan to use Passkeys
+- Optionally enabled managed auto-refresh for session state (`autoRefreshManagedState`)
+
+Sessions created by the SDK's auth flows are securely stored and selected automatically; you can also switch or clear sessions via `TurnkeyContext` APIs when needed.
+
+## Persisting sessions
+
+The Swift SDK generates an on-device API key pair to back your session:
+
+- When available, keys are created in the Secure Enclave and the private key material remains non-exportable and hardware-backed. Signing operations occur inside the enclave, via enclave-to-enclave communication within Turnkey's infrastructure.
+- If the Secure Enclave isn't available on the device, the SDK falls back to secure storage using the iOS Keychain with appropriate access control.
+
+This design aligns with Apple's guidance on Secure Enclave and Keychain Services. For terminology and security properties, see Apple documentation:
+
+- [Secure Enclave](https://developer.apple.com/documentation/security/certificate_key_and_trust_services/keys/storing_keys_in_the_secure_enclave)
+- [Keychain Services](https://developer.apple.com/documentation/security/keychain_services)
+
+## Authentication state
+
+Use the shared `TurnkeyContext` to observe authentication and react in your UI by observing the `authState` property.
+
+In the Swift SDK, `AuthState` represents where you are in the authentication lifecycle:
+
+- **Loading**: set while the context is initializing. At this point, the SDK hasn't yet determined whether a valid session exists.
+- **Authenticated**: set as soon as a valid session is detected and the client is configured to make authenticated requests to Turnkey.
+- **Unauthenticated**: set once the SDK determines no session exists.
+
+```swift focus={5,9-10,12,20-24}
+import SwiftUI
+import TurnkeySwift
+
+struct AuthStatusView: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Group {
+      switch turnkey.authState {
+      case .authenticated:
+        Text("Welcome back!")
+      case .loading:
+        ProgressView()
+      default:
+        Button("Log in") {
+          // Navigate to your auth flow (OTP, Passkey, or OAuth)
+        }
+      }
+    }
+    .onChange(of: turnkey.authState) { newState in
+      if newState == .authenticated {
+        // e.g., navigate to dashboard
+      }
+    }
+  }
+}
+```
+
+The context publishes key pieces of state (e.g., `authState`, `session`, `user`, `wallets`), so your views can stay reactive and minimal.
+
+## Customize sub-organization creation
+
+You can tailor default user and wallet creation settings by:
+
+- Passing `CreateSubOrgParams` to signup helpers (e.g., OTP or passkey signup), or
+- Providing defaults via `TurnkeyConfig.Auth.createSuborgParams`
+
+For more information, see [Sub-organization customization](/sdks/swift/sub-organization-customization).
+
+---
+
+## Next steps
+
+Follow the guides below to implement Email/SMS authentication, Passkey authentication, and Social Logins in your Swift app.
+
+<CardGroup>
+  <Card
+    title="Email & SMS"
+    href="/sdks/swift/authentication/email-sms"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to set up email and SMS authentication using the Auth Proxy.
+  </Card>
+  <Card
+    title="Passkey Authentication"
+    href="/sdks/swift/authentication/passkey"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Learn how to set up passkey authentication with system UI and secure sessions.
+  </Card>
+  <Card
+    title="Social Logins"
+    href="/sdks/swift/authentication/social-logins"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Implement OAuth-based logins (Google, Apple, Discord, X) and complete auth via Auth Proxy.
+  </Card>
+
+</CardGroup>

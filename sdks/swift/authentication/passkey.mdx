@@ -1,0 +1,136 @@
+---
+title: "Passkey authentication"
+description: "Set up and implement passkey authentication using the Turnkey Swift SDK."
+sidebarTitle: "Passkeys"
+---
+
+## Overview
+
+This guide shows how to implement passkey authentication in a Swift app using the Turnkey Swift SDK.  
+You'll add the required platform configuration, set `rpId`, and call `loginWithPasskey` and `signUpWithPasskey` from your UI. The examples below use SwiftUI, but the SDK works with any Swift framework.
+
+## Passkey setup
+
+To enable passkeys on iOS, configure Associated Domains and provide an `rpId` that matches your domain.
+
+- Add Associated Domains in Xcode (Signing & Capabilities → Associated Domains):
+  - `webcredentials:yourdomain.com`
+- For details, see Apple's docs on [Associated Domains](https://developer.apple.com/documentation/xcode/supporting-associated-domains).
+
+### Set `rpId` in your SDK configuration
+
+Ensure `TurnkeyConfig` has an `rpId` matching your Associated Domain, and set `organizationId` for login.
+
+```swift
+import TurnkeySwift
+
+let config = TurnkeyConfig(
+  rpId: "yourdomain.com",
+  organizationId: "<your_organization_id>",
+  authProxyConfigId: "<your_auth_proxy_config_id>" // required for passkey sign-up
+)
+TurnkeyContext.configure(config)
+```
+
+## Usage
+
+Below are examples for signing up and logging in with passkeys:
+
+### Log in with passkey
+
+Before calling `loginWithPasskey`, you must provide an `ASPresentationAnchor`.
+Apple requires a presentation context so the system can display the passkey UI in the correct window.
+We use a helper (`defaultAnchor()`) to resolve the active key window for this purpose.
+
+- Does not use Auth Proxy: `loginWithPasskey` runs entirely on-device and talks directly to Turnkey's API using a stamp; no Auth Proxy involvement.
+- Session expiration: You can pass `expirationSeconds` to set the session lifetime. If omitted, the SDK resolves it in this order:
+  1. Dashboard setting (when an Auth Proxy config is present and `sessionExpirationSeconds` is set), else
+  2. Default of 900 seconds (15 minutes).
+
+```swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct LoginWithPasskeyButton: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Button("Log in with passkey") {
+      Task {
+        if let anchor = defaultAnchor() {
+          // Optionally override session lifetime via `expirationSeconds`, e.g. "1800"
+          try? await turnkey.loginWithPasskey(
+            anchor: anchor
+            // , expirationSeconds: "1800"
+          )
+        }
+      }
+    }
+  }
+}
+
+private func defaultAnchor() -> ASPresentationAnchor? {
+  UIApplication.shared
+    .connectedScenes
+    .compactMap { $0 as? UIWindowScene }
+    .first(where: { $0.activationState == .foregroundActive })?
+    .windows
+    .first(where: { $0.isKeyWindow })
+}
+```
+
+### Sign up with passkey
+
+```swift
+import SwiftUI
+import AuthenticationServices
+import TurnkeySwift
+
+struct SignUpWithPasskeyButton: View {
+  @EnvironmentObject private var turnkey: TurnkeyContext
+
+  var body: some View {
+    Button("Sign up with passkey") {
+      Task {
+        if let anchor = defaultAnchor() {
+          try? await turnkey.signUpWithPasskey(anchor: anchor)
+        }
+      }
+    }
+  }
+}
+```
+
+Notes:
+
+- `signUpWithPasskey` requires the Auth Proxy to be configured (`authProxyConfigId`), since signup creates a new sub-organization and user.
+- You can customize the passkey display name during signup:
+
+```swift
+try await turnkey.signUpWithPasskey(
+  anchor: anchor,
+  passkeyDisplayName: "passkey-\(Int(Date().timeIntervalSince1970))"
+)
+```
+
+## Tips
+
+- Ensure your `rpId` exactly matches the domain configured in Associated Domains; otherwise passkey operations will fail.
+- Confirm your provisioning profile includes Associated Domains and your build contains the entitlements.
+
+---
+
+## Next steps
+
+<CardGroup>
+  <Card
+    title="Social Logins"
+    href="/sdks/swift/authentication/social-logins"
+    icon="file-lines"
+    iconType="solid"
+    horizontal
+  >
+    Set up OAuth-based logins (Google, Apple, Discord, X).
+  </Card>
+</CardGroup>

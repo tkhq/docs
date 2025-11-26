@@ -47,8 +47,9 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | **solana.tx**                  | SolanaTransaction    | The parsed Solana transaction payload (see Appendix below)   |
 | **tron.tx**                    | TronTransaction      | The parsed Tron transaction payload (see Appendix below)     |
 | **bitcoin.tx**                 | BitcoinTransaction   | The parsed Bitcoin transaction payload (see Appendix below)  |
-| **wallet**                     | Wallet               | The target wallet used in sign requests                      |
-| **private_key**                | PrivateKey           | The target private key used in sign requests                 |
+| **wallet**                     | Wallet               | The target wallet used in sign + export requests             |
+| **private_key**                | PrivateKey           | The target private key used in sign + export requests        |
+| **wallet_account**             | WalletAccount        | The target wallet account used in sign + export requests     |
 
 ## Types
 
@@ -268,25 +269,31 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 ## Appendix
 
+### Policy evaluation
+
+Note that our policy engine does not short circuit during evaluation. In practice, this means that if any clause within the `condition` field of a policy results in an error, the evaluated `outcome` for that policy will be an error. In such cases, consider breaking up complex policies into separate policies.
+
+For example, suppose you're looking to construct a policy with the condition `wallet.id == '\<wallet UUID\>' || private_key.id == '\<private key UUID\>'. This condition will _always_ error out during evaluation, because only one of the two clauses can ever be valid: an activity cannot target both a wallet and private key. That means if you're trying to, say, sign with a private key, then the wallet clause will fail (because a wallet isn't being passed into the policy evaluation). Conversely, if you're trying to sign with a wallet, the private key clause will fail for the same reason.
+
 ### Root quorum activities
 
-There are a select few activities that are not governed by policies, but rather by an organization's [root quorum](/concepts/users/root-quorum). These activities are: `ACTIVITY\_TYPE\_UPDATE\_ROOT\_QUORUM`, `ACTIVITY\_TYPE\_SET\_ORGANIZATION\_FEATURE`, `ACTIVITY\_TYPE\_REMOVE\_ORGANIZATION\_FEATURE`. For example, if a policy is added that allows a specific non-root user to perform `ACTIVITY\_TYPE\_SET\_ORGANIZATION\_FEATURE` activities, these requests will still fail as they are subject specifically to root quorum.
+There are a select few activities that are not governed by policies, but rather by an organization's [root quorum](/concepts/users/root-quorum). These activities are: `ACTIVITY_TYPE_UPDATE_ROOT_QUORUM`, `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`. For example, if a policy is added that allows a specific non-root user to perform `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activities, these requests will still fail as they are subject specifically to root quorum.
 
 ### Ethereum
 
 Our Ethereum policy language (accessible via `eth.tx`) allows for the granular governance of signing Ethereum (EVM-compatible) transactions. Our policy engine exposes a [fairly standard set of properties](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope) belonging to a transaction.
 
-See the [Ethereum policy examples](/concepts/policies/examples#ethereum-evm) for sample scenarios.
+See the [Ethereum policy examples](/concepts/policies/examples/ethereum) for sample scenarios.
 
 ### Solana
 
 Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure. Notably, within our policy engine, a Solana transaction contains a list of Transfers, currently corresponding to native SOL transfers. Each transfer within a transaction is considered a separate entity. Here are some approaches you might take to govern native SOL transfers:
 
-- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/concepts/policies/examples#allow-solana-transactions-that-include-a-transfer-with-only-one-specific-recipient))
-- _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/concepts/policies/examples#deny-all-solana-transactions-transferring-to-an-undesired-address))
-- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples#allow-solana-transactions-that-have-exactly-one-transfer-with-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
+- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-include-a-transfer-with-only-one-specific-recipient))
+- _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/concepts/policies/examples/solana#deny-all-solana-transactions-transferring-to-an-undesired-address))
+- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer-with-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
 
-See the [Solana policy examples](/concepts/policies/examples#solana) for sample scenarios.
+See the [Solana policy examples](/concepts/policies/examples/solana) for sample scenarios.
 
 ### Tron
 
@@ -294,15 +301,20 @@ Our Tron policy language (accessible via `tron.tx`) allows for policy control ov
 
 - TransferContract (TRX transfers)
 - TriggerSmartContract (Smart contract, including, but not limited to TRC-20, invocations)
+- DelegateResourceContract
+- UnDelegateResourceContract
+- FreezeBalanceV2Contract
+- UnfreezeBalanceV2Contract
+- AccountPermissionUpdateContract
 
-See the [Tron policy examples](/concepts/policies/examples#tron) for sample scenarios.
+See the [Tron policy examples](/concepts/policies/examples/tron) for sample scenarios.
 
 ### Bitcoin
 
-Our Bitcoin policy language (accessible via `bitcoin.tx`) allows for policy control over signing Bitcoin transactions. 
+Our Bitcoin policy language (accessible via `bitcoin.tx`) allows for policy control over signing Bitcoin transactions.
 
 NOTE: While our `SIGN TRANSACTION` endpoint takes in a Partially Signed Bitcoin Transaction (PSBT) as required for signing context -- our policy language supports only the standard fields inside a Bitcoin transaction: https://learnmeabitcoin.com/technical/transaction/#structure
 
-For further reference on how Turnkey handles Bitcoin transactions in our policy-enabled transaction signing flow, check out this section in our [Bitcoin Network Support](networks/bitcoin#policy-enabled-bitcoin-transaction-signing) page.
+For further reference on how Turnkey handles Bitcoin transactions in our policy-enabled transaction signing flow, check out this section in our [Bitcoin Network Support](/networks/bitcoin#policy-enabled-bitcoin-transaction-signing) page.
 
 See the [Bitcoin policy examples](/concepts/policies/examples/bitcoin) for sample Bitcoin policies.

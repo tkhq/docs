@@ -1,0 +1,167 @@
+---
+title: "Signing"
+description: "Learn how to sign messages and transactions in your Swift app using the Turnkey Swift SDK"
+sidebarTitle: "Signing"
+---
+
+## Overview
+
+This page shows how to sign messages using the Turnkey Swift SDK.  
+The examples below use SwiftUI, but the SDK works with any Swift framework.
+
+<Note>
+  You must be authenticated and have an active session in `TurnkeyContext`.
+</Note>
+
+## Signing messages
+
+To sign a transaction using a specific wallet account, use `signMessage(signWith:addressFormat:message:...)`.
+
+```swift SignMessageView.swift
+import SwiftUI
+import TurnkeySwift
+import TurnkeyTypes
+
+struct SignMessageView: View {
+    @EnvironmentObject var turnkey: TurnkeyContext
+    @State private var message = "Hello, Turnkey!"
+    @State private var r: String?
+    @State private var s: String?
+    @State private var v: String?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            TextField("Message", text: $message)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .frame(height: 44)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.gray.opacity(0.3)))
+
+            Button("Sign message") {
+                Task {
+                    do {
+                        guard let account = turnkey.wallets?.first?.accounts.first else {
+                            error = "No account available"
+                            return
+                        }
+
+                        let result = try await turnkey.signMessage(
+                            signWith: account.address,
+                            addressFormat: account.addressFormat,
+                            message: message
+                        )
+                        r = result.r; s = result.s; v = result.v
+                    } catch {
+                        self.error = "Failed to sign message"
+                    }
+                }
+            }
+
+            if let r, let s, let v {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("r: \(r)")
+                    Text("s: \(s)")
+                    Text("v: \(v)")
+                }
+                .font(.footnote)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+            }
+
+            if let error { Text(error).foregroundColor(.red) }
+        }
+        .padding()
+    }
+}
+```
+
+Notes:
+
+- For Ethereum accounts, `signMessage(...)` will default to Ethereum-style prefixing unless you override `addEthereumPrefix`.
+- If you already know the address and its `addressFormat`, you can call `signMessage(signWith: walletAddress,addressFormat: addressFormat,message: message)` directly without reading from `turnkey.wallets`.
+
+## Advanced: signing and sending Ethereum transactions
+
+To sign and broadcast Ethereum transactions you can use Web3.swift alongside the Turnkey HTTP client.  
+This is typically done in a server or other trusted environment. See the full walkthrough in the Swift SDK repo.
+
+### Prerequisite
+
+Ensure `TurnkeyContext` is already configured and provided to your views (e.g., via `@EnvironmentObject`). The examples below assume an authenticated session is active.
+
+### Step 1: Setup Web3 and Ethereum address
+
+```swift
+import Web3
+
+let infuraAPIKey = "<infura_api_key>"
+let walletFromAddress = "<wallet_from_address>"
+let web3 = Web3(rpcURL: "https://holesky.infura.io/v3/\(infuraAPIKey)")
+let from = try EthereumAddress(hex: walletFromAddress, eip55: true)
+```
+
+### Step 2: Get transaction count (nonce)
+
+```swift
+let nonce = try await web3.eth.getTransactionCount(address: from)
+```
+
+### Step 3: Build the EIP-1559 transaction
+
+```swift
+let transaction = EthereumTransaction(
+    nonce: nonce,
+    maxFeePerGas: EthereumQuantity(quantity: 21.gwei),
+    maxPriorityFeePerGas: EthereumQuantity(quantity: 1.gwei),
+    gasLimit: 29000,
+    to: try EthereumAddress(hex: "0xRecipientAddress", eip55: true),
+    value: EthereumQuantity(quantity: 1000.gwei),
+    transactionType: .eip1559
+)
+```
+
+### Step 4: Serialize the transaction to hex
+
+```swift
+let rlpItem: RLPItem = RLPItem.array([
+    .bigUInt(EthereumQuantity(integerLiteral: 17000).quantity), // Holesky chain id
+    .bigUInt(nonce.quantity),
+    .bigUInt(transaction.maxPriorityFeePerGas?.quantity ?? 0),
+    .bigUInt(transaction.maxFeePerGas?.quantity ?? 0),
+    .bigUInt(transaction.gasLimit?.quantity ?? 0),
+    .bytes(transaction.to?.rawAddress ?? Bytes()),
+    .bigUInt(transaction.value?.quantity ?? 0),
+    .bytes(Bytes()), // input data
+    .array([]) // Access list
+])
+
+let serializedTransaction = try RLPEncoder().encode(rlpItem)
+let transactionHexString = "02" + serializedTransaction.map { String(format: "%02x", $0) }.joined()
+```
+
+### Step 5: Sign the transaction with Turnkey
+
+Use the same wallet-selection pattern shown in the message signing example to pick which account to sign with, then call the Turnkey HTTP client.
+
+```swift
+import TurnkeySwift
+import TurnkeyTypes
+
+// Select a wallet account (customize this selection for your app)
+guard
+    let account = turnkey.wallets?.first?.accounts.first
+else {
+    fatalError("No account available")
+}
+
+let signedTransaction = try await turnkey.signTransaction(
+    signWith: account,
+    unsignedTransaction: transactionHexString,
+    type: .transaction_type_ethereum
+)
+```
+
+Once you have the signed transaction, broadcast it with your Web3 client (e.g., `eth_sendRawTransaction`).
