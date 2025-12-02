@@ -8,7 +8,7 @@ As outlined in our [Whitepaper](https://whitepaper.turnkey.com/foundations#boot-
 
 For the first time we're exposing proofs produced by our TEEs to the outside world. Turnkey's infrastructure produces two types of proofs: **Boot Proofs** and **App Proofs**.
 
-### Boot Proof
+### Boot Proofs
 
 A Boot Proof is a proof that a particular AWS Nitro Enclave has booted with a particular configuration. A Boot Proof contains:
 * An AWS attestation document, which contains AWS-level information: [PCR measurements](https://docs.aws.amazon.com/enclaves/latest/user/set-up-attestation.html#where), certificate chain, public key, and user data.
@@ -46,9 +46,13 @@ Verifying an App Proof thus involves 3 simple steps:
 
 # Use cases
 
-The use-case we're starting with is **address derivation**. Turnkey Verified will automatically fetch and verify proofs for you when new wallets are created through Turnkey's Embedded Wallet Kit, or via Turnkey's dashboard.
+Turnkey Verified currently supports two App Proof types, each verifying a different operation performed inside a secure enclave.
 
-Under the covers, App Proof payloads are human-readable and look like the following:
+### Address Derivation Proofs
+
+Address derivation proofs verify that a crypto address was correctly derived by Turnkey's **signer application**. These proofs are generated when new wallets are created. Turnkey verified will automatically fetch and verify proofs for you when new wallets are created through Turnkey's [Embedded Wallet Kit](/reference/embedded-wallet-kit) or via Turnkey's [dashboard](https://app.turnkey.com).
+
+The payload:
 ```json
 {
   "type": "APP_PROOF_TYPE_ADDRESS_DERIVATION",
@@ -62,7 +66,30 @@ Under the covers, App Proof payloads are human-readable and look like the follow
 }
 ```
 
-Enclave applications sign these payloads to produce App Proofs. For example:
+### Policy Outcome Proofs
+
+Policy outcome proofs verify that policy decisions for your activity requests were properly evaluated against your org's policies by Turnkey's **policy engine application** in a secure enclave. These proofs can be generated for all activities.
+
+The payload:
+```json
+{
+  "type": "APP_PROOF_TYPE_POLICY_OUTCOME",
+  "timestampMs": "1758909116",
+  "policyOutcomeProof": {
+    "organizationId": "your-organization-id",
+    "outcome": "OUTCOME_ALLOW",
+    "decisionContextDigest": "your-decision-context-digest",
+    "organizationDataDigest": "your-organization-data-digest",
+    "parentOrganizationDataDigest": "your-parent-organization-data-digest",
+    "userRequestApprovals": "your-request-signatures"
+  }
+}
+```
+
+### App Proof Structure
+
+All App Proofs share a common structure. Enclave applications sign the above JSON payloads to produce App Proofs. Address derivation proof example:
+
 ```json
 {
   "scheme": "SIGNATURE_SCHEME_EPHEMERAL_KEY_P256",
@@ -75,15 +102,17 @@ Enclave applications sign these payloads to produce App Proofs. For example:
 }
 ```
 
-By combining App Proof and Boot Proof verification, Turnkey Verified guarantees that your crypto address was derived:
+#### Verification Guarantees
+
+By combining App Proof and Boot Proof verification, Turnkey Verified guarantees that the operation was performed:
 * in the context of your Turnkey organization
-* with Turnkey's signer application
+* within a secure Turnkey enclave application
 * inside of a legitimate and precise version of [QuorumOS](https://github.com/tkhq/qos)
 * inside of a legitimate [AWS Nitro Enclave](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)
 * inside Turnkey's canonical AWS production account
 
 ### Open-source tooling
 
-We have written open-source code in our [Rust SDK](https://github.com/tkhq/rust-sdk/tree/main/proofs) and [Typescript SDK](https://github.com/tkhq/sdk/tree/main/packages/crypto/src/proof.ts) to verify App Proofs and Boot Proofs. This logic powers the "Verified" UI component you'll see when new address are derived via our Embedded Wallet Kit or dashboard.
+We have written open-source code in our [Rust SDK](https://github.com/tkhq/rust-sdk/tree/main/proofs) and [Typescript SDK](https://github.com/tkhq/sdk/tree/main/packages/crypto/src/proof.ts) to verify App Proofs and Boot Proofs. This logic powers the "Verified" UI component you'll see when new addresses are derived via our Embedded Wallet Kit or dashboard.
 
 Feel free to inspect this code and run it locally on your own hardware, and reach out if you run into bugs or if you have further questions!
