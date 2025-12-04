@@ -41,7 +41,7 @@ Unique identifier for a given Organization.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="caip2" type="enum<string>" required={true} default="">
-    Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`
+    Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`, `eip155:137`, `eip155:80002`
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="to" type="string" required={true} default="">
@@ -56,24 +56,20 @@ Unique identifier for a given Organization.
     Hex-encoded call data for contract interactions.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="nonce" type="string" required={true} default="">
-    Transaction nonce.
+    <NestedParam parentKey="parameters" childKey="nonce" type="string" required={false} default="">
+    Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="gasLimit" type="string" required={true} default="">
-    Maximum amount of gas to use for this transaction.
+    <NestedParam parentKey="parameters" childKey="gasLimit" type="string" required={false} default="">
+    Maximum amount of gas to use for this transaction, for EIP-1559 transactions.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="maxFeePerGas" type="string" required={true} default="">
-    Maximum total fee per gas unit (base fee + priority fee) in wei, for EIP-1559 transactions.
+    <NestedParam parentKey="parameters" childKey="maxFeePerGas" type="string" required={false} default="">
+    Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="maxPriorityFeePerGas" type="string" required={true} default="">
-    Maximum priority fee (tip) per gas unit in wei, for EIP-1559 transactions.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="deadline" type="string" required={false} default="">
-    Unix timestamp after which the Gas Station meta-transaction is no longer valid. Only used when sponsor=true.
+    <NestedParam parentKey="parameters" childKey="maxPriorityFeePerGas" type="string" required={false} default="">
+    Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -111,7 +107,7 @@ Whether to sponsor this transaction via Gas Station.
 <NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="caip2" type="enum" required={true}>
 CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).
   
-Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`
+Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`, `eip155:137`, `eip155:80002`
 
 </NestedParam>
 <NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="to" type="string" required={true}>
@@ -123,20 +119,17 @@ Amount of native asset to send in wei.
 <NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="data" type="string" required={false}>
 Hex-encoded call data for contract interactions.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="nonce" type="string" required={true}>
-Transaction nonce.
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="nonce" type="string" required={false}>
+Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="gasLimit" type="string" required={true}>
-Maximum amount of gas to use for this transaction.
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="gasLimit" type="string" required={false}>
+Maximum amount of gas to use for this transaction, for EIP-1559 transactions.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxFeePerGas" type="string" required={true}>
-Maximum total fee per gas unit (base fee + priority fee) in wei, for EIP-1559 transactions.
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxFeePerGas" type="string" required={false}>
+Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxPriorityFeePerGas" type="string" required={true}>
-Maximum priority fee (tip) per gas unit in wei, for EIP-1559 transactions.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="deadline" type="string" required={false}>
-Unix timestamp after which the Gas Station meta-transaction is no longer valid. Only used when sponsor=true.
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxPriorityFeePerGas" type="string" required={false}>
+Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
 </NestedParam>
 
       </Expandable>
@@ -150,8 +143,8 @@ Unix timestamp after which the Gas Station meta-transaction is no longer valid. 
         <NestedParam parentKey="activity.result" childKey="ethSendTransactionResult" type="object" required={true}>
       The ethSendTransactionResult object
       <Expandable title="ethSendTransactionResult details">
-        <NestedParam parentKey="activity.result.ethSendTransactionResult" childKey="transactionHash" type="string" required={true}>
-The transaction hash of the sent transaction
+        <NestedParam parentKey="activity.result.ethSendTransactionResult" childKey="sendTransactionStatusId" type="string" required={true}>
+The send_transaction_status ID associated with the transaction submission for sponsored transactions
 </NestedParam>
 
       </Expandable>
@@ -203,8 +196,7 @@ curl --request POST \
         "nonce": "<string>",
         "gasLimit": "<string>",
         "maxFeePerGas": "<string>",
-        "maxPriorityFeePerGas": "<string>",
-        "deadline": "<string>"
+        "maxPriorityFeePerGas": "<string>"
     }
 }'
 ```
@@ -226,11 +218,10 @@ const response = await turnkeyClient.apiClient().ethSendTransaction({
   to: "<string> (Recipient address as a hex string with 0x prefix.)",
   value: "<string> (Amount of native asset to send in wei.)",
   data: "<string> (Hex-encoded call data for contract interactions.)",
-  nonce: "<string> (Transaction nonce.)",
-  gasLimit: "<string> (Maximum amount of gas to use for this transaction.)",
-  maxFeePerGas: "<string> (Maximum total fee per gas unit (base fee + priority fee) in wei, for EIP-1559 transactions.)",
-  maxPriorityFeePerGas: "<string> (Maximum priority fee (tip) per gas unit in wei, for EIP-1559 transactions.)",
-  deadline: "<string> (Unix timestamp after which the Gas Station meta-transaction is no longer valid. Only used when sponsor=true.)"
+  nonce: "<string> (Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.)",
+  gasLimit: "<string> (Maximum amount of gas to use for this transaction, for EIP-1559 transactions.)",
+  maxFeePerGas: "<string> (Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.)",
+  maxPriorityFeePerGas: "<string> (Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.)"
 });
 ```
 
@@ -263,13 +254,12 @@ const response = await turnkeyClient.apiClient().ethSendTransaction({
             "nonce": "<string>",
             "gasLimit": "<string>",
             "maxFeePerGas": "<string>",
-            "maxPriorityFeePerGas": "<string>",
-            "deadline": "<string>"
+            "maxPriorityFeePerGas": "<string>"
           }
         },
         "result": {
           "ethSendTransactionResult": {
-            "transactionHash": "<string>"
+            "sendTransactionStatusId": "<string>"
           }
         },
         "votes": "<array>",
