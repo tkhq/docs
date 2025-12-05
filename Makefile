@@ -57,8 +57,11 @@ sync-sdk-gen-docs:
 	cp $(JS_SDK_ROOT)/generated-docs/docs.json docs.json
 
 	@echo Copying formatted docs to ./generated-docs...
-	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs
-	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs
+	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs/formatted
+	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs/formatted
+
+	@echo Copying formatted changelogs to ./changelogs...
+	cp -R $(JS_SDK_ROOT)/generated-docs/changelogs .
 
 	@echo Deleting temporary files...
 	find $(JS_SDK_ROOT)/generated-docs -mindepth 1 \
