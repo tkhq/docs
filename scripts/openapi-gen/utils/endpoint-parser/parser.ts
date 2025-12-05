@@ -393,6 +393,8 @@ function schemaToApiField(
   let defaultDescription: string;
   if (name === "parameters") {
     defaultDescription = "The parameters object containing the specific intent data for this activity.";
+  } else if (name === "generateAppProofs") {
+    defaultDescription = "Enable to have your activity generate and return App Proofs, enabling verifiability.";
   } else {
     defaultDescription = `${name} field`;
   }
