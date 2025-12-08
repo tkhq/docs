@@ -1,5 +1,5 @@
 ---
-title: "Signing & Sending Transactions"
+title: "Sending Transactions"
 description: "Guide for signing and sending Ethereum transactions using Turnkey’s `signAndSendTransaction` API from `@turnkey/sdk-core`, with and without the React handler from `@turnkey/sdk-react-wallet-kit`."
 ---
 
@@ -59,7 +59,6 @@ const { handleSendTransaction, wallets } = useTurnkey();
 const walletAccount = wallets[0].accounts[0];
 
 await handleSendTransaction({
-  organizationId: "<org-id>",
   from: walletAccount.address,
   to: "0xRecipient",
   value: "1000000000000000",
@@ -105,9 +104,8 @@ const client = new Turnkey({
 ## Step 2 — Submit the transaction
 
 ```ts
-const { sendTransactionStatusId } = await client.signAndSendTransaction({
+const sendTransactionStatusId  = await client.signAndSendTransaction({
   walletAccount,
-  organizationId: "<org-id>",
   from: walletAccount.address,
   to: "0xRecipient",
   caip2: "eip155:8453",
@@ -123,11 +121,26 @@ const { sendTransactionStatusId } = await client.signAndSendTransaction({
 ## Step 3 — Poll for inclusion
 
 ```ts
-const { txHash, status } = await client.pollTransactionStatus({
+const pollResult = await client?.pollTransactionStatus({
   sendTransactionStatusId,
 });
 
-console.log("Mined:", txHash);
+if (!pollResult) {
+  throw new TurnkeyError(
+    "Polling returned no result",
+    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+  );
+}
+
+const { eth } = pollResult;
+const txHash = eth?.txHash;
+if (!txHash) {
+  throw new TurnkeyError(
+    "Missing txHash in transaction result",
+    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+  );
+}
+console.log(txHash)
 ```
 
 ---
