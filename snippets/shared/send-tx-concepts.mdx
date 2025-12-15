@@ -1,0 +1,70 @@
+# Overview
+
+> This functionality is in closed beta - please reach out to us if you are interested in integrating!
+
+Traditionally, sending blockchain transactions onchain has been painful:
+
+- You need to fund wallets with native gas tokens, creating onboarding friction
+- Network congestion and gas spikes can cause transactions to stall or get dropped altogether
+
+Turnkey reduces this to a couple of API calls. We handle gassing and our battle-tested broadcast logic ensures inclusion even under adverse network conditions. You and your users never touch gas tokens or deal with stuck transactions.
+
+**Chain Support:**
+
+- Base - eip155:8453
+- Polygon - eip155:137
+- Ethereum - eip155:1 (Coming soon)
+
+> Interested in another chain? Reach out to us!
+
+## Concepts
+
+### Gas sponsorship (aka gas abstraction, gasless transactions, fee abstraction)
+
+A single endpoint lets you toggle between standard EIP-1559 transactions and sponsored transactions. Set `sponsor: true` to enable sponsorship.
+
+### Construction and Broadcast
+
+Whether or not you use sponsorship, Turnkey handles transaction construction and broadcast. We auto-fill any fields you omit, so you can submit minimal payloads and let us handle the rest.
+
+### Transaction status and enriched transaction errors
+
+After you send a transaction, Turnkey monitors its status until it fails or gets included in a block.
+
+For transactions that experience reversion errors, Turnkey runs a transaction simulation to produce structured execution traces and decode common revert reasons.
+
+### Spend limits
+
+To prevent runaway spend, you must configure USD gas limits. Turnkey supports two separate limits: all orgs and each sub-org. This allows you to control both total USD spent and the amount of USD a single user has spent. You can configure the limit values and time window through the dashboard.
+
+You can query current gas usage and limits through our endpoints.
+
+### Policy engine
+
+You can write policies against both sponsored and non-sponsored transactions using the normal `eth.tx` namespace in Turnkey's policy DSL. This means you can seamlessly switch between sponsored and non-sponsored transactions and still use the same policies.
+
+_Note:_ Turnkey sets all gas-related fields to 0 for sponsored transactions.
+
+### Billing
+
+Turnkey passes gas costs through to you and includes them as a line item at the end of the month. You pay based on the USD value of gas at time of broadcast; Turnkey internalizes the inventory risk of gas token price changes. Our battle-tested gas estimation aims to be cost efficient while ensuring quick transaction inclusion.
+
+### Advanced
+
+#### Gas sponsorship smart contracts
+
+We could not find a satisfactory setup for gas sponsorship contracts that were both fast and safe, so we made our own. The contracts are open source and you can check them out on [github](https://github.com/tkhq/gas-station).
+
+Based on our benchmarks, these are the most efficient gas sponsorship contracts on the market.
+
+#### Security
+
+Some gas sponsorship setups by other providers are subject to replay attacks. If a malicious actor compromises the provider infrastructure, they can replay the gas sponsorship request multiple times with different nonces to create multiple transactions from a single request. Concretely, this means if Bob signs a request to send Alice 1 ETH, a malicious actor could replay that request many times, draining all of Bob's ETH.
+
+At Turnkey, we never cut corners on security: we perform transaction construction in enclaves, and as long as the request includes the relevant nonce, only one transaction can be created from it. Since the user's authenticator signs requests and the enclave verifies signatures, a malicious actor cannot modify or replay the request.
+
+By default, our SDKs include a special gas station nonce for sponsored transaction requests.
+
+### RPCs
+
+Turnkey's transaction send and status endpoints eliminate the need for third-party RPC providers. You save costs and reduce latency because we holistically incorporate internal data and minimize calls.
