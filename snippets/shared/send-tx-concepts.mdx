@@ -21,21 +21,30 @@ Turnkey reduces this to a couple of API calls. We handle gassing and our battle-
 
 ### Gas sponsorship (aka gas abstraction, gasless transactions, fee abstraction)
 
-A single endpoint lets you toggle between standard EIP-1559 transactions and sponsored transactions. Set `sponsor: true` to enable sponsorship.
+A single endpoint lets you toggle between standard EIP-1559 transactions and sponsored transactions. EIP-1559 is the modern Ethereum fee model where transactions specify a base fee (determined by network congestion) and a priority fee (a tip to validators for faster inclusion). With sponsorship enabled, your users never need to hold native tokens to pay these fees—Turnkey covers them. Set `sponsor: true` to enable sponsorship.
 
 ### Construction and Broadcast
 
-Whether or not you use sponsorship, Turnkey handles transaction construction and broadcast. We auto-fill any fields you omit, so you can submit minimal payloads and let us handle the rest.
+A successful EVM transaction requires several components:
+
+- **Transaction construction**: assembling the payload (recipient, value, calldata)
+- **Nonce, gas and tip fee**: setting the correct nonce to order transactions, estimating gas usage and tip fees to ensure inclusion even during network congestion
+- **Signature**: cryptographically signing the transaction with the sender's private key
+- **Broadcast**: submitting the signed transaction to the network and monitoring for inclusion
+
+Turnkey handles all of this for you. Whether or not you use sponsorship, you pass through minimal payloads that define the contents of your transaction and we take care of construction, signing, and broadcast. We auto-fill any fields you omit.
+
+This endpoint supports arbitrary EVM transactions, not just simple sends. You can interact with smart contracts, deploy contracts, or execute any valid EVM operation.
 
 ### Transaction status and enriched transaction errors
 
 After you send a transaction, Turnkey monitors its status until it fails or gets included in a block.
 
-For transactions that experience reversion errors, Turnkey runs a transaction simulation to produce structured execution traces and decode common revert reasons.
+For transactions that experience reversion errors, Turnkey runs a transaction simulation to produce structured execution traces and decode common revert reasons. The result: actionable error messages that tell you exactly what went wrong, so you can debug and fix issues quickly instead of parsing opaque hex data.
 
 ### Spend limits
 
-To prevent runaway spend, you must configure USD gas limits. Turnkey supports two separate limits: all orgs and each sub-org. This allows you to control both total USD spent and the amount of USD a single user has spent. You can configure the limit values and time window through the dashboard.
+Turnkey provides tools to manage your gas sponsorship budget. You configure USD gas limits at two levels: across all orgs and per sub-org. This gives you control over both total spend and per-user spend. You can set limit values and time windows through the dashboard.
 
 You can query current gas usage and limits through our endpoints.
 
@@ -55,7 +64,7 @@ Turnkey passes gas costs through to you and includes them as a line item at the 
 
 We could not find a satisfactory setup for gas sponsorship contracts that were both fast and safe, so we made our own. The contracts are open source and you can check them out on [github](https://github.com/tkhq/gas-station).
 
-Based on our benchmarks, these are the most efficient gas sponsorship contracts on the market.
+Based on our benchmarks, these are the most efficient gas sponsorship contracts on the market. They achieve this through optimized logic, calldata encoding, and using assembly extensively, which reduces gas overhead per sponsored transaction. The result: lower costs for you and faster execution for your users.
 
 #### Security
 
@@ -67,4 +76,4 @@ By default, our SDKs include a special gas station nonce for sponsored transacti
 
 ### RPCs
 
-Turnkey's transaction send and status endpoints eliminate the need for third-party RPC providers. You save costs and reduce latency because we holistically incorporate internal data and minimize calls.
+Turnkey's send transaction and transaction status endpoints eliminate the need for third-party RPC providers. You save costs and reduce latency because we holistically incorporate internal data and minimize calls.
