@@ -1,0 +1,194 @@
+## Using `@turnkey/core` directly
+
+For custom frameworks, Node.js servers, or full manual control.
+
+You will call:
+
+### `signAndSendTransaction(params)`
+→ returns `{ sendTransactionStatusId }`
+
+### `pollTransactionStatus(params)`
+→ returns `{ txHash, status }`
+
+### Step 1 — Create a client
+
+```ts
+import { Turnkey } from "@turnkey/core";
+
+const client = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORG_ID,
+});
+```
+
+---
+
+### Step 2 — Submit the transaction
+
+```ts
+const sendTransactionStatusId  = await client.signAndSendTransaction({
+  walletAccount,
+  from: walletAccount.address,
+  to: "0xRecipient",
+  caip2: "eip155:8453",
+  sponsor: true,
+  value: "0",
+  data: "0x",
+  nonce: "0",
+});
+```
+
+---
+
+### Step 3 — Wait for inclusion
+
+```ts
+const pollResult = await client?.pollTransactionStatus({
+  sendTransactionStatusId,
+});
+
+if (!pollResult) {
+  throw new TurnkeyError(
+    "Polling returned no result",
+    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+  );
+}
+
+const { eth } = pollResult;
+const txHash = eth?.txHash;
+if (!txHash) {
+  throw new TurnkeyError(
+    "Missing txHash in transaction result",
+    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+  );
+}
+console.log(txHash)
+```
+
+---
+
+## `signAndSendTransaction` Implementation
+
+```ts
+/**
+ * Signs and submits an Ethereum transaction using Turnkey.
+ *
+ * Behavior:
+ * - Constructs transaction intent (sponsored or EIP-1559)
+ * - Submits via Turnkey
+ * - Returns { sendTransactionStatusId }
+ *
+ * Does NOT poll — caller must poll via pollTransactionStatus.
+ */
+signAndSendTransaction = async (
+  params: SignAndSendTransactionParams
+): Promise<SignAndSendResult> => {
+  const {
+    organizationId,
+    from,
+    to,
+    caip2,
+    sponsor,
+    value,
+    data,
+    nonce,
+    gasLimit,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    walletAccount,
+  } = params;
+
+  return withTurnkeyErrorHandling(
+    async () => {
+      const intent = {
+        from,
+        to,
+        caip2,
+        ...(value ? { value } : {}),
+        ...(data ? { data } : {}),
+      };
+
+      if (sponsor) {
+        intent["sponsor"] = true;
+      } else {
+        if (nonce) intent["nonce"] = nonce;
+        if (gasLimit) intent["gasLimit"] = gasLimit;
+        if (maxFeePerGas) intent["maxFeePerGas"] = maxFeePerGas;
+        if (maxPriorityFeePerGas)
+          intent["maxPriorityFeePerGas"] = maxPriorityFeePerGas;
+      }
+
+      const resp = await this.httpClient.ethSendTransaction({
+        ...intent,
+        ...(organizationId && { organizationId }),
+      });
+
+      return { sendTransactionStatusId: resp.sendTransactionStatusId };
+    },
+    {
+      errorMessage: "Failed to submit transaction",
+      errorCode: TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+    }
+  );
+};
+```
+
+---
+
+## `pollTransactionStatus` Implementation
+
+```ts
+/**
+ * Polls Turnkey until a transaction reaches a terminal state.
+ *
+ * Terminal states:
+ * - COMPLETED / INCLUDED → resolves { txHash, status }
+ * - FAILED / CANCELLED → rejects
+ */
+pollTransactionStatus({
+  httpClient,
+  organizationId,
+  sendTransactionStatusId,
+}: PollTransactionStatusParams): Promise<{
+  txHash: string;
+  status: string;
+}> {
+  return withTurnkeyErrorHandling(
+    async () => {
+      return new Promise((resolve, reject) => {
+        const ref = setInterval(async () => {
+          try {
+            const resp = await httpClient.getSendTransactionStatus({
+              organizationId,
+              sendTransactionStatusId,
+            });
+
+            const status = resp?.txStatus;
+            const txHash = resp?.eth?.txHash;
+            const txError = resp?.txError;
+
+            if (!status) return;
+
+            if (txError || status === "FAILED" || status === "CANCELLED") {
+              clearInterval(ref);
+              reject(txError || `Transaction ${status}`);
+              return;
+            }
+
+            if (status === "COMPLETED" || status === "INCLUDED") {
+              clearInterval(ref);
+              resolve({ txHash: txHash!, status });
+            }
+          } catch (e) {
+            console.warn("polling error:", e);
+          }
+        }, 500);
+      });
+    },
+    {
+      errorMessage: "Failed to poll transaction status",
+      errorCode: TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+    }
+  );
+}
+```

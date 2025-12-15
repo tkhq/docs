@@ -1,0 +1,134 @@
+## Using `handleSendTransaction` (React)
+
+This handler wraps everything: intent creation, signing, Turnkey submission, polling, modal UX, and final success UI.
+
+### Step 1 — Configure the Provider
+
+```ts
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+const turnkeyConfig = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_TURNKEY_ORG_ID,
+  rpId: window.location.hostname,
+  iframeUrl: "https://auth.turnkey.com",
+};
+
+export default function App({ children }) {
+  return (
+    <TurnkeyProvider config={turnkeyConfig}>
+      {children}
+    </TurnkeyProvider>
+  );
+}
+```
+
+---
+
+### Step 2 — Use `handleSendTransaction` inside your UI
+
+```ts
+const { handleSendTransaction, wallets } = useTurnkey();
+
+const walletAccount = wallets[0].accounts[0];
+
+await handleSendTransaction({
+  from: walletAccount.address,
+  to: "0xRecipient",
+  value: "1000000000000000",
+  data: "0x",
+  caip2: "eip155:8453",
+  sponsor: true,
+});
+```
+
+This automatically:
+- opens Turnkey modal
+- shows chain logo
+- polls until INCLUDED
+- displays success page + explorer link
+
+---
+
+## Full React Handler Implementation
+
+```ts
+const handleSendTransaction = useCallback(
+  async (params: HandleSendTransactionParams): Promise<void> => {
+    const s = await getSession();
+    const organizationId = params.organizationId || s?.organizationId;
+
+    const {
+      from,
+      to,
+      value,
+      data,
+      caip2,
+      sponsor,
+      gasLimit,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      nonce: providedNonce,
+      successPageDuration = 2000,
+    } = params;
+
+    const { nonce } = await generateNonces({
+      from: from,
+      rpcUrl: DEFAULT_RPC_BY_CHAIN[caip2],
+      providedNonce,
+    });
+
+    return new Promise((resolve, reject) => {
+      const SendTxContainer = () => {
+        const cleanedData =
+          data && data !== "0x" && data !== "" ? data : undefined;
+
+        const action = async () => {
+          const { sendTransactionStatusId } =
+            await client.signAndSendTransaction({
+              walletAccount,
+              organizationId,
+              from,
+              to,
+              caip2,
+              sponsor: !!sponsor,
+              value,
+              data: cleanedData,
+              nonce,
+              gasLimit,
+              maxFeePerGas,
+              maxPriorityFeePerGas,
+            });
+
+          const { txHash } = await client.pollTransactionStatus({
+            httpClient: client.httpClient,
+            organizationId,
+            sendTransactionStatusId,
+          });
+
+          return { txHash };
+        };
+
+        return (
+          <SendTransactionPage
+            icon={<img src={getChainLogo(caip2)} className="h-10 w-10" />}
+            action={action}
+            caip2={caip2}
+            successPageDuration={successPageDuration}
+            onSuccess={() => resolve()}
+            onError={(err) => reject(err)}
+          />
+        );
+      };
+
+      pushPage({
+        key: "Send Transaction",
+        content: <SendTxContainer />,
+        preventBack: true,
+        showTitle: false,
+      });
+    });
+  },
+  [pushPage, client]
+);
+```
