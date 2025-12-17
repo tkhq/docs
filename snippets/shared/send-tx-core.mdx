@@ -26,15 +26,16 @@ const client = new Turnkey({
 ### Step 2 — Submit the transaction
 
 ```ts
-const sendTransactionStatusId  = await client.ethSendTransaction({
-  walletAccount,
-  from: walletAccount.address,
-  to: "0xRecipient",
-  caip2: "eip155:8453",
-  sponsor: true,
-  value: "0",
-  data: "0x",
-  nonce: "0",
+const sendTransactionStatusId = await client.ethSendTransaction({
+  transaction: {
+    from: walletAccount.address,
+    to: "0xRecipient",
+    caip2: "eip155:8453",
+    sponsor: true,
+    value: "0",
+    data: "0x",
+    nonce: "0",
+  },
 });
 ```
 
@@ -67,128 +68,6 @@ console.log(txHash)
 
 ---
 
-## `ethSendTransaction` Implementation
+- `ethSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/core/src/__clients__/core.ts#L2732)
 
-```ts
-/**
- * Signs and submits an Ethereum transaction using Turnkey.
- *
- * Behavior:
- * - Constructs transaction intent (sponsored or EIP-1559)
- * - Submits via Turnkey
- * - Returns { sendTransactionStatusId }
- *
- * Does NOT poll — caller must poll via pollTransactionStatus.
- */
-ethSendTransaction = async (
-  params: EthSendTransactionParams
-): Promise<string> => {
-  const {
-    organizationId,
-    from,
-    to,
-    caip2,
-    sponsor,
-    value,
-    data,
-    nonce,
-    gasLimit,
-    maxFeePerGas,
-    maxPriorityFeePerGas,
-    walletAccount,
-  } = params;
-
-  return withTurnkeyErrorHandling(
-    async () => {
-      const intent = {
-        from,
-        to,
-        caip2,
-        ...(value ? { value } : {}),
-        ...(data ? { data } : {}),
-      };
-
-      if (sponsor) {
-        intent["sponsor"] = true;
-      } else {
-        if (nonce) intent["nonce"] = nonce;
-        if (gasLimit) intent["gasLimit"] = gasLimit;
-        if (maxFeePerGas) intent["maxFeePerGas"] = maxFeePerGas;
-        if (maxPriorityFeePerGas)
-          intent["maxPriorityFeePerGas"] = maxPriorityFeePerGas;
-      }
-
-      const resp = await this.httpClient.ethSendTransaction({
-        ...intent,
-        ...(organizationId && { organizationId }),
-      });
-
-      return { sendTransactionStatusId: resp.sendTransactionStatusId };
-    },
-    {
-      errorMessage: "Failed to submit transaction",
-      errorCode: TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
-    }
-  );
-};
-```
-
----
-
-## `pollTransactionStatus` Implementation
-
-```ts
-/**
- * Polls Turnkey until a transaction reaches a terminal state.
- *
- * Terminal states:
- * - COMPLETED / INCLUDED → resolves { txHash, status }
- * - FAILED / CANCELLED → rejects
- */
-pollTransactionStatus({
-  httpClient,
-  organizationId,
-  sendTransactionStatusId,
-}: PollTransactionStatusParams): Promise<{
-  txHash: string;
-  status: string;
-}> {
-  return withTurnkeyErrorHandling(
-    async () => {
-      return new Promise((resolve, reject) => {
-        const ref = setInterval(async () => {
-          try {
-            const resp = await httpClient.getSendTransactionStatus({
-              organizationId,
-              sendTransactionStatusId,
-            });
-
-            const status = resp?.txStatus;
-            const txHash = resp?.eth?.txHash;
-            const txError = resp?.txError;
-
-            if (!status) return;
-
-            if (txError || status === "FAILED" || status === "CANCELLED") {
-              clearInterval(ref);
-              reject(txError || `Transaction ${status}`);
-              return;
-            }
-
-            if (status === "COMPLETED" || status === "INCLUDED") {
-              clearInterval(ref);
-              resolve({ txHash: txHash!, status });
-            }
-          } catch (e) {
-            console.warn("polling error:", e);
-          }
-        }, 500);
-      });
-    },
-    {
-      errorMessage: "Failed to poll transaction status",
-      errorCode: TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
-    }
-  );
-}
-```
+- `pollTransactionStatus` Implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/core/src/__clients__/core.ts#L2866)
