@@ -22,9 +22,12 @@ By default, a parent organization has read access to all of its sub-organization
 
 #### Client side access
 
-Separately, if you would like the client to have all read requests encapsulated (instead of reading data via a proxy like in the previous approach), the client can initiate a read-only session via a [CreateReadOnlySession activity](/api-reference/sessions/create-read-only-session). This activity returns a session string that, if passed into an HTTP request via `X-Session` header, gives permission to perform reads. Note that because this is an activity performed by an end-user, it requires authentication (e.g. via passkey).
+Separately, if you would like the client to have all read requests encapsulated (instead of reading data via a proxy like in the previous approach), the client can initiate a read-only session via a [CreateReadOnlySession activity](/api-reference/activities/create-read-only-session). This activity returns a session string that, if passed into an HTTP request via `X-Session` header, gives permission to perform reads. Note that because this is an activity performed by an end user, it still requires authentication (for example, via passkey).
 
-If you’d like to do this via our SDK abstractions, you can leverage the [login](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/sdk-browser/src/sdk-client.ts#L231-L255)1 method, which creates a `CreateReadOnlySession` activity under the hood. It stores the resulting session string in [Local Storage](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/sdk-browser/src/sdk-client.ts#L242-L252)2, and subsequent requests to fetch data from Turnkey injects the session stored here at [call time](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/sdk-browser/src/__generated__/sdk-client-base.ts#L45-L47)3 within `@turnkey/sdk-browser`.
+Turnkey’s current SDKs, including `@turnkey/react-wallet-kit` and `@turnkey/core`, do not support read-only sessions. These SDKs are designed around cryptographically stamped, read-write sessions and do not expose the divergent request paths required for token-based read-only authentication.
+If you need read-only session support, you must either interact with the Turnkey API directly and attach the session token to requests manually, or use older / legacy SDK [implementations](https://github.com/tkhq/sdk/blob/6b3ea14d1184c5394449ecaad2b0f445e373823f/packages/sdk-browser/src/sdk-client.ts#L231-L255) that still support token-based read-only sessions.
+
+For most applications, read-write sessions are recommended. By default, a parent organization already has read access to all of its sub-organizations’ data, allowing clients to fetch read-only data via a backend using the parent organization’s API credentials, without requiring a separate read-only client session.
 
 ### Read-write sessions
 
@@ -61,7 +64,8 @@ Turnkey’s SDK provides helpers to:
 
 This is currently the **most persistent** session model for modern browsers that support WebCrypto. It is especially valuable in Progressive Web App (PWA) contexts or when iframe and Local Storage approaches are insufficient.
 
-To see a full working example, check out our [IndexedDB SDK example](https://github.com/tkhq/sdk/tree/main/examples/with-indexed-db). Or our [Web demo application](https://github.com/tkhq/demo-ewk) that leverages abstractions such as the `IndexedDbClient` for full end-to-end authentication flows.
+To see the IndexedDB-backed session mechanism in action, check out our Turnkey react-wallet-kit [playground](https://github.com/tkhq/sdk/tree/main/examples/with-sdk-js) or dedicated authentication examples like [oauth](https://github.com/tkhq/sdk/tree/main/examples/oauth), [email OTP](https://github.com/tkhq/sdk/tree/main/examples/otp-auth), and [external wallet authentication](https://github.com/tkhq/sdk/tree/main/examples/wallet-auth).
+Our [Web demo application](https://github.com/tkhq/sdk/tree/main/examples/react-wallet-kit) hosted at [wallets.turnkey.com](https://wallets.turnkey.com) showcases complete end-to-end authentication flows and client-side session persistence backed by IndexedDB.
 
 
 #### SecureStorage (mobile only)
