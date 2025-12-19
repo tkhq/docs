@@ -7,6 +7,7 @@ This guide covers how to set up client-side signing using Turnkey's `@turnkey/if
 ## Overview
 
 Client-side signing allows you to:
+
 - Export private keys from Turnkey to a secure iframe
 - Sign transactions and messages directly in the browser via iframe
 - Maintain multiple keys simultaneously for signing operations
@@ -14,26 +15,24 @@ Client-side signing allows you to:
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Your Application                          │
-│  ┌─────────────────┐    ┌─────────────────────────────────────┐ │
-│  │   Frontend      │    │         Backend (API Routes)        │ │
-│  │                 │    │                                     │ │
-│  │  IframeStamper  │◄──►│  Turnkey SDK (exportWalletAccount)  │ │
-│  └────────┬────────┘    └─────────────────────────────────────┘ │
-│           │                                                      │
-│           │ MessageChannel                                       │
-│           ▼                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │              export-and-sign Iframe                          ││
-│  │  ┌─────────────────┐    ┌──────────────────────────────┐    ││
-│  │  │  Embedded Key   │    │     In-Memory Private Keys   │    ││
-│  │  │  (P-256 ECDH)   │    │  { address → key, keypair }  │    ││
-│  │  │  localStorage   │    │         (memory only)        │    ││
-│  │  └─────────────────┘    └──────────────────────────────┘    ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph app["Your Application"]
+        subgraph frontend["Frontend"]
+            stamper["IframeStamper"]
+        end
+        subgraph backend["Backend (API Routes)"]
+            sdk["Turnkey SDK<br/>(exportWalletAccount)"]
+        end
+        stamper <--> sdk
+    end
+
+    subgraph iframe["export-and-sign Iframe"]
+        embedded["Embedded Key<br/>(P-256 ECDH)<br/>localStorage"]
+        inmemory["In-Memory Private Keys<br/>{ address → key, keypair }<br/>(memory only)"]
+    end
+
+    stamper <-->|"MessageChannel"| iframe
 ```
 
 ### Security Model
@@ -84,7 +83,9 @@ const IFRAME_CONTAINER_ID = "turnkey-iframe-container";
 const IFRAME_ELEMENT_ID = "turnkey-iframe";
 
 function SigningComponent() {
-  const [iframeStamper, setIframeStamper] = useState<IframeStamper | null>(null);
+  const [iframeStamper, setIframeStamper] = useState<IframeStamper | null>(
+    null
+  );
 
   useEffect(() => {
     const stamper = new IframeStamper({
@@ -93,7 +94,8 @@ function SigningComponent() {
       iframeElementId: IFRAME_ELEMENT_ID,
     });
 
-    stamper.init()
+    stamper
+      .init()
       .then(() => {
         setIframeStamper(stamper);
         // Optionally apply custom styles
@@ -107,7 +109,10 @@ function SigningComponent() {
   }, []);
 
   return (
-    <div id={IFRAME_CONTAINER_ID} style={{ display: "block" }}>
+    <div
+      id={IFRAME_CONTAINER_ID}
+      style={{ display: "block" }}
+    >
       {/* Iframe will be inserted here */}
     </div>
   );
@@ -176,8 +181,8 @@ async function exportKeyToIframe(
   const injected = await iframeStamper.injectKeyExportBundle(
     response.data.exportBundle,
     organizationId,
-    KeyFormat.Hexadecimal,  // or KeyFormat.Solana for Solana-formatted keys
-    walletAccountAddress    // Required for multi-key support
+    KeyFormat.Hexadecimal, // or KeyFormat.Solana for Solana-formatted keys
+    walletAccountAddress // Required for multi-key support
   );
 
   if (!injected) {
@@ -202,12 +207,12 @@ async function signMessage(
   const signature = await iframeStamper.signMessage(
     {
       message,
-      type: MessageType.Solana,  // or MessageType.Ethereum
+      type: MessageType.Solana, // or MessageType.Ethereum
     },
-    walletAccountAddress  // Required when multiple keys are loaded
+    walletAccountAddress // Required when multiple keys are loaded
   );
 
-  return signature;  // Returns hex-encoded signature
+  return signature; // Returns hex-encoded signature
 }
 ```
 
@@ -218,18 +223,18 @@ import { TransactionType } from "@turnkey/iframe-stamper";
 
 async function signTransaction(
   iframeStamper: IframeStamper,
-  serializedTransaction: string,  // Hex-encoded transaction bytes
+  serializedTransaction: string, // Hex-encoded transaction bytes
   walletAccountAddress: string
 ): Promise<string> {
   const signedTransaction = await iframeStamper.signTransaction(
     {
       transaction: serializedTransaction,
-      type: TransactionType.Solana,  // or TransactionType.Ethereum
+      type: TransactionType.Solana, // or TransactionType.Ethereum
     },
     walletAccountAddress
   );
 
-  return signedTransaction;  // Returns hex-encoded signed transaction
+  return signedTransaction; // Returns hex-encoded signed transaction
 }
 ```
 
@@ -256,14 +261,14 @@ async function loadMultipleKeys(
   for (const address of addresses) {
     const response = await axios.post("/api/exportWalletAccount", {
       walletAccountAddress: address,
-      targetPublicKey: embeddedKey,  // Same embedded key for all exports
+      targetPublicKey: embeddedKey, // Same embedded key for all exports
     });
 
     await iframeStamper.injectKeyExportBundle(
       response.data.exportBundle,
       organizationId,
       KeyFormat.Hexadecimal,
-      address  // Each key is stored by its address
+      address // Each key is stored by its address
     );
   }
 }
@@ -300,12 +305,14 @@ await iframeStamper.clearEmbeddedPrivateKey();
 Understanding the key lifecycle is important for building reliable applications.
 
 ### Embedded Key (P-256 ECDH)
+
 - **Storage**: localStorage within the iframe
 - **TTL**: 48 hours (default)
 - **Purpose**: Decrypt incoming export bundles via HPKE
 - **Behavior**: Persists across bundle injections - the same embedded key can decrypt multiple export bundles until it expires or is explicitly cleared
 
 ### In-Memory Private Keys
+
 - **Storage**: JavaScript memory only (never persisted)
 - **TTL**: 24 hours
 - **Purpose**: Sign messages and transactions
@@ -337,10 +344,10 @@ async function ensureKeyLoaded(
 
 The `@turnkey/iframe-stamper` supports two key formats:
 
-| Format | Description | Use Case |
-|--------|-------------|----------|
-| `KeyFormat.Hexadecimal` | 64 hexadecimal digits (32 bytes) | MetaMask, Ledger, Trezor, Ethereum/Tron keys |
-| `KeyFormat.Solana` | Base58-encoded 64-byte format (private + public) | Phantom, Solflare, Solana keys |
+| Format                  | Description                                      | Use Case                                     |
+| ----------------------- | ------------------------------------------------ | -------------------------------------------- |
+| `KeyFormat.Hexadecimal` | 64 hexadecimal digits (32 bytes)                 | MetaMask, Ledger, Trezor, Ethereum/Tron keys |
+| `KeyFormat.Solana`      | Base58-encoded 64-byte format (private + public) | Phantom, Solflare, Solana keys               |
 
 ## Styling the Iframe
 
@@ -358,11 +365,12 @@ await iframeStamper.applySettings({
     borderWidth: "1px",
     borderStyle: "solid",
     borderColor: "#e5e7eb",
-  }
+  },
 });
 ```
 
 Available style properties:
+
 - `padding`, `margin`
 - `borderWidth`, `borderStyle`, `borderColor`, `borderRadius`
 - `fontSize`, `fontWeight`, `fontFamily`, `lineHeight`
@@ -392,8 +400,13 @@ interface Props {
   walletAccountAddress: string;
 }
 
-export function ClientSideSigner({ organizationId, walletAccountAddress }: Props) {
-  const [iframeStamper, setIframeStamper] = useState<IframeStamper | null>(null);
+export function ClientSideSigner({
+  organizationId,
+  walletAccountAddress,
+}: Props) {
+  const [iframeStamper, setIframeStamper] = useState<IframeStamper | null>(
+    null
+  );
   const [isKeyLoaded, setIsKeyLoaded] = useState(false);
   const [message, setMessage] = useState("Hello, Turnkey!");
   const [signature, setSignature] = useState("");
@@ -406,7 +419,8 @@ export function ClientSideSigner({ organizationId, walletAccountAddress }: Props
       iframeElementId: IFRAME_ELEMENT_ID,
     });
 
-    stamper.init()
+    stamper
+      .init()
       .then(() => setIframeStamper(stamper))
       .catch(console.error);
 
@@ -454,7 +468,10 @@ export function ClientSideSigner({ organizationId, walletAccountAddress }: Props
       <div id={IFRAME_CONTAINER_ID} />
 
       {!isKeyLoaded ? (
-        <button onClick={exportKey} disabled={!iframeStamper}>
+        <button
+          onClick={exportKey}
+          disabled={!iframeStamper}
+        >
           Export Key
         </button>
       ) : (
@@ -475,17 +492,21 @@ export function ClientSideSigner({ organizationId, walletAccountAddress }: Props
 ## Troubleshooting
 
 ### "Iframe not ready"
+
 Ensure `init()` has completed before calling other methods. The iframe needs to load and establish the MessageChannel connection.
 
 ### "Key not found for address"
+
 - Verify the address is exactly as provided during `injectKeyExportBundle` (case-sensitive)
 - Check if the key has expired (24-hour TTL)
 - Ensure the page hasn't been reloaded (keys are in-memory only)
 
 ### "Embedded key not found"
+
 The embedded key may have expired (48-hour TTL) or been explicitly cleared. Call `initEmbeddedKey()` to create a new one.
 
 ### "Organization ID does not match"
+
 The bundle was created for a different organization. Ensure your backend uses the same organization ID as passed to `injectKeyExportBundle`.
 
 ## Best Practices
@@ -500,25 +521,25 @@ The bundle was created for a different organization. Ensure your backend uses th
 
 ### IframeStamper Methods
 
-| Method | Description |
-|--------|-------------|
-| `init()` | Insert iframe and establish connection |
-| `clear()` | Remove iframe and clean up resources |
-| `getEmbeddedPublicKey()` | Get current embedded key's public key |
-| `initEmbeddedKey()` | Create new embedded key |
-| `clearEmbeddedKey()` | Clear the embedded key |
-| `injectKeyExportBundle(bundle, orgId, format?, address?)` | Inject private key into iframe |
-| `signMessage(message, address?)` | Sign a message |
-| `signTransaction(transaction, address?)` | Sign a transaction |
-| `clearEmbeddedPrivateKey(address?)` | Clear in-memory keys |
-| `applySettings(settings)` | Apply styling to iframe |
+| Method                                                    | Description                            |
+| --------------------------------------------------------- | -------------------------------------- |
+| `init()`                                                  | Insert iframe and establish connection |
+| `clear()`                                                 | Remove iframe and clean up resources   |
+| `getEmbeddedPublicKey()`                                  | Get current embedded key's public key  |
+| `initEmbeddedKey()`                                       | Create new embedded key                |
+| `clearEmbeddedKey()`                                      | Clear the embedded key                 |
+| `injectKeyExportBundle(bundle, orgId, format?, address?)` | Inject private key into iframe         |
+| `signMessage(message, address?)`                          | Sign a message                         |
+| `signTransaction(transaction, address?)`                  | Sign a transaction                     |
+| `clearEmbeddedPrivateKey(address?)`                       | Clear in-memory keys                   |
+| `applySettings(settings)`                                 | Apply styling to iframe                |
 
 ### Supported Operations
 
-| Operation | Solana | Ethereum |
-|-----------|--------|----------|
-| Message signing | Yes | Planned |
-| Transaction signing | Yes | Planned |
+| Operation           | Solana | Ethereum |
+| ------------------- | ------ | -------- |
+| Message signing     | Yes    | Planned  |
+| Transaction signing | Yes    | Planned  |
 
 ## Additional Resources
 
