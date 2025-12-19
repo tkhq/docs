@@ -1,0 +1,374 @@
+---
+title: 'Polymarket Builders with Turnkey'
+sidebarTitle: "Polymarket Builders"
+---
+
+## Overview
+
+Polymarket's Builders program allows apps and order routers to generate and share revenue on the trades they helped create.
+Learn more about the program [here](https://docs.polymarket.com/developers/builders/builder-intro).
+
+## What does the Turnkey Safe Builder Example do?
+[This open-source demo](https://github.com/Polymarket/turnkey-safe-builder-example) allows users to log-in and make wallets, then use
+Polymarket's [CLOB](https://github.com/Polymarket/clob-client) and 
+[Builder Relayer](https://github.com/Polymarket/builder-relayer-client) clients for gasless trading
+with Builder-program order attribution.
+
+* Authenticate users via Turnkey email login for web2-style onboarding
+* Provision an EOA wallet automatically via Turnkey's embedded wallets
+* Deploy a Gnosis Safe Proxy Wallet using the builder-relayer-client
+* Obtain User API Credentials from the CLOB client
+* Set token approvals for CTF Contract, CTF Exchange, Neg Risk Exchange, and Neg Risk Adapter
+* Place orders via CLOB client with builder attribution using remote signing
+
+## Getting started
+
+Before running this demo, you need:
+
+1. **Builder API Credentials** from Polymarket
+   - Visit `polymarket.com/settings?tab=builder` to obtain your Builder credentials
+   - You'll need: `API_KEY`, `SECRET`, and `PASSPHRASE`
+
+2. **Polygon RPC URL**
+   - Any Polygon mainnet RPC (Alchemy, Infura, or public RPC)
+
+3. **Turnkey Organization**
+   - Sign up at [turnkey.com](https://turnkey.com/) and create an organization
+   - Get your **Organization ID** and **Auth Proxy Config ID** from the Turnkey Dashboard
+
+## Install dependencies
+
+**Installation**
+
+```bash
+git clone https://github.com/Polymarket/turnkey-safe-builder-example.git
+npm install
+```
+
+**Environment Setup**
+
+Populate `.env.local`:
+
+```bash
+# Polygon RPC endpoint
+NEXT_PUBLIC_POLYGON_RPC_URL=your_RPC_URL
+
+# Turnkey credentials (from turnkey.com dashboard)
+NEXT_PUBLIC_TURNKEY_ORGANIZATION_ID=your_organization_id
+NEXT_PUBLIC_TURNKEY_AUTH_PROXY_CONFIG_ID=your_auth_proxy_config_id
+
+# Builder credentials (from polymarket.com/settings?tab=builder)
+POLYMARKET_BUILDER_API_KEY=your_builder_api_key
+POLYMARKET_BUILDER_SECRET=your_builder_secret
+POLYMARKET_BUILDER_PASSPHRASE=your_builder_passphrase
+```
+
+**Run Development Server**
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+## Turnkey Authentication
+
+Files: `providers/WalletProvider.tsx`, `providers/WalletContext.tsx`
+
+Users authenticate via Turnkey's React Wallet Kit, which handles email login and automatically provisions a non-custodial EOA embedded wallet. No browser extension required.
+
+```typescript
+import { TurnkeyProvider, useTurnkey, AuthState } from "@turnkey/react-wallet-kit";
+import { createWalletClient, http } from "viem";
+import { createAccount } from "@turnkey/viem";
+import { polygon } from "viem/chains";
+
+// Wrap your app with TurnkeyProvider
+<TurnkeyProvider
+  config={{
+    organizationId: process.env.NEXT_PUBLIC_TURNKEY_ORGANIZATION_ID!,
+    authProxyConfigId: process.env.NEXT_PUBLIC_TURNKEY_AUTH_PROXY_CONFIG_ID!,
+  }}
+>
+  {children}
+</TurnkeyProvider>
+
+// Usage in components:
+const { handleLogin, logout, authState, wallets, httpClient, session } = useTurnkey();
+const authenticated = authState === AuthState.Authenticated;
+
+handleLogin(); // Opens Turnkey auth modal
+
+// Find embedded wallet and Ethereum account
+const wallet = wallets.find((w) => w.source === "embedded");
+const account = wallet?.accounts?.find((acc) => acc.address?.startsWith("0x"));
+const eoaAddress = account?.address as `0x${string}`;
+
+// Create Turnkey-powered viem account using @turnkey/viem
+const turnkeyAccount = await createAccount({
+  client: httpClient,
+  organizationId: session.organizationId,
+  signWith: eoaAddress,
+  ethereumAddress: eoaAddress,
+});
+
+// Create viem wallet client
+const walletClient = createWalletClient({
+  account: turnkeyAccount,
+  chain: polygon,
+  transport: http(POLYGON_RPC_URL),
+});
+```
+## Builder Config with Remote Signing
+
+File `app/api/polymarket/sign/route.ts`
+
+Builder credentials are stored server-side and accessed via a remote signing endpoint. This keeps your builder credentials secure while enabling order attribution or relay authentication.
+
+**Why remote signing?**
+
+- Builder credentials never exposed to client
+- Secure HMAC signature generation
+- Required for builder order attribution (with ClobClient) or authentication (RelayClient)
+
+```typescript
+// Server-side API route
+import {
+  BuilderApiKeyCreds,
+  buildHmacSignature,
+} from "@polymarket/builder-signing-sdk";
+
+const BUILDER_CREDENTIALS: BuilderApiKeyCreds = {
+  key: process.env.POLYMARKET_BUILDER_API_KEY!,
+  secret: process.env.POLYMARKET_BUILDER_SECRET!,
+  passphrase: process.env.POLYMARKET_BUILDER_PASSPHRASE!,
+};
+
+export async function POST(request: NextRequest) {
+  const { method, path, body } = await request.json();
+  const sigTimestamp = Date.now().toString();
+
+  const signature = buildHmacSignature(
+    BUILDER_CREDENTIALS.secret,
+    parseInt(sigTimestamp),
+    method,
+    path,
+    body
+  );
+
+  return NextResponse.json({
+    POLY_BUILDER_SIGNATURE: signature,
+    POLY_BUILDER_TIMESTAMP: sigTimestamp,
+    POLY_BUILDER_API_KEY: BUILDER_CREDENTIALS.key,
+    POLY_BUILDER_PASSPHRASE: BUILDER_CREDENTIALS.passphrase,
+  });
+}
+```
+
+## Safe Deployment
+
+File: `hooks/useSafeDeployment.ts`
+
+The Safe address is deterministically derived from the user's Turnkey EOA, then deployed if it doesn't exist.
+
+**Important:**
+
+- Safe address is **deterministic** - same EOA always gets same Safe address
+- Safe is the "funder" address that holds USDC.e and outcome tokens
+- One-time deployment per EOA on user's first login
+- Turnkey handles the signature request
+
+```typescript
+import { deriveSafe } from "@polymarket/builder-relayer-client/dist/builder/derive";
+import { getContractConfig } from "@polymarket/builder-relayer-client/dist/config";
+
+// Step 1: Derive Safe address (deterministic)
+const config = getContractConfig(137); // Polygon
+const safeAddress = deriveSafe(eoaAddress, config.SafeContracts.SafeFactory);
+
+// Step 2: Check if Safe is deployed
+const deployed = await relayClient.getDeployed(safeAddress);
+
+// Step 3: Deploy Safe if needed (Turnkey handles signature)
+if (!deployed) {
+  const response = await relayClient.deploy();
+  const result = await response.wait();
+  console.log("Safe deployed at:", result.proxyAddress);
+}
+```
+
+## Token Approvals
+
+Files: `hooks/useTokenApprovals.ts`, `utils/approvals.ts`
+
+Before trading, the Safe must approve **multiple contracts** to spend USDC.e and manage outcome tokens. This involves setting approvals for both **ERC-20 (USDC.e)** and **ERC-1155 (outcome tokens)**.
+
+**Key Points:**
+- Uses **batch execution** via `relayClient.execute()` for gas efficiency
+- Sets **unlimited approvals** (MaxUint256) for ERC-20 tokens
+- Sets **operator approvals** for ERC-1155 outcome tokens
+- One-time setup per Safe (persists across sessions)
+- User signs once to approve all transactions (Turnkey handles signature)
+- Gasless for the user
+
+#### Required Approvals
+
+**USDC.e (ERC-20) Approvals:**
+
+- CTF Contract: `0x4d97dcd97ec945f40cf65f87097ace5ea0476045`
+- CTF Exchange: `0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E`
+- Neg Risk CTF Exchange: `0xC5d563A36AE78145C45a50134d48A1215220f80a`
+- Neg Risk Adapter: `0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296`
+
+**Outcome Token (ERC-1155) Approvals:**
+
+- CTF Exchange: `0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E`
+- Neg Risk CTF Exchange: `0xC5d563A36AE78145C45a50134d48A1215220f80a`
+- Neg Risk Adapter: `0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296`
+
+#### Implementation
+
+```typescript
+import { createAllApprovalTxs, checkAllApprovals } from "@/utils/approvals";
+
+// Step 1: Check existing approvals
+const approvalStatus = await checkAllApprovals(safeAddress);
+
+if (approvalStatus.allApproved) {
+  console.log("All approvals already set");
+  // Skip approval step
+} else {
+  // Step 2: Create approval transactions
+  const approvalTxs = createAllApprovalTxs();
+  // Returns array of SafeTransaction objects
+
+  // Step 3: Execute all approvals in a single batch
+  const response = await relayClient.execute(
+    approvalTxs,
+    "Set all token approvals for trading"
+  );
+
+  await response.wait();
+  console.log("All approvals set successfully");
+}
+```
+
+#### Approval Transaction Structure
+
+Each approval transaction is a `SafeTransaction`:
+
+```typescript
+// ERC-20 approval (USDC.e)
+{
+  to: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', // USDC.e address
+  operation: OperationType.Call,
+  data: erc20Interface.encodeFunctionData('approve', [
+    spenderAddress,
+    MAX_UINT256 // Unlimited approval
+  ]),
+  value: '0'
+}
+
+// ERC-1155 approval (outcome tokens)
+{
+  to: '0x4d97dcd97ec945f40cf65f87097ace5ea0476045', // CTF Contract address
+  operation: OperationType.Call,
+  data: erc1155Interface.encodeFunctionData('setApprovalForAll', [
+    operatorAddress,
+    true // Enable operator
+  ]),
+  value: '0'
+}
+```
+
+#### Why Multiple Approvals?
+
+Polymarket's trading system uses different contracts for different market types:
+
+- **CTF Contract**: Manages outcome tokens (ERC-1155)
+- **CTF Exchange**: Standard binary markets
+- **Neg Risk CTF Exchange**: Negative risk markets (mutually exclusive outcomes)
+- **Neg Risk Adapter**: Converts between neg risk and standard markets
+
+Setting all approvals upfront ensures:
+
+- Users can trade in any market type
+- One-time setup (approvals persist across sessions)
+- Gasless execution via RelayClient
+- Single user signature for all approvals
+
+#### Checking Approvals
+
+Before setting approvals, the app checks onchain state:
+
+```typescript
+// Check USDC.e approval
+const allowance = await publicClient.readContract({
+  address: USDC_E_ADDRESS,
+  abi: ERC20_ABI,
+  functionName: "allowance",
+  args: [safeAddress, spenderAddress],
+});
+
+const isApproved = allowance >= threshold; // 1000000000000 (1M USDC.e)
+
+// Check outcome token approval
+const isApprovedForAll = await publicClient.readContract({
+  address: CTF_CONTRACT_ADDRESS,
+  abi: ERC1155_ABI,
+  functionName: "isApprovedForAll",
+  args: [safeAddress, operatorAddress],
+});
+```
+
+## Placing Orders
+
+File: `hooks/useClobOrder.ts`
+
+With the authenticated ClobClient, you can place orders with builder attribution.
+
+**Key Points:**
+
+- Orders are signed by the user's Turnkey EOA (via `TurnkeyEthersSigner._signTypedData`)
+- Executed from the Safe address (funder)
+- Builder attribution is automatic via builderConfig
+- Gasless execution (no gas fees for users)
+
+```typescript
+// Create order
+const order = {
+  tokenID: "0x...", // Outcome token address
+  price: 0.65, // Price in decimal (65 cents)
+  size: 10, // Number of shares
+  side: "BUY", // or 'SELL'
+  feeRateBps: 0,
+  expiration: 0, // 0 = Good-til-Cancel
+  taker: "0x0000000000000000000000000000000000000000",
+};
+
+// Submit order (Turnkey handles signature via TurnkeyEthersSigner)
+const response = await clobClient.createAndPostOrder(
+  order,
+  { negRisk: false }, // Market-specific flag
+  OrderType.GTC
+);
+
+console.log("Order ID:", response.orderID);
+```
+
+**Cancel Order:**
+
+```typescript
+await clobClient.cancelOrder({ orderID: "order_id_here" });
+```
+
+## Conclusion
+
+With this integration you can:
+
+* Onboard users easily, with a variety of sign-in methods.
+* Scale with ease.
+* Create and manage Polymarket orders with order attribution
+
+Be sure to see the even more detailed [README](https://github.com/Polymarket/turnkey-safe-builder-example/blob/main/README.md)
+for more implementation details.
