@@ -453,3 +453,52 @@ Follow these steps to resolve the issue:
 
 Read more about fully specified imports in the [Webpack documentation](https://webpack.js.org/configuration/module/#resolvefullyspecified).
 
+### 9. Client is not initialized error when using Turnkey functions
+
+<img
+  src="/images/sdks/img/react/client-not-initialized.png"
+  alt="Client is not initialized error"
+/>
+
+#### Problem
+This error occurs when you try to use Turnkey client functions before the SDK has finished initializing said client. The Turnkey SDK performs several asynchronous operations during initialization, and if you attempt to call client functions before this process is complete, you'll encounter this error.
+
+#### Solution
+
+To resolve this issue, ensure that you only call Turnkey client functions after the SDK has fully initialized. You can do this by checking the `clientState` state variable from the `useTurnkey` hook. The `clientState` variable indicates the current state of the Turnkey client. You can read up more about how to use the `clientState` variable and why its important in the [Getting Started](/sdks/react/getting-started#client-readiness) guide.
+
+Example solutions to potential issues: 
+
+**Calling client functions in `useEffects` or event handlers without checking client readiness:**
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { handleSignMessage } = useTurnkey();
+
+useEffect(() => {
+  handleSignMessage({
+    message: "Hello, Turnkey!",
+    walletAccount: activeWalletAccount,
+  });
+}, []);
+```
+
+**Fix: Check `clientState` before calling client functions:**
+
+```tsx
+import { ClientState, useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { clientState, handleSignMessage } = useTurnkey();
+
+useEffect(() => {
+  if (clientState === ClientState.Ready) {
+    handleSignMessage({
+      message: "Hello, Turnkey!",
+      walletAccount: activeWalletAccount,
+    });
+  }
+}, [clientState]);
+```
+
+
