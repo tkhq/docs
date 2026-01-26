@@ -162,6 +162,62 @@ export default function RootLayout({
 > - Keeping layout.tsx as a server component maintains optimal rendering and avoids unnecessarily making your entire app client-side.
 > - Centralizing Turnkey setup in app/providers.tsx keeps configuration, styles, and callbacks in one place.
 
+## Client Readiness
+
+The `ClientState` enum tracks the initialization status of the Turnkey client. Before performing any auth or wallet operations, you must wait for the client to reach it's `Ready` state
+
+### `ClientState` Values
+
+```ts
+export enum ClientState {
+  Loading = "loading",
+  Ready = "ready",
+  Error = "error",
+}
+```
+
+### Why Client Readiness Matters
+
+The client performs several asynchronous operations during initialization:
+
+1. Configuration Loading - Fetches auth proxy config if configured
+2. TurnkeyClient Initialization - Sets up the HTTP client, passkey, api key & wallet stampers, and wallet providers
+3. Session Restoration - Loads and validates existing sessions from storage
+4. Wallet Provider Setup - Initializes wallet connection listeners
+
+Calling methods before Ready can cause:
+
+* Race conditions with session management
+* Missing configuration errors
+* Failed client operations
+
+### How To Check Client Readiness
+
+Access `clientState` via the `useTurnkey` hook:
+
+```ts
+import { ClientState, AuthState, useTurnkey } from "@turnkey/react-wallet-kit";
+
+function MyComponent() {
+  const { clientState, authState } = useTurnkey();
+
+  // Show loading spinner while client initializes
+  if (clientState === undefined || clientState === ClientState.Loading) {
+    return <LoadingSpinner />;
+  }
+
+  // Handle client initialization errors
+  if (clientState === ClientState.Error) {
+    return <ErrorMessage />;
+  }
+
+  // Client is ready - render your UI
+  return <Content />;
+}
+```
+
+The client starts as undefined, moves to Loading during initialization, then settles on either Ready (success) or Error (failure).
+
 ## Next steps
 
 Ready to start building your app? Check out the [Authentication](/sdks/react/auth) guide to learn how to set up login or signup with just one line of code!
