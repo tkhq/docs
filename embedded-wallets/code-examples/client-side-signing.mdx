@@ -21,7 +21,7 @@ flowchart TB
         subgraph frontend["Frontend"]
             stamper["IframeStamper"]
         end
-        subgraph backend["Backend (API Routes)"]
+        subgraph exporter["Backend (API Routes) or Frontend"]
             sdk["Turnkey SDK<br/>(exportWalletAccount)"]
         end
         stamper <--> sdk
@@ -65,11 +65,14 @@ NEXT_PUBLIC_BASE_URL=https://api.turnkey.com
 NEXT_PUBLIC_EXPORT_SIGN_IFRAME_URL=https://export-and-sign.turnkey.com
 
 # Server-side only (never expose to client)
+# Not necessary if user performs export using a session directly via frontend
 API_PUBLIC_KEY=<your-api-public-key>
 API_PRIVATE_KEY=<your-api-private-key>
 ```
 
 ## Sample Implementation
+
+Note: the following is for a NextJS application with a separate frontend and backend. The foundations should be applicable for other configurations.
 
 ### Step 1: Initialize the IframeStamper
 
@@ -112,9 +115,9 @@ function SigningComponent() {
 
 For an example in context, we highly recommend taking a look at the [wallet-export-sign example app](https://github.com/tkhq/sdk/blob/0af0303ca4714cf65f5177cdb05f824877713d2a/examples/wallet-export-sign/src/components/Export.tsx#L62-L107).
 
-### Step 2: Create the Backend Export Endpoint
+### Step 2: Create the Export Caller (Backend or Client-side)
 
-Set up a server-side API route to handle the export request.
+The export call can be made from a backend API route or a trusted client-side environment. The example below shows a server-side API route; if you call from the client, avoid exposing key material.
 
 ```typescript
 // pages/api/exportWalletAccount.ts
@@ -164,7 +167,7 @@ async function exportKeyToIframe(
     embeddedKey = await iframeStamper.initEmbeddedKey();
   }
 
-  // Step 3b: Request export bundle from backend
+  // Step 3b: Request export bundle from your export caller
   const response = await axios.post("/api/exportWalletAccount", {
     walletAccountAddress,
     targetPublicKey: embeddedKey,
