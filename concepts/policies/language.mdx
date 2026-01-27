@@ -83,7 +83,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **Activity**             | type                     | string                                    | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                                                                                                                      |
 |                          | resource                 | string                                    | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `**RECOVERY`, `AUTH`, `OTP`, `PAYMENT_METHOD`, `SUBSCRIPTION`                                                                                   |
 |                          | action                   | string                                    | The action of the activity: `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT`, `IMPORT`                                                                                                                                                                                                   |
-|                          | params                   | string                                    | The parameters of the activity: `SIGN_RAW_PAYLOADS`, `SIGN_RAW_PAYLOAD_V2` - `hash_function`, `encoding`                                                                                                                                                                               |
+|                          | params                   | struct                                    | The parameters of the activity. See [here](#activity-parameters) for more details.                                                                                                                                                                                                     |
 | **Wallet**               | id                       | string                                    | The identifier of the wallet                                                                                                                                                                                                                                                           |
 |                          | imported                 | bool                                      | Boolean indicating whether or not this wallet has been imported                                                                                                                                                                                                                        |
 |                          | exported                 | bool                                      | Boolean indicating whether or not this wallet has been exported                                                                                                                                                                                                                        |
@@ -294,6 +294,47 @@ The language is strongly typed which makes policies easy to author and maintain.
 Note that our policy engine does not short circuit during evaluation. In practice, this means that if any clause within the `condition` field of a policy results in an error, the evaluated `outcome` for that policy will be an error. In such cases, consider breaking up complex policies into separate policies.
 
 For example, suppose you're looking to construct a policy with the condition `wallet.id == '\<wallet UUID\>' || private_key.id == '\<private key UUID\>'. This condition will _always_ error out during evaluation, because only one of the two clauses can ever be valid: an activity cannot target both a wallet and private key. That means if you're trying to, say, sign with a private key, then the wallet clause will fail (because a wallet isn't being passed into the policy evaluation). Conversely, if you're trying to sign with a wallet, the private key clause will fail for the same reason.
+
+### Activity parameters
+
+The `activity.params` field exposes specific parameters based on the activity type. Most activities do not expose any parameters, but certain activities expose fields that can be used in policy conditions.
+
+| Category           | Activity Type                      | Field         | Type              | Description                                                            |
+|--------------------|------------------------------------|---------------|-------------------|------------------------------------------------------------------------|
+| Signing            | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD`   | `hash_function` | string           | The hash function used (e.g., `HASH_FUNCTION_NO_OP`, `HASH_FUNCTION_KECCAK256`)        |
+|                    |                                    | `encoding`      | string           | The payload encoding (e.g., `PAYLOAD_ENCODING_HEXADECIMAL`, `PAYLOAD_ENCODING_EIP712`) |
+|                    | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2`| `hash_function` | string           | The hash function used                                                 |
+|                    |                                    | `encoding`      | string           | The payload encoding                                                   |
+|                    | `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS`  | `hash_function` | string           | The hash function used                                                 |
+|                    |                                    | `encoding`      | string           | The payload encoding                                                   |
+|                    | `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`| `type`          | string           | The transaction type (e.g., `TRANSACTION_TYPE_ETHEREUM, TRANSACTION_TYPE_SOLANA, TRANSACTION_TYPE_BITCOIN, TRANSACTION_TYPE_TRON, TRANSACTION_TYPE_TEMPO`)                                                  |
+| User Management    | `ACTIVITY_TYPE_DELETE_USERS`       | `user_ids`      | list<string>      | The list of user IDs being deleted                                     |
+| Wallet Management  | `ACTIVITY_TYPE_UPDATE_WALLET`      | `wallet_id`     | string            | The ID of the wallet being updated                                     |
+| Authentication     | `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`   | `otp_length`    | int               | The length of the OTP code                                             |
+|                    | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`   | `otp_length`    | int               | The length of the OTP code                                             |
+
+#### Example usage
+
+To deny signing raw payloads with the NO_OP hash function (except for EIP-712):
+
+```json
+{
+  "policyName": "Deny NO_OP hash signing",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
+}
+```
+
+To allow a user to delete only themselves:
+
+```json
+{
+  "policyName": "Allow self-deletion",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_DELETE_USERS' && activity.params.user_ids.count() == 1 && '<USER_ID>' in activity.params.user_ids"
+}
+```
 
 ### Root quorum activities
 
