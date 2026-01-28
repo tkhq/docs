@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="eth_send_transaction" />
+<EndpointPath type="submit" path="sol_send_transaction" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_ETH_SEND_TRANSACTION`
+Enum options: `ACTIVITY_TYPE_SOL_SEND_TRANSACTION`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,7 +32,11 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="from" type="string" required={true} default="">
+    <NestedParam parentKey="parameters" childKey="unsignedTransaction" type="string" required={true} default="">
+    Base64-encoded serialized unsigned Solana transaction
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
     A wallet or private key address to sign with. This does not support private key IDs.
     </NestedParam>
     
@@ -41,38 +45,19 @@ Unique identifier for a given Organization.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="caip2" type="enum<string>" required={true} default="">
-    Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`, `eip155:137`, `eip155:80002`
+    Enum options: `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`, `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG`, `solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY`
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="to" type="string" required={true} default="">
-    Recipient address as a hex string with 0x prefix.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="value" type="string" required={false} default="">
-    Amount of native asset to send in wei.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="data" type="string" required={false} default="">
-    Hex-encoded call data for contract interactions.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="nonce" type="string" required={false} default="">
-    Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="gasLimit" type="string" required={false} default="">
-    Maximum amount of gas to use for this transaction, for EIP-1559 transactions.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="maxFeePerGas" type="string" required={false} default="">
-    Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="maxPriorityFeePerGas" type="string" required={false} default="">
-    Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
+    <NestedParam parentKey="parameters" childKey="recentBlockhash" type="string" required={false} default="">
+    user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution
     </NestedParam>
   </Expandable>
 </ParamField>
+<ParamField body="generateAppProofs" type="boolean" required={false}>
+
+Enable to have your activity generate and return App Proofs, enabling verifiability.
+</ParamField>
+
 
 <H3Bordered text="Response" />
 A successful response returns the following fields:
@@ -95,41 +80,26 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="ethSendTransactionIntent" type="object" required={true}>
-      The ethSendTransactionIntent object
-      <Expandable title="ethSendTransactionIntent details">
-        <NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="from" type="string" required={true}>
+        <NestedParam parentKey="activity.intent" childKey="solSendTransactionIntent" type="object" required={true}>
+      The solSendTransactionIntent object
+      <Expandable title="solSendTransactionIntent details">
+        <NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="unsignedTransaction" type="string" required={true}>
+Base64-encoded serialized unsigned Solana transaction
+</NestedParam>
+<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="signWith" type="string" required={true}>
 A wallet or private key address to sign with. This does not support private key IDs.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="sponsor" type="boolean" required={false}>
+<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="sponsor" type="boolean" required={false}>
 Whether to sponsor this transaction via Gas Station.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="caip2" type="enum" required={true}>
-CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).
+<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="caip2" type="enum" required={true}>
+CAIP-2 chain ID (e.g., 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' for Solana mainnet).
   
-Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`, `eip155:137`, `eip155:80002`
+Enum options: `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`, `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG`, `solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY`
 
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="to" type="string" required={true}>
-Recipient address as a hex string with 0x prefix.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="value" type="string" required={false}>
-Amount of native asset to send in wei.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="data" type="string" required={false}>
-Hex-encoded call data for contract interactions.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="nonce" type="string" required={false}>
-Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="gasLimit" type="string" required={false}>
-Maximum amount of gas to use for this transaction, for EIP-1559 transactions.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxFeePerGas" type="string" required={false}>
-Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxPriorityFeePerGas" type="string" required={false}>
-Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
+<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="recentBlockhash" type="string" required={false}>
+user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution
 </NestedParam>
 
       </Expandable>
@@ -140,11 +110,11 @@ Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="ethSendTransactionResult" type="object" required={true}>
-      The ethSendTransactionResult object
-      <Expandable title="ethSendTransactionResult details">
-        <NestedParam parentKey="activity.result.ethSendTransactionResult" childKey="sendTransactionStatusId" type="string" required={true}>
-The send_transaction_status ID associated with the transaction submission for sponsored transactions
+        <NestedParam parentKey="activity.result" childKey="solSendTransactionResult" type="object" required={true}>
+      The solSendTransactionResult object
+      <Expandable title="solSendTransactionResult details">
+        <NestedParam parentKey="activity.result.solSendTransactionResult" childKey="sendTransactionStatusId" type="string" required={true}>
+The send_transaction_status ID associated with the transaction submission
 </NestedParam>
 
       </Expandable>
@@ -178,25 +148,20 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/eth_send_transaction \
+  --url https://api.turnkey.com/public/v1/submit/sol_send_transaction \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_ETH_SEND_TRANSACTION",
+    "type": "ACTIVITY_TYPE_SOL_SEND_TRANSACTION",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "from": "<string>",
+        "unsignedTransaction": "<string>",
+        "signWith": "<string>",
         "sponsor": "<boolean>",
-        "caip2": "<eip155:1>",
-        "to": "<string>",
-        "value": "<string>",
-        "data": "<string>",
-        "nonce": "<string>",
-        "gasLimit": "<string>",
-        "maxFeePerGas": "<string>",
-        "maxPriorityFeePerGas": "<string>"
+        "caip2": "<solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp>",
+        "recentBlockhash": "<string>"
     }
 }'
 ```
@@ -211,17 +176,12 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().ethSendTransaction({
-  from: "<string> (A wallet or private key address to sign with. This does not support private key IDs.)",
+const response = await turnkeyClient.apiClient().solSendTransaction({
+  unsignedTransaction: "<string> (Base64-encoded serialized unsigned Solana transaction)",
+  signWith: "<string> (A wallet or private key address to sign with. This does not support private key IDs.)",
   sponsor: true // Whether to sponsor this transaction via Gas Station.,
-  caip2: "<eip155:1>" // CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).,
-  to: "<string> (Recipient address as a hex string with 0x prefix.)",
-  value: "<string> (Amount of native asset to send in wei.)",
-  data: "<string> (Hex-encoded call data for contract interactions.)",
-  nonce: "<string> (Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.)",
-  gasLimit: "<string> (Maximum amount of gas to use for this transaction, for EIP-1559 transactions.)",
-  maxFeePerGas: "<string> (Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.)",
-  maxPriorityFeePerGas: "<string> (Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.)"
+  caip2: "<solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp>" // CAIP-2 chain ID (e.g., 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' for Solana mainnet).,
+  recentBlockhash: "<string> (user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution)"
 });
 ```
 
@@ -234,7 +194,7 @@ const response = await turnkeyClient.apiClient().ethSendTransaction({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_ETH_SEND_TRANSACTION",
+    "type": "ACTIVITY_TYPE_SOL_SEND_TRANSACTION",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -244,21 +204,16 @@ const response = await turnkeyClient.apiClient().ethSendTransaction({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "ethSendTransactionIntent": {
-            "from": "<string>",
+          "solSendTransactionIntent": {
+            "unsignedTransaction": "<string>",
+            "signWith": "<string>",
             "sponsor": "<boolean>",
-            "caip2": "<eip155:1>",
-            "to": "<string>",
-            "value": "<string>",
-            "data": "<string>",
-            "nonce": "<string>",
-            "gasLimit": "<string>",
-            "maxFeePerGas": "<string>",
-            "maxPriorityFeePerGas": "<string>"
+            "caip2": "<solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp>",
+            "recentBlockhash": "<string>"
           }
         },
         "result": {
-          "ethSendTransactionResult": {
+          "solSendTransactionResult": {
             "sendTransactionStatusId": "<string>"
           }
         },

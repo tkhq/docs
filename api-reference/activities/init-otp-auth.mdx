@@ -33,28 +33,24 @@ Unique identifier for a given Organization.
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="otpType" type="string" required={true} default="">
-    Enum to specifiy whether to send OTP via SMS or email
+    Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="contact" type="string" required={true} default="">
     Email or phone number to send the OTP code to
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="appName" type="string" required={true} default="">
-    The name of the application.
-    </NestedParam>
-    
     <NestedParam parentKey="parameters" childKey="otpLength" type="number" required={false} default="">
     Optional length of the OTP code. Default = 9
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="appName" type="string" required={true} default="">
+    The name of the application. This field is required and will be used in email notifications if an email template is not provided.
     </NestedParam>
     
     <ParamField body="emailCustomization" type="object" required={false} path="parameters.emailCustomization">
       <p>emailCustomization field</p>
       <Expandable title="details">
-        <NestedParam parentKey="parameters.emailCustomization" childKey="appName" type="string" required={false} default="">
-        The name of the application.
-        </NestedParam>
-        
         <NestedParam parentKey="parameters.emailCustomization" childKey="logoUrl" type="string" required={false} default="">
         A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px.
         </NestedParam>
@@ -96,6 +92,10 @@ Unique identifier for a given Organization.
     Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'
     </NestedParam>
     
+    <NestedParam parentKey="parameters" childKey="expirationSeconds" type="string" required={false} default="">
+    Expiration window (in seconds) indicating how long the OTP is valid for. If not provided, a default of 5 minutes will be used. Maximum value is 600 seconds (10 minutes)
+    </NestedParam>
+    
     <NestedParam parentKey="parameters" childKey="replyToEmailAddress" type="string" required={false} default="">
     Optional custom email address to use as reply-to
     </NestedParam>
@@ -132,24 +132,21 @@ The activity type
       The initOtpAuthIntentV3 object
       <Expandable title="initOtpAuthIntentV3 details">
         <NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="otpType" type="string" required={true}>
-Enum to specifiy whether to send OTP via SMS or email
+Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL
 </NestedParam>
 <NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="contact" type="string" required={true}>
 Email or phone number to send the OTP code to
 </NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="appName" type="string" required={true}>
-The name of the application.
-</NestedParam>
 <NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="otpLength" type="number" required={false}>
 Optional length of the OTP code. Default = 9
+</NestedParam>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="appName" type="string" required={true}>
+The name of the application. This field is required and will be used in email notifications if an email template is not provided.
 </NestedParam>
 <NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="emailCustomization" type="object" required={false}>
       emailCustomization field
       <Expandable title="emailCustomization details">
-        <NestedParam parentKey="activity.intent.initOtpAuthIntentV3.emailCustomization" childKey="appName" type="string" required={false}>
-The name of the application.
-</NestedParam>
-<NestedParam parentKey="activity.intent.initOtpAuthIntentV3.emailCustomization" childKey="logoUrl" type="string" required={false}>
+        <NestedParam parentKey="activity.intent.initOtpAuthIntentV3.emailCustomization" childKey="logoUrl" type="string" required={false}>
 A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px.
 </NestedParam>
 <NestedParam parentKey="activity.intent.initOtpAuthIntentV3.emailCustomization" childKey="magicLinkTemplate" type="string" required={false}>
@@ -184,6 +181,9 @@ Optional flag to specify if the OTP code should be alphanumeric (Crockford’s B
 </NestedParam>
 <NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="sendFromEmailSenderName" type="string" required={false}>
 Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'
+</NestedParam>
+<NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="expirationSeconds" type="string" required={false}>
+Expiration window (in seconds) indicating how long the OTP is valid for. If not provided, a default of 5 minutes will be used. Maximum value is 600 seconds (10 minutes)
 </NestedParam>
 <NestedParam parentKey="activity.intent.initOtpAuthIntentV3" childKey="replyToEmailAddress" type="string" required={false}>
 Optional custom email address to use as reply-to
@@ -246,10 +246,9 @@ curl --request POST \
     "parameters": {
         "otpType": "<string>",
         "contact": "<string>",
-        "appName": "<string>",
         "otpLength": "<number>",
+        "appName": "<string>",
         "emailCustomization": {
-            "appName": "<string>",
             "logoUrl": "<string>",
             "magicLinkTemplate": "<string>",
             "templateVariables": "<string>",
@@ -262,6 +261,7 @@ curl --request POST \
         "sendFromEmailAddress": "<string>",
         "alphanumeric": "<boolean>",
         "sendFromEmailSenderName": "<string>",
+        "expirationSeconds": "<string>",
         "replyToEmailAddress": "<string>"
     }
 }'
@@ -278,12 +278,11 @@ const turnkeyClient = new Turnkey({
 });
 
 const response = await turnkeyClient.apiClient().initOtpAuth({
-  otpType: "<string> (Enum to specifiy whether to send OTP via SMS or email)",
+  otpType: "<string> (Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL)",
   contact: "<string> (Email or phone number to send the OTP code to)",
-  appName: "<string> (The name of the application.)",
   otpLength: 0 // Optional length of the OTP code. Default = 9,
+  appName: "<string> (The name of the application. This field is required and will be used in email notifications if an email template is not provided.)",
   emailCustomization: { // emailCustomization field,
-    appName: "<string> (The name of the application.)",
     logoUrl: "<string> (A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px.)",
     magicLinkTemplate: "<string> (A template for the URL to be used in a magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`.)",
     templateVariables: "<string> (JSON object containing key/value pairs to be used with custom templates.)",
@@ -296,6 +295,7 @@ const response = await turnkeyClient.apiClient().initOtpAuth({
   sendFromEmailAddress: "<string> (Optional custom email address from which to send the OTP email)",
   alphanumeric: true // Optional flag to specify if the OTP code should be alphanumeric (Crockford’s Base32). Default = true,
   sendFromEmailSenderName: "<string> (Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications')",
+  expirationSeconds: "<string> (Expiration window (in seconds) indicating how long the OTP is valid for. If not provided, a default of 5 minutes will be used. Maximum value is 600 seconds (10 minutes))",
   replyToEmailAddress: "<string> (Optional custom email address to use as reply-to)"
 });
 ```
@@ -322,10 +322,9 @@ const response = await turnkeyClient.apiClient().initOtpAuth({
           "initOtpAuthIntentV3": {
             "otpType": "<string>",
             "contact": "<string>",
-            "appName": "<string>",
             "otpLength": "<number>",
+            "appName": "<string>",
             "emailCustomization": {
-              "appName": "<string>",
               "logoUrl": "<string>",
               "magicLinkTemplate": "<string>",
               "templateVariables": "<string>",
@@ -338,6 +337,7 @@ const response = await turnkeyClient.apiClient().initOtpAuth({
             "sendFromEmailAddress": "<string>",
             "alphanumeric": "<boolean>",
             "sendFromEmailSenderName": "<string>",
+            "expirationSeconds": "<string>",
             "replyToEmailAddress": "<string>"
           }
         },
