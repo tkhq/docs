@@ -1936,32 +1936,6 @@
         "tags": ["User Auth"]
       }
     },
-    "/public/v1/submit/eth_send_raw_transaction": {
-      "post": {
-        "summary": "Submit a raw transaction for broadcasting.",
-        "description": "Submit a raw transaction (serialized and signed) for broadcasting to the network.",
-        "operationId": "EthSendRawTransaction",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/ActivityResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/EthSendRawTransactionRequest"
-            }
-          }
-        ],
-        "tags": ["Broadcasting"]
-      }
-    },
     "/public/v1/submit/eth_send_transaction": {
       "post": {
         "summary": "Submit a transaction intent for broadcasting.",
@@ -2584,6 +2558,32 @@
           }
         ],
         "tags": ["Signing"]
+      }
+    },
+    "/public/v1/submit/sol_send_transaction": {
+      "post": {
+        "summary": "Submit a transaction intent for broadcasting.",
+        "description": "Submit a transaction intent describing a transaction you would like to broadcast.",
+        "operationId": "SolSendTransaction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SolSendTransactionRequest"
+            }
+          }
+        ],
+        "tags": ["Broadcasting"]
       }
     },
     "/public/v1/submit/stamp_login": {
@@ -3218,7 +3218,8 @@
         "ACTIVITY_TYPE_UPSERT_GAS_USAGE_CONFIG",
         "ACTIVITY_TYPE_CREATE_TVC_APP",
         "ACTIVITY_TYPE_CREATE_TVC_DEPLOYMENT",
-        "ACTIVITY_TYPE_APPROVE_TVC_DEPLOYMENT"
+        "ACTIVITY_TYPE_CREATE_TVC_MANIFEST_APPROVALS",
+        "ACTIVITY_TYPE_SOL_SEND_TRANSACTION"
       ]
     },
     "AddressFormat": {
@@ -3443,26 +3444,6 @@
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
-    },
-    "ApproveTvcDeploymentIntent": {
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "description": "Unique identifier of the TVC deployment to approve"
-        }
-      },
-      "required": ["deploymentId"]
-    },
-    "ApproveTvcDeploymentResult": {
-      "type": "object",
-      "properties": {
-        "deploymentId": {
-          "type": "string",
-          "description": "The unique identifier for the approved TVC deployment"
-        }
-      },
-      "required": ["deploymentId"]
     },
     "Attestation": {
       "type": "object",
@@ -5199,9 +5180,30 @@
         "appId": {
           "type": "string",
           "description": "The unique identifier for the TVC application"
+        },
+        "manifestSetId": {
+          "type": "string",
+          "description": "The unique identifier for the TVC manifest set"
+        },
+        "manifestSetOperatorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The unique identifier(s) of the manifest set operators"
+        },
+        "manifestSetThreshold": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The required number of approvals for the manifest set"
         }
       },
-      "required": ["appId"]
+      "required": [
+        "appId",
+        "manifestSetId",
+        "manifestSetOperatorIds",
+        "manifestSetThreshold"
+      ]
     },
     "CreateTvcDeploymentIntent": {
       "type": "object",
@@ -5229,6 +5231,10 @@
           },
           "description": "Arguments to pass to the pivot binary at startup. Encoded as a list of strings, for example [\"--foo\", \"bar\"]"
         },
+        "expectedPivotDigest": {
+          "type": "string",
+          "description": "Digest of the pivot binary in the pivot container. This value will be inserted in the QOS manifest to ensure application integrity."
+        },
         "hostContainerImageUrl": {
           "type": "string",
           "description": "URL of the container containing the host binary"
@@ -5243,6 +5249,12 @@
             "type": "string"
           },
           "description": "Arguments to pass to the host binary at startup. Encoded as a list of strings, for example [\"--foo\", \"bar\"]"
+        },
+        "nonce": {
+          "type": "integer",
+          "format": "int64",
+          "x-nullable": true,
+          "description": "Optional nonce to ensure uniqueness of the deployment manifest. If not provided, it defaults to the current Unix timestamp in seconds."
         }
       },
       "required": [
@@ -5251,6 +5263,7 @@
         "pivotContainerImageUrl",
         "pivotPath",
         "pivotArgs",
+        "expectedPivotDigest",
         "hostContainerImageUrl",
         "hostPath",
         "hostArgs"
@@ -5262,9 +5275,44 @@
         "deploymentId": {
           "type": "string",
           "description": "The unique identifier for the TVC deployment"
+        },
+        "manifestId": {
+          "type": "string",
+          "description": "The unique identifier for the TVC manifest"
         }
       },
-      "required": ["deploymentId"]
+      "required": ["deploymentId", "manifestId"]
+    },
+    "CreateTvcManifestApprovalsIntent": {
+      "type": "object",
+      "properties": {
+        "manifestId": {
+          "type": "string",
+          "description": "Unique identifier of the TVC deployment to approve"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TvcManifestApproval"
+          },
+          "description": "List of manifest approvals"
+        }
+      },
+      "required": ["manifestId", "approvals"]
+    },
+    "CreateTvcManifestApprovalsResult": {
+      "type": "object",
+      "properties": {
+        "approvalIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The unique identifier(s) for the manifest approvals"
+        }
+      },
+      "required": ["approvalIds"]
     },
     "CreateUserTagIntent": {
       "type": "object",
@@ -5558,7 +5606,7 @@
     },
     "Curve": {
       "type": "string",
-      "enum": ["CURVE_SECP256K1", "CURVE_ED25519"]
+      "enum": ["CURVE_SECP256K1", "CURVE_ED25519", "CURVE_P256"]
     },
     "CustomRevertError": {
       "type": "object",
@@ -6770,31 +6818,6 @@
       },
       "required": ["signedTransaction", "caip2"]
     },
-    "EthSendRawTransactionRequest": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["ACTIVITY_TYPE_ETH_SEND_RAW_TRANSACTION"]
-        },
-        "timestampMs": {
-          "type": "string",
-          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
-        },
-        "organizationId": {
-          "type": "string",
-          "description": "Unique identifier for a given Organization."
-        },
-        "parameters": {
-          "$ref": "#/definitions/EthSendRawTransactionIntent"
-        },
-        "generateAppProofs": {
-          "type": "boolean",
-          "x-nullable": true
-        }
-      },
-      "required": ["type", "timestampMs", "organizationId", "parameters"]
-    },
     "EthSendRawTransactionResult": {
       "type": "object",
       "properties": {
@@ -6901,7 +6924,7 @@
       "properties": {
         "sendTransactionStatusId": {
           "type": "string",
-          "description": "The send_transaction_status ID associated with the transaction submission for sponsored transactions"
+          "description": "The send_transaction_status ID associated with the transaction submission"
         }
       },
       "required": ["sendTransactionStatusId"]
@@ -9286,8 +9309,11 @@
         "createTvcDeploymentIntent": {
           "$ref": "#/definitions/CreateTvcDeploymentIntent"
         },
-        "approveTvcDeploymentIntent": {
-          "$ref": "#/definitions/ApproveTvcDeploymentIntent"
+        "createTvcManifestApprovalsIntent": {
+          "$ref": "#/definitions/CreateTvcManifestApprovalsIntent"
+        },
+        "solSendTransactionIntent": {
+          "$ref": "#/definitions/SolSendTransactionIntent"
         }
       }
     },
@@ -10564,8 +10590,11 @@
         "createTvcDeploymentResult": {
           "$ref": "#/definitions/CreateTvcDeploymentResult"
         },
-        "approveTvcDeploymentResult": {
-          "$ref": "#/definitions/ApproveTvcDeploymentResult"
+        "createTvcManifestApprovalsResult": {
+          "$ref": "#/definitions/CreateTvcManifestApprovalsResult"
+        },
+        "solSendTransactionResult": {
+          "$ref": "#/definitions/SolSendTransactionResult"
         }
       }
     },
@@ -11160,6 +11189,74 @@
         }
       }
     },
+    "SolSendTransactionIntent": {
+      "type": "object",
+      "properties": {
+        "unsignedTransaction": {
+          "type": "string",
+          "description": "Base64-encoded serialized unsigned Solana transaction"
+        },
+        "signWith": {
+          "type": "string",
+          "description": "A wallet or private key address to sign with. This does not support private key IDs."
+        },
+        "sponsor": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether to sponsor this transaction via Gas Station."
+        },
+        "caip2": {
+          "type": "string",
+          "enum": [
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+            "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+            "solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
+          ],
+          "description": "CAIP-2 chain ID (e.g., 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' for Solana mainnet)."
+        },
+        "recentBlockhash": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution"
+        }
+      },
+      "required": ["unsignedTransaction", "signWith", "caip2"]
+    },
+    "SolSendTransactionRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_SOL_SEND_TRANSACTION"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/SolSendTransactionIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "SolSendTransactionResult": {
+      "type": "object",
+      "properties": {
+        "sendTransactionStatusId": {
+          "type": "string",
+          "description": "The send_transaction_status ID associated with the transaction submission"
+        }
+      },
+      "required": ["sendTransactionStatusId"]
+    },
     "StampLoginIntent": {
       "type": "object",
       "properties": {
@@ -11244,8 +11341,23 @@
         "TRANSACTION_TYPE_ETHEREUM",
         "TRANSACTION_TYPE_SOLANA",
         "TRANSACTION_TYPE_TRON",
-        "TRANSACTION_TYPE_BITCOIN"
+        "TRANSACTION_TYPE_BITCOIN",
+        "TRANSACTION_TYPE_TEMPO"
       ]
+    },
+    "TvcManifestApproval": {
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "Unique identifier of the operator providing this approval"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Signature from the operator approving the manifest"
+        }
+      },
+      "required": ["operatorId", "signature"]
     },
     "TvcOperatorParams": {
       "type": "object",
