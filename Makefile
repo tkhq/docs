@@ -13,6 +13,7 @@ install:
 
 # Default MDX generation target
 gen: mintlify-check
+	npx ts-node scripts/openapi-gen/swagger-to-openapi.ts
 	cd scripts/openapi-gen && npx ts-node openapi-gen.ts --file=openapi.json --generate-mdx
 
 # Run the OpenAPI generator (allows custom ARGS)

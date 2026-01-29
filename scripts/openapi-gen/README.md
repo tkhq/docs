@@ -27,6 +27,8 @@ A utility for parsing, dereferencing, and generating content from OpenAPI specif
 ```text
 scripts/openapi-gen/
 ├── openapi-gen.ts           # CLI entrypoint and core logic
+├── swagger-to-openapi.ts    # Script to convert the public_api.swagger.json to openapi v3
+├── openapi.json             # The openapi v3 result of the conversion script
 ├── utils/
 │   ├── cli.ts               # Commander-based argument parsing
 │   ├── parser.ts            # OpenAPI spec parsing & dereferencing
