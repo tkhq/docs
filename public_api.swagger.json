@@ -37,7 +37,7 @@
     },
     {
       "name": "Users",
-      "description": "Users are responsible for any action taken within an Organization. They can have ApiKey or Auuthenticator credentials, allowing you to onboard teammates to the Organization, or create API-only Users to run as part of your infrastructure."
+      "description": "Users are responsible for any action taken within an Organization. They can have ApiKey or Authenticator credentials, allowing you to onboard teammates to the Organization, or create API-only Users to run as part of your infrastructure."
     },
     {
       "name": "User Tags",
@@ -57,7 +57,7 @@
     },
     {
       "name": "Consensus",
-      "description": "Policies can enforce consensus requirements for Activities. For example, adding a new user requires two admins to approve the request.\n\nActivities that have been proposed, but don't yet meet the Consesnsus requirements will have the status: `REQUIRES_CONSENSUS`. Activities in this state can be approved or rejected using the unique fingerprint generated when an Activity is created."
+      "description": "Policies can enforce consensus requirements for Activities. For example, adding a new user requires two admins to approve the request.\n\nActivities that have been proposed, but don't yet meet the Consensus requirements will have the status: `REQUIRES_CONSENSUS`. Activities in this state can be approved or rejected using the unique fingerprint generated when an Activity is created."
     }
   ],
   "host": "api.turnkey.com",
@@ -271,6 +271,32 @@
           }
         ],
         "tags": ["Boot Proof"]
+      }
+    },
+    "/public/v1/query/get_nonces": {
+      "post": {
+        "summary": "Get nonces for an address.",
+        "description": "Get nonce values for an address on a given network. Can fetch the standard on-chain nonce and/or the gas station nonce used for sponsored transactions.",
+        "operationId": "GetNonces",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetNoncesResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetNoncesRequest"
+            }
+          }
+        ],
+        "tags": ["Broadcasting"]
       }
     },
     "/public/v1/query/get_oauth2_credential": {
@@ -1910,32 +1936,6 @@
         "tags": ["User Auth"]
       }
     },
-    "/public/v1/submit/eth_send_raw_transaction": {
-      "post": {
-        "summary": "Submit a raw transaction for broadcasting.",
-        "description": "Submit a raw transaction (serialized and signed) for broadcasting to the network.",
-        "operationId": "EthSendRawTransaction",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/ActivityResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/EthSendRawTransactionRequest"
-            }
-          }
-        ],
-        "tags": ["Broadcasting"]
-      }
-    },
     "/public/v1/submit/eth_send_transaction": {
       "post": {
         "summary": "Submit a transaction intent for broadcasting.",
@@ -2558,6 +2558,32 @@
           }
         ],
         "tags": ["Signing"]
+      }
+    },
+    "/public/v1/submit/sol_send_transaction": {
+      "post": {
+        "summary": "Submit a transaction intent for broadcasting.",
+        "description": "Submit a transaction intent describing a transaction you would like to broadcast.",
+        "operationId": "SolSendTransaction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SolSendTransactionRequest"
+            }
+          }
+        ],
+        "tags": ["Broadcasting"]
       }
     },
     "/public/v1/submit/stamp_login": {
@@ -3188,7 +3214,12 @@
         "ACTIVITY_TYPE_EMAIL_AUTH_V3",
         "ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2",
         "ACTIVITY_TYPE_INIT_OTP_AUTH_V3",
-        "ACTIVITY_TYPE_INIT_OTP_V2"
+        "ACTIVITY_TYPE_INIT_OTP_V2",
+        "ACTIVITY_TYPE_UPSERT_GAS_USAGE_CONFIG",
+        "ACTIVITY_TYPE_CREATE_TVC_APP",
+        "ACTIVITY_TYPE_CREATE_TVC_DEPLOYMENT",
+        "ACTIVITY_TYPE_CREATE_TVC_MANIFEST_APPROVALS",
+        "ACTIVITY_TYPE_SOL_SEND_TRANSACTION"
       ]
     },
     "AddressFormat": {
@@ -3897,6 +3928,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/CreateFiatOnRampCredentialIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -4252,10 +4287,11 @@
           "description": "The consensus expression that triggers the Effect"
         },
         "notes": {
-          "type": "string"
+          "type": "string",
+          "description": "Notes for a Policy."
         }
       },
-      "required": ["policyName", "effect"]
+      "required": ["policyName", "effect", "notes"]
     },
     "CreatePolicyRequest": {
       "type": "object",
@@ -4659,7 +4695,7 @@
         },
         "smartContractInterface": {
           "type": "string",
-          "description": "ABI/IDL as a JSON string"
+          "description": "ABI/IDL as a JSON string. Limited to 400kb"
         },
         "type": {
           "$ref": "#/definitions/SmartContractInterfaceType"
@@ -5099,6 +5135,185 @@
       },
       "required": ["subOrganizationId"]
     },
+    "CreateTvcAppIntent": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the new TVC application"
+        },
+        "quorumPublicKey": {
+          "type": "string",
+          "description": "Quorum public key to use for this application"
+        },
+        "manifestSetId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Unique identifier for an existing TVC operator set to use as the Manifest Set for this TVC application. If left empty, a new Manifest Set configuration is required"
+        },
+        "manifestSetParams": {
+          "$ref": "#/definitions/TvcOperatorSetParams",
+          "x-nullable": true,
+          "description": "Configuration to create a new TVC operator set, used as the Manifest Set for this TVC application. If left empty, a Manifest Set ID is required"
+        },
+        "shareSetId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Unique identifier for an existing TVC operator set to use as the Share Set for this TVC application. If left empty, a new Share Set configuration is required"
+        },
+        "shareSetParams": {
+          "$ref": "#/definitions/TvcOperatorSetParams",
+          "x-nullable": true,
+          "description": "Configuration to create a new TVC operator set, used as the Share Set for this TVC application. If left empty, a Share Set ID is required"
+        },
+        "externalConnectivity": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Enables external connectivity for this TVC app. Default if not provided: false."
+        }
+      },
+      "required": ["name", "quorumPublicKey"]
+    },
+    "CreateTvcAppResult": {
+      "type": "object",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "The unique identifier for the TVC application"
+        },
+        "manifestSetId": {
+          "type": "string",
+          "description": "The unique identifier for the TVC manifest set"
+        },
+        "manifestSetOperatorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The unique identifier(s) of the manifest set operators"
+        },
+        "manifestSetThreshold": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The required number of approvals for the manifest set"
+        }
+      },
+      "required": [
+        "appId",
+        "manifestSetId",
+        "manifestSetOperatorIds",
+        "manifestSetThreshold"
+      ]
+    },
+    "CreateTvcDeploymentIntent": {
+      "type": "object",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "The unique identifier of the to-be-deployed TVC application"
+        },
+        "qosVersion": {
+          "type": "string",
+          "description": "The QuorumOS version to use to deploy this application"
+        },
+        "pivotContainerImageUrl": {
+          "type": "string",
+          "description": "URL of the container containing the pivot binary"
+        },
+        "pivotPath": {
+          "type": "string",
+          "description": "Location of the binary in the pivot container"
+        },
+        "pivotArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments to pass to the pivot binary at startup. Encoded as a list of strings, for example [\"--foo\", \"bar\"]"
+        },
+        "expectedPivotDigest": {
+          "type": "string",
+          "description": "Digest of the pivot binary in the pivot container. This value will be inserted in the QOS manifest to ensure application integrity."
+        },
+        "hostContainerImageUrl": {
+          "type": "string",
+          "description": "URL of the container containing the host binary"
+        },
+        "hostPath": {
+          "type": "string",
+          "description": "Location of the binary inside the host container"
+        },
+        "hostArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments to pass to the host binary at startup. Encoded as a list of strings, for example [\"--foo\", \"bar\"]"
+        },
+        "nonce": {
+          "type": "integer",
+          "format": "int64",
+          "x-nullable": true,
+          "description": "Optional nonce to ensure uniqueness of the deployment manifest. If not provided, it defaults to the current Unix timestamp in seconds."
+        }
+      },
+      "required": [
+        "appId",
+        "qosVersion",
+        "pivotContainerImageUrl",
+        "pivotPath",
+        "pivotArgs",
+        "expectedPivotDigest",
+        "hostContainerImageUrl",
+        "hostPath",
+        "hostArgs"
+      ]
+    },
+    "CreateTvcDeploymentResult": {
+      "type": "object",
+      "properties": {
+        "deploymentId": {
+          "type": "string",
+          "description": "The unique identifier for the TVC deployment"
+        },
+        "manifestId": {
+          "type": "string",
+          "description": "The unique identifier for the TVC manifest"
+        }
+      },
+      "required": ["deploymentId", "manifestId"]
+    },
+    "CreateTvcManifestApprovalsIntent": {
+      "type": "object",
+      "properties": {
+        "manifestId": {
+          "type": "string",
+          "description": "Unique identifier of the TVC deployment to approve"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TvcManifestApproval"
+          },
+          "description": "List of manifest approvals"
+        }
+      },
+      "required": ["manifestId", "approvals"]
+    },
+    "CreateTvcManifestApprovalsResult": {
+      "type": "object",
+      "properties": {
+        "approvalIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The unique identifier(s) for the manifest approvals"
+        }
+      },
+      "required": ["approvalIds"]
+    },
     "CreateUserTagIntent": {
       "type": "object",
       "properties": {
@@ -5391,7 +5606,22 @@
     },
     "Curve": {
       "type": "string",
-      "enum": ["CURVE_SECP256K1", "CURVE_ED25519"]
+      "enum": ["CURVE_SECP256K1", "CURVE_ED25519", "CURVE_P256"]
+    },
+    "CustomRevertError": {
+      "type": "object",
+      "properties": {
+        "errorName": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The name of the custom error."
+        },
+        "paramsJson": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The decoded parameters as a JSON object."
+        }
+      }
     },
     "DeleteApiKeysIntent": {
       "type": "object",
@@ -5530,6 +5760,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/DeleteFiatOnRampCredentialIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -6281,6 +6515,36 @@
       "type": "string",
       "enum": ["EFFECT_ALLOW", "EFFECT_DENY"]
     },
+    "EmailAuthCustomizationParams": {
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string",
+          "description": "The name of the application. This field is required and will be used in email notifications if an email template is not provided."
+        },
+        "logoUrl": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px."
+        },
+        "magicLinkTemplate": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "A template for the URL to be used in a magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`."
+        },
+        "templateVariables": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "JSON object containing key/value pairs to be used with custom templates."
+        },
+        "templateId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Unique identifier for a given Email Template. If not specified, the default is the most recent Email Template."
+        }
+      },
+      "required": ["appName"]
+    },
     "EmailAuthIntent": {
       "type": "object",
       "properties": {
@@ -6390,10 +6654,6 @@
           "type": "string",
           "description": "Client-side public key generated by the user, to which the email auth bundle (credentials) will be encrypted."
         },
-        "appName": {
-          "type": "string",
-          "description": "The name of the application."
-        },
         "apiKeyName": {
           "type": "string",
           "x-nullable": true,
@@ -6405,9 +6665,8 @@
           "description": "Expiration window (in seconds) indicating how long the API key is valid for. If not provided, a default of 15 minutes will be used."
         },
         "emailCustomization": {
-          "$ref": "#/definitions/EmailCustomizationParams",
-          "x-nullable": true,
-          "description": "Optional parameters for customizing emails. If not provided, the default email will be used."
+          "$ref": "#/definitions/EmailAuthCustomizationParams",
+          "description": "Parameters for customizing emails. If not provided, the default email will be used. Note that app_name is required."
         },
         "invalidateExisting": {
           "type": "boolean",
@@ -6430,7 +6689,7 @@
           "description": "Optional custom email address to use as reply-to"
         }
       },
-      "required": ["email", "targetPublicKey", "appName"]
+      "required": ["email", "targetPublicKey", "emailCustomization"]
     },
     "EmailAuthRequest": {
       "type": "object",
@@ -6501,6 +6760,31 @@
         }
       }
     },
+    "EmailCustomizationParamsV2": {
+      "type": "object",
+      "properties": {
+        "logoUrl": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "A URL pointing to a logo in PNG format. Note this logo will be resized to fit into 340px x 124px."
+        },
+        "magicLinkTemplate": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "A template for the URL to be used in a magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`."
+        },
+        "templateVariables": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "JSON object containing key/value pairs to be used with custom templates."
+        },
+        "templateId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Unique identifier for a given Email Template. If not specified, the default is the most recent Email Template."
+        }
+      }
+    },
     "EnableAuthProxyIntent": {
       "type": "object"
     },
@@ -6533,31 +6817,6 @@
         }
       },
       "required": ["signedTransaction", "caip2"]
-    },
-    "EthSendRawTransactionRequest": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["ACTIVITY_TYPE_ETH_SEND_RAW_TRANSACTION"]
-        },
-        "timestampMs": {
-          "type": "string",
-          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
-        },
-        "organizationId": {
-          "type": "string",
-          "description": "Unique identifier for a given Organization."
-        },
-        "parameters": {
-          "$ref": "#/definitions/EthSendRawTransactionIntent"
-        },
-        "generateAppProofs": {
-          "type": "boolean",
-          "x-nullable": true
-        }
-      },
-      "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
     "EthSendRawTransactionResult": {
       "type": "object",
@@ -6626,6 +6885,11 @@
           "type": "string",
           "x-nullable": true,
           "description": "Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions."
+        },
+        "gasStationNonce": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The gas station delegate contract nonce. Only used when sponsor=true. Include this if you want maximal security posture."
         }
       },
       "required": ["from", "caip2", "to"]
@@ -6647,6 +6911,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/EthSendTransactionIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -6656,7 +6924,7 @@
       "properties": {
         "sendTransactionStatusId": {
           "type": "string",
-          "description": "The send_transaction_status ID associated with the transaction submission for sponsored transactions"
+          "description": "The send_transaction_status ID associated with the transaction submission"
         }
       },
       "required": ["sendTransactionStatusId"]
@@ -7241,6 +7509,49 @@
       },
       "required": ["organizationId", "appName"]
     },
+    "GetNoncesRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "address": {
+          "type": "string",
+          "description": "The Ethereum address to query nonces for."
+        },
+        "caip2": {
+          "type": "string",
+          "description": "The network identifier in CAIP-2 format (e.g., 'eip155:1' for Ethereum mainnet)."
+        },
+        "nonce": {
+          "type": "boolean",
+          "description": "Whether to fetch the standard on-chain nonce."
+        },
+        "gasStationNonce": {
+          "type": "boolean",
+          "description": "Whether to fetch the gas station nonce used for sponsored transactions."
+        }
+      },
+      "required": ["organizationId", "address", "caip2"]
+    },
+    "GetNoncesResponse": {
+      "type": "object",
+      "properties": {
+        "nonce": {
+          "type": "string",
+          "format": "uint64",
+          "x-nullable": true,
+          "description": "The standard on-chain nonce for the address, if requested."
+        },
+        "gasStationNonce": {
+          "type": "string",
+          "format": "uint64",
+          "x-nullable": true,
+          "description": "The gas station nonce for sponsored transactions, if requested."
+        }
+      }
+    },
     "GetOauth2CredentialRequest": {
       "type": "object",
       "properties": {
@@ -7494,6 +7805,11 @@
           "type": "string",
           "x-nullable": true,
           "description": "The error encountered when broadcasting or confirming the transaction, if any."
+        },
+        "error": {
+          "$ref": "#/definitions/TxError",
+          "x-nullable": true,
+          "description": "Structured error information including revert details, if available."
         }
       },
       "required": ["txStatus"]
@@ -8235,7 +8551,7 @@
         "smsCustomization": {
           "$ref": "#/definitions/SmsCustomizationParams",
           "x-nullable": true,
-          "description": "Optional parameters for customizing SMS message. If not provided, the default sms message will be used."
+          "description": "Optional parameters for customizing SMS message. If not provided, the default SMS message will be used."
         },
         "userIdentifier": {
           "type": "string",
@@ -8270,15 +8586,11 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Enum to specifiy whether to send OTP via SMS or email"
+          "description": "Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL"
         },
         "contact": {
           "type": "string",
           "description": "Email or phone number to send the OTP code to"
-        },
-        "appName": {
-          "type": "string",
-          "description": "The name of the application."
         },
         "otpLength": {
           "type": "integer",
@@ -8286,15 +8598,19 @@
           "x-nullable": true,
           "description": "Optional length of the OTP code. Default = 9"
         },
+        "appName": {
+          "type": "string",
+          "description": "The name of the application. This field is required and will be used in email notifications if an email template is not provided."
+        },
         "emailCustomization": {
-          "$ref": "#/definitions/EmailCustomizationParams",
+          "$ref": "#/definitions/EmailCustomizationParamsV2",
           "x-nullable": true,
           "description": "Optional parameters for customizing emails. If not provided, the default email will be used."
         },
         "smsCustomization": {
           "$ref": "#/definitions/SmsCustomizationParams",
           "x-nullable": true,
-          "description": "Optional parameters for customizing SMS message. If not provided, the default sms message will be used."
+          "description": "Optional parameters for customizing SMS message. If not provided, the default SMS message will be used."
         },
         "userIdentifier": {
           "type": "string",
@@ -8315,6 +8631,11 @@
           "type": "string",
           "x-nullable": true,
           "description": "Optional custom sender name for use with sendFromEmailAddress; if left empty, will default to 'Notifications'"
+        },
+        "expirationSeconds": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Expiration window (in seconds) indicating how long the OTP is valid for. If not provided, a default of 5 minutes will be used. Maximum value is 600 seconds (10 minutes)"
         },
         "replyToEmailAddress": {
           "type": "string",
@@ -8440,25 +8761,25 @@
           "type": "string",
           "description": "Email or phone number to send the OTP code to"
         },
-        "appName": {
-          "type": "string",
-          "description": "The name of the application."
-        },
         "otpLength": {
           "type": "integer",
           "format": "int32",
           "x-nullable": true,
           "description": "Optional length of the OTP code. Default = 9"
         },
+        "appName": {
+          "type": "string",
+          "description": "The name of the application. This field is required and will be used in email notifications if an email template is not provided."
+        },
         "emailCustomization": {
-          "$ref": "#/definitions/EmailCustomizationParams",
+          "$ref": "#/definitions/EmailCustomizationParamsV2",
           "x-nullable": true,
           "description": "Optional parameters for customizing emails. If not provided, the default email will be used."
         },
         "smsCustomization": {
           "$ref": "#/definitions/SmsCustomizationParams",
           "x-nullable": true,
-          "description": "Optional parameters for customizing SMS message. If not provided, the default sms message will be used."
+          "description": "Optional parameters for customizing SMS message. If not provided, the default SMS message will be used."
         },
         "userIdentifier": {
           "type": "string",
@@ -8578,19 +8899,14 @@
           "type": "string",
           "description": "Client-side public key generated by the user, to which the recovery bundle will be encrypted."
         },
-        "appName": {
-          "type": "string",
-          "description": "The name of the application."
-        },
         "expirationSeconds": {
           "type": "string",
           "x-nullable": true,
           "description": "Expiration window (in seconds) indicating how long the recovery credential is valid for. If not provided, a default of 15 minutes will be used."
         },
         "emailCustomization": {
-          "$ref": "#/definitions/EmailCustomizationParams",
-          "x-nullable": true,
-          "description": "Optional parameters for customizing emails. If not provided, the default email will be used."
+          "$ref": "#/definitions/EmailAuthCustomizationParams",
+          "description": "Parameters for customizing emails. If not provided, the default email will be used. Note that `app_name` is required."
         },
         "sendFromEmailAddress": {
           "type": "string",
@@ -8608,7 +8924,7 @@
           "description": "Optional custom email address to use as reply-to"
         }
       },
-      "required": ["email", "targetPublicKey", "appName"]
+      "required": ["email", "targetPublicKey", "emailCustomization"]
     },
     "InitUserEmailRecoveryRequest": {
       "type": "object",
@@ -8983,6 +9299,21 @@
         },
         "initOtpAuthIntentV3": {
           "$ref": "#/definitions/InitOtpAuthIntentV3"
+        },
+        "upsertGasUsageConfigIntent": {
+          "$ref": "#/definitions/UpsertGasUsageConfigIntent"
+        },
+        "createTvcAppIntent": {
+          "$ref": "#/definitions/CreateTvcAppIntent"
+        },
+        "createTvcDeploymentIntent": {
+          "$ref": "#/definitions/CreateTvcDeploymentIntent"
+        },
+        "createTvcManifestApprovalsIntent": {
+          "$ref": "#/definitions/CreateTvcManifestApprovalsIntent"
+        },
+        "solSendTransactionIntent": {
+          "$ref": "#/definitions/SolSendTransactionIntent"
         }
       }
     },
@@ -9128,6 +9459,27 @@
         "MNEMONIC_LANGUAGE_KOREAN",
         "MNEMONIC_LANGUAGE_SPANISH"
       ]
+    },
+    "NativeRevertError": {
+      "type": "object",
+      "properties": {
+        "nativeType": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The type of native error: 'error_string', 'panic', or 'execution_reverted'."
+        },
+        "message": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The error message for Error(string) reverts."
+        },
+        "panicCode": {
+          "type": "string",
+          "format": "uint64",
+          "x-nullable": true,
+          "description": "The panic code for Panic(uint256) reverts."
+        }
+      }
     },
     "Oauth2AuthenticateIntent": {
       "type": "object",
@@ -10228,6 +10580,50 @@
         },
         "ethSendTransactionResult": {
           "$ref": "#/definitions/EthSendTransactionResult"
+        },
+        "upsertGasUsageConfigResult": {
+          "$ref": "#/definitions/UpsertGasUsageConfigResult"
+        },
+        "createTvcAppResult": {
+          "$ref": "#/definitions/CreateTvcAppResult"
+        },
+        "createTvcDeploymentResult": {
+          "$ref": "#/definitions/CreateTvcDeploymentResult"
+        },
+        "createTvcManifestApprovalsResult": {
+          "$ref": "#/definitions/CreateTvcManifestApprovalsResult"
+        },
+        "solSendTransactionResult": {
+          "$ref": "#/definitions/SolSendTransactionResult"
+        }
+      }
+    },
+    "RevertChainEntry": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string",
+          "description": "The contract address where the revert occurred."
+        },
+        "errorType": {
+          "type": "string",
+          "description": "Type of error: 'unknown', 'native', or 'custom'."
+        },
+        "displayMessage": {
+          "type": "string",
+          "description": "Human-readable message describing this revert."
+        },
+        "unknown": {
+          "$ref": "#/definitions/UnknownRevertError",
+          "description": "Details for unknown error types."
+        },
+        "native": {
+          "$ref": "#/definitions/NativeRevertError",
+          "description": "Details for native Solidity errors (Error, Panic, execution reverted)."
+        },
+        "custom": {
+          "$ref": "#/definitions/CustomRevertError",
+          "description": "Details for custom contract errors."
         }
       }
     },
@@ -10793,6 +11189,74 @@
         }
       }
     },
+    "SolSendTransactionIntent": {
+      "type": "object",
+      "properties": {
+        "unsignedTransaction": {
+          "type": "string",
+          "description": "Base64-encoded serialized unsigned Solana transaction"
+        },
+        "signWith": {
+          "type": "string",
+          "description": "A wallet or private key address to sign with. This does not support private key IDs."
+        },
+        "sponsor": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether to sponsor this transaction via Gas Station."
+        },
+        "caip2": {
+          "type": "string",
+          "enum": [
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+            "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+            "solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
+          ],
+          "description": "CAIP-2 chain ID (e.g., 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' for Solana mainnet)."
+        },
+        "recentBlockhash": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution"
+        }
+      },
+      "required": ["unsignedTransaction", "signWith", "caip2"]
+    },
+    "SolSendTransactionRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_SOL_SEND_TRANSACTION"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/SolSendTransactionIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "SolSendTransactionResult": {
+      "type": "object",
+      "properties": {
+        "sendTransactionStatusId": {
+          "type": "string",
+          "description": "The send_transaction_status ID associated with the transaction submission"
+        }
+      },
+      "required": ["sendTransactionStatusId"]
+    },
     "StampLoginIntent": {
       "type": "object",
       "properties": {
@@ -10877,8 +11341,99 @@
         "TRANSACTION_TYPE_ETHEREUM",
         "TRANSACTION_TYPE_SOLANA",
         "TRANSACTION_TYPE_TRON",
-        "TRANSACTION_TYPE_BITCOIN"
+        "TRANSACTION_TYPE_BITCOIN",
+        "TRANSACTION_TYPE_TEMPO"
       ]
+    },
+    "TvcManifestApproval": {
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "Unique identifier of the operator providing this approval"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Signature from the operator approving the manifest"
+        }
+      },
+      "required": ["operatorId", "signature"]
+    },
+    "TvcOperatorParams": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name for this new operator"
+        },
+        "publicKey": {
+          "type": "string",
+          "description": "Public key for this operator"
+        }
+      },
+      "required": ["name", "publicKey"]
+    },
+    "TvcOperatorSetParams": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Short description for this new operator set"
+        },
+        "newOperators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TvcOperatorParams"
+          },
+          "description": "Operators to create as part of this new operator set"
+        },
+        "existingOperatorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Existing operators to use as part of this new operator set"
+        },
+        "threshold": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The threshold of operators needed to reach consensus in this new Operator Set"
+        }
+      },
+      "required": ["name", "threshold"]
+    },
+    "TxError": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message describing what went wrong."
+        },
+        "revertChain": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/RevertChainEntry"
+          },
+          "description": "Chain of revert errors from nested contract calls, ordered from outermost to innermost."
+        }
+      }
+    },
+    "UnknownRevertError": {
+      "type": "object",
+      "properties": {
+        "selector": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The 4-byte error selector, if available."
+        },
+        "data": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The raw error data, hex-encoded."
+        }
+      }
     },
     "UpdateAllowedOriginsIntent": {
       "type": "object",
@@ -11052,6 +11607,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/UpdateFiatOnRampCredentialIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -11689,6 +12248,38 @@
         }
       },
       "required": ["walletId"]
+    },
+    "UpsertGasUsageConfigIntent": {
+      "type": "object",
+      "properties": {
+        "orgWindowLimitUsd": {
+          "type": "string",
+          "description": "Gas sponsorship USD limit for the billing organization window."
+        },
+        "subOrgWindowLimitUsd": {
+          "type": "string",
+          "description": "Gas sponsorship USD limit for sub-organizations under the billing organization."
+        },
+        "windowDurationMinutes": {
+          "type": "string",
+          "description": "Rolling sponsorship window duration, expressed in minutes."
+        }
+      },
+      "required": [
+        "orgWindowLimitUsd",
+        "subOrgWindowLimitUsd",
+        "windowDurationMinutes"
+      ]
+    },
+    "UpsertGasUsageConfigResult": {
+      "type": "object",
+      "properties": {
+        "gasUsageConfigId": {
+          "type": "string",
+          "description": "Unique identifier for the gas usage configuration that was created or updated."
+        }
+      },
+      "required": ["gasUsageConfigId"]
     },
     "User": {
       "type": "object",
