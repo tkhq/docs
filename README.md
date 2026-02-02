@@ -61,11 +61,7 @@ These commands require Node.js and `ts-node`.
 1. Checkout the specific [Mono Release tag](https://github.com/tkhq/mono/tags) and copy over [public_api.swagger.json](https://github.com/tkhq/mono/blob/main/src/js/internal/http/src/__internal__/services/coordinator/public/v1/public_api.swagger.json) to docs
    - `git checkout {latest_release_tag}` i.e. `v2025.12.1`
    - `make -C proto sync/docs`
-1. Convert  to Open API v3. You can use [Next Swagger Editor](https://editor-next.swagger.io/) for conversion.
-   - Copy [public_api.swagger.json](https://github.com/tkhq/mono/blob/main/src/js/internal/http/src/__internal__/services/coordinator/public/v1/public_api.swagger.json) into the editor.
-   - From the menu bar click `Edit` -> `Convert to OpenAPI 3.0.x`
-1. Copy and paste the converted output into [scripts/openapi-gen/openapi.json](scripts/openapi-gen/openapi.json)
-1. Run `make gen`
+2. Run `make gen`
 
 **Shared Snippets Usage Guidelines**
 

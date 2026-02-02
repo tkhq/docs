@@ -203,7 +203,7 @@ export const tags = ${tagsStr};`;
 
         // Find the API Reference tab
         const apiRefTab = docsConfig.navigation.tabs.find(
-          (item: any) => item.tab === "API Reference"
+          (item: any) => item.tab === "API reference"
         );
 
         if (apiRefTab && Array.isArray(apiRefTab.pages)) {
