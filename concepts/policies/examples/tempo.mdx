@@ -4,88 +4,85 @@ description: "This page provides examples of policies governing Tempo signing."
 sidebarTitle: "Tempo"
 ---
 
-Note: see the [language section](/concepts/policies/language#ethereum) for more details.
+Note: see the [language section](/concepts/policies/language#tempo) for more details.
 
-#### Allow ABI-specific contract call parameters
+## Overview
 
-See [here](../../../concepts/policies/smart-contract-interfaces) for more information and examples.
+Tempo transactions have limited policy support compared to other blockchain types. Unlike Ethereum, Solana, Bitcoin, and Tron, Tempo does not expose transaction-specific fields (such as `tempo.tx`) in the policy engine. The primary way to govern Tempo transactions is through the `activity.params.type` field and other general policy attributes.
 
-#### Allow ERC-20 transfers for a specific token smart contract
+## Policy Examples
+
+#### Allow Tempo transactions
 
 ```json
 {
-  "policyName": "Enable ERC-20 transfers for <CONTRACT_ADDRESS>",
+  "policyName": "Allow Tempo transactions",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.tx.to == '<CONTRACT_ADDRESS>' && eth.tx.data[0..10] == '0xa9059cbb'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
 }
 ```
 
-#### Allow anyone to sign transactions for testnet (Sepolia)
+#### Deny Tempo transactions
 
 ```json
 {
-  "policyName": "Allow signing ethereum sepolia transactions",
-  "effect": "EFFECT_ALLOW",
-  "condition": "eth.tx.chain_id == 11155111"
-}
-```
-
-#### Allow ETH transactions with a specific nonce range
-
-```json
-{
-  "policyName": "Allow signing Ethereum transactions with an early nonce",
-  "effect": "EFFECT_ALLOW",
-  "condition": "eth.tx.nonce <= 3"
-}
-```
-
-#### Allow signing of EIP-712 payloads for Hyperliquid `ApproveAgent` operations
-
-```json
-{
-  "policyName": "Allow signing of EIP-712 Payloads for Hyperliquid `ApproveAgent` operations",
-  "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:ApproveAgent' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
-}
-```
-
-### Deny signing of `NO_OP` keccak256 payloads
-
-```json
-{
-  "policyName": "Deny NO_OP hash signing",
+  "policyName": "Deny Tempo transactions",
   "effect": "EFFECT_DENY",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
+  "condition": "activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
 }
 ```
 
-#### Allow signing of EIP-712 payloads for EIP-3009 Transfers
+#### Allow Tempo transactions for a specific wallet
 
 ```json
 {
-  "policyName": "Allow signing of EIP-712 payloads for EIP-3009 Transfers for USD Coin",
+  "policyName": "Allow Tempo transactions for specific wallet",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'TransferWithAuthorization' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.params.type == 'TRANSACTION_TYPE_TEMPO' && wallet.id == '<WALLET_ID>'"
 }
 ```
 
-#### Allow signing of EIP-712 payloads for EIP-2612 Permits for USD Coin
+#### Allow Tempo transactions for a specific private key
 
 ```json
 {
-  "policyName": "Allow signing of EIP-712 payloads for EIP-2612 Permits for USD Coin",
+  "policyName": "Allow Tempo transactions for specific private key",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'Permit' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.params.type == 'TRANSACTION_TYPE_TEMPO' && private_key.id == '<PRIVATE_KEY_ID>'"
 }
 ```
 
-#### Allow signing of EIP-7702 Authorizations
+#### Require specific approver for Tempo transactions
 
 ```json
 {
-  "policyName": "Allow signing of EIP-7702 Authorizations",
+  "policyName": "Require specific approver for Tempo transactions",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_7702_authorization.address == '<ADDRESS>' && eth.eip_7702_authorization.chain_id == '<CHAIN_ID>' && eth.eip_7702_authorization.nonce == '<NONCE>' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
 }
 ```
+
+#### Allow Tempo transactions for wallets with a specific label
+
+```json
+{
+  "policyName": "Allow Tempo transactions for wallets with specific label",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.params.type == 'TRANSACTION_TYPE_TEMPO' && wallet.label == 'tempo-production'"
+}
+```
+
+#### Allow Tempo transactions for private keys with a specific tag
+
+```json
+{
+  "policyName": "Allow Tempo transactions for private keys with tag",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.params.type == 'TRANSACTION_TYPE_TEMPO' && private_key.tags.contains('tempo-enabled')"
+}
+```
+
+## Legacy Ethereum Transactions on Tempo
+
+During Tempo's testnet period, [legacy Ethereum transactions](https://docs.tempo.xyz/quickstart/evm-compatibility#transaction-differences) are also supported on Tempo and can be governed using standard Ethereum policy syntax. See the [Ethereum policy examples](/concepts/policies/examples/ethereum) for more details on how to write policies for these transaction types.
