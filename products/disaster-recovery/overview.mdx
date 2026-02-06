@@ -1,0 +1,185 @@
+---
+title: "Disaster Recovery"
+description: "Secure, auditable recovery paths for wallets and cryptographic material using Turnkey's secure enclaves and quorum policies."
+---
+
+> This is a guide to disaster recovery with Turnkey. Our approach provides secure, auditable recovery paths for wallets and cryptographic material, whether migrating from another provider, backing up user wallets, or establishing enterprise-grade treasury recovery procedures.
+
+## Why Turnkey for Disaster Recovery?
+
+Turnkey provides a cryptographically secure foundation for disaster recovery that eliminates the traditional tradeoffs between security and operability. Our approach combines [secure enclaves](/security/secure-enclaves), end-to-end encryption, and flexible [quorum policies](/concepts/users/root-quorum) to ensure recovery material is protected at rest, in transit, and during use.
+
+## Core security principles
+
+Turnkey's disaster recovery solution is engineered around these foundational principles:
+
+- **End-to-end encryption:** All key material is encrypted directly to Turnkey's secure enclave using [HPKE (Hybrid Public Key Encryption)](/security/enclave-secure-channels). The plaintext never exists outside the enclave boundary.
+- **Zero exposure during import:** When importing wallets or private keys, the material is encrypted on the user's device before transmission. Turnkey's infrastructure only ever sees encrypted blobs.
+- **Quorum-controlled recovery:** Sensitive operations like key export can require [multi-party approval](/security/quorum-deployments), preventing single points of compromise and ensuring organizational oversight.
+- **Cryptographic audit trail:** Every recovery operation is cryptographically signed and logged, providing tamper-evident records for compliance and forensics.
+
+## Two recovery paths
+
+Turnkey supports two distinct disaster recovery architectures, each optimized for different operational requirements:
+
+| Path | Architecture | Best For |
+| :--- | :--- | :--- |
+| **Direct Wallet Import** | Import keys directly into Turnkey's secure enclave | Fast recovery, treasury backup, provider migration |
+| **Encryption Key Escrow** | Store only encryption keys in Turnkey; keep encrypted bundles externally | Compliance separation, non-custodial products, 2-of-2 security |
+
+## A high-stakes example: Treasury recovery
+
+Consider an enterprise treasury holding significant digital assets across multiple chains. A key holder becomes unavailable, a hardware wallet fails, or a migration from another custody provider is required. These scenarios demand recovery procedures that are both secure and operationally feasible.
+
+**Typical needs for treasury recovery:**
+
+| Need | Solution |
+| :--- | :--- |
+| Keys must never be exposed during recovery | Material encrypted to enclave; decryption only inside secure boundary |
+| Recovery must be auditable | All operations logged with cryptographic signatures |
+| No single person can unilaterally recover | Quorum policies require M-of-N approval for sensitive operations |
+| Must support multiple asset types | Single import path for Bitcoin, Ethereum, Solana, and all ECDSA/EdDSA chains |
+| Recovered keys must be immediately operational | Direct import enables instant signing capability with full policy controls |
+
+## How Turnkey secures the recovery lifecycle
+
+<Steps>
+  <Step title="Secure organization setup">
+    Before any recovery operation, establish the organizational security foundation:
+
+    - Create dedicated recovery users with specific, limited permissions
+    - Configure the [Root Quorum](/concepts/users/root-quorum) to require multiple approvers for sensitive operations
+    - Define policies that restrict recovery operations to approved treasury addresses
+    - Distribute authenticators (passkeys, YubiKeys) across geographic locations
+
+    This ensures no single credential compromise can trigger unauthorized recovery.
+  </Step>
+
+  <Step title="Path 1: Direct wallet import">
+    For immediate operational recovery, import wallet material directly into Turnkey's secure enclave:
+
+    1. **Initialize import:** Request a temporary encryption public key from Turnkey's enclave
+    2. **Offline encryption:** On an air-gapped machine, encrypt the mnemonic or private key to the enclave's public key
+    3. **Secure transport:** Transmit the encrypted bundle to Turnkey (plaintext never leaves the secure device)
+    4. **Enclave decryption:** The enclave decrypts and stores the key material, encrypted to the organization's quorum key
+    5. **Immediate operation:** The wallet is now operational within Turnkey, subject to all configured policies
+
+    The imported wallet inherits the full security model: quorum approvals, transaction whitelists, spending limits, and audit logging.
+  </Step>
+
+  <Step title="Path 2: Encryption key escrow">
+    For compliance separation or non-custodial architectures, use Turnkey as an authenticated key escrow:
+
+    1. **Create encryption keypair:** Generate a P-256 keypair in Turnkey (not for on-chain use)
+    2. **Encrypt externally:** Use the public key to encrypt recovery bundles on your infrastructure
+    3. **Store separately:** Keep encrypted bundles in your storage (S3, vault, cold storage)—Turnkey never sees this data
+    4. **Recover on demand:** When needed, export the encryption key (with quorum approval) to decrypt your bundles
+
+    This creates a true 2-of-2 security model: an attacker must compromise both Turnkey authentication AND your bundle storage.
+  </Step>
+
+  <Step title="Fund sweeping (Path 1)">
+    After importing a wallet, Turnkey's SDK enables rapid, policy-controlled fund movement:
+
+    - Configure policies to restrict sweeping to pre-approved treasury addresses
+    - Automate sweeping for time-sensitive recovery scenarios
+    - Maintain full audit trails of all fund movements
+    - Support multiple networks (Ethereum, Solana, Bitcoin) from a single interface
+
+    Example policy for automated sweeping to approved addresses only:
+
+    ```json
+    {
+      "policyName": "DR-Sweep-Only-Policy",
+      "effect": "EFFECT_ALLOW",
+      "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && eth.tx.to in ['0xSAFE_TREASURY_1', '0xSAFE_TREASURY_2']",
+      "consensus": "approvers.any(user, user.id == 'DR_AUTOMATION_USER_ID')"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Security architecture
+
+### Path 1: Direct import flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    OFFLINE CEREMONY                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │  Export Key  │───▶│  Encrypt to  │───▶│  Transport   │       │
+│  │  from Current│    │  Turnkey TEK │    │  Encrypted   │       │
+│  │  Provider    │    │              │    │  Bundle      │       │
+│  └──────────────┘    └──────────────┘    └──────────────┘       │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 TURNKEY SECURE ENCLAVE                          │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  HPKE Decryption  ───▶  Key Storage  ───▶  Policy Engine │   │
+│  │                        (Encrypted to      (Quorum, White-│   │
+│  │                         Quorum Key)        lists, Limits) │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  Key material NEVER exists in plaintext outside the enclave     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Path 2: Encryption escrow flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    YOUR INFRASTRUCTURE                           │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐  │
+│  │ Public Key  │───▶│   Encrypt   │───▶│  Encrypted Bundle   │  │
+│  │ (from TK)   │    │   Material  │    │  (your storage)     │  │
+│  └─────────────┘    └─────────────┘    └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+         ▲                                         │
+         │ Public key export                       │ Bundle stored externally
+         │                                         ▼
+┌────────┴────────────────────────────────────────────────────────┐
+│                 TURNKEY SECURE ENCLAVE                           │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  Encryption Keypair (P-256)                               │   │
+│  │  • Private key never exported without quorum approval     │   │
+│  │  • Public key freely available for encryption             │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  Turnkey authenticates access; you control the encrypted data   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Comparison: Path 1 vs Path 2
+
+| Factor | Path 1: Direct Import | Path 2: Encryption Escrow |
+| :--- | :--- | :--- |
+| Recovery speed | Immediate—keys operational in Turnkey | Requires decryption ceremony |
+| Fund sweeping | Built-in SDK support | Requires wallet tooling after decryption |
+| Key storage | Turnkey holds wallet keys in enclave | Turnkey holds only encryption keys |
+| Material location | Turnkey secure enclave | Your storage (encrypted) |
+| Complexity | Lower | Higher |
+| Best for | Enterprise DR, treasury backup | User recovery, compliance separation |
+| Security model | Single party (authorized Turnkey users) | 2-of-2 (Turnkey auth + bundle access) |
+
+## The result: Recoverable without compromise
+
+Turnkey transforms disaster recovery from a high-risk, manual operation into a secure, auditable process. Whether you need immediate operational recovery through direct import or compliance-separated storage through encryption escrow, Turnkey provides:
+
+- **Cryptographic guarantees:** Key material is protected by secure enclaves and end-to-end encryption
+- **Organizational controls:** Quorum policies prevent unilateral action on sensitive operations
+- **Operational flexibility:** Support for all major chains and key types through a unified interface
+- **Audit compliance:** Every operation is logged with cryptographic signatures
+
+This enables enterprises to maintain robust disaster recovery procedures without sacrificing the security properties that protect their assets.
+
+> This process is further explored in our [GitHub 'Disaster Recovery' example](https://github.com/tkhq/sdk/tree/main/examples/disaster-recovery)
+
+## Resources
+
+- [Import Wallets Guide](/wallets/import-wallets)
+- [Export Wallets Guide](/wallets/export-wallets)
+- [Root Quorum Configuration](/concepts/users/root-quorum)
+- [Secure Enclaves Overview](/security/secure-enclaves)
+- [Enclave Secure Channels](/security/enclave-secure-channels)
