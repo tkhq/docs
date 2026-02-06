@@ -1,0 +1,243 @@
+---
+title: "Encryption Key Escrow"
+description: "Use Turnkey as a secure key storage and retrieval service to build high-performance signing, user-controlled recovery, and distributed trust architectures."
+---
+
+> This guide demonstrates how to use Turnkey as a **secure key storage and retrieval service** rather than relying on Turnkey for signing operations directly. By separating encrypted data (in your infrastructure) from encryption keys (in Turnkey's secure enclave), you can build applications with enhanced security, performance, and flexibility.
+
+## Why Encryption Key Escrow?
+
+Traditional key management forces a tradeoff: either you hold keys locally (fast but risky) or use a remote signing service (secure but adds latency). The encryption key escrow pattern eliminates this tradeoff by separating concerns:
+
+- **Your infrastructure** holds encrypted data (Turnkey never sees it)
+- **Turnkey's secure enclave** holds the encryption key
+- **Both are required** to access plaintext data
+
+This creates a **2-of-2 security model** where neither party alone can compromise the data, while enabling you to perform operations locally once the key is retrieved.
+
+## The 2-of-2 Security Model
+
+```
+┌──────────────────────────────────┐     ┌──────────────────────────────────┐
+│     YOUR INFRASTRUCTURE          │     │     TURNKEY SECURE ENCLAVE       │
+│                                  │     │                                  │
+│  ┌────────────────────────────┐  │     │  ┌────────────────────────────┐  │
+│  │   Encrypted Data     ✓    │  │     │  │   Encryption Key    ✓      │  │
+│  │   Encryption Key     ✗    │  │     │  │   Encrypted Data    ✗      │  │
+│  └────────────────────────────┘  │     │  └────────────────────────────┘  │
+│                                  │     │                                  │
+│  You control storage, access,    │     │  Protected by authentication,    │
+│  and data lifecycle              │     │  policies, and quorum controls   │
+└──────────────────────────────────┘     └──────────────────────────────────┘
+                    │                                     │
+                    └─────────────┬───────────────────────┘
+                                  │
+                                  ▼
+                     Both required to decrypt
+```
+
+| Compromise Scenario | Impact |
+| :--- | :--- |
+| Your infrastructure breached | Attacker gets encrypted blobs, cannot decrypt without Turnkey authentication |
+| Turnkey credentials compromised | Attacker can export key but has no encrypted data |
+| Both compromised | Full access (inherent to any 2-of-2 model) |
+
+## Use Cases
+
+### High-Performance Multi-Wallet Signing
+
+Applications requiring ultra-fast signing—trading platforms, gaming, batch operations—can achieve near-zero latency:
+
+<Steps>
+  <Step title="Setup (one-time)">
+    Create an encryption keypair in Turnkey. Encrypt wallet private keys with the public key and store the encrypted bundles in your infrastructure (localStorage, database, S3).
+  </Step>
+  <Step title="Session start">
+    When a user authenticates, export the decryption key from Turnkey (single API call, ~100ms). Decrypt all wallet bundles locally.
+  </Step>
+  <Step title="Active session">
+    Sign transactions with any wallet—zero network latency, zero Turnkey API calls. Scale to hundreds of wallets without performance degradation.
+  </Step>
+  <Step title="Session end">
+    Clear the decryption key and decrypted wallets from memory. Encrypted bundles remain safely stored for the next session.
+  </Step>
+</Steps>
+
+**Performance characteristics:**
+- Key export: ~100ms (single Turnkey API call, regardless of wallet count)
+- Local decryption: ~2ms per wallet
+- Transaction signing: <5ms (pure local operation)
+
+### User-Controlled Backup & Recovery
+
+Similar to [World App's integration with Turnkey](https://www.turnkey.com/blog/turnkey-announces-integration-tools-for-humanitys-world-app), applications can implement secure, user-controlled recovery:
+
+- **Encrypt recovery bundles on-device** using Turnkey's public key
+- **Store encrypted bundles client-side** or in your infrastructure—Turnkey never sees this data
+- **Gate decryption through user authentication** (OAuth, passkeys, email OTP)
+- **Enable recovery** by authenticating to Turnkey to retrieve the decryption key
+
+This keeps users in control of their data while providing a secure recovery path that doesn't require them to manage backup keys themselves.
+
+### Distributed Trust Models
+
+For compliance or architectural requirements where sensitive material must be separated from any single party:
+
+- Store encrypted credentials, API keys, or secrets in your infrastructure
+- Gate decryption through Turnkey's authentication and [policy engine](/concepts/policies/overview)
+- Require [quorum approval](/concepts/users/root-quorum) for key export in high-security scenarios
+- Maintain audit trails of all key access events
+
+## How It Works
+
+### Initial Setup
+
+<Steps>
+  <Step title="Create encryption keypair">
+    Generate a P-256 keypair in Turnkey using [createPrivateKeys](/api-reference/private-keys/create-private-keys). The private key is stored in Turnkey's [secure enclave](/security/secure-enclaves) and never exposed.
+
+    ```typescript
+    const { privateKeys } = await turnkey.apiClient().createPrivateKeys({
+      privateKeys: [{
+        privateKeyName: "escrow-encryption-key",
+        curve: "CURVE_P256",
+        addressFormats: [],
+      }],
+    });
+    ```
+  </Step>
+  <Step title="Retrieve public key">
+    Fetch the public key to use for encryption:
+
+    ```typescript
+    const { privateKey } = await turnkey.apiClient().getPrivateKey({
+      privateKeyId: encryptionKeyId,
+    });
+    const publicKey = privateKey.publicKey;
+    ```
+  </Step>
+  <Step title="Encrypt data locally">
+    Use the public key to encrypt sensitive data on your side. Turnkey never sees the plaintext or the encrypted result:
+
+    ```typescript
+    // Using P-256 ECIES encryption
+    const encryptedBundle = await encryptWithPublicKey(publicKey, sensitiveData);
+
+    // Store in YOUR infrastructure
+    await saveToYourStorage(encryptedBundle);
+    ```
+  </Step>
+</Steps>
+
+### On-Demand Access
+
+<Steps>
+  <Step title="Authenticate user">
+    User authenticates to your application through your normal auth flow.
+  </Step>
+  <Step title="Export decryption key">
+    Request the encryption private key from Turnkey using [exportPrivateKey](/api-reference/private-keys/export-private-key):
+
+    ```typescript
+    const targetKeyPair = generateP256KeyPair();
+
+    const { exportBundle } = await turnkey.apiClient().exportPrivateKey({
+      privateKeyId: encryptionKeyId,
+      targetPublicKey: targetKeyPair.publicKeyUncompressed,
+    });
+
+    const decryptionKey = await decryptExportBundle({
+      exportBundle,
+      embeddedKey: targetKeyPair.privateKey,
+      organizationId,
+    });
+    ```
+  </Step>
+  <Step title="Decrypt and use locally">
+    Decrypt your stored bundles and use them—all locally, with no further Turnkey calls:
+
+    ```typescript
+    const plaintext = await decryptWithPrivateKey(decryptionKey, encryptedBundle);
+    // Use the decrypted data (sign transactions, access credentials, etc.)
+    ```
+  </Step>
+  <Step title="Clear sensitive data">
+    When done, clear the decryption key and any decrypted data from memory:
+
+    ```typescript
+    secureWipe(decryptionKey);
+    secureWipe(decryptedData);
+    ```
+  </Step>
+</Steps>
+
+## Security Considerations
+
+### Authentication Options
+
+Turnkey supports multiple authentication methods for key export, allowing you to match your security requirements:
+
+- **API keys** — Server-to-server access for automated systems
+- **Passkeys** — User-initiated access via WebAuthn
+- **OAuth** — Social login flows (Google, Apple, etc.)
+- **Email/SMS OTP** — Additional verification factors
+
+### Policy Controls
+
+Use Turnkey's [policy engine](/concepts/policies/overview) to add additional controls on key export:
+
+```json
+{
+  "policyName": "Escrow-Key-Export-Policy",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.type == 'ACTIVITY_TYPE_EXPORT_PRIVATE_KEY' && private_key.id == '<ENCRYPTION_KEY_ID>'",
+  "consensus": "approvers.count() >= 2"
+}
+```
+
+This example requires two approvers for any export of the encryption key, adding human oversight to sensitive operations.
+
+### Storage Recommendations
+
+Encrypted bundles can be stored anywhere you control:
+
+| Storage Type | Use Case | Considerations |
+| :--- | :--- | :--- |
+| **localStorage / IndexedDB** | Client-side web apps | Cleared on browser data wipe |
+| **Secure Enclave (mobile)** | iOS/Android apps | Hardware-backed protection |
+| **Your database** | Server-managed data | Your standard backup/DR applies |
+| **Object storage (S3, GCS)** | Scalable, distributed access | Configure appropriate IAM policies |
+
+## Real-World Implementation
+
+World App (by Tools for Humanity) uses this pattern for user wallet recovery:
+
+> "World App encrypts each user's recovery bundle locally on-device. Turnkey's infrastructure manages the bundle's encryption key within secure enclaves, which can only be used in response to user-authenticated actions such as OAuth."
+
+This architecture ensures:
+- Users retain control of their encrypted recovery data
+- The encryption key lives in secure enclaves, not centralized servers
+- Key access requires explicit user authentication
+- No single point of failure—both components must be compromised
+
+Learn more: [Turnkey + World App Integration](https://www.turnkey.com/blog/turnkey-announces-integration-tools-for-humanitys-world-app) | [World App Backup Service (GitHub)](https://github.com/worldcoin/backup-service)
+
+## The Result: Security Without Compromise
+
+The encryption key escrow pattern enables you to:
+
+- **Maintain full control** over your data and operations
+- **Achieve performance** not possible with network-based signing
+- **Implement flexible recovery** flows that keep users in control
+- **Distribute trust** between your infrastructure and Turnkey
+
+Turnkey provides the secure key storage, authentication, and policy enforcement—you decide how to use the keys and where to store the encrypted data.
+
+> Explore the complete implementation in our [GitHub encryption-key-escrow example](https://github.com/tkhq/sdk/tree/main/examples/encryption-key-escrow)
+
+## Resources
+
+- [Secure Enclaves](/security/secure-enclaves) — How Turnkey protects key material
+- [Export Private Keys](/wallets/export-wallets) — API documentation for key export
+- [Policy Engine](/concepts/policies/overview) — Configuring access controls
+- [Root Quorum](/concepts/users/root-quorum) — Multi-party approval for sensitive operations
