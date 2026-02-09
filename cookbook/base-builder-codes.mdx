@@ -1,0 +1,120 @@
+---
+title: "Use Turnkey wallets with Base Builder Codes"
+sidebarTitle: "Base Builder Codes"
+---
+
+## Overview
+
+[Builder Codes (ERC-8021)](https://docs.base.org/buildathon/builder-codes-for-app-developers) allow app developers to attribute onchain activity on Base to their application. By appending an encoded Builder Code to transaction data, you can track usage analytics on [base.dev](https://base.dev) and qualify for potential future rewards.
+
+This guide walks through integrating Builder Code attribution with Turnkey-signed transactions using viem's `dataSuffix` option.
+
+## Getting started
+
+The first step is to set up your Turnkey organization and account. By following the [Quickstart guide](/getting-started/quickstart), you should have:
+
+- A root user with a public/private API key pair within the Turnkey parent organization
+- An organization ID
+
+You'll also need:
+
+- A wallet with an Ethereum account created within this organization, funded with ETH on Base Mainnet
+- A Builder Code from [base.dev](https://base.dev) (found under **Settings** > **Builder Code**)
+- `viem` version `2.45.0` or higher
+
+## Encode your Builder Code
+
+Builder codes are displayed in their decoded format on base.dev (e.g. `bc_b7k3p9da`). They need to be encoded into a hex `dataSuffix` (ending in `80218021`) before use.
+
+Use the `ox` package to encode your Builder Code:
+
+```bash
+npm i ox
+```
+
+```tsx
+import { Attribution } from "ox/erc8021";
+
+// Get your Builder Code from base.dev > Settings > Builder Codes
+const DATA_SUFFIX = Attribution.toDataSuffix({
+  codes: ["YOUR-BUILDER-CODE"], // e.g. "bc_b7k3p9da"
+});
+```
+
+## Set up the Turnkey signer with attribution
+
+We'll use `@turnkey/viem` to create a Turnkey signer and configure the wallet client with the `dataSuffix` option. This automatically appends your Builder Code to all transactions sent through this client.
+
+```tsx
+import { base } from "viem/chains";
+import { createAccount } from "@turnkey/viem";
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
+import {
+  createWalletClient,
+  http,
+  type Account,
+  createPublicClient,
+} from "viem";
+
+const turnkeyClient = new TurnkeyServerSDK({
+  apiBaseUrl: process.env.TURNKEY_BASE_URL!,
+  apiPrivateKey: process.env.NONROOT_API_PRIVATE_KEY!,
+  apiPublicKey: process.env.NONROOT_API_PUBLIC_KEY!,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+});
+
+const turnkeyAccount = await createAccount({
+  client: turnkeyClient.apiClient(),
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: process.env.SIGN_WITH!,
+});
+
+const client = createWalletClient({
+  account: turnkeyAccount as Account,
+  chain: base,
+  transport: http(
+    `https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY!}`,
+  ),
+  dataSuffix: DATA_SUFFIX, // Appends Builder Code to all transactions
+});
+
+// Use the standard viem client for non-signing operations
+const publicClient = createPublicClient({
+  transport: http(
+    `https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY!}`,
+  ),
+  chain: base,
+});
+```
+
+## Send a transaction
+
+With the `dataSuffix` configured at the client level, all transactions automatically include your Builder Code. No changes are needed to individual transaction calls.
+
+```tsx
+import { parseEther } from "viem";
+
+const hash = await client.sendTransaction({
+  to: "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+  value: parseEther("0.01"),
+});
+
+console.log("Transaction:", `https://basescan.org/tx/${hash}`);
+```
+
+## Verify attribution
+
+To confirm your Builder Code is being appended correctly:
+
+1. **Check base.dev** — Visit [base.dev](https://base.dev), select **Onchain** from the transaction type dropdown, and verify your attribution counts are incrementing under Total Transactions.
+
+2. **Use a block explorer** — Find your transaction on [Basescan](https://basescan.org), view the input data field, and verify the last 16 bytes contain the `8021` repeating pattern. Decode the suffix to confirm your Builder Code is present.
+
+3. **Use the open source validation tool** — Use the [Builder Code Validation](https://builder-code-checker.vercel.app/) tool to check a transaction or UserOperation hash for attribution.
+
+## Resources
+
+- [Base Builder Codes documentation](https://docs.base.org/buildathon/builder-codes-for-app-developers)
+- [ERC-8021 specification](https://eips.ethereum.org/EIPS/eip-8021)
+- [Turnkey viem integration](/sdks/web3/viem)
+- [Turnkey policy engine](/concepts/policies/overview)
