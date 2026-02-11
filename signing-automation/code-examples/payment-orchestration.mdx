@@ -1,23 +1,22 @@
 ---
 title: "Payment Orchestration"
-description: "Programmatically move internal funds across different wallet types in an organization (e.g., hot wallets, omnibus wallets,
-payout wallets) with role-based access controls to define which users or wallets can execute key operations
-(transfers, sweeps, swaps, mints, redemptions). "
+description: "Programmatically move funds across wallet types including hot wallets, omnibus wallets, and payout wallets
+with role-based access controls defining which users or wallets can execute transfers, sweeps, swaps, mints, and redemptions."
 mode: wide
 ---
 
 ## Why Turnkey for Payment Orchestration?
 
-Turnkey’s primitive-first foundations enable immense power to create existing or novel onchain funding flows with an unrivaled level
-of security and scalability. Role-Based Access Controls (RBAC) work with Turnkey’s fast flexible transaction signing to spin up wallets,
-take actions with them, and control where and how funds move.
+Turnkey automates treasury operations, internal transfers, and crosschain routing through a single integration with sub-100ms
+signing and role-based-access-controls (RBAC) at every transaction. Keys stay secure in hardware-backed enclaves while your team
+gets full visibility into every fund movement.
 
 ## Core security principles
 
 Turnkey's solution is engineered to meet the operational and security needs of high-value, high-volume payment flows:
 
-* **Zero exposure of private keys:** Private keys are default generated and kept within [Turnkey’s secure enclave](/security/secure-enclaves), never directly handled by employees or automated systems.
-* **Strict access control (RBAC):** Every action is explicitly permissioned via [Policies](/concepts/policies/quickstart). If an employee or automated system is not explicitly allowed to perform an action, they cannot.  
+* **Zero exposure of private keys:** Private keys are default-generated and isolated within [Turnkey’s secure enclave](/security/secure-enclaves), ensuring raw private keys are never exposed to employees, automated systems, or even to Turnkey itself.   
+* **Strict access control (RBAC):** Every action is explicitly permissioned in [Turnkey’s Policy Engine](/concepts/policies/quickstart). If an employee or automated system is not explicitly allowed to perform an action, they cannot.  
 * **Predictable and flexible workflows:** Policies allow for granular control over permissions based on transaction type, value, wallet properties, smart contract interactions, and more. This flexibility allows businesses to meet both automated and human-operator review requirements.  
 * **Enhanced operational security:** Workflows ensure that all transfers and actions come from known, authorized addresses, adding a layer of transparency and accountability to activity.
 
@@ -27,7 +26,7 @@ are delivering at scale today with Turnkey-powered flows.
 
 ## Example
 
-One of the pioneering payment flows to exemplify the need for highly scalable, highly secure onchain systems is the typical exchange or payment processor model.  
+Exchanges and payment processors are common examples requiring highly scalable, highly secure onchain systems.  
 
 ![payment-flow](/assets/files/payment-flow.png)
 
@@ -49,19 +48,20 @@ Turnkey can help at every step to remove friction, accelerate time-to-value, and
 <Steps>
 <Step title="Secure organization setup">
 
-The first step involves creating a Turnkey Organization and populating it with users, representing your team and automated workflows.
+The first step is to create a Turnkey Organization and populate it with users representing your team and automated workflows.
 These users (human and machine) are assigned specific Policies dictating their access patterns to different wallets and onchain functions.
 
-Crucially, the organization’s highest security threshold (the [**Root Quorum**](https://docs.turnkey.com/concepts/users/root-quorum)) is secured.
-To prevent a single point of failure, we recommend raising the root quorum to require multiple root users to approve the most sensitive
-organizational changes, ensuring operational continuity even in the event of credential loss.
+Among these users, the [Root Quorum](/concepts/users/root-quorum) holds the highest level of access as a group that
+can execute any action and bypass the policy engine. By default, your initial user is the sole member. To prevent a single point
+of failure, we recommend raising the Root Quorum to require multiple root users to approve the most sensitive organizational changes.
+
 </Step>
 
 <Step title="Deposit wallet creation">
 
-It is easy and free to create numerous wallet accounts, each with a unique address belonging to the same underlying [wallet](/concepts/wallets)
-resource. Before we can programmatically create an unlimited number of wallet accounts, let's create a “Deposits wallet” using the
-[@turnkey/sdk-server](https://www.npmjs.com/package/@turnkey/sdk-server) Typescript SDK.
+Turnkey allows you to create numerous wallet accounts at no cost, each with a unique address belonging to the same
+underlying [wallet](/concepts/wallets) resource. Before we can programmatically create an unlimited number of wallet accounts,
+let's create a “Deposits wallet” using the [@turnkey/sdk-server](https://www.npmjs.com/package/@turnkey/sdk-server) Typescript SDK.
 
 ```ts
 import { Turnkey } from "@turnkey/sdk-server";
@@ -114,17 +114,19 @@ Such a function could be connected to end-user action, or kicked off by some int
 
 <Step title="Hot wallet automations">
 
-Being able to create deposit addresses on command is great, but the traditionally challenging part is what comes after something is deposited.
+Creating deposit addresses on demand is straightforward, but traditionally, the complexity begins  after something is deposited.
 Moving these funds to a company wallet after deposit (a “sweep”) is subject to major security and cost considerations. With Turnkey we can:
 
-* Enforce that all transfers from deposit addresses are into a centrally controlled omnibus address.  
+* Enforce that all transfers from deposit addresses are into a centrally controlled omnibus address.
 * Forgo sending additional funds to every deposit address to cover transaction fees (gas).
 
-Let's assume you have created an omnibus wallet for your organization, either as demonstrated above or in the Web Dashboard. This is a new
-hot wallet collecting the funds initially deposited across thousands of deposit addresses.  
-Lets first ensure that policy exists limiting transactions from these deposit addresses to only allow the omnibus address as a recipient.
-EVM and SVM will need similar but distinct policies due to their differing transaction types. These policies can also be chain dependent
-\- in real production they will likely need to be.
+Assume you have created an omnibus wallet for your organization, either as shown above or in the Web Dashboard.
+This is a new hot wallet collecting the funds initially deposited across thousands of deposit addresses.
+
+Let’s first ensure that policy exists limiting transactions from these deposit addresses to only allow the omnibus address as a recipient.
+EVM and SVM will require similar yet distinct policies due to their distinct transaction types. These policies can also vary by chain, and
+in production, they likely will need to.
+
 
 ```json
 {
@@ -141,14 +143,15 @@ EVM and SVM will need similar but distinct policies due to their differing trans
 }
 ```
 
-With the default-deny behavior of the Policy Engine we must only specify the exact conditions to allow.
-**Additionally, raw or obfuscated payloads will not execute** \- only those transactions parsable and meeting the given parameters.
+Turnkey’s Policy Engine is default-deny, meaning  we only need to specify the exact conditions to allow. Turnkey only executes transactions
+that can be fully parsed and validated against your policy parameters, **rejecting any raw or obfuscated payloads.**
 
-Touched on above, a challenging and potentially expensive component of deposit wallet operations is “gassing” each address. That is,
-providing enough funds to every unique deposit address to cover the transaction (network) fee incurred by the transfer into your central
-wallet. This transfer to provide the gas would itself incur a second transaction fee…  
-Thankfully, with a single line we can enable Turnkey’s sponsored transaction feature and perform only one, highly optimized
-externally-sponsored transaction.
+A costly component of deposit wallet operations is funding each address with enough gas to cover the network fee for sweeping into
+your central wallet. This funding transaction itself incurs a second fee.
+
+Thankfully, with a single line, we can enable Turnkey’s sponsored transaction feature and bypass this entirely, executing a single
+optimized externally sponsored transaction.
+
 
 ```ts
 const sendTransactionStatusId = await turnkeyClient.apiClient().ethSendTransaction({
@@ -169,12 +172,14 @@ A more complete guide to gas sponsorship can be [found here](/signing-automation
 
 <Step title="Treasury wallet flows">
 
-UChecking our progress, we’ve covered easily spinning up deposit addresses as-needed, and the secure efficient sweeping of
-these funds to a treasury address. Now exists a wallet which will likely need human-operator approval, and may demand sophisticated
-automations like asset rebalancing.
+At this point, we've covered creating deposit addresses on demand and securely sweeping funds to a treasury address. 
 
-It is straightforward to set policy requiring approval from multiple users to execute. Lets create a [user tag](/concepts/users/introduction),
-perhaps ‘ops-team’ and apply it to several of our teammates to require their approval for transfers to a company cold wallet.
+The next step is managing a wallet that likely requires human-operator approval and may need more sophisticated automations like
+asset rebalancing. Now you have a wallet that will likely need human-operator approval and may require sophisticated automations like asset rebalancing.
+
+To set multi-user approval in policies, create a user tag (e.g., 'ops-team') and apply it to your teammates. You can then set a policy requiring
+their approval for transfers to a company cold wallet.
+
 
 ```json
 {
@@ -185,19 +190,18 @@ perhaps ‘ops-team’ and apply it to several of our teammates to require their
 }
 ```
 
-Of course the asset being transferred may be a token instead of the network’s native fund. As demonstrated above the transaction data
-can be sliced for matches to predictable functions and formats (an ERC-20 transfer would resemble the example), but the most correct path
-is to [upload the contract ABI](/concepts/policies/smart-contract-interfaces) for supported assets and act on them once parsed.
+When transferring tokens rather than native funds, the transaction data can be parsed for known function signatures (e.g., an ERC-20 transfer),
+but the recommended approach is to [upload the contract ABI](/concepts/policies/smart-contract-interfaces) for supported assets and act
+on fully parsed transactions.
 
-When handling real assets at scale, dynamically managing funds becomes a highly relevant subject filled with security nuances.
-Factors like risk management, regulatory compliance, and meeting ongoing withdrawal demand make safely shifting funds traditionally
-one of the most challenging aspects to engineer. While there is no one size fits all solution, combinations of the outlined approaches
- pairing application-specific users with highly-tailored policies governing them is the most robust security posture leading Web3 teams adopt.
+Managing real assets at scale introduces security complexity. Balancing risk management, regulatory compliance, and maintaining enough
+liquidity to meet ongoing withdrawal demand makes fund movement one of the hardest problems to engineer. While there's no universal solution,
+pairing application-specific users with tailored policies is the security posture adopted by leading Web3 teams.
 </Step>
 </Steps>
 
 ## The result: Security as Code
 
 Turnkey makes onchain movement easy, scaling to meet high-value and high-volume workflows where access and actions are defined by code.
-This "Security as Code" approach allows businesses to scale Web3 operations with confidence, knowing their mission-critical payment flows
- are protected by cryptographically enforced security and least-privilege access control.
+This "Security as Code" approach allows businesses to scale Web3 operations with confidence, knowing their mission-critical payment
+flows are protected by cryptographically enforced security and least-privilege access control.
