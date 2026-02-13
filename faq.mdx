@@ -5,211 +5,159 @@ title: "FAQ"
 ## Authentication and credentials
 
 <AccordionGroup>
-<Accordion title="Can I sign up for Turnkey multiple times with the same email?">
+  <Accordion title="Can I sign up for Turnkey multiple times with the same email?">
+    When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and associated credentials. Currently we do not allow multiple users to be associated with the same email address.
+  </Accordion>
+  <Accordion title="Why do you require a public / private key pair to access Turnkey API?">
+    Asymmetric cryptography offers various security benefits to you:
 
-When you authenticate to the Turnkey dashboard, your email is used to lookup your organization and associated credentials. Currently we do not allow multiple users to be associated with the same email address.
+    - Turnkey _cannot_ leak your API private keys, even if compromised, because Turnkey only knows your API public keys.
+    - Your API private key stays on the server you generated it for. This means there's a lower risk of key exfiltration compared to other methods where an API key, or API credentials in general, are generated in one place (web browser, company server), transported via a second (copy/paste, email, PDF document) and used in a third place (your server).
+  </Accordion>
+  <Accordion title="Why do I need to sign the whole POST body?">
+    Signing the whole payload is a way for Turnkey to know:
 
-</Accordion>
-<Accordion title="Why do you require a public / private key pair to access Turnkey API?">
+    - That you are in possession of your API key (because we can verify the signature you attach to requests).
+    - That the person or program signing is approving the current request (not just any request).
 
-Asymmetric cryptography offers various security benefits to you:
+    Concretely, Turnkey needs the following:
 
-- Turnkey _cannot_ leak your API private keys, even if compromised, because Turnkey only knows your API public keys.
-- Your API private key stays on the server you generated it for. This means there's a lower risk of key exfiltration compared to other methods where an API key, or API credentials in general, are generated in one place (web browser, company server), transported via a second (copy/paste, email, PDF document) and used in a third place (your server).
+    1. **The original request you sent**: this is achieved by simply receiving the HTTP request and its body
+    2. **That your API key was used to approve the request**: this is achieved by checking the signature contained in the `X-Stamp` header. For this verification we need the serialized POST body, your API public key, and the signature. This is all contained in the header value.
+    3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](/security/secure-enclaves). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
 
-</Accordion>
-<Accordion title="Why do I need to sign the whole POST body?">
+    Turnkey would not be able to have its enclaves verify signatures and check the request intent if we didn't have your signature on the whole payload.
+  </Accordion>
+  <Accordion title="How is a Turnkey API key different from a crypto public / private key?">
+    A Turnkey API key is simply a way to authenticate requests to Turnkey. Crypto assets are not tied to it in any way.
 
-Signing the whole payload is a way for Turnkey to know:
+    Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](/concepts/policies/overview)!), and revocable if they are lost or compromised.
+  </Accordion>
+  <Accordion title="What happens if I lose my API key? Do I lose my crypto?">
+    Losing your Turnkey API key doesn't mean you'll lose your crypto:
 
-- That you are in possession of your API key (because we can verify the signature you attach to requests).
-- That the person or program signing is approving the current request (not just any request).
+    - By default, your API key is not able to move funds
+    - If you've changed policies so that your API key is allowed to unilaterally move funds, you may be at risk. Leverage the Turnkey UI to revoke your API key as soon as possible.
 
-Concretely, Turnkey needs the following:
+    Talk to our team ([hello@turnkey.com](mailto:hello@turnkey.com)) if you want to get in touch and talk more in-depth.
+  </Accordion>
+  <Accordion title="How long is a signed activity request valid for?">
+    We require a recent timestamp in the `timestampMs` field for each new activity submission.
 
-1. **The original request you sent**: this is achieved by simply receiving the HTTP request and its body
-2. **That your API key was used to approve the request**: this is achieved by checking the signature contained in the `X-Stamp` header. For this verification we need the serialized POST body, your API public key, and the signature. This is all contained in the header value.
-3. **That the request is legitimate**: this is achieved by parsing the serialized request to make sure the intent is correct. This happens all the way down in our [Secure Enclaves](/security/secure-enclaves). For example, when you send a request to create a new Private Key, our policy engine parses your original request to independently derive the type of request, the payload to sign, etc. This guards against man-in-the-middle attacks.
+    Our secure enclaves have their own, independent, secure source of time. We currently require request timestamps to be **less than an hour old**, and **up to 5 minutes in the future**.
+  </Accordion>
+  <Accordion title="Can I use my existing crypto private key as a Turnkey API key?">
+    You can, but it doesn't mean you should. If you use your existing crypto private key as a turnkey API key, you are coupling Turnkey access with your crypto wallet. In essence, the risk profile of this key goes up. It's a bit like re-using passwords across many sites. Turnkey highly recommends creating a fresh public/private key pair if you need programmatic Turnkey access.
+  </Accordion>
+  <Accordion title="How can I safely rotate API key credentials?">
+    While we don't have an off the shelf recipe, one potential approach is:
 
-Turnkey would not be able to have its enclaves verify signatures and check the request intent if we didn't have your signature on the whole payload.
+    - At sub-org creation, create your root user with 2+ API keys. One for day-to-day signing, and the other(s) securely stored.
+    - If the day-to-day key is leaked, then you can use one of the secure, additional keys to remove it from all impacted sub-orgs via `ACTIVITY_TYPE_DELETE_API_KEYS`.
 
-</Accordion>
-<Accordion title="How is a Turnkey API key different from a crypto public / private key?">
-
-A Turnkey API key is simply a way to authenticate requests to Turnkey. Crypto assets are not tied to it in any way.
-
-Think about Turnkey API keys as an access-gating mechanism to Turnkey functionality. They're flexible in what they can do (you get to decide this with [Policies](/concepts/policies/overview)!), and revocable if they are lost or compromised.
-
-</Accordion>
-<Accordion title="What happens if I lose my API key? Do I lose my crypto?">
-
-Losing your Turnkey API key doesn't mean you'll lose your crypto:
-
-- By default, your API key is not able to move funds
-- If you've changed policies so that your API key is allowed to unilaterally move funds, you may be at risk. Leverage the Turnkey UI to revoke your API key as soon as possible.
-
-Talk to our team ([hello@turnkey.com](mailto:hello@turnkey.com)) if you want to get in touch and talk more in-depth.
-
-</Accordion>
-<Accordion title="How long is a signed activity request valid for?">
-
-We require a recent timestamp in the `timestampMs` field for each new activity submission.
-
-Our secure enclaves have their own, independent, secure source of time. We currently require request timestamps to be **less than an hour old**, and **up to 5 minutes in the future**.
-
-</Accordion>
-<Accordion title="Can I use my existing crypto private key as a Turnkey API key?">
-
-You can, but it doesn't mean you should. If you use your existing crypto private key as a turnkey API key, you are coupling Turnkey access with your crypto wallet. In essence, the risk profile of this key goes up. It's a bit like re-using passwords across many sites. Turnkey highly recommends creating a fresh public/private key pair if you need programmatic Turnkey access.
-
-</Accordion>
-<Accordion title="How can I safely rotate API key credentials?">
-
-While we don't have an off the shelf recipe, one potential approach is:
-
-- At sub-org creation, create your root user with 2+ API keys. One for day-to-day signing, and the other(s) securely stored.
-- If the day-to-day key is leaked, then you can use one of the secure, additional keys to remove it from all impacted sub-orgs via `ACTIVITY_TYPE_DELETE_API_KEYS`.
-
-Reach out to our team ([hello@turnkey.com](mailto:hello@turnkey.com)) for additional guidance.
-
-</Accordion>
+    Reach out to our team ([hello@turnkey.com](mailto:hello@turnkey.com)) for additional guidance.
+  </Accordion>
 </AccordionGroup>
 
 ## Limits
 
 <AccordionGroup>
-<Accordion title="Are there limits on how many resources I can create, or activities I can execute?">
+  <Accordion title="Are there limits on how many resources I can create, or activities I can execute?">
+    See [resource limits](/concepts/resource-limits).
+  </Accordion>
+  <Accordion title="Do you have any rate limits in place in your public API?">
+    Yes - Turnkey's public API enforces rate limits that vary by plan:
 
-See [resource limits](/concepts/resource-limits).
+    - **Free:** 1 request per second (RPS)
+    - **Pay-as-you-go:** 1 RPS
+    - **Pro:** 3 RPS
+    - **Enterprise:** 60 RPS
 
-</Accordion>
-<Accordion title="Do you have any rate limits in place in your public API?">
+    In addition, there is a **per-suborganization limit of 10 RPS**, regardless of tier. This protects against spam and abuse (e.g., fake user creation).
 
-Yes - Turnkey's public API enforces rate limits that vary by plan:
+    Rate limit information is included in the response headers:
 
-- **Free:** 1 request per second (RPS)
-- **Pay-as-you-go:** 1 RPS
-- **Pro:** 3 RPS
-- **Enterprise:** 60 RPS 
+    - `ratelimit-limit`: your plan's total RPS limit
+    - `ratelimit-remaining`: current quota remaining
+    - `x-rate-limit-request-forwarded-for` and `x-rate-limit-request-remote-addr`: echo back request IPs for debugging purposes
 
-In addition, there is a **per-suborganization limit of 10 RPS**, regardless of tier. This protects against spam and abuse (e.g., fake user creation).
+    When rate limits are exceeded, an error with HTTP 429 is returned with the following message: `Too many requests. Please wait and try again in a few seconds`.
 
-Rate limit information is included in the response headers:
+    This limit is on a **per IP address** basis: if you have multiple servers making requests to the turnkey API under a different IP address, each server is subject to the 60 RPS limit individually.
 
-- `ratelimit-limit`: your plan's total RPS limit
-- `ratelimit-remaining`: current quota remaining
-- `x-rate-limit-request-forwarded-for` and `x-rate-limit-request-remote-addr`: echo back request IPs for debugging purposes
-
-When rate limits are exceeded, an error with HTTP 429 is returned with the following message: `Too many requests. Please wait and try again in a few seconds`.
-
-This limit is on a **per IP address** basis: if you have multiple servers making requests to the turnkey API under a different IP address, each server is subject to the 60 RPS limit individually.
-
-Please get in touch with us ([help@turnkey.com](mailto:help@turnkey.com)) if you need this limit adjusted for your use-case.
-
-</Accordion>
+    Please get in touch with us ([help@turnkey.com](mailto:help@turnkey.com)) if you need this limit adjusted for your use-case.
+  </Accordion>
 </AccordionGroup>
 
 ## Supported functionality
 
 <AccordionGroup>
-<Accordion title="Does Turnkey support Ethereum (EVM)?">
+  <Accordion title="Does Turnkey support Ethereum (EVM)?">
+    Yes! See [Ethereum (EVM) support on Turnkey](networks/ethereum) for more information and concrete examples.
+  </Accordion>
+  <Accordion title="Does Turnkey support Solana (SVM)?">
+    Yes! See [Solana (SVM) support on Turnkey](networks/solana) for more information and concrete examples.
+  </Accordion>
+  <Accordion title="Does Turnkey support Bitcoin?">
+    Yes! See [Bitcoin support on Turnkey](networks/bitcoin) for more information and concrete examples.
+  </Accordion>
+  <Accordion title="Which cryptographic curves do you support?">
+    Turnkey currently supports SECP256k1 and Ed25519.
+  </Accordion>
+  <Accordion title="Which ecosystems and chains do you support?">
+    Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. Our approach to supporting assets is tiered, see [this page](networks/overview) for more information.
 
-Yes! See [Ethereum (EVM) support on Turnkey](networks/ethereum) for more information and concrete examples.
+    We have deeper support for [Ethereum](networks/ethereum), [Solana](networks/solana), and [Bitcoin](networks/bitcoin).
 
-</Accordion>
-<Accordion title="Does Turnkey support Solana (SVM)?">
+    If there are specific ecosystems or chains you'd like to see us offer deeper support for, please let us know by contacting us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).
+  </Accordion>
+  <Accordion title="Do you support transaction construction and broadcast?">
+    Turnkey's [Transaction Management](/concepts/transaction-management) supports  gas sponsorship, transaction construction, broadcast, nonce management and monitoring capabilities, down to just a few API calls. 
 
-Yes! See [Solana (SVM) support on Turnkey](networks/solana) for more information and concrete examples.
+    We handle gassing and our battle-tested broadcast logic ensures inclusion even under adverse network conditions. You and your users never touch gas tokens or deal with stuck transactions.
 
-</Accordion>
-<Accordion title="Does Turnkey support Bitcoin?">
+    While we'e abstracted gas sponsorship, you're always able to bring in your own gas service, and we can handle the rest.
+  </Accordion>
+  <Accordion title="What does `HASH_FUNCTION_NO_OP` mean?">
+    In the ECDSA context, messages are hashed before signing. Turnkey can perform this hashing for you, as we support two hash functions: `HASH_FUNCTION_KECCAK256` and `HASH_FUNCTION_SHA256` (for Ethereum and Bitcoin ecosystems respectively). If your message had already been hashed, you should use the `HASH_FUNCTION_NO_OP` option to sign the raw hash, in which case Turnkey will sign the payload as is. `HASH_FUNCTION_NO_OP` also has privacy implications: if a raw hashed message is passed in, Turnkey has no knowledge of the underlying pre-image.
 
-Yes! See [Bitcoin support on Turnkey](networks/bitcoin) for more information and concrete examples.
+    As an example, in our Viem package, the message is [hashed](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L201) before [signing](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L348).
+  </Accordion>
+  <Accordion title="What is `HASH_FUNCTION_NOT_APPLICABLE` and how does it differ from `HASH_FUNCTION_NO_OP`?">
+    Unlike ECDSA, in which a message is hashed as a separate step _before_ signing, when using Ed25519, hashing is performed _during_ signature computation, and thus cannot be skipped (for more details on the standard, see [RFC 8032](https://datatracker.ietf.org/doc/html/rfc8032#section-5.1): `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
 
-</Accordion>
-<Accordion title="Which cryptographic curves do you support?">
-
-Turnkey currently supports SECP256k1 and Ed25519.
-
-</Accordion>
-<Accordion title="Which ecosystems and chains do you support?">
-
-Turnkey's primitive for private keys and wallet is the **cryptographic curve** rather than specific cryptocurrencies. Our approach to supporting assets is tiered, see [this page](networks/overview) for more information.
-
-We have deeper support for [Ethereum](networks/ethereum), [Solana](networks/solana), and [Bitcoin](networks/bitcoin).
-
-If there are specific ecosystems or chains you'd like to see us offer deeper support for, 
-please let us know by contacting us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), 
-or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).
-
-</Accordion>
-<Accordion title="Do you support transaction construction and broadcast?">
-
-Turnkey does not offer native support for transaction construction and broadcast, instead we focus on transaction signing.
-
-We suggest you use blockchain-specific libraries, like Ethers.js for Ethereum, to construct transactions. We offer simple [scripts](https://github.com/tkhq/sdk/tree/main/examples/with-ethers/) leveraging `ethers.js` to help you with basic transaction construction.
-
-You can use any blockchain node provider, like Infura or Alchemy, to broadcast your transactions.
-
-</Accordion>
-<Accordion title="What does `HASH_FUNCTION_NO_OP` mean?">
-
-In the ECDSA context, messages are hashed before signing. Turnkey can perform this hashing for you, as we support two hash functions: `HASH_FUNCTION_KECCAK256` and `HASH_FUNCTION_SHA256` (for Ethereum and Bitcoin ecosystems respectively). If your message had already been hashed, you should use the `HASH_FUNCTION_NO_OP` option to sign the raw hash, in which case Turnkey will sign the payload as is. `HASH_FUNCTION_NO_OP` also has privacy implications: if a raw hashed message is passed in, Turnkey has no knowledge of the underlying pre-image.
-
-As an example, in our Viem package, the message is [hashed](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L201) before [signing](https://github.com/tkhq/sdk/blob/673442f025990fde6a37436bed987b42e694a64d/packages/viem/src/index.ts#L348).
-
-</Accordion>
-<Accordion title="What is `HASH_FUNCTION_NOT_APPLICABLE` and how does it differ from `HASH_FUNCTION_NO_OP`?">
-
-Unlike ECDSA, in which a message is hashed as a separate step _before_ signing, when using Ed25519, hashing is performed _during_ signature computation, and thus cannot be skipped (for more details on the standard, see [RFC 8032](https://datatracker.ietf.org/doc/html/rfc8032#section-5.1): `“Ed25519 is EdDSA instantiated with: …H(x) = SHA-512"`). As a result, we have a special `HASH_FUNCTION_NOT_APPLICABLE` option for when you use ed25519/EdDSA.
-
-An example for this case can be found in our [Solana signer](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/solana/src/index.ts#L64).
-
-</Accordion>
+    An example for this case can be found in our [Solana signer](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/solana/src/index.ts#L64).
+  </Accordion>
 </AccordionGroup>
 
 ## Guidance
 
 <AccordionGroup>
-<Accordion title="Do you have a status page?">
+  <Accordion title="Do you have a status page?">
+    Yes, we report critical incidents at [turnkey-status.com](https://www.turnkey-status.com/).
+  </Accordion>
+  <Accordion title="How do you recommend testing the Turnkey API and functionality safely?">
+    Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.
 
-Yes, we report critical incidents at [turnkey-status.com](https://www.turnkey-status.com/).
+    To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground.
 
-</Accordion>
-<Accordion title="How do you recommend testing the Turnkey API and functionality safely?">
+    If you need many test organizations or if you have specific questions, our team is happy to help you get set up.
+  </Accordion>
+  <Accordion title="How do pricing and billing work?">
+    Turnkey is priced per signature, i.e. any transaction or raw payload successfully signed by a private key created on Turnkey. Turnkey offers 25 free signatures each month. To execute more than 25 transactions in a given month, you are required to have a credit card on file or active enterprise plan on your account. To upgrade your plan, navigate to Account Settings from the menu in the top right-hand corner in the Turnkey dashboard and follow the instructions.
 
-Typically we recommend that you create "test" organizations to test the API and functionality freely. When you are ready to go to production, use a "main" organization used for production only.
-
-To do this you can use email aliases: if `firstname@domain.com` is your email, you can sign up for a new Turnkey organization with `firstname+test@domain.com` to have a test playground.
-
-If you need many test organizations or if you have specific questions, our team is happy to help you get set up.
-
-</Accordion>
-<Accordion title="How do pricing and billing work?">
-
-Turnkey is priced per signature, i.e. any transaction or raw payload successfully signed by a private key created on Turnkey. Turnkey offers 25 free signatures each month. To execute more than 25 transactions in a given month, you are required to have a credit card on file or active enterprise plan on your account. To upgrade your plan, navigate to Account Settings from the menu in the top right-hand corner in the Turnkey dashboard and follow the instructions.
-
-For more information about pricing and billing, check out the [pricing page](https://www.turnkey.com/pricing).
-
-</Accordion>
-<Accordion title="Where else can I get help with my Turnkey implementation?">
-
-Join our slack community [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ) to get support with your integration, share product feedback, and connect with other crypto builders. Or, reach out directly to [help@turnkey.com.](mailto:help@turnkey.com.) Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via [hello@turnkey.com](mailto:hello@turnkey.com).
-
-</Accordion>
-<Accordion title="What is your data deletion policy?">
-
-To request the deletion of your parent organization from our records, please email us at [privacy@turnkey.com](mailto:privacy@turnkey.com).
-
-</Accordion>
-<Accordion title="Is my country supported?">
-
-Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions.
-
-</Accordion>
-<Accordion title="Where can I learn more about Turnkey's internal architecture?">
-
-Check out our whitepaper, available at [whitepaper.turnkey.com](https://whitepaper.turnkey.com)! It covers our foundations and architecture in great detail.
-
-</Accordion>
+    For more information about pricing and billing, check out the [pricing page](https://www.turnkey.com/pricing).
+  </Accordion>
+  <Accordion title="Where else can I get help with my Turnkey implementation?">
+    Join our slack community [here](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ) to get support with your integration, share product feedback, and connect with other crypto builders. Or, reach out directly to [help@turnkey.com.](mailto:help@turnkey.com.) Teams that are looking for more in-depth integration support can upgrade to an Enterprise plan via [hello@turnkey.com](mailto:hello@turnkey.com).
+  </Accordion>
+  <Accordion title="What is your data deletion policy?">
+    To request the deletion of your parent organization from our records, please email us at [privacy@turnkey.com](mailto:privacy@turnkey.com).
+  </Accordion>
+  <Accordion title="Is my country supported?">
+    Turnkey is not currently available to users in any countries currently subject to US OFAC sanctions.
+  </Accordion>
+  <Accordion title="Where can I learn more about Turnkey's internal architecture?">
+    Check out our whitepaper, available at [whitepaper.turnkey.com](https://whitepaper.turnkey.com)! It covers our foundations and architecture in great detail.
+  </Accordion>
 </AccordionGroup>
