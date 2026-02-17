@@ -19,12 +19,13 @@ Use the policy engine to define your approval workflows. No contract deployments
 
 | Need | Turnkey solution |
 | :--- | :--- |
+| Merchant deposit addresses | Instant wallet provisioning with policy-enforced sweeping to omnibus |
 | Treasury management | Centralized funds with role-based access and multi-approval requirements |
 | Payroll automation | Scheduled payments to allowlisted recipients without manual signing |
 | Vendor payments | Contact lists with pre-approved addresses and spending limits |
 | Delegated spending | Grant limited payment authority to teams or individuals |
 | Multi-approval workflows | Require 2+ approvers for high-value transactions |
-| Spending controls | Per-transaction limits, daily caps, recipient restrictions |
+| Asset restrictions | Only approved tokens (e.g., USDC) can be transferred |
 
 ## Core capabilities
 
@@ -38,9 +39,51 @@ Use the policy engine to define your approval workflows. No contract deployments
 
 **Spending limits**: Enforce per-transaction maximums, daily outflow caps, and asset restrictions at the policy level.
 
+## Example: Merchant deposit addresses with automated sweeping
+
+Provision deposit addresses instantly for merchants or customers. Enforce that funds can only move to your omnibus wallet, and only approved assets (like USDC) can be transferred.
+
+**Architecture:**
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Merchant A     │     │  Merchant B     │     │  Merchant C     │
+│  Deposit Addr   │     │  Deposit Addr   │     │  Deposit Addr   │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         │    USDC-only policy   │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                                 ▼
+                    ┌────────────────────────┐
+                    │    Omnibus Wallet      │
+                    │    (Consolidated)      │
+                    └────────────────────────┘
+```
+
+**Policy: Restrict transfers to USDC only, omnibus destination only**
+
+```json
+{
+  "policyName": "USDC transfers to omnibus only",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('sweep-service'))",
+  "condition": "eth.tx.to == '<USDC_CONTRACT_ADDRESS>' && eth.tx.data[34..74] == '<OMNIBUS_WALLET_ADDRESS>'"
+}
+```
+
+All other transfer attempts are implicitly denied. Wrong token? Denied. Wrong destination? Denied. The policy engine enforces your rules at signing time.
+
+**Transaction flow:**
+1. Create merchant wallet instantly via API (under 2 seconds)
+2. Customer deposits funds to merchant's address
+3. Backend sweep service lists balances across all merchant wallets
+4. Sweep service signs transfers to omnibus wallet
+5. Policy enforces USDC-only, omnibus-only at signing time
+
 ## Example: Contractor and vendor payments
 
-Maintain a contact list of approved payment recipients. Store each contractor's preferred wallet address for USDC disbursements or other payments.
+Maintain a contact list of approved payment recipients. Store each contractor's preferred wallet address for USDC disbursements.
 
 **Set up recipient allowlist policy:**
 
