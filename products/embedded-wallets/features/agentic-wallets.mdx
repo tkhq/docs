@@ -132,10 +132,9 @@ const tx = await signer.connect(provider).sendTransaction({
 ## Common Patterns
 
 ### Autonomous Trading Agent
-An AI agent that executes trades on a DEX with policies scoped to the DEX router contract and specific function selectors. Higher-value trades require consensus approval from a risk-assessment service.
-
+An AI agent that analyzes market data and executes trades on a DEX. The agent has a dedicated wallet with policies scoped to the DEX router contract and specific token pairs. For higher-value trades, a consensus policy requires both the agent and a risk-assessment service (another Turnkey user) to approve the transaction.
 ### DeFi Yield Optimizer
-An agent that moves user funds between yield protocols. Policies restrict the agent to a whitelist of approved protocol contracts and deposit/withdraw functions only.
+An agent that moves user funds between yield protocols. Policies restrict the agent to a whitelist of approved protocol contracts and deposit/withdraw functions only. Use Turnkey's [smart contract interface upload feature](https://docs.turnkey.com/concepts/policies/smart-contract-interfaces) to write policies against decoded ABI parameters.
 
 ### Automated Payment Processor
 A backend that sweeps deposits and processes payouts. Policies restrict signing to specific payout addresses and require multi-party consensus for large transfers.
@@ -145,17 +144,13 @@ Multiple specialized agents share access to a wallet with different policy scope
 
 ## Security Best Practices
 
-### Principle of Least Privilege
-Only grant the minimum permissions required for the agent's task. If it sweeps funds to treasury, it doesn't need permission to call arbitrary contracts.
+**Principle of Least Privilege**: This is the single most important security practice for agentic wallets. An agent should only be able to do the minimum set of actions required for its task. If your agent sweeps funds to a treasury, it doesn't need permission to call arbitrary contracts. If it trades on Uniswap, restrict it to that router's address and the specific function selectors it uses.
 
-### Prefer Client-Side DA Setup
-When the end-user sets up delegated access from the frontend, the DA user is created as non-root from the start with no elevated privileges.
+**Prefer Client-Side DA Setup**:  When the end-user sets up delegated access from the frontend using their authenticated session, the DA user is created as non-root from the start. There is never a window where the agent has elevated privileges. The server-side approach requires temporarily adding the DA user to the root quorum, which introduces risk if the subsequent quorum update fails.
 
-### Use DENY Policies as Circuit Breakers
-DENY always overrides ALLOW in Turnkey's policy engine. Use DENY policies to block all signing if anomalous behavior is detected.
+**Use DENY Policies as Circuit Breakers**: DENY always overrides ALLOW in Turnkey's policy engine. Use DENY policies as circuit-breakers: for example, a DENY policy that blocks all signing for a specific wallet can be toggled on programmatically if anomalous behavior is detected, and it will override any ALLOW policies in place.
 
-### Include Self-Delete Permission
-Give the DA user permission to delete itself for fast remediation if compromised:
+**Include Self-Delete Permission**: Give the DA user permission to delete itself for fast remediation if compromised:
 
 ```json
 {
