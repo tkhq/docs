@@ -9,9 +9,9 @@ Manage organizational wallets with programmable controls. Define approval workfl
 
 ## Why Turnkey for Embedded Business Wallets?
 
-Business wallets are organization-controlled wallets for internal operations: treasury, payroll, vendor payments, and operational funds. Unlike consumer wallets where each end user owns their wallet, business wallets require coordinated access across teams with configurable approval requirements.
+The same [Embedded Wallet Kit](/embedded-wallets/overview) that powers consumer applications works equally well for internal business operations: treasury, payroll, vendor payments, and operational funds.
 
-Turnkey runs wallet infrastructure for business operations. Create wallets for your organization. Define who can sign, what they can sign, and how many approvals are required. Set spending limits and recipient allowlists. Private keys stay in hardware-backed enclaves, secured through Turnkey's [verifiable security architecture](/security/our-approach).
+Turnkey runs wallet infrastructure for business operations. Create wallets for your organization. Optionally define who can sign, what they can sign, and how many approvals are required. Set spending limits and recipient allowlists. Private keys stay in hardware-backed enclaves, secured through Turnkey's [verifiable security architecture](/security/our-approach).
 
 Use the policy engine to encode your approval workflows. No smart contract deployments. No on-chain coordination. Update rules instantly.
 
@@ -38,42 +38,125 @@ Use the policy engine to encode your approval workflows. No smart contract deplo
 
 **Spending limits**: Enforce per-transaction maximums, daily outflow caps, and asset restrictions at the policy level.
 
-## Policy examples
+## Example: Contractor and vendor payments
 
-### Role-based signing limits
+Maintain a contact list of approved payment recipients. Store each contractor's preferred wallet address for USDC disbursements or other payments.
+
+**Set up recipient allowlist policy:**
 
 ```json
 {
-  "policyName": "Finance team can sign transactions up to $10,000",
+  "policyName": "Auto-approve payments to verified vendors",
   "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.tags.contains('finance-team'))",
-  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value <= 10000000000000000000000"
+  "consensus": "approvers.any(user, user.tags.contains('accounts-payable'))",
+  "condition": "eth.tx.to in ['<VENDOR_1_ADDRESS>', '<VENDOR_2_ADDRESS>', '<CONTRACTOR_ADDRESS>']"
 }
 ```
 
-### Multi-approval for high-value transactions
+Payments to known recipients execute with single approval. Add new vendors by updating the policy. No on-chain changes required.
+
+## Example: Scheduled recurring payments
+
+Set up automated payments that execute on a schedule without manual signing. Pay contractors on the last business day of each month for the next 6 months.
+
+<Steps>
+  <Step title="Configure payment schedule">
+    Define recurring payments in your application: recipient, amount, frequency, duration.
+  </Step>
+  <Step title="Create backend signing policy">
+    Allow your backend service to sign transactions to specific recipients up to specified amounts:
+
+    ```json
+    {
+      "policyName": "Backend can execute monthly contractor payments",
+      "effect": "EFFECT_ALLOW",
+      "consensus": "approvers.any(user, user.id == '<BACKEND_API_USER_ID>')",
+      "condition": "eth.tx.to in ['<CONTRACTOR_1>', '<CONTRACTOR_2>'] && eth.tx.value <= 5000000000000000000000"
+    }
+    ```
+  </Step>
+  <Step title="Trigger payments on schedule">
+    Your backend executes payments when due. No manual approval required for pre-authorized recipients and amounts.
+  </Step>
+</Steps>
+
+## Example: Delegated spending authority
+
+Grant limited payment permissions to individuals or teams without giving full wallet access.
+
+### Petty cash for operators
 
 ```json
 {
-  "policyName": "Require 2 approvers for transactions over $10,000",
+  "policyName": "Operators can make small purchases",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('operator'))",
+  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value <= 500000000000000000000"
+}
+```
+
+### Contractor self-service withdrawals
+
+```json
+{
+  "policyName": "Contractor can withdraw earned funds to registered address",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<CONTRACTOR_USER_ID>')",
+  "condition": "eth.tx.to == '<CONTRACTOR_WALLET_ADDRESS>' && eth.tx.value <= 2000000000000000000000"
+}
+```
+
+### Department budgets
+
+Assign each department a spending limit. Marketing can spend up to $25k without executive approval:
+
+```json
+{
+  "policyName": "Marketing team budget authority",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('marketing-team'))",
+  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value <= 25000000000000000000000"
+}
+```
+
+## Example: Multi-approval workflows
+
+Require multiple approvers for high-value or sensitive transactions.
+
+### Two finance approvers for large payments
+
+```json
+{
+  "policyName": "Require 2 finance approvers for transactions over $10,000",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.filter(user, user.tags.contains('finance-team')).count() >= 2",
   "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value > 10000000000000000000000"
 }
 ```
 
-### Automated payments to allowlisted recipients
+### Executive approval for major transactions
 
 ```json
 {
-  "policyName": "Backend can execute scheduled payroll",
+  "policyName": "CFO required for transactions over $50,000",
   "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.id == '<BACKEND_API_USER_ID>')",
-  "condition": "eth.tx.to in ['<EMPLOYEE_1>', '<EMPLOYEE_2>', '<EMPLOYEE_3>'] && eth.tx.value <= 10000000000000000000000"
+  "consensus": "approvers.any(user, user.tags.contains('cfo'))",
+  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value > 50000000000000000000000"
 }
 ```
 
-See [Policy Language](/concepts/policies/language) for the full policy syntax and [Access Control Examples](/concepts/policies/examples/access-control) for more patterns.
+## Example: Spending controls
+
+Implement organizational controls beyond simple approval requirements.
+
+| Control | Policy approach |
+| :--- | :--- |
+| **Per-transaction limits** | Set `eth.tx.value` ceiling in condition |
+| **Recipient restrictions** | Allowlist addresses with `eth.tx.to in [...]` |
+| **Role-based limits** | Different `consensus` rules per spending tier |
+| **Asset restrictions** | Filter by contract address for token transfers |
+
+See [Policy Language](/concepts/policies/language) for the full syntax and [Access Control Examples](/concepts/policies/examples/access-control) for more patterns.
 
 ## Trusted by leading businesses
 
