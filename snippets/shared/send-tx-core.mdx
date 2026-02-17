@@ -1,0 +1,88 @@
+## Using `@turnkey/core` directly
+
+For custom frameworks or full manual control (client-side).
+
+You will call:
+
+### `ethSendTransaction(params)`
+→ returns `{ sendTransactionStatusId }`
+
+### `pollTransactionStatus(params)`
+→ returns `{ txHash, status }`
+
+### Step 1 — Create a client
+
+If you're on a Node.js backend, use `@turnkey/sdk-server` and initialize the server client like this:
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+const client = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com/",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+
+For `@turnkey/core`, create the client like this:
+
+```ts
+import { Turnkey } from "@turnkey/core";
+
+const client = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORG_ID,
+});
+```
+
+---
+
+### Step 2 — Submit the transaction
+
+```ts
+const sendTransactionStatusId = await client.ethSendTransaction({
+  transaction: {
+    from: walletAccount.address,
+    to: "0xRecipient",
+    caip2: "eip155:8453",
+    sponsor: true,
+    value: "0",
+    data: "0x",
+    nonce: "0",
+  },
+});
+```
+
+---
+
+### Step 3 — Wait for inclusion
+
+```ts
+const pollResult = await client?.pollTransactionStatus({
+  sendTransactionStatusId,
+});
+
+if (!pollResult) {
+  throw new TurnkeyError(
+    "Polling returned no result",
+    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+  );
+}
+
+const { eth } = pollResult;
+const txHash = eth?.txHash;
+if (!txHash) {
+  throw new TurnkeyError(
+    "Missing txHash in transaction result",
+    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
+  );
+}
+console.log(txHash)
+```
+
+---
+
+- `ethSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/core/src/__clients__/core.ts#L2732)
+
+- `pollTransactionStatus` Implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/core/src/__clients__/core.ts#L2866)

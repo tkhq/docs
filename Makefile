@@ -13,6 +13,7 @@ install:
 
 # Default MDX generation target
 gen: mintlify-check
+	npx ts-node scripts/openapi-gen/swagger-to-openapi.ts
 	cd scripts/openapi-gen && npx ts-node openapi-gen.ts --file=openapi.json --generate-mdx
 
 # Run the OpenAPI generator (allows custom ARGS)
@@ -57,8 +58,8 @@ sync-sdk-gen-docs:
 	cp $(JS_SDK_ROOT)/generated-docs/docs.json docs.json
 
 	@echo Copying formatted docs to ./generated-docs...
-	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs/formatted
-	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs/formatted
+	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs
+	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs
 
 	@echo Copying formatted changelogs to ./changelogs...
 	cp -R $(JS_SDK_ROOT)/generated-docs/changelogs .

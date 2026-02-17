@@ -1,0 +1,52 @@
+## Using `handleSendTransaction` (React)
+
+This handler wraps everything: intent creation, signing, Turnkey submission, polling, modal UX, and final success UI.
+
+### Step 1 — Configure the Provider
+
+```ts
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+const turnkeyConfig = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_TURNKEY_ORG_ID,
+  rpId: window.location.hostname,
+  iframeUrl: "https://auth.turnkey.com",
+};
+
+export default function App({ children }) {
+  return (
+    <TurnkeyProvider config={turnkeyConfig}>
+      {children}
+    </TurnkeyProvider>
+  );
+}
+```
+
+---
+
+### Step 2 — Use `handleSendTransaction` inside your UI
+
+```ts
+const { handleSendTransaction, wallets } = useTurnkey();
+
+const walletAccount = wallets[0].accounts[0];
+
+await handleSendTransaction({
+  transaction: {
+    from: walletAccount.address,
+    to: "0xRecipient",
+    value: "1000000000000000",
+    data: "0x",
+    caip2: "eip155:8453",
+    sponsor: true,
+  },
+});
+```
+- Full React handler implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/react-wallet-kit/src/providers/client/Provider.tsx#L5536)
+
+This automatically:
+- opens Turnkey modal
+- shows chain logo
+- polls until INCLUDED
+- displays success page + explorer link

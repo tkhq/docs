@@ -1,13 +1,15 @@
 ---
 title: "Errors"
-description: "An error returned by the Turnkey API might look something like this:"
+description: "Error codes, messages, and troubleshooting guide for the Turnkey API."
 ---
 
+An error returned by the Turnkey API might look something like this:
+
 ```bash
-Turnkey error 3: organization mismatch: request is targeting organization ("USER SUB ORG"), but voters are in organization ("OUR MAIN ORG")
+Turnkey error 3: organization mismatch: request is targeting organization ("USER SUB ORG"), but voters are in organization ("OUR MAIN ORG") (Details: [{"@type":"type.googleapis.com/errors.v1.TurnkeyErrorDetail","turnkeyErrorCode":"ORGANIZATION_MISMATCH"}])
 ```
 
-Within this error message there are a few different parts that are worth breaking down. First the GRPC Error code. This looks like this:
+Within this error message there are a few different parts that are worth breaking down. First the GRPC Error code:
 
 ```bash
 Turnkey error 3:
@@ -19,11 +21,64 @@ This GRPC error wraps what we call a Turnkey Error which looks something like:
 organization mismatch: request is targeting organization ("USER SUB ORG"), but voters are in organization ("OUR MAIN ORG")
 ```
 
-What is more important to you as a developer is the TurnkeyError. This will give you information about what error occurred and how you can handle it. In fact, you should **not** perform error handling based on the GRPC code. These codes are meant to be used internally and will eventually be removed from our error responses. More on that [here](#grpc-error-codes). This page enumerates all errors that might be received while using the Turnkey API and also provides information about causes for these errors and helpful troubleshooting tips.
+And when available, a `turnkeyErrorCode` in the Details section:
 
-## All Error Codes for Actions
+```bash
+(Details: [{"@type":"type.googleapis.com/errors.v1.TurnkeyErrorDetail","turnkeyErrorCode":"ORGANIZATION_MISMATCH"}])
+```
 
-The below table enumerates all errors across different actions that can be taken using the API. It contains both the GRPC codes as well as the HTTP codes corresponding with each error as well as the displayed error message. More on GRPC error codes below this table. Click on the message to view a details explanation of possible causes and trouble shooting tips for that specific error
+## Error Handling Best Practices
+
+What matters most for error handling is the **Turnkey Error**: the human-readable message and `turnkeyErrorCode` (when available). You should **not** perform error handling based on the GRPC code - these are used internally and will eventually be removed. More on that [here](#grpc-error-codes).
+
+**Understanding TurnkeyErrorCodes:** These codes represent **categories** of errors, not specific messages. For example, `SIGNATURE_INVALID` may appear with messages like "could not verify WebAuthn signature" or "could not verify api key signature". Use the `turnkeyErrorCode` to identify the error category programmatically, and use the human-readable message for specific details.
+
+
+
+### Available TurnkeyErrorCodes
+
+The following error codes may be returned in error details:
+
+| Code                             | Description                                                                                                                    |
+| :------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
+| `UNSPECIFIED` | Error code not specified |
+| `INTERNAL` | Internal server error |
+| `ORGANIZATION_NOT_FOUND` | The specified organization could not be found |
+| `API_OPERATIONS_DISABLED` | Global API access is temporarily disabled |
+| `SIGNING_QUOTA_EXCEEDED` | Organization has exceeded its signing quota and cannot execute activities |
+| `REQUEST_NOT_AUTHORIZED` | Request is not authorized - may occur when accessing resources outside permissions or beyond session restrictions |
+| `PUBLIC_KEY_NOT_FOUND` | Public key could not be found in the organization or its parent |
+| `RATE_LIMIT_EXCEEDED` | Organization has been rate limited and cannot execute activities |
+| `SIGNATURE_MISSING` | Required authentication signature is missing from the request |
+| `SIGNATURE_INVALID` | Could not verify API key or WebAuthn signature |
+| `CREDENTIAL_NOT_FOUND` | Credential or WebAuthn authenticator not found in organization or its parent |
+| `CREDENTIAL_CONFLICT` | Multiple sub-organizations are associated with this credential, creating ambiguous authentication |
+| `API_KEY_EXPIRED` | The API key has expired and can no longer be used |
+| `REQUEST_INVALID` | Request contains invalid or missing required parameters |
+| `FORBIDDEN` | User does not have permission to view or access this organization |
+| `UNAUTHENTICATED` | Authentication failed - request lacks valid authentication credentials |
+| `UNSUPPORTED_TRANSACTION_TYPE` | Transaction type is not supported (supported: Ethereum, Solana, Tron, Bitcoin, Tempo) |
+| `INVALID_TRANSACTION` | Transaction structure is invalid (e.g., too many addresses in Solana transaction) |
+| `INVALID_OIDC_TOKEN` | OIDC token is invalid or missing required claims (aud, sub, iss) |
+| `INVALID_ORGANIZATION_ID` | Organization ID is invalid or malformed (must be a valid UUID) |
+| `OAUTH2_CREDENTIAL_NOT_FOUND` | The specified OAuth 2.0 credential could not be found |
+| `OAUTH2_PROVIDER_NOT_FOUND` | The specified OAuth 2.0 provider could not be found |
+| `INVALID_OAUTH2_PROVIDER` | OAuth 2.0 provider configuration is invalid or misconfigured |
+| `OAUTH2_PROVIDER_NOT_CONFIGURED` | OAuth 2.0 provider has not been configured for this organization |
+| `INVALID_ACTIVITY_CALLER` | This activity cannot be called by sub-organizations |
+| `WALLET_ACCOUNT_NOT_EXPORTED` | Wallet account has not been exported and cannot be deleted without export |
+| `INVALID_TIME` | Time range is invalid or results in excessive intervals |
+| `RPC_CALL_ERROR` | RPC provider communication error |
+| `INVALID_EMAIL` | Email address is invalid - check format, domain, and TLD (Top-Level Domain) |
+| `INVALID_FQDN` | Email domain could not be reached or verified |
+| `OAUTH_PROVIDER_ALREADY_EXISTS` | OAuth provider with same audience, subject, and issuer already exists |
+| `EMAIL_SENDING_DISABLED` | Email sending functionality is currently disabled |
+
+<Note> Not all errors currently include a `turnkeyErrorCode`, though we aim to include one in all customer-facing errors. If you encounter an error where you would expect a `turnkeyErrorCode` but don't see one, please contact Turnkey support.</Note>
+
+## Detailed Error Messages
+
+The below table enumerates common errors across different actions that can be taken using the API. It contains GRPC codes, HTTP codes, and error messages. More on GRPC error codes [below](#grpc-error-codes). Click on the message to view detailed explanation of possible causes and troubleshooting tips for that specific error.
 
 | GRPC Code         | HTTP Code | Message                                                                                                                                                                                                                                                                                                                                                 |
 | :---------------- | :-------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -50,6 +105,18 @@ The below table enumerates all errors across different actions that can be taken
 | InvalidArgument   | 400       | [invalid magic link template](#invalid-magic-link-template)                                                                                                                                                                                                                                                                                             |
 | InvalidArgument   | 400       | [failed to get email template contents](#failed-to-get-email-template-contents)                                                                                                                                                                                                                                                                         |
 | InvalidArgument   | 400       | [failed to unmarshal template variables](#failed-to-unmarshal-template-variables)                                                                                                                                                                                                                                                                       |
+| InvalidArgument   | 400       | [organization mismatch](#organization-mismatch)                                                                                                                                                                                                                                                                                                         |
+| InvalidArgument   | 400       | [invalid wallet account UUID](#invalid-wallet-account-uuid)                                                                                                                                                                                                                                                                                             |
+| InvalidArgument   | 400       | [wallet account not part of your organization](#wallet-account-not-part-of-your-organization)                                                                                                                                                                                                                                                           |
+| InvalidArgument   | 400       | [wallet account has not been exported](#wallet-account-has-not-been-exported)                                                                                                                                                                                                                                                                           |
+| InvalidArgument   | 400       | [invalid OIDC token](#invalid-oidc-token)                                                                                                                                                                                                                                                                                                               |
+| InvalidArgument   | 400       | [invalid email address](#invalid-email-address)                                                                                                                                                                                                                                                                                                         |
+| InvalidArgument   | 400       | [could not reach email](#could-not-reach-email)                                                                                                                                                                                                                                                                                                         |
+| InvalidArgument   | 400       | [auth_code must be set](#oauth2-parameter-errors)                                                                                                                                                                                                                                                                                                       |
+| InvalidArgument   | 400       | [code_verifier must be set](#oauth2-parameter-errors)                                                                                                                                                                                                                                                                                                   |
+| InvalidArgument   | 400       | [oauth2_credential_id must be set](#oauth2-parameter-errors)                                                                                                                                                                                                                                                                                            |
+| InvalidArgument   | 400       | [redirect_uri must be set](#oauth2-parameter-errors)                                                                                                                                                                                                                                                                                                    |
+| InvalidArgument   | 400       | [client_id must be set](#oauth2-parameter-errors)                                                                                                                                                                                                                                                                                                       |
 | Unauthenticated   | 401       | [no valid authentication signature found for request](#no-valid-authentication-signature-found-for-request)                                                                                                                                                                                                                                             |
 | Unauthenticated   | 401       | [could not find public key in organization](#could-not-find-public-key-in-organization)                                                                                                                                                                                                                                                                 |
 | Unauthenticated   | 401       | [failed while looking up public key in parent organization](#failed-while-looking-up-public-key-in-parent-organization)                                                                                                                                                                                                                                 |
@@ -79,7 +146,7 @@ The below table enumerates all errors across different actions that can be taken
 | ResourceExhausted | 429       | [this sub-organization cannot execute activities because its parent is over its allotted quota. Please reach out to the Turnkey team (help@turnkey.com) for more information.](#this-sub-organization-cannot-execute-activities-because-its-parent-is-over-its-allotted-quota-please-reach-out-to-the-turnkey-team-helpturnkeycom-for-more-information) |
 | ResourceExhausted | 429       | [this organization cannot execute activities because it has been rate limited. Please reach out to the Turnkey team (help@turnkey.com) for more information.](#this-organization-cannot-execute-activities-because-it-has-been-rate-limited-please-reach-out-to-the-turnkey-team-helpturnkeycom-for-more-information)                                   |
 | ResourceExhausted | 429       | [this sub-organization cannot execute activities because its parent has been rate limited. Please reach out to the Turnkey team (help@turnkey.com) for more information.](#this-sub-organization-cannot-execute-activities-because-its-parent-has-been-rate-limited-please-reach-out-to-the-turnkey-team-helpturnkeycom-for-more-information)           |
-| Internal          | 500       | [internal server error](#internal-server-error)                                                                                                                                                                                                                                                                                                         |
+| Internal          | 500       | [internal server error](#internal-server-error)                      
 
 ## GRPC Error Codes
 
@@ -794,3 +861,91 @@ Troubleshooting tips:
 
 - Retry the activity. This could be a fluke case and the following activity could pass without failure.
 - If you think there is problem or if your service is degraded, please reach out to Turnkey [help@turnkey.com](mailto:help@turnkey.com) and provide the error id in the error message.
+
+### organization mismatch
+
+Common causes:
+
+- The request is targeting one organization (e.g., a sub-organization), but the users signing/approving the request belong to a different organization (e.g., the parent organization)
+
+Troubleshooting tips:
+
+- Ensure the `organizationId` in your request matches the organization where your signing users are located
+
+### invalid wallet account UUID
+
+Common causes:
+
+- A malformed or invalid UUID was provided for a wallet account ID
+
+Troubleshooting tips:
+
+- Verify the wallet account ID is a valid UUID in the format `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`
+
+### wallet account not part of your organization
+
+Common causes:
+
+- Attempting to delete or modify a wallet account that belongs to a different organization
+- Using a wallet account ID from another organization
+
+Troubleshooting tips:
+
+- Verify the wallet account ID belongs to your organization
+- Check that you're using the correct organization ID in your request
+
+### wallet account has not been exported
+
+Common causes:
+
+- Attempting to delete a wallet account that has not been exported
+- The `deleteWithoutExport` parameter is not set to `true` when trying to delete an unexported wallet account
+
+Troubleshooting tips:
+
+- Export the wallet account before deleting it using the export wallet account activity
+- Set `deleteWithoutExport` to `true` in your delete request if you want to delete without exporting (use with caution)
+
+### invalid OIDC token
+
+Common causes:
+
+- The OIDC token format is invalid (not a valid JWT with 3 parts)
+- Required claims are missing from the OIDC token (`aud`, `sub`, or `iss`)
+- The token structure doesn't match the expected format
+
+Troubleshooting tips:
+
+- Verify the OIDC token is a valid JWT with three parts separated by periods (header.payload.signature)
+- Ensure the token includes all required claims:
+  - `aud` (audience): The intended recipient of the token
+  - `sub` (subject): The user identifier
+  - `iss` (issuer): The identity provider that issued the token
+- Check that your OIDC provider is correctly configured to include these claims
+
+### invalid email address
+
+Common causes:
+
+- Email address format is invalid
+
+Troubleshooting tips:
+
+- Verify the email address follows the standard format: `user@domain.com`
+- Remove any extra spaces or invalid characters from the email address
+
+### could not reach email
+
+Common causes:
+
+- The email domain cannot be reached or verified
+- Invalid MX (Mail Exchange) records for the email domain
+- The email provider's servers are unreachable or non-existent
+- The domain doesn't have proper DNS configuration
+
+Troubleshooting tips:
+
+- Verify the email domain is a valid, active domain
+- Check that the email provider's MX records are properly configured
+- Try using an email address from a well-known provider (Gmail, Outlook, etc.) to test
+- If you believe this is in error, please contact Turnkey

@@ -8,7 +8,7 @@ description: "Email Authentication enables users to authenticate and recover the
 - Uses a 6-9 digit or bech32 alphanumeric one-time password sent via email
 - Simple, and familiar user experience
 
-#### One-Time Password Sandbox Environment
+**One-Time Password Sandbox Environment**
 
 To test OTP codes in our sandbox environment you can use the following:
 
@@ -17,7 +17,7 @@ To test OTP codes in our sandbox environment you can use the following:
 - Email: [user@example.com](mailto:user@example.com)
 - OTP Code: `000000`
 
-**Credential Bundle**
+#### Credential Bundle
 
 - Sends an encrypted API key credential directly via email
 - Alternative method for specific use cases
@@ -44,9 +44,19 @@ The authentication process happens in two steps:
 
 ### Credential bundle method
 
-**Note:** on web, this method is only supported with the legacy iframe-based flow, if no hard requirement to use encrypted bundles, we suggest to use the IndexedDB-based OTP flow instead.
+<Note> This method is only supported by **legacy iframe-based flows** and is not available in the current Turnkey SDKs. </Note>
 
 The API key credential is encrypted and delivered directly through email to the user. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](/security/enclave-secure-channels) for more info on how we achieve secure delivery.
+
+This flow remains available for existing legacy integrations but is not recommended for new implementations.
+As an alternative, we recommend using the email OTP flow, which is fully supported by the current SDKs. An example that sends a magic link using [magicLinkTemplate](https://docs.turnkey.com/authentication/email#email-auth-and-recovery:~:text=height%20of%20124px-,magicLinkTemplate,-%3A%20a%20template%20for) can be found [here](https://github.com/tkhq/sdk/tree/main/examples/magic-link-auth).
+
+### Email Recovery
+
+In Turnkey, email recovery **does not refer to a separate, recovery-only email address** (as commonly used in consumer products, where a recovery email can reset access but cannot itself be used to sign in).
+Instead, it means **adding email as an authentication method for a user**. Once added, that user can authenticate using email by default, alongside any other configured authenticators (such as passkeys, social logins or external wallets).
+
+The legacy iframe-based flow using `INIT_USER_EMAIL_RECOVERY` and `RECOVER_USER` still exists for backward compatibility with older integrations. These flows ultimately attach new authentication material (for example, a passkey) to the user. They are being deprecated and **should not be used for new integrations**.
 
 ## Prerequisites
 
@@ -70,7 +80,7 @@ For OTP Auth signup and login flows you will need a user with the following poli
 }
 ```
 
-**Note:** Avoid using an API key that is also present in the sub-organization that you're targeting within the email activities. Turnkey identifies the user from the request signature and in case of an identical API key it will always prioritize the sub-organization user matching. As a result, it will try to evaluate the sub-organization policies instead of the parent ones.
+<Note>Avoid using an API key that is also present in the sub-organization that you're targeting within the email activities. Turnkey identifies the user from the request signature and in case of an identical API key it will always prioritize the sub-organization user matching. As a result, it will try to evaluate the sub-organization policies instead of the parent ones.</Note>
 
 ## User experience
 
@@ -160,9 +170,9 @@ const response = await client.emailAuth({
 ### Breaking Change: `appName` Required
 
 <Warning>
-  **Effective December 8, 2025**
+  **Effective December 16, 2025**
   
-  Beginning the week of December 8, 2025, all email-based OTP and recovery activities will require the `appName` parameter. Existing SDK versions will continue working, but upgrading without setting an `appName` will break email-based flows.
+  Beginning December 16, 2025, all email-based OTP and recovery activities will require the `appName` parameter. Existing SDK versions will continue working, but upgrading without setting an `appName` will break email-based flows.
 
 <CardGroup cols={2}>
   <Card title="Auth Proxy Users" icon="server">
@@ -178,6 +188,41 @@ const response = await client.emailAuth({
     • For `init_otp` or `init_otp_auth`: update your API call to match the new input structure when upgrading to the latest server-SDK
   </Card>
 </CardGroup>
+
+<Accordion title="Server SDK code examples">
+    <Card title="emailAuth & emailRecovery">
+      Both methods use the same parameter structure. Here's an example with `emailAuth`:
+      
+      ```js
+      await client.emailAuth({
+        parameters: {
+          email: "user@example.com", 
+          targetPublicKey: "<client-public-key>",
+          emailCustomization: {
+            appName: "Your App Name" // this is now required
+          }
+        }
+      });
+      ```
+    </Card>
+
+    <Card title="initOtp & initOtpAuth">
+      Both methods use the same parameter structure. Here's an example with `initOtp`:
+      
+      ```js
+      await client.initOtp({
+        parameters: {
+          otpType: "OTP_TYPE_EMAIL", 
+          contact: "user@example.com", 
+          appName: "Your App Name",  // this is now required
+          emailCustomization: {
+            // other optional customization
+          }
+        }
+      });
+      ```
+    </Card>
+</Accordion>
 
 <Card title="Policy activity type updates">
   If you manage email flows with policies, update to the new activity types:
@@ -254,6 +299,7 @@ Please keep in mind that:
 - If there is no `sendFromEmailAddress` or it's invalid, the other two fields are ignored
 - If `sendFromEmailSenderName` is absent, it defaults to "Notifications" (again, ONLY if `sendFromEmailAddress` is present and valid)
 - If `replyToEmailAddress` is absent, then there is no reply-to added. If it is present, it must ALSO be from a valid, whitelisted domain, but it doesn't have to be the same email address as the `sendFromEmailAddress` one (though once again, this first one MUST be present, or the other two feature are ignored)
+- **Sender name screening:** Some email clients (e.g. Gmail) screen sender names more aggressively than others (e.g. Apple Mail), which can lead to inconsistent display across clients. To ensure a consistent experience, keep your `sendFromEmailSenderName` "safe looking" — avoid underscores, special symbols, or unusual formatting that may cause it to be filtered or hidden.
 
 If you are interested in implementing bespoke, fully-customized email templates and sender domain, please reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
 
@@ -265,7 +311,7 @@ Authorization is managed through our [policy engine](/concepts/policies/overview
 
 Both OTP-based and credential bundle authentication activities:
 
-- Can be performed by [root users](/concepts/overview#users) and users with proper policy authorization
+- Can be performed by [root quorum](/concepts/users/root-quorum#root-quorum) or users with proper policy authorization
 - Require the respective feature to be enabled in the organization and sub-organization
 - Can target any user in the organization or sub-organizations
 

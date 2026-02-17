@@ -38,18 +38,19 @@ Keywords are reserved words that are dynamically interchanged for real values at
 
 ### Condition
 
-| Keyword                        | Type                 | Description                                                  |
-| ------------------------------ | -------------------- | ------------------------------------------------------------ |
-| **activity**                   | Activity             | The activity metadata of the request                         |
-| **eth.tx**                     | EthereumTransaction  | The parsed Ethereum transaction payload (see Appendix below) |
-| **eth.eip_712**                | Eip712TypedData      | EIP-712 Typed Data (see Appendix below)                      |
-| **eth.eip_7702_authorization** | Eip7702Authorization | EIP-7702 Authorization (see Appendix below)                  |
-| **solana.tx**                  | SolanaTransaction    | The parsed Solana transaction payload (see Appendix below)   |
-| **tron.tx**                    | TronTransaction      | The parsed Tron transaction payload (see Appendix below)     |
-| **bitcoin.tx**                 | BitcoinTransaction   | The parsed Bitcoin transaction payload (see Appendix below)  |
-| **wallet**                     | Wallet               | The target wallet used in sign + export requests             |
-| **private_key**                | PrivateKey           | The target private key used in sign + export requests        |
-| **wallet_account**             | WalletAccount        | The target wallet account used in sign + export requests     |
+| Keyword                        | Type                 | Description                                                                  |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------------------- |
+| **activity**                   | Activity             | The activity metadata of the request                                         |
+| **eth.tx**                     | EthereumTransaction  | The parsed Ethereum transaction payload (see Appendix below)                 |
+| **eth.eip_712**                | Eip712TypedData      | EIP-712 Typed Data (see Appendix below)                                      |
+| **eth.eip_7702_authorization** | Eip7702Authorization | EIP-7702 Authorization (see Appendix below)                                  |
+| **solana.tx**                  | SolanaTransaction    | The parsed Solana transaction payload (see Appendix below)                   |
+| **tron.tx**                    | TronTransaction      | The parsed Tron transaction payload (see Appendix below)                     |
+| **bitcoin.tx**                 | BitcoinTransaction   | The parsed Bitcoin transaction payload (see Appendix below)                  |
+| **wallet**                     | Wallet               | The target wallet used in sign + export requests                             |
+| **wallets**                    | list\<Wallet\>       | The target wallets associated with requests involving with multiple wallets  |
+| **private_key**                | PrivateKey           | The target private key used in sign + export requests                        |
+| **wallet_account**             | WalletAccount        | The target wallet account used in sign + export requests                     |
 
 ## Types
 
@@ -80,7 +81,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | credential_id            | string                                    | The credential ID of a passkey. Note: this is only populated for passkeys (also known as Authenticators within Turnkey resources), not API keys                                                                                                                                        |
 |                          | public_key               | string                                    | The public key of the credential that approved the request                                                                                                                                                                                                                             |
 | **Activity**             | type                     | string                                    | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                                                                                                                      |
-|                          | resource                 | string                                    | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `RECOVERY`, `AUTH`, `OTP`, `PAYMENT_METHOD`, `SUBSCRIPTION`                                                                                   |
+|                          | resource                 | string                                    | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `**RECOVERY`, `AUTH`, `OTP`, `PAYMENT_METHOD`, `SUBSCRIPTION`                                                                                   |
 |                          | action                   | string                                    | The action of the activity: `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT`, `IMPORT`                                                                                                                                                                                                   |
 |                          | params                   | string                                    | The parameters of the activity: `SIGN_RAW_PAYLOADS`, `SIGN_RAW_PAYLOAD_V2` - `hash_function`, `encoding`                                                                                                                                                                               |
 | **Wallet**               | id                       | string                                    | The identifier of the wallet                                                                                                                                                                                                                                                           |
@@ -133,7 +134,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | outputs                  | list\<BitcoinTxOutput\>                   | All outputs created by this Bitcoin transaction                                                                                                                                                                                                                                        |
 |                          | locktime                 | BitcoinTxLocktime                         | The locktime of this bitcoin transaction                                                                                                                                                                                                                                               |
 
-\*\*NOTE: The `ContractArgument` type, used in documentation for ABI an IDL arguments represents an enum indicating this type could be any one of the string, number, array or struct types listed in our Primitives section.
+<Note> The `ContractArgument` type, used in documentation for ABI an IDL arguments represents an enum indicating this type could be any one of the string, number, array or struct types listed in our Primitives section. </Note>
 
 #### Nested Structs
 
@@ -202,7 +203,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **BitcoinTxOutput**             | value                   | int                                   | The value of this output in Satoshis                                                                                                                                          |
 |                                 | script_pubkey           | string                                | The locking code for this transaction output                                                                                                                                  |
 |                                 | address                 | string                                | The on chain address representation for this transaction output                                                                                                               |
-|                                 | address_type            | string                                | The address derivation type of the address for this transaction output                                                                                                        |
+|                                 | address_type            | string (case insensitive)             | The address derivation type of the address for this transaction output                                                                                                        |
 | **BitcoinTxLocktime**           | amount                  | int                                   | The amount represented in this transaction's locktime                                                                                                                         |
 |                                 | type                    | string                                | The type of locktime represented (either 'Seconds' or 'Blocks')                                                                                                               |
 
@@ -229,6 +230,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                              | IMPORT |                   ACTIVITY_TYPE_IMPORT_WALLET |
 |                              | DELETE |                  ACTIVITY_TYPE_DELETE_WALLETS |
 |                              | UPDATE |                   ACTIVITY_TYPE_UPDATE_WALLET |
+|                              | DELETE |          ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS | 
 | **PRIVATE_KEY**              | CREATE |          ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2 |
 |                              | CREATE |          ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG |
 |                              | UPDATE |          ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG |
@@ -241,10 +243,15 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                              | SIGN   |             ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2 |
 |                              | SIGN   |               ACTIVITY_TYPE_SIGN_RAW_PAYLOADS |
 |                              | SIGN   |             ACTIVITY_TYPE_SIGN_TRANSACTION_V2 |
-| **USER**                     | CREATE |                 ACTIVITY_TYPE_CREATE_USERS_V2 |
+|                              | SIGN   |            ACTIVITY_TYPE_ETH_SEND_TRANSACTION |
+|                              | SIGN   |            ACTIVITY_TYPE_SOL_SEND_TRANSACTION |
+| **USER**                     | CREATE |                 ACTIVITY_TYPE_CREATE_USERS_V3 |
 |                              | CREATE |                 ACTIVITY_TYPE_CREATE_USER_TAG |
 |                              | CREATE |           ACTIVITY_TYPE_CREATE_API_ONLY_USERS |
 |                              | UPDATE |                     ACTIVITY_TYPE_UPDATE_USER |
+|                              | UPDATE |                ACTIVITY_TYPE_UPDATE_USER_NAME |
+|                              | UPDATE |               ACTIVITY_TYPE_UPDATE_USER_EMAIL |
+|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_USER_PHONE_NUMBER |
 |                              | UPDATE |                 ACTIVITY_TYPE_UPDATE_USER_TAG |
 |                              | DELETE |                    ACTIVITY_TYPE_DELETE_USERS |
 |                              | DELETE |                ACTIVITY_TYPE_DELETE_USER_TAGS |
@@ -258,14 +265,27 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                              | DELETE |           ACTIVITY_TYPE_DELETE_PAYMENT_METHOD |
 | **SUBSCRIPTION**             | CREATE |           ACTIVITY_TYPE_ACTIVATE_BILLING_TIER |
 | **CONFIG**                   | UPDATE |          ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS |
-| **RECOVERY**                 | CREATE |        ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY |
-| **AUTH**                     | CREATE |                   ACTIVITY_TYPE_EMAIL_AUTH_V2 |
-|                              | CREATE |                   ACTIVITY_TYPE_INIT_OTP_AUTH |
+| ****RECOVERY**               | CREATE |     ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2 |
+| **AUTH**                     | CREATE |                   ACTIVITY_TYPE_EMAIL_AUTH_V3 |
+|                              | CREATE |                ACTIVITY_TYPE_INIT_OTP_AUTH_V3 |
 |                              | CREATE |                        ACTIVITY_TYPE_OTP_AUTH |
 |                              | CREATE |                           ACTIVITY_TYPE_OAUTH |
+|                              | CREATE |                     ACTIVITY_TYPE_OAUTH_LOGIN |
+|                              | CREATE |                       ACTIVITY_TYPE_OTP_LOGIN |
+|                              | CREATE |                     ACTIVITY_TYPE_STAMP_LOGIN |
 |                              | CREATE |    ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2 |
-| **OTP**                      | CREATE |                        ACTIVITY_TYPE_INIT_OTP |
+|                              | CREATE |        ACTIVITY_TYPE_CREATE_OAUTH2_CREDENTIAL |
+|                              | DELETE |        ACTIVITY_TYPE_DELETE_OAUTH2_CREDENTIAL |
+|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL |
+|                              | CREATE |             ACTIVITY_TYPE_OAUTH2_AUTHENTICATE |
+| **OTP**                      | CREATE |                     ACTIVITY_TYPE_INIT_OTP_V2 |
 |                              | VERIFY |                      ACTIVITY_TYPE_VERIFY_OTP |
+| **AUTH_PROXY**               | CREATE |               ACTIVITY_TYPE_ENABLE_AUTH_PROXY |
+|                              | DELETE |              ACTIVITY_TYPE_DISABLE_AUTH_PROXY |
+|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_AUTH_PROXY_CONFIG |
+   
+
+<Note> ** Legacy features, deprecated in the latest SDKs. </Note>
 
 ## Appendix
 
@@ -285,6 +305,13 @@ Our Ethereum policy language (accessible via `eth.tx`) allows for the granular g
 
 See the [Ethereum policy examples](/concepts/policies/examples/ethereum) for sample scenarios.
 
+
+<Note> The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart contracts support signed integers up to 256 bits (`int256`), but values exceeding the 128-bit signed range cannot be used in policy conditions. </Note>
+
+#### EIP-712
+
+Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When defining policies for EIP-712 messages, please ensure that all hex-encoded strings (e.g. addresses, function selectors, bytes) are **lowercase**. The policy engine expects lowercase hex strings to conform to Ethereum's standard convention. Using uppercase hex strings may result in errors or policy rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
+
 ### Solana
 
 Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure.
@@ -299,6 +326,11 @@ Here are some approaches you might take to govern transfers:
 - _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/concepts/policies/examples/solana#deny-all-solana-transactions-transferring-to-an-undesired-address))
 - Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
 
+#### Account Address Lookups
+Solana transactions can reference onchain address lookup tables for account addresses. Turnkey surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP` in Solana address fields (`account_keys`, instruction accounts, `transfers`, and `spl_transfers`). The `solana.tx.address_table_lookups` array indicates when lookups are present, but the specific addresses are not resolved. If you rely on allowlists or denylists of addresses, add a guard for this placeholder (for example, require `solana.tx.address_table_lookups.count == 0` before comparing addresses, or explicitly deny when `ADDRESS_TABLE_LOOKUP` appears with something like `solana.tx.transfers.any(t, t.to == 'ADDRESS_TABLE_LOOKUP')`) so that dynamic lookups cannot bypass or unexpectedly fail your policy. See the [address table lookup examples](/concepts/policies/examples/solana#deny-all-address-table-lookups) for examples on how to enforce this.
+
+#### Program address lookups
+Turnkey rejects Solana transactions where program addresses are resolved via address lookup tables. Program IDs must be statically defined in the transaction to enable static analysis of instructions without requiring on-chain data lookups. If your transaction references a program via an address table lookup, the signing request will fail. Account addresses (non-program) can still be dynamically resolved via lookup tables as described above.
 
 See the [Solana policy examples](/concepts/policies/examples/solana) for sample scenarios.
 
