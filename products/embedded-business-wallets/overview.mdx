@@ -3,232 +3,118 @@ title: "Embedded Business Wallets"
 description: "Use Turnkey's embedded wallet infrastructure for internal enterprise operations: treasury management, payroll automation, vendor payments, and organizational spending controls."
 ---
 
-> Traditional enterprise wallet solutions force organizations to choose between security and usability. Multisig wallets provide security through multiple approvals but are operationally complex and slow. Centralized treasury tools offer convenience but create single points of failure. Turnkey's Embedded Business Wallets eliminate this tradeoff by combining programmable policy controls with a seamless operational experience.
+## Embedded Business Wallets
 
-## Why Embedded Business Wallets?
+Manage organizational wallets with programmable controls. Define approval workflows, spending limits, and access policies. Private keys stay in hardware-backed enclaves. See [Embedded Wallets Overview](/embedded-wallets/overview) for the consumer-facing counterpart.
 
-Embedded wallets are typically associated with consumer applications, where each end user gets their own wallet. But the same infrastructure that powers millions of consumer wallets is equally powerful for internal enterprise use cases:
+## Why Turnkey for Embedded Business Wallets?
 
-- **Treasury management**: Centralize organizational funds with granular access controls
-- **Payroll and contractor payments**: Automate recurring disbursements without manual signing
-- **Vendor payments**: Maintain contact lists and streamline accounts payable workflows
-- **Operational wallets**: Delegate specific payment authorities to teams or individuals
+Business wallets are organization-controlled wallets for internal operations: treasury, payroll, vendor payments, and operational funds. Unlike consumer wallets where each end user owns their wallet, business wallets require coordinated access across teams with configurable approval requirements.
 
-With Turnkey, you get the security benefits of multisig (multiple approvals, separation of duties) combined with the programmability and automation that traditional multisig solutions lack.
+Turnkey runs wallet infrastructure for business operations. Create wallets for your organization. Define who can sign, what they can sign, and how many approvals are required. Set spending limits and recipient allowlists. Private keys stay in hardware-backed enclaves, secured through Turnkey's [verifiable security architecture](/security/our-approach).
 
-## Multisig Security, Without the Multisig Complexity
+Use the policy engine to encode your approval workflows. No smart contract deployments. No on-chain coordination. Update rules instantly.
 
-Traditional multisig wallets require coordinating multiple signers for every transaction. This creates operational friction:
+## Typical use cases
 
-- Signers must be available simultaneously
-- Gas costs increase with signature count
-- Adding or removing signers requires on-chain transactions
-- No granular control over what transactions require approval
+| Need | Turnkey solution |
+| :--- | :--- |
+| Treasury management | Centralized funds with role-based access and multi-approval requirements |
+| Payroll automation | Scheduled payments to allowlisted recipients without manual signing |
+| Vendor payments | Contact lists with pre-approved addresses and spending limits |
+| Delegated spending | Grant limited payment authority to teams or individuals |
+| Multi-approval workflows | Require 2+ approvers for high-value transactions |
+| Spending controls | Per-transaction limits, daily caps, recipient restrictions |
 
-Turnkey's policy engine delivers equivalent security guarantees with superior flexibility:
+## Core capabilities
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TRADITIONAL MULTISIG                                 │
-│                                                                         │
-│   ┌─────────┐    ┌─────────┐    ┌─────────┐                            │
-│   │ Signer  │ +  │ Signer  │ +  │ Signer  │  →  On-chain execution     │
-│   │   A     │    │   B     │    │   C     │                            │
-│   └─────────┘    └─────────┘    └─────────┘                            │
-│                                                                         │
-│   • All signers required for every transaction                         │
-│   • No conditional logic                                               │
-│   • On-chain coordination overhead                                     │
-└─────────────────────────────────────────────────────────────────────────┘
+**Programmable approval requirements**: Define how many approvals each transaction type needs. Small payments auto-approve. Large transfers require multiple signers. Update thresholds without code changes.
 
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    TURNKEY POLICY ENGINE                                │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────┐      │
-│   │                    POLICY RULES                             │      │
-│   │                                                             │      │
-│   │   Transaction < $1,000    →  Single approval (Operator)    │      │
-│   │   Transaction < $10,000   →  Two approvals (Finance team)  │      │
-│   │   Transaction >= $10,000  →  CFO + CEO approval            │      │
-│   │   Recipient in allowlist  →  Auto-approve                  │      │
-│   │   Scheduled payment       →  Auto-execute on date          │      │
-│   └─────────────────────────────────────────────────────────────┘      │
-│                                                                         │
-│   • Conditional approval requirements                                   │
-│   • Role-based access control                                          │
-│   • Off-chain policy evaluation, on-chain execution                    │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+**Role-based access control**: Assign permissions via user tags. Finance team signs up to $10k. Executives required above $50k. Operators handle day-to-day transactions.
 
-## Key Capabilities
+**Recipient allowlists**: Maintain approved vendor and contractor addresses. Payments to known recipients can bypass additional approval steps.
 
-### Role-Based Access Control
+**Automated scheduled payments**: Backend services sign recurring transactions (payroll, subscriptions) based on policy rules. No manual intervention required.
 
-Assign different permissions to different team members using user tags:
+**Spending limits**: Enforce per-transaction maximums, daily outflow caps, and asset restrictions at the policy level.
+
+## Policy examples
+
+### Role-based signing limits
 
 ```json
 {
-  "policyName": "Finance team can sign transactions up to $5,000",
+  "policyName": "Finance team can sign transactions up to $10,000",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.tags.contains('finance-team'))",
-  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value <= 5000000000000000000000"
+  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value <= 10000000000000000000000"
 }
 ```
 
-| Role | Permissions |
-| :--- | :--- |
-| **Operator** | Sign transactions up to $1,000 to pre-approved addresses |
-| **Finance** | Sign transactions up to $10,000, add recipients to allowlist |
-| **Treasury** | Sign any transaction with single approval |
-| **Executive** | Required for transactions over $50,000 |
-
-### Multi-Approval Workflows
-
-Require multiple approvers for high-value transactions, just like multisig, but with programmable thresholds:
+### Multi-approval for high-value transactions
 
 ```json
 {
-  "policyName": "Require 2 finance approvers for transactions over $10,000",
+  "policyName": "Require 2 approvers for transactions over $10,000",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.filter(user, user.tags.contains('finance-team')).count() >= 2",
   "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.value > 10000000000000000000000"
 }
 ```
 
-Unlike on-chain multisig:
-- Add or remove approvers instantly (no on-chain transactions)
-- Different approval requirements for different transaction types
-- Approval collection happens off-chain (no coordination overhead)
-
-### Delegated Permissions
-
-Grant specific, limited permissions to individuals or teams without giving them full wallet access:
+### Automated payments to allowlisted recipients
 
 ```json
 {
-  "policyName": "Contractor can withdraw up to $500/day to their registered address",
+  "policyName": "Backend can execute scheduled payroll",
   "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.id == '<CONTRACTOR_USER_ID>')",
-  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'SIGN' && eth.tx.to == '<CONTRACTOR_ADDRESS>' && eth.tx.value <= 500000000000000000000"
+  "consensus": "approvers.any(user, user.id == '<BACKEND_API_USER_ID>')",
+  "condition": "eth.tx.to in ['<EMPLOYEE_1>', '<EMPLOYEE_2>', '<EMPLOYEE_3>'] && eth.tx.value <= 10000000000000000000000"
 }
 ```
 
-Use cases:
-- **Petty cash**: Operators can make small purchases without approval
-- **Contractor advances**: Allow contractors to withdraw earned funds
-- **Department budgets**: Each department controls their allocation
+See [Policy Language](/concepts/policies/language) for the full policy syntax and [Access Control Examples](/concepts/policies/examples/access-control) for more patterns.
 
-### Recipient Allowlists
+## Trusted by leading businesses
 
-Maintain a contact list of approved payment recipients. Payments to allowlisted addresses can be auto-approved or require fewer approvals:
+Turnkey's infrastructure powers enterprise payment operations at scale. See [Turnkey Customers](https://www.turnkey.com/customers) for more examples.
 
-```json
-{
-  "policyName": "Auto-approve payments to verified vendors",
-  "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.tags.contains('finance-team'))",
-  "condition": "eth.tx.to in ['<VENDOR_1_ADDRESS>', '<VENDOR_2_ADDRESS>', '<VENDOR_3_ADDRESS>']"
-}
-```
-
-Common patterns:
-- Vendor payment addresses (accounts payable)
-- Contractor wallet addresses (payroll)
-- Exchange deposit addresses (treasury operations)
-- Internal wallet addresses (inter-account transfers)
-
-### Automated Scheduled Payments
-
-Set up recurring payments that execute automatically based on your policy rules:
-
-<Steps>
-  <Step title="Define payment schedule">
-    Configure recurring payments in your application: amount, recipient, frequency (weekly, monthly, etc.).
-  </Step>
-  <Step title="Create permissive policy">
-    Create a policy that allows your backend service to sign scheduled transactions:
-
-    ```json
-    {
-      "policyName": "Backend can execute scheduled payroll",
-      "effect": "EFFECT_ALLOW",
-      "consensus": "approvers.any(user, user.id == '<BACKEND_API_USER_ID>')",
-      "condition": "eth.tx.to in ['<EMPLOYEE_1>', '<EMPLOYEE_2>', '<EMPLOYEE_3>'] && eth.tx.value <= 10000000000000000000000"
-    }
-    ```
-  </Step>
-  <Step title="Automate execution">
-    Your backend triggers payments on schedule. No manual signing required for pre-approved recipients and amounts.
-  </Step>
-</Steps>
-
-Example: Pay contractors on the last business day of each month for the next 6 months, without requiring manual approval for each payment.
-
-### Spending Controls
-
-Implement organizational spending limits and controls that would be impossible with traditional wallets:
-
-| Control Type | Example |
-| :--- | :--- |
-| **Per-transaction limits** | No single transaction over $50,000 |
-| **Daily/weekly limits** | Maximum $100,000 in outflows per day |
-| **Recipient restrictions** | Only send to verified addresses |
-| **Time-based controls** | No transactions outside business hours |
-| **Asset restrictions** | Only USDC transfers from this wallet |
-
-## Real-World Implementation: Mural Pay
-
-[Mural Pay](https://www.turnkey.com/customers/mural-pay-cross-border-payments) demonstrates how Turnkey's infrastructure powers enterprise-grade payment operations at scale.
-
-### The Challenge
-
-Mural Pay needed to simplify cryptocurrency payments for non-crypto-native organizations. Their platform initially required users to understand blockchain mechanics, limiting their addressable market.
-
-### The Solution
-
-By integrating Turnkey's wallet infrastructure, Mural Pay delivers a fintech-like payment experience:
-
-- **Simplified authentication**: Non-custodial embedded wallets via passkey or email, eliminating seed phrase management
-- **Secure infrastructure**: Turnkey's secure enclaves protect organizational funds
-- **High-speed transactions**: 50-100ms transaction signing for seamless payment experiences
-
-### The Results
+**[Mural Pay](https://www.turnkey.com/customers/mural-pay-cross-border-payments)**: Cross-border stablecoin payments for non-crypto-native organizations.
 
 | Metric | Value |
 | :--- | :--- |
 | Monthly stablecoin payments | 5,000+ |
 | Transaction volume (12 months) | $200M+ |
-| Monthly infrastructure savings | $3,000 |
 | Integration time | 3 weeks |
 
 > "Turnkey strikes that rare balance between uncompromising security and an intuitive user experience."
 >
 > Chris Fernandes, Co-founder and CTO, Mural Pay
 
-## Getting Started
+## Implementation workflow
 
 <Steps>
   <Step title="Create your organization">
-    Sign up for Turnkey and create your parent organization. This will be your administrative control plane.
+    Sign up for Turnkey and create your parent organization. This serves as your administrative control plane.
   </Step>
   <Step title="Create operational wallets">
-    Create one or more wallets for your business operations: treasury, payroll, vendor payments, etc.
+    Create wallets for your business operations: treasury, payroll, vendor payments. See [Wallets Concept](/concepts/wallets) for HD wallet structure.
   </Step>
   <Step title="Define user roles">
-    Create user tags that represent roles in your organization (finance, operations, executive, etc.).
+    Create user tags representing roles in your organization (finance, operations, executive). Add users and assign appropriate tags.
   </Step>
   <Step title="Implement policies">
-    Write policies that encode your approval workflows and spending controls.
+    Write policies encoding your approval workflows and spending controls. See [Policy Quickstart](/concepts/policies/quickstart) for setup guidance.
   </Step>
-  <Step title="Build your application">
-    Integrate Turnkey's API to build payment workflows, approval interfaces, and automation.
+  <Step title="Build payment workflows">
+    Integrate Turnkey's API to build approval interfaces, payment automation, and operational dashboards. See [Transaction Automation](/signing-automation/overview) for backend signing patterns.
   </Step>
 </Steps>
 
 ## Resources
 
-- [Policy Engine Overview](/concepts/policies/overview): Learn the fundamentals of Turnkey policies
+- [Policy Engine Overview](/concepts/policies/overview): Fundamentals of Turnkey policies
 - [Access Control Examples](/concepts/policies/examples/access-control): Sample RBAC policies
-- [Signing Control Examples](/concepts/policies/examples/signing-control): Policies for transaction signing
+- [Signing Control Examples](/concepts/policies/examples/signing-control): Transaction signing policies
+- [Delegated Access](/concepts/policies/delegated-access-overview): Backend automation patterns
 - [Transaction Automation](/signing-automation/overview): Building automated signing workflows
-- [Mural Pay Case Study](https://www.turnkey.com/customers/mural-pay-cross-border-payments): Enterprise payments at scale
