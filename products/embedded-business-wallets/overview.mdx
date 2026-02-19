@@ -73,8 +73,8 @@ First, upload the USDC contract ABI as a [smart contract interface](/concepts/po
 All other transfer attempts are implicitly denied. Wrong token? Denied. Wrong destination? Denied. The policy engine enforces your rules at signing time.
 
 **Transaction flow:**
-1. Create merchant wallet instantly via API (under 2 seconds)
-2. Customer deposits funds to merchant's address
+1. Create a unique merchant address in instantly via API (~100ms)
+2. Customer deposits funds to merchant's unique address
 3. Backend sweep service lists balances across all merchant wallets
 4. Sweep service signs transfers to omnibus wallet
 5. Policy enforces USDC-only, omnibus-only at signing time
@@ -85,12 +85,14 @@ Maintain a contact list of approved payment recipients. Store each contractor's 
 
 **Set up recipient allowlist policy:**
 
+With the USDC ABI uploaded as a [smart contract interface](/concepts/policies/smart-contract-interfaces), you can restrict payments to approved recipients:
+
 ```json
 {
   "policyName": "Auto-approve payments to verified vendors",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.tags.contains('accounts-payable'))",
-  "condition": "eth.tx.to in ['<VENDOR_1_ADDRESS>', '<VENDOR_2_ADDRESS>', '<CONTRACTOR_ADDRESS>']"
+  "condition": "eth.tx.to == '<USDC_CONTRACT_ADDRESS>' && eth.tx.function_name == 'transfer' && eth.tx.contract_call_args['_to'] in ['<VENDOR_1_ADDRESS>', '<VENDOR_2_ADDRESS>', '<CONTRACTOR_ADDRESS>']"
 }
 ```
 
