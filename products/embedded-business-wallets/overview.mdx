@@ -41,37 +41,40 @@ Provision deposit addresses instantly for merchants or customers. Enforce that f
 **Architecture:**
 
 ```
- MERCHANTS                          DEPOSIT ADDRESSES (Turnkey wallets)
-┌─────────────┐                    ┌─────────────────┐
-│ Merchant A  │───────────────────▶│  Deposit Addr A │──┐
-└─────────────┘                    └─────────────────┘  │
-┌─────────────┐                    ┌─────────────────┐  │
-│ Merchant B  │───────────────────▶│  Deposit Addr B │──┤
-└─────────────┘                    └─────────────────┘  │
-┌─────────────┐                    ┌─────────────────┐  │
-│ Merchant C  │───────────────────▶│  Deposit Addr C │──┤
-└─────────────┘                    └─────────────────┘  │
-                                                        │
-                            Sweep service initiates     │
-                            transfer to omnibus         │
-                                                        ▼
-                                   ┌──────────────────────────────────┐
-                                   │     TURNKEY POLICY ENGINE        │
-                                   │                                  │
-                                   │  Is token USDC?                  │
-                                   │    YES ──▶ continue              │
-                                   │    NO  ──▶ DENIED                │
-                                   │                                  │
-                                   │  Is destination omnibus wallet?  │
-                                   │    YES ──▶ APPROVED              │
-                                   │    NO  ──▶ DENIED                │
-                                   └───────────────┬──────────────────┘
-                                                   │
-                                                   ▼ APPROVED
-                                   ┌──────────────────────────────┐
-                                   │       Omnibus Wallet         │
-                                   │   (Consolidated treasury)    │
-                                   └──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  YOUR TURNKEY ORGANIZATION                                                   │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  HD Wallet                                                             │  │
+│  │                                                                        │  │
+│  │  createWalletAccounts()                                                │  │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐        │  │
+│  │  │  Deposit Addr A │  │  Deposit Addr B │  │  Deposit Addr C │  ...   │  │
+│  │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘        │  │
+│  └───────────┼────────────────────┼────────────────────┼─────────────────┘  │
+│              │                    │                    │                     │
+│  MERCHANTS   │                    │                    │                     │
+│  ┌───────────┴──┐  ┌─────────────┴──┐  ┌─────────────┴──┐                  │
+│  │  Merchant A  │  │  Merchant B    │  │  Merchant C    │                  │
+│  │  (customer)  │  │  (customer)    │  │  (customer)    │                  │
+│  └──────────────┘  └────────────────┘  └────────────────┘                  │
+│                                                                              │
+│              Sweep service initiates transfer to omnibus                     │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  TURNKEY POLICY ENGINE                                                 │  │
+│  │                                                                        │  │
+│  │  Is token USDC?                  Is destination omnibus wallet?         │  │
+│  │    YES ──▶ continue                YES ──▶ APPROVED                    │  │
+│  │    NO  ──▶ DENIED                  NO  ──▶ DENIED                      │  │
+│  └───────────────────────────────────┬────────────────────────────────────┘  │
+│                                      │                                       │
+│                                      ▼ APPROVED                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  Omnibus Wallet (Consolidated treasury)                                │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Policy: Restrict transfers to USDC only, omnibus destination only**
