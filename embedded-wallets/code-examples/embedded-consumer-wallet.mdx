@@ -1,0 +1,189 @@
+---
+title: "Embedded Consumer Wallet"
+description: "Turnkey wallet infrastructure with flexible authentication, programmable transaction flows, and granular access controls. Keys remain in hardware-backed enclaves; use the Embedded Wallet Kit or drop to low-level primitives to customize."
+
+---
+
+Turnkey provides wallet infrastructure with flexible authentication, programmable transaction flows, and granular access controls, while keys remain in hardware-backed enclaves. Start with the Embedded Wallet Kit and drop down to low-level primitives when you need to customize.
+
+**Why Turnkey for Embedded Consumer Wallets**  
+Turnkey provides a secure, flexible solution for embedding end-user wallets directly into your application. Users sign in with familiar methods (passkeys, email, OAuth), without seed phrases, browser extensions, or external wallets. Turnkey lets you compose your app's core experiences (onboarding, wallet flows, and transactions) with full control, without restricting critical product decisions to pre-built flows. Keys stay inside hardware-backed Trusted Execution Environments [(TEEs)](/security/secure-enclaves), ensuring private keys are never exposed to your developers or to Turnkey.
+
+You can use the [Embedded Wallet Kit](/reference/embedded-wallet-kit) for fast integration, or [Turnkey SDKs](/sdks/introduction) and the [API](/api-reference/overview) for more customization. Leading apps like [Moonshot](https://www.turnkey.com/customers/how-moonshot-powers-millions-of-self-custodial-wallets-using-turnkey), [Infinex](https://www.turnkey.com/customers/making-onchain-ux-seamless-with-infinex-and-turnkey), and [Axiom](https://www.turnkey.com/customers/axiom-global-defi-trading-platform) use Turnkey for embedded consumer wallets in production.
+
+## Key implementation decisions
+
+Turnkey enables developers to tailor non-custodial, embedded user wallets across dimensions such as custody model, authentication, and more. See the key implementation decisions below to curate the exact user experience you need. For a full map of embedded wallet capabilities, see the [Features overview](/embedded-wallets/features/overview).
+
+| Decision | Explanation | Learn more |
+| :---- | :---- | :---- |
+| **Custody model** | Determine the appropriate custody model for your app. Options include user-controlled, app-controlled, or delegated/hybrid. Configure via policies and sub-organization settings. | [Sub-organizations as wallets](/embedded-wallets/sub-organizations-as-wallets), [Delegated Access](/concepts/policies/delegated-access-frontend) |
+| **Authentication methods** | Choose user auth methods: Passkeys, OAuth/email, or SMS. You can use the [Auth Proxy](/reference/auth-proxy) for backend-signed OTP/OAuth/signup without your own backend, or wire auth to your app. | [Authentication Overview](https://docs.turnkey.com/authentication/overview), [Auth Proxy](https://docs.turnkey.com/reference/auth-proxy#auth-proxy), [Sub-organization auth](https://docs.turnkey.com/embedded-wallets/sub-organization-auth) |
+| **Session management** | Allow a user to take multiple, contiguous actions in a defined period of time. Actions include: Read-write or read-only. | [Sessions](https://docs.turnkey.com/authentication/sessions#sessions) |
+| **Wallet architecture** | Choose between key-based (HD) or smart contract wallets for your users. Turnkey supports both. | [Wallets Concept](https://docs.turnkey.com/concepts/wallets#wallets), [Transaction Management](/concepts/transaction-management) |
+| **Gas sponsorship** | Integrate a gasless UX via sponsored transactions to cover who pays gas and how transactions are broadcast. | [Transaction Management](https://docs.turnkey.com/concepts/transaction-management#transaction-management), [Sending sponsored transactions](https://docs.turnkey.com/embedded-wallets/code-examples/sending-sponsored-transactions#sending-sponsored-transactions) |
+| **Key portability** | Determine whether users can import or export keys. | [Export](/embedded-wallets/code-examples/export), [Import](/embedded-wallets/code-examples/import) |
+
+### Custody model
+
+Choose how much control users and your app have over signing:
+
+| Model | Description | Why choose this? |
+| :---- | :---- | :---- |
+| **User-controlled** | Only the user can authorize actions (self-custody). | **Full Sovereignty**: Best for non-custodial apps where users require exclusive signing authority via their own authenticators (e.g., passkeys). |
+| **App-controlled** | Your backend can authorize actions (automation, trading, subscriptions). | **Seamless Automation:** Ideal for custodial products like trading bots or subscriptions that require acting on a user's behalf without manual approval. |
+| **Delegated / hybrid** | Scoped permissions shared between user and backend. | **Frictionless UX:** Enables background actions (e.g., gas sponsorship or scheduled ops) while keeping the user in final control of asset transfers. |
+
+Configure via [policies](/concepts/policies/quickstart) and sub-organization settings. See [Sub-organizations as wallets](/embedded-wallets/sub-organizations-as-wallets) and [Delegated Access](/concepts/policies/delegated-access-frontend) for non-custodial, hybrid, and app-controlled options.
+
+### Authentication
+
+Balance security and friction for your audience:
+
+- **Passkeys:** Phishing-resistant, biometric. See [passkey authentication](/authentication/overview).
+- **OAuth / email:** Familiar, low-friction. See [Authentication Overview](/authentication/overview).
+- **SMS:** Market-dependent; consider risk and compliance.
+
+Turnkey authentication plugs into your onboarding flow. You can use the [Auth Proxy](/reference/auth-proxy) when you want backend-signed OTP/OAuth/signup with origin enforcement and central config without hosting your own backend; your frontend calls Auth Proxy endpoints directly. Alternatively, wire auth to your app. Get started with the [Embedded Wallets Quickstart](/getting-started/embedded-wallet-quickstart) and [Sub-organization auth](/embedded-wallets/sub-organization-auth).
+
+### Session management
+
+Choose how users stay authorized and where session credentials live:
+
+- **Read-write vs read-only:** Read-write sessions (OTP, OAuth, passkey sessions) let users perform multiple signed actions in a time window. Read-only sessions suit low-touch apps where you mainly need to read data (e.g., via parent-org access or a read-only session token).
+- **Storage:** IndexedDB (web) for persistent, client-held sessions without exposing keys to your JavaScript; SecureStorage (mobile); or LocalStorage (keys in app-accessible storage).
+- **Session duration:** Default: 15 minutes (configurable via `expirationSeconds`).
+
+See [Sessions](/authentication/sessions) for mechanisms, refresh, and FAQ, and the [Embedded Wallets Quickstart](/getting-started/embedded-wallet-quickstart) for configuration.
+
+### Wallet architecture
+
+Choose where keys are generated and how wallets interact with the blockchain.
+
+| Approach | Pros | Considerations |
+| :---- | :---- | :---- |
+| **Key-based (HD wallets)** | Chain-agnostic, no on-chain deployment, broad compatibility. | Standard derivation and signing. |
+| **Smart contract wallets** | Gas sponsorship, batching, advanced permissions. | Requires on-chain deployment and infrastructure. |
+
+Turnkey supports both. See [Wallets Concept](/concepts/wallets) and [Transaction Management](/concepts/transaction-management) for derivation and gas sponsorship.
+
+### Gas sponsorship
+
+Provide gasless UX by sponsoring gas for your users. Turnkey supports sponsored transactions and relay integration so users can sign and send without holding native tokens.
+
+See [Transaction Management](/concepts/transaction-management) for gas sponsorship, transaction construction, broadcast, nonce management and monitoring capabilities.
+
+### Key portability
+
+Enable key portability and define whether users can import or export private keys. Enabling export can support user sovereignty and long-term trust. See [Export](/embedded-wallets/code-examples/export) and [Import](/embedded-wallets/code-examples/import).
+
+## Core security principles
+
+Embedded consumer wallet with Turnkey is built on these key principles:
+
+- **Keys never leave the enclave:** Private keys live in [Trusted Execution Environments (TEEs)](/security/secure-enclaves). All derivation and signing happen inside verifiable infrastructure; only signatures are returned. [Remote attestation](https://whitepaper.turnkey.com/architecture) lets you verify enclave integrity. Raw keys are never exposed to your app or to Turnkey.
+- **Authenticator-bound requests:** Every sensitive operation is signed by a user-held authenticator (passkey, email, etc.). The enclave verifies the signature and then performs the operation. No request, no signing; a compromise outside the enclave cannot move funds. See [Authentication Overview](/authentication/overview) for supported methods and [Enclave to end-user secure channel](/security/enclave-secure-channels) for how requests are verified.
+- **Scoped, programmable control:** Choose non-custodial, hybrid, or app-controlled custody. [Policies](/concepts/policies/quickstart) and sub-organization isolation limit who can sign what.
+- **Trusted vs. untrusted separation:** Verification and execution run only inside secure enclaves. Trusted and untrusted infrastructure are strictly separated so that a breach of your app or backend does not expose keys or signing capability.
+
+## Architecture at a glance
+
+User authentication flows into a signed request to Turnkey. Inside the enclave, the [policy engine](/concepts/policies/overview) evaluates the request; key derivation and signing follow, and only the signature is returned. Your app can then broadcast the transaction through another provider or with [Turnkey Transaction Management](https://docs.turnkey.com/concepts/transaction-management#construction-and-broadcast). For data flow and infrastructure details, see [Embedded Wallets overview](/embedded-wallets/overview) and [Secure enclaves](/security/secure-enclaves).
+
+## Example: Neobank-style embedded consumer wallet
+
+Typical requirements and how Turnkey addresses them:
+
+| Requirement | Turnkey capability |
+| :---- | :---- |
+| Seamless onboarding | Automated provisioning via [Quickstart](/getting-started/embedded-wallet-quickstart) and [SDKs](/sdks/introduction) |
+| User custody without key exposure | Keys remain in [secure enclaves](/security/secure-enclaves); only signatures are returned |
+| Gasless UX | [Sponsored transactions](/concepts/transaction-management) and [sending sponsored transactions](/embedded-wallets/code-examples/sending-sponsored-transactions) |
+| Email-based auth and recovery | [Sub-organization auth](/embedded-wallets/sub-organization-auth) and [Sub-organization recovery](/embedded-wallets/sub-organization-recovery) |
+| Send without wallet setup | [Claim links](/wallets/claim-links#claim-links): send via URL; recipient claims with email |
+| Backend automation | [Delegated access](/concepts/policies/delegated-access-backend) and scoped signing policies |
+| Multichain support | Chain-agnostic derivation and signing; [Networks](/networks/overview) and [Wallets Concept](/concepts/wallets) |
+| Fast integration | [Code Examples Hub](/category/code-examples) and [SDKs](/sdks/introduction) |
+
+## Setting up your embedded consumer wallet
+
+Follow these steps to launch an embedded consumer wallet experience inside your app.
+
+<Steps>
+  <Step title="Create a Turnkey Org & Configure Authentication">
+
+    Create an organization in the [Turnkey Dashboard](https://app.turnkey.com) and choose how end users authenticate (Email OTP, Passkeys, OAuth).
+
+    **Docs**
+
+    - [Account setup (create org)](https://docs.turnkey.com/getting-started/quickstart)
+    - [Auth Proxy overview](https://docs.turnkey.com/reference/auth-proxy)
+    - [Email authentication (OTP)](https://docs.turnkey.com/authentication/email)
+    - [Passkeys integration](https://docs.turnkey.com/authentication/passkeys/integration)
+
+  </Step>
+
+  <Step title="Add Turnkey to Your Client App">
+
+    Install and initialize the Turnkey SDK at app startup so sessions and wallet operations are ready immediately.
+
+    **Docs**
+
+    - [Embedded Wallet Kit (React)](https://docs.turnkey.com/sdks/react/getting-started)
+    - [Embedded Wallet Kit (React Native)](https://docs.turnkey.com/sdks/react-native/getting-started)
+    - [TypeScript frontend SDK](https://docs.turnkey.com/sdks/typescript-frontend/getting-started)
+    - [Embedded wallets quickstart](https://docs.turnkey.com/getting-started/embedded-wallet-quickstart)
+
+  </Step>
+
+  <Step title="Implement Login, Signup & Session Handling">
+
+    Build your login/signup flow and gate wallet actions until:
+
+    - The user is authenticated
+    - The Turnkey client is initialized
+
+    **Docs**
+
+    - [Frontend authentication guide](https://docs.turnkey.com/sdks/typescript-frontend/auth)
+    - [OAuth signup helper](https://docs.turnkey.com/generated-docs/core/turnkey-client-sign-up-with-oauth)
+
+  </Step>
+
+  <Step title="Create a Sub-Organization & Wallet Per User">
+
+    **On first login:**
+
+    1. Create a sub-organization
+    2. Create a wallet
+    3. Create required accounts (e.g., Ethereum, Solana)
+
+    **Docs**
+
+    - [Sub-organizations as wallets](https://docs.turnkey.com/embedded-wallets/sub-organizations-as-wallets)
+    - [Create wallet](https://docs.turnkey.com/generated-docs/core/turnkey-client-create-wallet)
+    - [Create wallet accounts](https://docs.turnkey.com/generated-docs/core/turnkey-client-create-wallet-accounts)
+
+  </Step>
+
+  <Step title="Enable Core Wallet Actions in the UI">
+
+    Expose wallet functionality directly inside your app.
+
+    **Signing Docs**
+
+    - [Sign message](https://docs.turnkey.com/generated-docs/core/turnkey-client-sign-message)
+    - [Sign transaction](https://docs.turnkey.com/generated-docs/core/turnkey-client-sign-transaction)
+    - [Sign & send transaction](https://docs.turnkey.com/generated-docs/core/turnkey-client-sign-and-send-transaction)
+
+    **Import / Export / Recovery (Optional) Docs**
+
+    - [Export wallets](https://docs.turnkey.com/wallets/export-wallets)
+    - [Import example](https://docs.turnkey.com/embedded-wallets/code-examples/import)
+
+  </Step>
+</Steps>
+
+## Next steps
+
+Ready to build? You can start with the [Embedded Wallets Quickstart](/getting-started/embedded-wallet-quickstart), explore the [Features overview](/embedded-wallets/features/overview), or browse the [Code Examples Hub](/category/code-examples).
