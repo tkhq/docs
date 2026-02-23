@@ -1,0 +1,181 @@
+---
+title: "How to Integrate Gasless Transactions on Base with Turnkey"
+sidebarTitle: "Gasless Base Transactions"
+---
+
+Turnkey offers flexible infrastructure to create and manage wallets with built-in gas sponsorship. By combining Turnkey's secure key infrastructure with native gas abstraction, developers can deliver gasless transaction experiences on Base without requiring users to hold ETH for fees.
+
+## Setting up gasless transactions on Base
+
+Turnkey provides native gas sponsorship for Base (EIP-155:8453) and Base Sepolia (EIP-155:84532). Unlike traditional paymaster setups, Turnkey handles transaction construction, signing, gas estimation, and broadcast in a single API call. You toggle sponsorship with a single parameter.
+
+<Note>
+  To access gas sponsorship, ensure it is enabled within your [Turnkey dashboard](https://app.turnkey.com). Then use the corresponding chain ID in the `caip2` parameter.
+</Note>
+
+## How it works
+
+Turnkey's `ethSendTransaction` endpoint handles the full transaction lifecycle:
+
+1. **Transaction construction:** You provide the minimal payload (recipient, value, calldata). Turnkey fills in nonce, gas estimates, and tip fees.
+2. **Signing:** The transaction is signed within Turnkey's secure enclave using the sender's private key.
+3. **Broadcast and monitoring:** Turnkey submits the signed transaction to Base and monitors it until inclusion or failure.
+
+With `sponsor: true`, Turnkey covers the gas fees. Your users never need to hold ETH on Base.
+
+## Getting started
+
+Set up your Turnkey organization and account by following the [Quickstart guide](/getting-started/quickstart). You should have:
+
+- A root user with a public/private API key pair within the Turnkey parent organization
+- An organization ID
+- A wallet with an Ethereum account created within this organization
+
+## Install dependencies
+
+<CodeGroup>
+
+```bash npm
+npm i @turnkey/sdk-server
+```
+
+```bash pnpm
+pnpm add @turnkey/sdk-server
+```
+
+```bash yarn
+yarn add @turnkey/sdk-server
+```
+
+</CodeGroup>
+
+## Option 1: Using `@turnkey/sdk-server`
+
+For backend services and Node.js applications.
+
+### Step 1: Create a client
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+const client = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com/",
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+}).apiClient();
+```
+
+### Step 2: Submit a sponsored transaction
+
+```ts
+const sendTransactionStatusId = await client.ethSendTransaction({
+  transaction: {
+    from: walletAccount.address,
+    to: "0xRecipient",
+    caip2: "eip155:8453", // Base mainnet
+    sponsor: true,
+    value: "0",
+    data: "0x",
+    nonce: "0",
+  },
+});
+```
+
+Set `sponsor: false` (or omit the field) to send a standard EIP-1559 transaction where the sender pays gas.
+
+### Step 3: Poll for inclusion
+
+```ts
+const pollResult = await client.pollTransactionStatus({
+  sendTransactionStatusId,
+});
+
+const txHash = pollResult?.eth?.txHash;
+console.log("Transaction:", `https://basescan.org/tx/${txHash}`);
+```
+
+### Transaction statuses
+
+| Status | Description |
+| :--- | :--- |
+| INITIALIZED | Transaction constructed and signed, not yet broadcast |
+| BROADCASTING | Actively broadcasting to the network, awaiting inclusion |
+| INCLUDED | Transaction included in a block |
+| FAILED | Transaction could not be included and will not be retried |
+
+## Option 2: Using `@turnkey/react-wallet-kit`
+
+For React applications, `handleSendTransaction` provides a complete UI experience with modals, loading states, and explorer links.
+
+<CodeGroup>
+
+```bash npm
+npm i @turnkey/react-wallet-kit
+```
+
+```bash pnpm
+pnpm add @turnkey/react-wallet-kit
+```
+
+```bash yarn
+yarn add @turnkey/react-wallet-kit
+```
+
+</CodeGroup>
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { handleSendTransaction } = useTurnkey();
+
+const txHash = await handleSendTransaction({
+  to: "0xRecipient",
+  value: "1000000000000000", // 0.001 ETH in wei
+  caip2: "eip155:8453", // Base mainnet
+  sponsor: true,
+});
+```
+
+For the full React walkthrough, see [Sending Sponsored Transactions (React)](/embedded-wallets/code-examples/sending-sponsored-transactions).
+
+## Checking gas usage
+
+You can configure gas limits at both the sub-org and organization level. Monitor usage to handle edge cases when approaching your limit:
+
+```ts
+const resp = await client.getGasUsage({});
+if (resp?.usageUsd! > resp?.windowLimitUsd!) {
+  console.error("Gas usage limit exceeded for sponsored transactions");
+  return;
+}
+```
+
+## Smart contract interactions
+
+Sponsored transactions support arbitrary EVM operations, not just simple sends. You can interact with smart contracts by passing calldata:
+
+```ts
+const sendTransactionStatusId = await client.ethSendTransaction({
+  transaction: {
+    from: walletAccount.address,
+    to: "0xContractAddress",
+    caip2: "eip155:8453",
+    sponsor: true,
+    value: "0",
+    data: "0xa9059cbb...", // encoded contract call
+    nonce: "0",
+  },
+});
+```
+
+## Security
+
+Turnkey's gas sponsorship is designed to prevent replay attacks. Transaction construction happens inside secure enclaves, and as long as the request includes the relevant nonce, only one transaction can be created from it. The user's authenticator signs requests and the enclave verifies signatures, so a malicious actor cannot modify or replay the request.
+
+## Resources
+
+- [Transaction Management](/concepts/transaction-management): Full conceptual overview of gas sponsorship, broadcast, and monitoring
+- [Gas Station SDK](/sdks/web3/gas-station): EIP-7702 based gasless transactions with your own paymaster
+- [Turnkey policy engine](/concepts/policies/overview): Write policies against both sponsored and non-sponsored transactions
+- [Base network support](/networks/ethereum): Turnkey's Ethereum and Base ecosystem support
