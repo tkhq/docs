@@ -7,8 +7,11 @@ You will call:
 ### `ethSendTransaction(params)`
 → returns `{ sendTransactionStatusId }`
 
+### `solSendTransaction(params)`
+→ returns `{ sendTransactionStatusId }`
+
 ### `pollTransactionStatus(params)`
-→ returns `{ txHash, status }`
+→ returns chain-specific status (`eth.txHash` or `sol.signature`)
 
 ### Step 1 — Create a client
 
@@ -38,7 +41,7 @@ const client = new Turnkey({
 
 ---
 
-### Step 2 — Submit the transaction
+### Step 2 — Submit the transaction (Ethereum)
 
 ```ts
 const sendTransactionStatusId = await client.ethSendTransaction({
@@ -50,6 +53,20 @@ const sendTransactionStatusId = await client.ethSendTransaction({
     value: "0",
     data: "0x",
     nonce: "0",
+  },
+});
+```
+
+OR (Solana):
+
+```ts
+const sendTransactionStatusId = await client.solSendTransaction({
+  transaction: {
+    signWith: walletAccount.address, // Solana address
+    unsignedTransaction: "<base64-serialized-unsigned-solana-tx>",
+    caip2: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", // devnet
+    sponsor: true,
+    // recentBlockhash: "<recent blockhash>", // optional
   },
 });
 ```
@@ -70,19 +87,21 @@ if (!pollResult) {
   );
 }
 
-const { eth } = pollResult;
-const txHash = eth?.txHash;
-if (!txHash) {
+const txHash = pollResult.eth?.txHash; // Ethereum
+const signature = pollResult.sol?.signature; // Solana
+const transactionId = txHash ?? signature;
+
+if (!transactionId) {
   throw new TurnkeyError(
-    "Missing txHash in transaction result",
+    "Missing transaction id in transaction result",
     TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
   );
 }
-console.log(txHash)
+console.log(transactionId);
 ```
 
 ---
 
-- `ethSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/core/src/__clients__/core.ts#L2732)
-
-- `pollTransactionStatus` Implementation [here](https://github.com/tkhq/sdk/blob/e5a153efa90c325d4f5ecfe65d8d2bff8573c64f/packages/core/src/__clients__/core.ts#L2866)
+- `ethSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e1dfe3e2eeb0976069aad1799597bbed64ec52f5/packages/core/src/__clients__/core.ts#L2711)
+- `solSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e1dfe3e2eeb0976069aad1799597bbed64ec52f5/packages/core/src/__clients__/core.ts#L2848)
+- `pollTransactionStatus` Implementation [here](https://github.com/tkhq/sdk/blob/e1dfe3e2eeb0976069aad1799597bbed64ec52f5/packages/core/src/__clients__/core.ts#L2936)

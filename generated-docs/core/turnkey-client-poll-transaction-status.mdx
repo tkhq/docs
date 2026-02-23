@@ -9,14 +9,14 @@ import { NestedParam } from "/snippets/nested-param.mdx";
 
 **API subject to change**
 
-Polls Turnkey for the final result of a previously submitted Ethereum transaction.
+Polls Turnkey for the final result of a previously submitted transaction.
 
 This function repeatedly calls ``getSendTransactionStatus`` until the transaction reaches a terminal state.
 
 Terminal states:
 
 <ul>
-  <li>**COMPLETED** or **INCLUDED** → resolves with ``{ txHash }``</li>
+  <li>**COMPLETED** or **INCLUDED** → resolves with chain-specific transaction details</li>
   <li>**FAILED** rejects with an error</li>
 </ul>
 
@@ -25,21 +25,30 @@ Behavior:
 <ul>
   <li>Queries Turnkey every 500ms.</li>
   <li>Stops polling automatically when a terminal state is reached.</li>
-  <li>Extracts the canonical on-chain hash via ``resp.eth.txHash`` when available.</li>
+  <li>Returns the full status payload from Turnkey.</li>
+  <li>When available, Ethereum transaction details are exposed at ``resp.eth.txHash``.</li>
 </ul>
 
 <p><strong>Package:</strong> <code>core</code></p>
 
-<p><strong>Defined in:</strong> <a href="https://github.com/tkhq/sdk/blob/main/packages/core/src/__clients__/core.ts#L2843">__clients__/core.ts:2843</a></p>
+<p><strong>Defined in:</strong> <a href="https://github.com/tkhq/sdk/blob/main/packages/core/src/__clients__/core.ts#L2938">__clients__/core.ts:2938</a></p>
 
 <H3Bordered text="Parameters" />
 
 <ParamField body="params" type='PollTransactionStatusParams' required={true} >
   <Expandable title="params details">
-    <NestedParam parentKey="params" childKey="organizationId" type='string' required={false}></NestedParam>
-    <NestedParam parentKey="params" childKey="pollingIntervalMs" type='number' required={false}></NestedParam>
-    <NestedParam parentKey="params" childKey="sendTransactionStatusId" type='string' required={true}></NestedParam>
-    <NestedParam parentKey="params" childKey="stampWith" type='StamperType' required={false}></NestedParam>
+    <NestedParam parentKey="params" childKey="organizationId" type='string' required={false}>
+Organization ID under which the transaction was submitted.
+</NestedParam>
+    <NestedParam parentKey="params" childKey="pollingIntervalMs" type='number' required={false}>
+Optional polling interval in milliseconds (default: 500ms).
+</NestedParam>
+    <NestedParam parentKey="params" childKey="sendTransactionStatusId" type='string' required={true}>
+Status ID returned by `ethSendTransaction` or `solSendTransaction`.
+</NestedParam>
+    <NestedParam parentKey="params" childKey="stampWith" type='StamperType' required={false}>
+Optional stamper to use for polling.
+</NestedParam>
   </Expandable>
 </ParamField>
 
@@ -47,5 +56,5 @@ Behavior:
 A successful response returns the following fields:
 
 <ResponseField name="returns" type="TGetSendTransactionStatusResponse" required={true} >
-  A promise resolving to `{ txHash?: string }` if successful.
+  A promise resolving to the transaction status payload if successful.
 </ResponseField>
