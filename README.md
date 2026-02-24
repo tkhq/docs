@@ -73,7 +73,7 @@ The docs in this repository utilize shared MDX snippets to ensure consistency an
 | ------------------------------------------------------------- | ------------------------------------- |
 | `concepts/policies/overview.mdx`                              | `/snippets/shared/policy-engine.mdx`  |
 | `products/embedded-wallets/features/policy-engine.mdx`        | `/snippets/shared/policy-engine.mdx`  |
-| `products/transaction-automation/features/export-wallets.mdx` | `/snippets/shared/export-wallets.mdx` |
-| `products/transaction-automation/features/import-wallets.mdx` | `/snippets/shared/import-wallets.mdx` |
+| `products/company-wallets/features/export-wallets.mdx` | `/snippets/shared/export-wallets.mdx` |
+| `products/company-wallets/features/import-wallets.mdx` | `/snippets/shared/import-wallets.mdx` |
 
 _Note: Duplicate pages must reside in separate file paths as required by `docs.json`. Mintlify restricts pages with identical content from sharing the same path to ensure correct sidebar behavior._
