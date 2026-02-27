@@ -5,40 +5,54 @@ description: "Use Turnkey's embedded wallet infrastructure for internal enterpri
 
 ## Why Turnkey for Embedded Business Wallets?
 
-The same [Embedded Wallet Kit](/embedded-wallets/overview) that powers consumer applications works equally well for internal business operations: treasury, payroll, vendor payments, and operational funds.
+The same [Embedded Wallet Kit](/embedded-wallets/overview) that powers consumer applications works equally well for internal business operations such as treasury, payroll, vendor payments, and operational funds.
 
 Let Turnkey run your wallet infrastructure for business operations. Define who can sign, what they can sign, and how many approvals are required. Set spending limits and recipient allowlists. Private key material and sensitive operations are protected through Turnkey's [verifiable security architecture](/security/our-approach).
 
-Use the policy engine to define your approval workflows. No contract deployments or on-chain coordination necessary.
+Use the [policy engine](/concepts/policies/overview) to define your approval workflows. No contract deployments or on-chain coordination necessary.
 
-## Common use cases
+## Common Operational Workflows
 
-| Need | Turnkey solution |
+| Need | Common Operational Workflow |
 | :--- | :--- |
-| [Merchant deposit addresses](#example-merchant-deposit-addresses-with-automated-sweeping) | Instant wallet provisioning with policy-enforced sweeping to omnibus |
-| [Contractor and vendor payments](#example-contractor-and-vendor-payments) | Contact lists with pre-approved addresses and spending limits |
-| [Scheduled recurring payments](#example-scheduled-recurring-payments) | Scheduled payments to allowlisted recipients without manual signing |
-| [Delegated spending](#example-delegated-spending-authority) | Grant limited payment authority to teams or individuals |
-| [Multi-approval workflows](#example-multi-approval-workflows) | Require 2+ approvers for high-value transactions |
-| [Spending controls](#example-spending-controls) | Per-transaction limits, asset restrictions, and role-based rules |
+| Provision unique deposit addresses and automatically consolidate funds into a single wallet, ensuring only approved assets move to approved destinations. | **Merchant deposit addresses** — Instant wallet provisioning with policy-enforced sweeping to omnibus |
+| Pay known vendors and contractors without manual approval on every transaction, while controlling who can receive payments. | **Contractor and vendor payments** — Contact lists with pre-approved addresses and spending limits |
+| Recurring payments should execute automatically on a schedule without requiring manual sign-off each time. | **Scheduled recurring payments** — Scheduled payments to allowlisted recipients without manual signing |
+| Individuals or teams should only have limited spending authority, without full wallet access. | **RBAC** — Grant limited payment authority to teams or individuals |
+| Prevent high-value transactions from being executed unilaterally by requiring sign-off from multiple stakeholders or specific roles. | **Multi-approval workflows** — Require 2+ approvers for high-value transactions |
+| Enforce organization-wide guardrails on transaction size, approved assets, and role-based limits without relying on manual oversight. | **Transaction restrictions** — Per-transaction limits, asset restrictions, and role-based rules |
+| Sponsor gas fees so users and services don't need native tokens, while managing the full transaction lifecycle. | **Transaction management** — Gas sponsorship, construction, broadcast, and status tracking |
 
-## Core capabilities
+## Core Capabilities
 
-**Programmable approval requirements**: Define how many approvals each transaction type needs. For example, small payments auto-approve, large transfers require multiple signers.
+**Instant wallet provisioning**  
+Create secure wallets programmatically during onboarding with familiar authentication and a white-labeled interface using [Embedded Wallet Kit](/embedded-wallets/overview).
 
-**Role-based access control (RBAC)**: Tag users as "finance-team" or "executive", then use Turnkey's policy engine to grant specific permissions to those groups.
+**Programmable approval requirements**  
+Define how many approvals each transaction type needs. For example, small payments auto-approve, large transfers require multiple signers.
 
-**Recipient allowlists**: Maintain approved vendor and contractor addresses. Payments to known recipients can bypass additional approval steps.
+**Role-based access control (RBAC)**  
+Tag users as “finance-team” or “executive,” then use Turnkey's policy engine to grant specific permissions to those groups.
 
-**Automated scheduled payments**: Backend services sign recurring transactions (payroll, subscriptions) based on policy rules. No manual intervention required.
+**Recipient allowlists**  
+Maintain approved vendor and contractor addresses. Payments to known recipients can bypass additional approval steps.
 
-**Spending limits**: Enforce per-transaction maximums, asset restrictions, or destination restrictions at the policy level.
+**Automated scheduled payments**  
+Backend services sign recurring transactions (payroll, subscriptions) based on policy rules. No manual intervention required.
 
-## Example: Merchant deposit addresses with automated sweeping
+**Spending controls**  
+Enforce per-transaction maximums, asset restrictions, or destination restrictions at the policy level.
+
+**Transaction Management with Gas Sponsorship**  
+Sponsor gas fees and manage the transaction lifecycle end-to-end — construction, nonce sequencing, gas estimation and payment, signing, broadcast, and status tracking. See [Transaction Management](/concepts/transaction-management).
+
+---
+
+## Example: Merchant Deposit Addresses with Automated Sweeping
 
 Provision deposit addresses instantly for merchants or customers. Enforce that funds can only move to your omnibus wallet, and only approved assets (like USDC) can be transferred.
 
-**Architecture:**
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -67,10 +81,10 @@ First, upload the USDC contract ABI as a [smart contract interface](/concepts/po
 }
 ```
 
-All other transfer attempts are implicitly denied. Wrong token? Denied. Wrong destination? Denied. The policy engine enforces your rules at signing time.
+All other transfer attempts are implicitly denied, such as an incorrect token or destination. The policy engine enforces your rules at signing time.
 
 **Transaction flow:**
-1. Create a unique merchant address in instantly via API (~100ms)
+1. Create a unique merchant address instantly via API (~100ms)
 2. Customer deposits funds to merchant's unique address
 3. Backend sweep service lists balances across all merchant wallets
 4. Sweep service signs transfers to omnibus wallet
@@ -120,7 +134,7 @@ Set up automated payments that execute on a schedule without manual signing. Pay
   </Step>
 </Steps>
 
-## Example: Delegated spending authority
+## Example: Role Based Access Control (RBAC)
 
 Grant limited payment permissions to individuals or teams without giving full wallet access.
 
@@ -197,6 +211,64 @@ Implement organizational controls beyond simple approval requirements.
 | **Asset restrictions** | Filter by contract address for token transfers |
 
 See [Policy Language](/concepts/policies/language) for the full syntax and [Access Control Examples](/concepts/policies/examples/access-control) for more patterns.
+
+## Example: Transaction management with gas sponsorship
+
+Use Turnkey's [transaction management](/concepts/transaction-management) to handle the full transaction lifecycle, including gas sponsorship so your users and backend services never need to hold native tokens for fees.
+
+<Steps>
+  <Step title="Submit a sponsored transaction">
+    Use `ethSendTransaction` with `sponsor: true` to send a USDC transfer on Base. Turnkey handles construction, nonce management, gas estimation, signing, and broadcast.
+
+    ```ts
+    import { Turnkey } from "@turnkey/sdk-server";
+
+    const client = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com/",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+    }).apiClient();
+
+    const sendTransactionStatusId = await client.ethSendTransaction({
+      transaction: {
+        from: walletAccount.address,
+        to: "<USDC_CONTRACT_ADDRESS>",
+        caip2: "eip155:8453", // Base mainnet
+        sponsor: true,
+        value: "0",
+        data: "<ENCODED_TRANSFER_CALLDATA>",
+        nonce: "0",
+      },
+    });
+    ```
+  </Step>
+  <Step title="Poll for inclusion">
+    Monitor the transaction until it's included in a block or fails:
+
+    ```ts
+    const pollResult = await client.pollTransactionStatus({
+      sendTransactionStatusId,
+    });
+
+    const txHash = pollResult?.eth?.txHash;
+    console.log("Transaction:", `https://basescan.org/tx/${txHash}`);
+    ```
+  </Step>
+  <Step title="Monitor gas usage">
+    Check your sponsorship spend against configured limits:
+
+    ```ts
+    const resp = await client.getGasUsage({});
+    if (resp?.usageUsd! > resp?.windowLimitUsd!) {
+      console.error("Gas usage limit exceeded");
+      return;
+    }
+    ```
+  </Step>
+</Steps>
+
+Policies apply to sponsored transactions the same way as standard transactions. Set `sponsor: false` (or omit the field) to have the sender pay gas instead. See [Transaction Management](/concepts/transaction-management) for the full conceptual overview.
 
 ## Trusted by leading businesses
 
