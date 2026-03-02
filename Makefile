@@ -38,14 +38,25 @@ mintlify-check:
 .PHONY: sync-sdk-gen-docs
 sync-sdk-gen-docs:
 	@if [ ! -d $(JS_SDK_ROOT) ]; then git clone git@github.com:tkhq/sdk.git $(JS_SDK_ROOT); fi
-	$(cd "$JS_SDK_ROOT && git pull)
+	cd $(JS_SDK_ROOT) && \
+		SDK_TAG=$$(curl -sI https://github.com/tkhq/sdk/releases/latest | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r\n') && \
+		echo "Checking out latest SDK release: $$SDK_TAG" && \
+		git fetch --tags && \
+		git checkout $$SDK_TAG && \
+		pnpm run clean-all && \
+		pnpm run build-all
 
 	cp docs.json $(JS_SDK_ROOT)/generated-docs
 
 	@mkdir -p ./generated-docs
 
 	@echo Generating docs and formatting output into mdx...
-	(cd $(JS_SDK_ROOT) && pnpm run generate-docs)
+	cd $(JS_SDK_ROOT) && \
+		SDK_TAG=$$(git describe --tags --exact-match) && \
+		sed -i.bak "s/\"gitRevision\": \"[^\"]*\"/\"gitRevision\": \"$$SDK_TAG\"/" typedoc.json && \
+		rm -f typedoc.json.bak && \
+		pnpm exec typedoc --options typedoc.json && \
+		git restore typedoc.json
 
 	(cd $(JS_SDK_ROOT) && node $(JS_SDK_ROOT)/typedoc-theme/format-json-output.js \
 		--packages react-wallet-kit core \
@@ -69,3 +80,6 @@ sync-sdk-gen-docs:
 		! -name 'docs.json' \
 		! -name 'sdk-docs.json' \
 		-exec rm -rf {} +
+	
+	@echo Sync complete! Checking back out main branch in SDK repo...
+	cd $(JS_SDK_ROOT) && git checkout main
