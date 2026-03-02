@@ -9,12 +9,8 @@ Similar to [email auth](/authentication/email), social login authentication is i
 
 Turnkey supports two different types of Social Login Providers:
 
-1. **OIDC Providers**
-   (Google, Apple, Auth0, Cognito…)
-   These providers issue your app an **OIDC ID Token** identifying an end-user, which can subsequently be passed to Turnkey as a means of authentication.
-2. **OAuth 2.0-Only Providers**
-   (X/Twitter, Discord…)
-   These providers do _not_ issue **OIDC ID Tokens** themselves, and instead provide only bare-bones OAuth 2.0.  To work around this limitation, Turnkey runs the **OAuth 2.0 Authorization Code + PKCE** flow, calls the provider’s `who-am-I` endpoint using your app's credentials, and then uses the returned user data to **issue a short-lived OIDC ID token**.  In effect, Turnkey acts as an "_OIDC Wrapper_" for these OAuth 2.0 Services.
+1. **OIDC Providers** (Google, Apple, Auth0, Cognito…) These providers issue your app an **OIDC ID Token** identifying an end-user, which can subsequently be passed to Turnkey as a means of authentication.
+2. **OAuth 2.0-Only Providers** (X/Twitter, Discord…) These providers do _not_ issue **OIDC ID Tokens** themselves, and instead provide only bare-bones OAuth 2.0.  To work around this limitation, Turnkey runs the **OAuth 2.0 Authorization Code + PKCE** flow, calls the provider’s `who-am-I` endpoint using your app's credentials, and then uses the returned user data to **issue a short-lived OIDC ID token**.  In effect, Turnkey acts as an "_OIDC Wrapper_" for these OAuth 2.0 Services.
 
 While the backend flows associated with these two types of Providers differ upstream of **OIDC ID Token** generation, they converge at that point and have no downstream differences.  In both cases, the goal is to get an **OIDC ID Token** identifying the end user.
 
@@ -263,7 +259,7 @@ For example, if a Google-authenticated user (OIDC token `sub` claim: `google-oau
 
 ### AWS Cognito
 
-The main thing to call out is the inability to pass custom `nonce` claims easily. To pass the hash of the end-user's public key, use a custom `tknonce` claim instead.
+Amazon Cognito supports the standard OIDC nonce parameter — you can supply a custom nonce value in the `/oauth2/authorize` request and Cognito will include it in the resulting ID token (as per [AWS documentation](https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html)).
 
 ### Social linking
 
@@ -329,8 +325,6 @@ You can also see the example [here](https://github.com/tkhq/sdk/blob/main/exampl
 
 When using OAuth 2.0-Only Social Providers, it is also possible to have the bearer token returned by the `OAuth2Authenticate` endpoint, which can be useful if you would like your app to have additional integrations involving this Social Provider.
 
-In order to guaruntee the secure transfer of the bearer token, it must be encrypted to a P256 Encryption Key inside our secure enclave, returned to the caller, and then finally decrypted.
-Therefore, the return of the encrypted bearer token is dependent on the caller providing an optional `bearerTokenTargetPublicKey` parameter in the request to `OAuth2Authenticate`.
+In order to guaruntee the secure transfer of the bearer token, it must be encrypted to a P256 Encryption Key inside our secure enclave, returned to the caller, and then finally decrypted. Therefore, the return of the encrypted bearer token is dependent on the caller providing an optional `bearerTokenTargetPublicKey` parameter in the request to `OAuth2Authenticate`.
 
 An example demonstrating this flow can be seen [here](https://github.com/tkhq/sdk/blob/main/examples/with-x/src/app/auth/turnkey/x/route.ts).
-
