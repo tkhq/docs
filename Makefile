@@ -58,9 +58,11 @@ sync-sdk-gen-docs:
 		pnpm exec typedoc --options typedoc.json && \
 		git restore typedoc.json
 
+	cd $(JS_SDK_ROOT) && pnpm exec typedoc --options typedoc.json
+
 	(cd $(JS_SDK_ROOT) && node $(JS_SDK_ROOT)/typedoc-theme/format-json-output.js \
-		--packages react-wallet-kit core \
-		--groups React "TypeScript | Frontend")
+		--packages react-wallet-kit core react-native-wallet-kit \
+		--groups React "TypeScript | Frontend" "React Native")
 
 	@echo Running prettier...
 	(cd $(JS_SDK_ROOT) && pnpm run prettier-all:write)
@@ -71,6 +73,47 @@ sync-sdk-gen-docs:
 	@echo Copying formatted docs to ./generated-docs...
 	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs
 	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs
+	cp -R $(JS_SDK_ROOT)/generated-docs/react-native-wallet-kit ./generated-docs
+
+	@echo Copying formatted changelogs to ./changelogs...
+	cp -R $(JS_SDK_ROOT)/generated-docs/changelogs .
+
+	@echo Deleting temporary files...
+	find $(JS_SDK_ROOT)/generated-docs -mindepth 1 \
+		! -name 'docs.json' \
+		! -name 'sdk-docs.json' \
+		-exec rm -rf {} +
+	
+	@echo Sync complete! Checking back out main branch in SDK repo...
+	cd $(JS_SDK_ROOT) && git checkout main
+
+# Convenience method to sync docs without checking out latest release (e.g. for testing/instant syncing)
+# If you want the references to reflect the latest release, update the "packageOptions" in the repo level typedoc.json to have "gitRevision": "<TAG>" and then run this target
+.PHONY: sync-sdk-gen-docs-off-main
+sync-sdk-gen-docs-off-main:
+	@if [ ! -d $(JS_SDK_ROOT) ]; then git clone git@github.com:tkhq/sdk.git $(JS_SDK_ROOT); fi
+
+	cp docs.json $(JS_SDK_ROOT)/generated-docs
+
+	@mkdir -p ./generated-docs
+
+	@echo Generating docs and formatting output into mdx...
+	cd $(JS_SDK_ROOT) && pnpm exec typedoc --options typedoc.json
+
+	(cd $(JS_SDK_ROOT) && node $(JS_SDK_ROOT)/typedoc-theme/format-json-output.js \
+		--packages react-wallet-kit core react-native-wallet-kit \
+		--groups React "TypeScript | Frontend" "React Native")
+
+	@echo Running prettier...
+	(cd $(JS_SDK_ROOT) && pnpm run prettier-all:write)
+
+	@echo Copying synced docs.json to root...
+	cp $(JS_SDK_ROOT)/generated-docs/docs.json docs.json
+
+	@echo Copying formatted docs to ./generated-docs...
+	cp -R $(JS_SDK_ROOT)/generated-docs/react-wallet-kit ./generated-docs
+	cp -R $(JS_SDK_ROOT)/generated-docs/core ./generated-docs
+	cp -R $(JS_SDK_ROOT)/generated-docs/react-native-wallet-kit ./generated-docs
 
 	@echo Copying formatted changelogs to ./changelogs...
 	cp -R $(JS_SDK_ROOT)/generated-docs/changelogs .
