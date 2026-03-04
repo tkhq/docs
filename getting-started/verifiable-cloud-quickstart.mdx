@@ -1,0 +1,221 @@
+---
+title: "Turnkey Verifiable Cloud quickstart"
+description: "Run any code in isolated, verifiable secure enclaves powered by Turnkey’s trusted infrastructure."
+sidebarTitle: "Turnkey Verifiable Cloud"
+tag: "Beta"
+---
+
+<Warning>
+Turnkey Verifiable Cloud is currently in Private Beta. Join the waitlist [here](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist).
+</Warning>
+
+## Prerequisites
+
+This guide assumes you've been enabled for Turnkey Verifiable Cloud, and you've completed the steps to create an account and an organization 
+as described in the [account setup](/getting-started/quickstart) section.
+
+## Installation
+
+Install the TVC CLI in the [Rust SDK](https://github.com/tkhq/rust-sdk) to get started:
+
+```bash
+git clone git@github.com:tkhq/rust-sdk.git
+cd rust-sdk
+cargo install --path tvc
+```
+
+## Create your first verifiable app
+
+<Steps>
+<Step title="Login">
+With your new organization ID ready, login through the CLI.
+
+```bash
+tvc login
+```
+
+You will be asked to paste in your organization ID, and prompted to add a new generated API key to your organization.
+
+<Note>
+This step generates an operator P256 keypair locally for you. It is stored in `~/.config/turnkey/orgs/<name>/operator.json`. 
+The public key will be used in the following steps.
+</Note>
+
+</Step>
+
+<Step title="Create a new TVC app">
+
+Visit the [TVC dashboard](https://app.turnkey.com/dashboard/tvc) and click on "Create app".
+
+<Frame>
+  ![Create app button on the TVC dashboard](/assets/files/tvc_create-app-dashboard.png)
+</Frame>
+
+A modal should appear:
+
+<Frame>
+  ![Create app modal](/assets/files/tvc_create-app-modal.png)
+</Frame>
+
+Name your app something identifiable; for this demo it can be `"TVC Hello World"`.
+Paste in your operator public key from the login step, then click "Create new TVC App" to create your app.
+
+<Accordion title="CLI steps (same functionality as dashboard)">
+Create a local app template by running
+
+```bash
+tvc app init --output <my-app-template>.json
+```
+
+This step is purely local, and generates an editable json template for your app to be used during creation.
+Your template will look something like this when first generated:
+
+```json
+{
+  "name": "<FILL_IN_APP_NAME>",
+  "quorumPublicKey": KNOWN_QUORUM_KEY,
+  "externalConnectivity": false,
+  "manifestSetId": null,
+  "manifestSetParams": {
+    "name": "<FILL_IN_MANIFEST_SET_NAME>",
+    "threshold": 1,
+    "newOperators": [
+      {
+        "name": "operator-1",
+        "publicKey": PUBLIC_KEY_AUTOPOPULATED_FROM_LOGIN
+      }
+    ],
+    "existingOperatorIds": []
+  }
+}
+```
+
+Name your app something identifiable; for this demo it can be `"TVC Hello World"`.
+Your manifest set is currently just the public key generated during login;
+give it an easy to remember name, such as `"TVC Manifest"`.
+
+<Warning>
+The CLI has also automatically populated this template with a known quorum key, which is sufficient for
+running verifiable code but not advised for encrypting sensitive data.
+</Warning>
+
+Create your app in TVC by running
+
+```bash
+tvc app create my-app-template.json
+```
+
+This creates your app, and saves its quorum key and manifest settings to the Turnkey Verifiable Cloud platform.
+Check out your new app on the [TVC dashboard](https://app.turnkey.com/dashboard/tvc).
+</Accordion>
+</Step>
+
+<Step title="Create new TVC deployment">
+
+Once your app is created, click into it on the [dashboard](https://app.turnkey.com/dashboard/tvc). Click on "Create deployment"
+to start a new deployment for your app. 
+
+<Frame>
+  ![Create deployment button](/assets/files/tvc_create-deployment.png)
+</Frame>
+
+This should open a modal with all your deployment settings:
+
+<Frame>
+  ![Deployment settings modal](/assets/files/tvc_deployment-modal.png)
+</Frame>
+
+If you do not have your own app, try our helloworld template:
+- **Container Image URL** 
+  ```
+  ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d
+  ```
+- **Executable Path**: `/helloworld`
+- **Executable Args**: leave blank
+- **Executable bind address**: `3000`
+- **Executable digest**: same as the sha256 hash in the container URL
+  ```
+  f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d
+  ```
+
+If you are bringing your own private container, TVC supports uploading pull secrets by encrypting them to
+a known public key. As a security measure, it also compares the executable digest to the pulled binary to ensure
+TVC is running the exact code you want.
+
+When ready, click "Deploy TVC App"!
+
+
+<Accordion title="CLI steps (same functionality as dashboard)">
+Start with this local-only step, which generates a deployment template:
+
+```bash
+tvc deploy init
+```
+
+The generated JSON file is named by its time of creation, but you can name it anything by specifying
+a name after the `--output` flag. Open it and fill in each field:
+
+- `appId` is populated with the last app you created. You may edit it to be the id of any app you've created in the past.
+- `qosVersion`: use `"v2026.2.6"`
+- `pivotContainerImageUrl`: link to a public image. For this demo, feel free to use 
+  ```json
+  "ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d"
+  ```
+- `pivotPath`: location of your binary in the container. Use `"/helloworld"` for the demo app.
+- `pivotArgs`: leave this empty unless you have arguments to pass to your application.
+- `expectedPivotDigest`: for the demo, use 
+  ```json
+  "f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d"
+  ```
+
+  For an arbitrary app, compute the expected digest with
+  ```bash
+  docker create --name tmp-extract <container URL> /bin/true \
+    && docker cp tmp-extract:/path/to/binary ./binary \
+    && docker rm tmp-extract
+
+  sha256sum ./binary
+  ```
+- `pivotContainerEncryptedPullSecret`: if you don't have a pull secret to the pivot container, delete this field.
+
+Deploy to TVC by running
+
+```bash
+tvc deploy create deploy-YYYY-MM-DD.json [--pull-secret <path-to-pull-secret>.json]
+```
+
+Find the newly created deployment by clicking into your app on the [TVC dashboard](https://app.turnkey.com/dashboard/tvc).
+</Accordion>
+
+</Step>
+
+<Step title="Approve deployment">
+
+By design, your deployment is not live yet. TVC requires approvals by the manifest set to fully deploy your application.
+Your app should be at the `Approve` stage on the dashboard:
+
+<Frame>
+  ![Approve stage on the dashboard](/assets/files/tvc_approve-stage.png)
+</Frame>
+
+For this demo app, your manifest set is the public key you created at login, so you may approve your deployment through the CLI:
+
+```bash
+tvc deploy approve \
+  --deploy-id <DEPLOYMENT_UUID_FROM_CREATING_DEPLOYMENT>
+```
+
+This command generates an approval from the public keys created in step 1.
+If you didn't change anything during the demo, that should be the only required approval from your manifest set.
+Your app is now live on Turnkey Verifiable Cloud!
+</Step>
+</Steps>
+
+## Next steps
+
+Once the deployment is approved, your app can serve traffic and produce App Proofs, which are cryptographic
+signatures that prove TVC is running the correct, expected software on a legitimate AWS Nitro Enclave. Learn
+more about app proofs in [our documentation](/security/turnkey-verified#app-proofs).
+
+If you are not yet signed up for Turnkey Verifiable Cloud, join the waitlist 
+[here](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist)!
