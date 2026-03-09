@@ -25,6 +25,20 @@ To test OTP codes in our sandbox environment you can use the following:
 
 Both methods provide users with an expiring API key for authentication or account recovery.
 
+## Enclave-based OTP security
+
+Starting with SDK `v2026.2.8`, Turnkey's OTP system uses an **enclave-first architecture** where the OTP code is generated, delivered, and verified entirely inside the TLS Fetcher Enclave. The coordinator never sees a plaintext OTP code.
+
+<Card title="OTP Enclave Security" icon="shield-halved" href="/security/otp-enclave">
+  Learn how Turnkey generates and verifies OTPs inside secure enclaves, the cryptographic invariants that protect your users, and the client-side security changes in SDK v2026.2.8.
+</Card>
+
+Key security improvements in the current SDK:
+- The client verifies the enclave's bundle signature before trusting the `otpEncryptionTargetBundle` public key
+- OTP attempts are HPKE-encrypted before being sent to the server
+- `publicKey` is now required when encrypting an OTP attempt (no throwaway keypairs)
+- Login/signup sign with the verification token key, not the session key
+
 ## Core mechanism
 
 Email Authentication is built with expiring API keys as the foundation. The two delivery mechanisms are:
@@ -86,7 +100,7 @@ For OTP Auth signup and login flows you will need a user with the following poli
 
 ### OTP-based authentication flow
 
-The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP` using the parent organization id with these parameters:
+The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP_V3` (enclave-generated OTP) using the parent organization id with these parameters:
 
 - `otpType`: specify `"OTP_TYPE_EMAIL"`
 - `contact`: user's email address
@@ -99,13 +113,13 @@ The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP` using the p
 - `sendFromEmailSenderName` : optional custom sender name for use with sendFromEmailAddress; if left empty, will default to ‘Notifications’
 - `replyToEmailAddress` : optional custom email address to use as reply-to
 
-After receiving the OTP, users complete OTP verification with `ACTIVITY_TYPE_VERIFY_OTP` using the parent organization id which returns a verificationToken JWT:
+After receiving the OTP, users complete OTP verification with `ACTIVITY_TYPE_VERIFY_OTP_V2` using the parent organization id which returns a verificationToken JWT:
 
 - `otpId`: ID from the init activity
 - `otpCode`: the 6-9 digit or alphanumeric code received via email
 - `expirationSeconds`: optional validity window (defaults to 1 hour)
 
-After receiving the verification token, users complete OTP authentication flow with with `ACTIVITY_TYPE_OTP_LOGIN` using the sub orgazanition ID associated with the contact from the first step:
+After receiving the verification token, users complete OTP authentication flow with `ACTIVITY_TYPE_OTP_LOGIN_V2` using the sub-organization ID associated with the contact from the first step:
 
 - `publicKey`: public key to add to organization data associated with the signing key in IndexedDB or SecureStorage.
 - `verificationToken`: JWT returned from successfull `VERIFY_OTP` activity
@@ -235,9 +249,21 @@ const response = await client.emailAuth({
   Old: `ACTIVITY_TYPE_INIT_OTP_AUTH`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`<br/>
   New: `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`
 
-  **INIT_OTP**<br/>
-  Old: `ACTIVITY_TYPE_INIT_OTP`<br/>
-  New: `ACTIVITY_TYPE_INIT_OTP_V2`
+  **INIT_OTP** (enclave-generated, contact verification & signup)<br/>
+  Old: `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_INIT_OTP_V2`<br/>
+  New: `ACTIVITY_TYPE_INIT_OTP_V3`
+
+  **INIT_OTP_AUTH** (coordinator-generated, existing-user login)<br/>
+  Old: `ACTIVITY_TYPE_INIT_OTP_AUTH`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`<br/>
+  New: `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`
+
+  **VERIFY_OTP**<br/>
+  Old: `ACTIVITY_TYPE_VERIFY_OTP`<br/>
+  New: `ACTIVITY_TYPE_VERIFY_OTP_V2`
+
+  **OTP_LOGIN**<br/>
+  Old: `ACTIVITY_TYPE_OTP_LOGIN`<br/>
+  New: `ACTIVITY_TYPE_OTP_LOGIN_V2`
 
   **INIT_USER_EMAIL_RECOVERY**<br/>
   Old: `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY`<br/>
@@ -317,7 +343,8 @@ Both OTP-based and credential bundle authentication activities:
 
 Specifically:
 
-- For OTP-based auth: `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_VERIFY_OTP` and `ACTIVITY_TYPE_OTP_LOGIN`
+- For OTP-based auth (current): `ACTIVITY_TYPE_INIT_OTP_V3`, `ACTIVITY_TYPE_VERIFY_OTP_V2`, and `ACTIVITY_TYPE_OTP_LOGIN_V2`
+- For OTP-based auth (login legacy): `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`, `ACTIVITY_TYPE_VERIFY_OTP_V2`, and `ACTIVITY_TYPE_OTP_LOGIN_V2`
 - For credential bundle auth: `ACTIVITY_TYPE_EMAIL_AUTH`
 
 <Frame>
