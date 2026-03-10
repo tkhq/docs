@@ -1,0 +1,73 @@
+---
+title: "Sending Sponsored Solana Transactions"
+description: "Send sponsored Solana transactions using Turnkey's solSendTransaction API"
+---
+
+import SendSolanaTxSdkOverview from "/snippets/shared/send-solana-tx-sdk-overview.mdx";
+
+<SendSolanaTxSdkOverview />
+
+## Using `handleSendTransaction` (React)
+
+This handler wraps everything: intent creation, signing, Turnkey submission, polling, modal UX, and final success UI.
+
+### Step 1 — Configure the Provider
+```tsx
+import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+const turnkeyConfig = {
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.NEXT_PUBLIC_TURNKEY_ORG_ID,
+  rpId: window.location.hostname,
+  iframeUrl: "https://auth.turnkey.com",
+};
+
+export default function App({ children }) {
+  return (
+    <TurnkeyProvider config={turnkeyConfig}>
+      {children}
+    </TurnkeyProvider>
+  );
+}
+```
+
+### Step 2 — Use `handleSendTransaction` for Solana
+```tsx
+const { handleSendTransaction, wallets } = useTurnkey();
+
+const walletAccount = wallets
+  .flatMap((w) => w.accounts)
+  .find((a) => a.addressFormat === "ADDRESS_FORMAT_SOLANA");
+
+if (!walletAccount) {
+  throw new Error("No Solana wallet account found");
+}
+
+await handleSendTransaction({
+  transaction: {
+    signWith: walletAccount.address,
+    unsignedTransaction: "<base64-serialized-unsigned-solana-tx>",
+    caip2: "solana:mainnet",
+    sponsor: true,
+  },
+});
+```
+
+This automatically:
+- Opens the Turnkey modal
+- Shows the chain logo
+- Polls until `INCLUDED`
+- Displays success page + explorer link
+
+## Checking Gas Usage
+
+You can configure gas limits for both sub-orgs and all orgs. We recommend checking sub-org gas usage against the limit on the client side so your application can handle edge cases when approaching or exceeding the gas limit.
+```tsx
+const resp = await httpClient?.getGasUsage({});
+if (resp?.usageUsd! > resp?.windowLimitUsd!) {
+  console.error("Gas usage limit exceeded for sponsored transactions");
+  return;
+}
+```
+
+For additional references leveraging these endpoints, check out our [Swapping Example](/cookbook/jupiter) and [Sweeping Example](/cookbook/sweeping).
