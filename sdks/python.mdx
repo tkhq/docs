@@ -1,26 +1,120 @@
 ---
 title: "Python"
-description: "Turnkey offers support for interacting with the API using Python. See [https://github.com/tkhq/python-sdk](https://github.com/tkhq/python-sdk) for more details."
+description: "Turnkey offers native tooling for interacting with the API using Python. See [https://github.com/tkhq/python-sdk](https://github.com/tkhq/python-sdk) for more details."
 mode: wide
 ---
 
 # Turnkey Python SDK
 
-This repository contains support for interacting with the Turnkey API using Python.
+This repository contains the Turnkey Python SDK for interacting with the Turnkey API.
 
-Unlike other languages ([Typescript](https://github.com/tkhq/sdk), [Ruby](https://github.com/tkhq/ruby-sdk)), we do not yet offer a full SDK for Rust.
+## Packages
 
-If you are working on a project in Python and would benefit from a Python SDK please open an issue or get in touch with us at [hello@turnkey.com](mailto:hello@turnkey.com) to discuss prioritizing this.
+The Python SDK is a monorepo containing multiple packages:
 
-## Stamper
+| Package | PyPI | Description |
+|---|---|---|
+| `turnkey-http` | [![PyPI](https://img.shields.io/pypi/v/turnkey-http)](https://pypi.org/project/turnkey-http/) | Auto-generated HTTP client for the Turnkey API |
+| `turnkey-api-key-stamper` | [![PyPI](https://img.shields.io/pypi/v/turnkey-api-key-stamper)](https://pypi.org/project/turnkey-api-key-stamper/) | API key authentication stamper |
+| `turnkey-sdk-types` | [![PyPI](https://img.shields.io/pypi/v/turnkey-sdk-types)](https://pypi.org/project/turnkey-sdk-types/) | Pydantic type definitions for the Turnkey API |
 
-The Stamper utility stamps requests to the Turnkey API and authenticates your calls. To use it, fill out the fields at the top of the stamper script:
+## Installation
 
-```python
-ENDPOINT = "https://api.turnkey.com/public/v1/whoami"
-API_PUBLIC_KEY = "<Your Turnkey API Public Key (02xx)>"
-API_PRIVATE_KEY = "<Your Turnkey API Private Key>"
-ORG_ID = "<Your Organization ID>"
+Install the HTTP client and API key stamper:
+
+```bash
+pip install turnkey-http turnkey-api-key-stamper
 ```
 
-You can find the script and examples in the [python-sdk repo](https://github.com/tkhq/python-sdk).
+## Quick Start
+
+```python
+from turnkey_http import TurnkeyClient
+from turnkey_api_key_stamper import ApiKeyStamper, ApiKeyStamperConfig
+
+# Initialize the stamper with your API credentials
+config = ApiKeyStamperConfig(
+    api_public_key="<Your Turnkey API Public Key (02xx or 03xx)>",
+    api_private_key="<Your Turnkey API Private Key>"
+)
+stamper = ApiKeyStamper(config)
+
+# Create the HTTP client
+client = TurnkeyClient(
+    base_url="https://api.turnkey.com",
+    stamper=stamper,
+    organization_id="<Your Organization ID>"
+)
+
+# Make API calls
+response = client.get_whoami()
+print(response)
+```
+
+## API Key Stamper
+
+The `turnkey-api-key-stamper` package signs requests to the Turnkey API and handles authentication. It uses P256 (secp256r1) ECDSA signing under the hood, producing an `X-Stamp` header that is attached to each request.
+
+```python
+from turnkey_api_key_stamper import ApiKeyStamper, ApiKeyStamperConfig
+import json
+
+# Initialize the stamper with your API credentials
+config = ApiKeyStamperConfig(
+    api_public_key="<Your Turnkey API Public Key (02xx or 03xx)>",
+    api_private_key="<Your Turnkey API Private Key>"
+)
+stamper = ApiKeyStamper(config)
+
+# Stamp a raw request payload
+payload = json.dumps({"organizationId": "<your org ID>"})
+stamp = stamper.stamp(payload)
+
+print(stamp.stamp_header_name)   # "X-Stamp"
+print(stamp.stamp_header_value)  # base64url-encoded stamp
+```
+
+The stamper validates that the public key matches the private key at signing time, so mismatches are caught early.
+
+## HTTP Client
+
+The `turnkey-http` package provides a fully typed HTTP client auto-generated from the Turnkey OpenAPI spec. Each API endpoint is exposed as a method with typed inputs and outputs (via `turnkey-sdk-types`).
+
+```python
+from turnkey_http import TurnkeyClient
+from turnkey_api_key_stamper import ApiKeyStamper, ApiKeyStamperConfig
+
+config = ApiKeyStamperConfig(
+    api_public_key="<Your Turnkey API Public Key>",
+    api_private_key="<Your Turnkey API Private Key>"
+)
+stamper = ApiKeyStamper(config)
+
+client = TurnkeyClient(
+    base_url="https://api.turnkey.com",
+    stamper=stamper,
+    organization_id="<Your Organization ID>"
+)
+
+# Whoami
+whoami = client.get_whoami()
+print(whoami)
+
+# List wallets
+wallets = client.get_wallets()
+print(wallets)
+```
+
+## Requirements
+
+- Python 3.8+
+- `requests >= 2.31.0`
+- `cryptography` (for ECDSA signing in `turnkey-api-key-stamper`)
+
+## Getting Your API Credentials
+
+You can create API keys in the [Turnkey dashboard](https://app.turnkey.com). Each API key consists of a **public key** (starts with `02` or `03`) and a **private key** (both in hex format).
+
+## Source Code
+
+The full source code, examples, and contribution guide are available on GitHub: [https://github.com/tkhq/python-sdk](https://github.com/tkhq/python-sdk).
