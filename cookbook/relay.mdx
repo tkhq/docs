@@ -1,0 +1,182 @@
+---
+title: 'Use Turnkey wallets with Relay'
+sidebarTitle: "Relay integration"
+---
+
+## Overview
+
+[Relay](https://relay.link/) is a cross-chain protocol for bridging tokens and swapping assets across networks. This guide demonstrates integrating Turnkey wallets with Relay to enable cross-chain bridging and same-chain token swaps, covering authentication, quote fetching, multi-step execution, and intent status polling.
+
+The [`relay-wallet-provider-examples`](https://github.com/relayprotocol/relay-wallet-provider-examples/tree/main/turnkey) example is a Next.js application that bridges ETH from Base to Arbitrum and swaps ETH for USDC on Base.
+
+---
+
+## Prerequisites
+
+Complete the Turnkey Quickstart first. You'll need:
+
+* A Turnkey organization and Auth Proxy Config ID
+* (Optional) A Relay API key from [dashboard.relay.link](https://dashboard.relay.link/) for higher rate limits
+
+---
+
+## Installation
+
+```bash
+npm install @turnkey/react-wallet-kit @turnkey/viem viem wagmi
+```
+
+## Wallet Configuration
+
+The `@turnkey/react-wallet-kit` package handles browser-based authentication. Each new user gets a Turnkey sub-organization with an HD wallet provisioned automatically on first login. Use `@turnkey/viem`'s `createAccount` to turn the active session into a viem `Account`:
+
+```tsx
+"use client";
+
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+import { createAccount } from "@turnkey/viem";
+import { createWalletClient, createPublicClient, http } from "viem";
+
+export function useTurnkeyWallet() {
+  const { httpClient, session, fetchWalletAccounts, wallets } = useTurnkey();
+
+  const accounts = await fetchWalletAccounts({ wallet: wallets[0] });
+  const ethAccount = accounts[0];
+
+  const turnkeyAccount = await createAccount({
+    client: httpClient!,
+    organizationId: ethAccount.organizationId,
+    signWith: ethAccount.address,
+    ethereumAddress: ethAccount.address,
+  });
+
+  function makeWalletClient(chain: Chain) {
+    return createWalletClient({ account: turnkeyAccount, chain, transport: http() });
+  }
+
+  function makePublicClient(chain: Chain) {
+    return createPublicClient({ chain, transport: http() });
+  }
+}
+```
+
+## Relay Integration
+
+Call the Relay API from Next.js server actions to keep the API key server-side. The `/quote/v2` endpoint returns an executable quote with all transaction calldata and signature payloads:
+
+```tsx
+"use server";
+
+export async function getQuote(params: QuoteRequest): Promise<QuoteResponse> {
+  const res = await fetch("https://api.relay.link/quote/v2", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(process.env.RELAY_API_KEY
+        ? { Authorization: `Bearer ${process.env.RELAY_API_KEY}` }
+        : {}),
+    },
+    body: JSON.stringify(params),
+  });
+  return res.json();
+}
+```
+
+Request a bridge quote by specifying origin and destination chains and currencies:
+
+```tsx
+import { parseEther } from "viem";
+import { base, arbitrum } from "viem/chains";
+
+const NATIVE = "0x0000000000000000000000000000000000000000";
+
+const quote = await getQuote({
+  user: address,
+  originChainId: base.id,
+  destinationChainId: arbitrum.id,
+  originCurrency: NATIVE,
+  destinationCurrency: NATIVE,
+  amount: parseEther("0.001").toString(),
+  tradeType: "EXACT_INPUT",
+});
+```
+
+## Executing a Quote
+
+A Relay quote contains an array of steps, each of kind `"transaction"` or `"signature"`. Iterate through all steps and dispatch them in order using the Turnkey-backed wallet client:
+
+```tsx
+"use client";
+
+export async function executeQuote({ quote, account, chains, makeWalletClient, makePublicClient }) {
+  for (const step of quote.steps) {
+    for (const item of step.items) {
+      if (item.status === "complete") continue;
+
+      const chain = chains.find((c) => c.id === item.data.chainId) ?? chains[0];
+
+      if (step.kind === "signature") {
+        const client = makeWalletClient(chain);
+        const signature = await signItem(client, item);
+        await submitSignature(item.data.post.endpoint, signature, item.data.post.body);
+
+      } else if (step.kind === "transaction") {
+        const client = makeWalletClient(chain);
+        const publicClient = makePublicClient(chain);
+
+        const hash = await client.sendTransaction({
+          account,
+          chain,
+          to: item.data.to,
+          data: item.data.data ?? "0x",
+          value: item.data.value ? BigInt(item.data.value) : 0n,
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
+    }
+  }
+}
+```
+
+## Handling EIP-191 and EIP-712 Signatures
+
+Some Relay steps (particularly for swaps) require off-chain signatures before the deposit transaction. Handle both signature kinds with the Turnkey-backed viem wallet client:
+
+```tsx
+"use client";
+
+import { type WalletClient, type Hex } from "viem";
+
+async function signItem(walletClient: WalletClient, item: StepItem): Promise<Hex> {
+  const sign = item.data.sign!;
+
+  if (sign.signatureKind === "eip191") {
+    return walletClient.signMessage({
+      account: walletClient.account!,
+      message: sign.message,
+    });
+  }
+
+  // EIP-712: strip EIP712Domain — viem constructs it from the domain object
+  const { EIP712Domain: _, ...types } = sign.types ?? {};
+
+  return walletClient.signTypedData({
+    account: walletClient.account!,
+    domain: sign.domain as any,
+    types,
+    primaryType: sign.primaryType!,
+    message: sign.value as any,
+  });
+}
+```
+
+## Key Takeaways
+
+✅ Successfully implemented:
+
+* Turnkey authentication using `@turnkey/react-wallet-kit` with passkey and email OTP support
+* Relay cross-chain bridging and same-chain swaps via the `/quote/v2` API
+* Multi-step quote execution handling both `transaction` and `signature` step kinds
+* EIP-191 and EIP-712 signing through the Turnkey-backed viem account
+* Server-side API key protection using Next.js server actions
