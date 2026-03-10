@@ -14,6 +14,42 @@ To construct and sign an EVM transaction with Turnkey, we offer:
 - [@turnkey/viem](https://github.com/tkhq/sdk/tree/main/packages/viem): contains a `createAccount` method to create a Turnkey-powered [custom account](https://viem.sh/docs/accounts/local) which [Viem](https://viem.sh/) can use seamlessly.
 - [@turnkey/ethers](https://github.com/tkhq/sdk/tree/main/packages/ethers): contains a `TurnkeySigner` which implements Ethers' `AbstractSigner` interface. See [Ethers docs](https://docs.ethers.org/v6/api/providers/abstract-signer/#AbstractSigner).
 
+## Transaction management & Gas sponsorship
+
+Turnkey's [Transaction Management](/concepts/transaction-management) handles the full lifecycle of EVM transactions — construction, broadcast, nonce management, and status monitoring — down to a few API calls.
+
+### What Turnkey auto-fills
+
+When you submit a transaction via `ethSendTransaction`, Turnkey automatically manages:
+
+- **Nonce**: set correctly to order transactions and prevent conflicts
+- **Gas estimation**: calculated to ensure inclusion under current network conditions
+- **Priority fee (tip)**: set to target timely block inclusion per EIP-1559
+
+### Gas sponsorship (fee abstraction)
+
+Set `sponsor: true` to enable fee sponsorship — your users never need to hold native tokens to pay gas. Turnkey covers fees on your behalf and passes costs through as a monthly line item.
+
+**Supported networks:**
+- Base (eip155:8453)
+- Polygon (eip155:137)
+- Ethereum (eip155:1)
+- Base Sepolia, Polygon Amoy, Ethereum Sepolia (testnets)
+
+<Note>
+  To enable gas sponsorship, ensure it is activated in your Turnkey dashboard before setting `sponsor: true`.
+</Note>
+
+### Non-sponsored transactions
+
+Set `sponsor: false` to have gas paid by the sender's wallet. Turnkey still manages nonce, gas estimation, tip fees, broadcast, and status monitoring — you just don't get fee abstraction.
+
+### Transaction status
+
+After broadcast, Turnkey monitors your transaction until it is included in a block or fails, with structured error decoding for smart contract reverts. Query status via the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status) endpoint.
+
+For a full walkthrough, see [Sending Sponsored EVM Transactions](/embedded-wallets/code-examples/sending-sponsored-transactions).
+
 ## Transaction parsing, policies, and signing
 
 Turnkey has built an EVM parser which runs in a secure enclave, to parse unsigned EVM transactions and extract useful metadata: transaction source, destination, amount, chain ID, and more. See the `EthereumTransaction` struct in our [policy language](/concepts/policies/language) page for a full list.
