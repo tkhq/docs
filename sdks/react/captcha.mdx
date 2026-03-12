@@ -1,0 +1,241 @@
+---
+title: "Captcha Protection"
+description: "Learn how to enable Cloudflare Turnstile captcha protection for your Turnkey Embedded Wallet Kit integration."
+sidebarTitle: "Captcha Protection"
+---
+
+<Warning>
+ {/* TODO: UPDATE THE VERSION */}
+  Captcha support requires `@turnkey/react-wallet-kit` version **x.x.x** or later. Make sure to update your package before proceeding.
+</Warning>
+
+## Overview
+
+The Embedded Wallet Kit supports [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) captcha protection to help prevent abuse and ensure that authentication requests are performed by real users. When enabled, fresh captcha tokens are required for **every Signup request and every InitOtp request** (including OTP resends).
+
+There are two ways to use captcha with the Embedded Wallet Kit:
+
+1. **Using the built-in Auth component** — captcha is handled automatically, no additional code required.
+2. **Building a custom auth UI** — you'll need to integrate Turnstile components yourself in the right places.
+
+## Enabling Captcha in the Dashboard
+
+<Warning>
+  As soon as captcha is enabled in the dashboard, **all** Signup and InitOtp requests will require captcha tokens. If your frontend is not set up to provide tokens, authentication will fail. It is **strongly recommended** to deploy your app with captcha components integrated first (they will idle silently in the background), and **then** enable the captcha toggle in the dashboard. This ensures a seamless transition with no downtime.
+</Warning>
+
+<Steps>
+  <Step title="Navigate to Wallet Kit settings">
+    Go to the [Turnkey Dashboard](https://app.turnkey.com), navigate to the **Wallet Kit** page.
+
+    {/* <!-- TODO: Screenshot of navigating to the Wallet Kit page --> */}
+  </Step>
+
+  <Step title="Enable the Captcha option">
+    Toggle the **Captcha** option to enable it.
+
+    {/* <!-- TODO: Screenshot of the Captcha toggle --> */}
+  </Step>
+
+  <Step title="Save your changes">
+    Click **Save**. From this point on, all Signup and InitOtp requests will require valid captcha tokens.
+
+    {/* <!-- TODO: Screenshot of the save confirmation --> */}
+  </Step>
+</Steps>
+
+### Detecting captcha status on the frontend
+
+Once captcha is enabled in the dashboard, the `turnstileSiteKey` field will be present in the config returned by the Embedded Wallet Kit (populated from the `getWalletKitClientParams` request). You can use this to determine whether captcha is active:
+
+```tsx
+const { config } = useTurnkey();
+
+const isCaptchaEnabled = !!config?.turnstileSiteKey;
+```
+
+## Option 1: Using the Built-in Auth Component
+
+If you're using the Embedded Wallet Kit's built-in auth component (via `handleLogin`), captcha is handled entirely for you. The auth component automatically:
+
+- Pre-warms a captcha token in the background when the user is not authenticated
+- Shows a visible Turnstile challenge only if Cloudflare requires user interaction
+- Attaches captcha tokens to all Signup and InitOtp requests
+- Manages token refresh for the OTP verification step
+
+No code changes are required — just enable captcha in the dashboard and update to the latest package version.
+
+## Option 2: Custom Auth UI
+
+If you're building your own auth modal or layout, you'll need to integrate Turnstile components in **two places**:
+
+1. **The initial auth screen** — where users enter their email/phone or choose a sign-up method
+2. **The OTP verification screen** — where users enter the OTP code (and can resend)
+
+This is because a **fresh captcha token is consumed on each request**. A token used for `initOtp` cannot be reused for a subsequent `signup` or another `initOtp` call.
+
+### Install the Turnstile library
+
+We recommend using [`@marsidev/react-turnstile`](https://github.com/marsidev/react-turnstile), a lightweight React wrapper around the Cloudflare Turnstile widget:
+
+<CodeGroup>
+
+```bash npm
+npm install @marsidev/react-turnstile
+```
+
+```bash pnpm
+pnpm add @marsidev/react-turnstile
+```
+
+```bash yarn
+yarn add @marsidev/react-turnstile
+```
+
+</CodeGroup>
+
+### Setting up the Turnstile component
+
+Import the component and types:
+
+```tsx
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+```
+
+#### Appearance modes
+
+Cloudflare Turnstile supports several appearance modes. For the best user experience, we recommend:
+
+- **`"interaction-only"`** — The widget is completely hidden unless Cloudflare determines it needs user interaction. This is ideal for most cases as users won't see anything unless a challenge is required.
+- **`"always"`** — The widget is always visible. Use this if you want users to always see the captcha.
+
+The Turnkey dashboard configures Turnstile in **Managed** mode, meaning Cloudflare decides whether an interactive challenge is needed. Using `appearance: "interaction-only"` pairs well with this — the widget stays invisible for most users, and only appears when Cloudflare needs interaction.
+
+### Auth screen integration
+
+Add a Turnstile component to your auth screen. This component will generate a token that gets consumed when the user initiates a Signup or InitOtp request.
+
+```tsx
+import { useRef, useState } from "react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function AuthScreen() {
+  const { config } = useTurnkey();
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  return (
+    <div>
+      {/* Your auth form inputs here */}
+
+      {config?.turnstileSiteKey && (
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={config.turnstileSiteKey}
+          onSuccess={(token) => setCaptchaToken(token)}
+          onError={() => setCaptchaToken(null)}
+          onExpire={() => setCaptchaToken(null)}
+          onBeforeInteractive={() => setShowPrompt(true)}
+          options={{
+            appearance: "interaction-only",
+            size: "flexible",
+          }}
+        />
+      )}
+
+      {showPrompt && (
+        <p>Please complete the captcha to continue.</p>
+      )}
+    </div>
+  );
+}
+```
+
+### OTP screen integration
+
+A **second** Turnstile component is needed on the OTP verification screen. This generates fresh tokens for completing the OTP or resending it — both of which are captcha-protected requests.
+
+```tsx
+import { useRef, useState } from "react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function OtpScreen() {
+  const { config } = useTurnkey();
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  return (
+    <div>
+      {/* Your OTP input here */}
+
+      {config?.turnstileSiteKey && (
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={config.turnstileSiteKey}
+          onSuccess={(token) => setCaptchaToken(token)}
+          onError={() => setCaptchaToken(null)}
+          onExpire={() => setCaptchaToken(null)}
+          onBeforeInteractive={() => setShowPrompt(true)}
+          options={{
+            appearance: "interaction-only",
+            size: "flexible",
+          }}
+        />
+      )}
+
+      {showPrompt && (
+        <p>Please complete the captcha to continue.</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Consuming tokens
+
+Each captcha token can only be used **once**. After consuming a token (e.g., when calling `initOtp`), you must reset the widget to generate a new one for the next request:
+
+```tsx
+// Consume the token and reset the widget for the next request
+const consumeToken = () => {
+  const token = captchaToken;
+  setCaptchaToken(null);
+  turnstileRef.current?.reset();
+  return token;
+};
+
+// Example: passing the token to initOtp
+const handleSendOtp = async () => {
+  const token = consumeToken();
+
+  await initOtp({
+    otpType: "email",
+    contact: email,
+    ...(token ? { captchaToken: token } : {}),
+  });
+};
+
+// Example: passing the token to a signup request
+const handleSignup = async () => {
+  const token = consumeToken();
+
+  await signUpWithPasskey({
+    ...(token ? { captchaToken: token } : {}),
+  });
+};
+```
+
+<Note>
+  The `captchaToken` parameter is accepted by `initOtp`, `completeOtp`, `completeOauth`, `loginOrSignupWithWallet`, and OAuth handle methods. When captcha is not enabled, omitting the token has no effect.
+</Note>
+
+## Best Practices
+
+- **Deploy first, enable second**: Integrate captcha components into your app before enabling captcha in the dashboard. The Turnstile widget will silently idle when captcha is not enabled (no `turnstileSiteKey` in config).
+- **Always reset after consuming**: Call `turnstileRef.current?.reset()` after using a token so the widget can generate a fresh one for the next request.
+- **Handle expiration**: Turnstile tokens expire after a short period. Listen to the `onExpire` callback and clear your stored token so that users aren't submitting stale tokens.
+- **Disable submit buttons while waiting**: Consider disabling auth buttons until a valid captcha token is available to prevent failed requests.
