@@ -1,0 +1,52 @@
+---
+title: "Solana transaction construction for sponsored flows"
+description: "Understand what Turnkey manages for sponsored Solana transactions, what your application still controls, and the current transaction-construction caveats."
+sidebarTitle: "Transaction Construction"
+---
+
+## Overview
+
+This page explains how Turnkey handles sponsored Solana transactions at submission time.
+
+The focus here is not how to build a Solana transaction from scratch. It is how Turnkey behaves when you submit an unsigned transaction through `solSendTransaction`: which values Turnkey preserves, which values Turnkey fills in if they are missing, and which rent-sponsorship constraints can affect account-creation flows.
+
+This is especially relevant if you accept prebuilt transactions from a backend, router, or third-party API.
+
+## What Turnkey auto-manages
+
+Turnkey preserves the transaction values you provide where supported and fills in missing broadcast-time fields when needed.
+
+- **Recent blockhash**: if your transaction already includes a blockhash, Turnkey uses it as provided. This lets you time-bound the transaction yourself. If you do not provide one, Turnkey fetches and sets a fresh blockhash at broadcast time.
+- **Compute budget instructions**: if your transaction already includes compute budget instructions for compute unit limit or compute unit price, Turnkey uses those values. If you do not provide them, Turnkey estimates and sets competitive values at broadcast time.
+- **Broadcast and monitoring**: Turnkey broadcasts the transaction and tracks its lifecycle. You can retrieve the latest status through the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status) endpoint.
+
+## Current Solana transaction-construction constraints
+
+Sponsored Solana transaction support is intentionally conservative in the current implementation.
+
+- Turnkey currently requires the `System Program` to appear in the transaction's static account keys, not through an address lookup table.
+- Turnkey currently supports one Turnkey signer per transaction.
+- That signer model has an important consequence for account creation in sponsored flows: Turnkey does not currently support top-level `createAccount` or `createAccountWithSeed` instructions, because those outer account-creation instructions require two signatures.
+
+In practice, this does not mean account creation is uncommon in sponsored Solana flows. In many applications, accounts are created inside program execution through `invoke_signed` rather than as top-level system instructions.
+
+If your sponsored flow depends on account creation, prefer program-driven flows and validate any prebuilt transaction before submission.
+
+## Designing safe sponsored flows
+
+For most products, the safest approach is to validate or construct sponsored Solana transactions on the backend rather than blindly forwarding arbitrary user-supplied payloads.
+
+Recommended guardrails:
+
+- treat account creation and account closure as first-class review criteria
+- prefer a constrained set of known transaction patterns over arbitrary routed transactions
+- reuse persistent token accounts where possible instead of creating and closing temporary ones repeatedly
+- inspect third-party-built transactions before submission, especially when they may wrap and unwrap SOL or close accounts automatically
+
+If you use a routing service such as Jupiter, review the final instruction payload carefully. Temporary account creation and `CloseAccount` behavior are common sources of rent leakage and sponsorship surprises. See [Solana Rent Sponsorship](/networks/solana-rent-refunds) for refund-path risk and mitigation guidance.
+
+## Next steps
+
+- See [Solana (SVM) support on Turnkey](/networks/solana)
+- See [Solana Rent Sponsorship](/networks/solana-rent-refunds)
+- See [Sending Sponsored Solana Transactions](/embedded-wallets/code-examples/sending-sponsored-solana-transactions)
