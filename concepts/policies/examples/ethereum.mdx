@@ -50,6 +50,45 @@ See [here](../../../concepts/policies/smart-contract-interfaces) for more inform
 }
 ```
 
+#### Inspect nested fields in EIP-712 message payloads
+
+The `eth.eip_712.message` map supports nested field access using bracket notation, allowing policies to inspect typed data contents beyond just the domain and primary type.
+
+**Syntax:**
+- Nested struct fields: `eth.eip_712.message['outerField']['innerField']`
+- Array element fields: `eth.eip_712.message['arrayField'][0]['innerField']`
+
+**Example: Restrict Hyperliquid orders to a specific asset**
+
+Hyperliquid's `HyperliquidTransaction:Order` message contains an `orders` array of `Order` structs. Each `Order` uses short field names: `a` (asset index), `b` (isBuy), `p` (price), `s` (size), `r` (reduceOnly).
+
+```json
+{
+  "primaryType": "HyperliquidTransaction:Order",
+  "domain": { "name": "HyperliquidSignTransaction", ... },
+  "message": {
+    "orders": [
+      { "a": 3, "b": true, "p": "1800.0", "s": "0.1", "r": false, ... }
+    ],
+    "grouping": "normalTpsl"
+  }
+}
+```
+
+To allow only orders for a specific asset (e.g. ETH = asset index `3`):
+
+```json
+{
+  "policyName": "Allow Hyperliquid orders for ETH only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'][0]['a'] == '3' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+<Note>
+Array access is index-based (`[0]`, `[1]`, etc.). The condition `message['orders'][0]['a'] == '3'` only checks the first order — any additional orders in the array are not evaluated. To restrict all orders in a known-size batch, add a condition for each index: `message['orders'][0]['a'] == '3' && message['orders'][1]['a'] == '3'`.
+</Note>
+
 ### Deny signing of `NO_OP` keccak256 payloads
 
 ```json
