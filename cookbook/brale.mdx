@@ -1,0 +1,344 @@
+---
+title: "Turnkey Wallet integration"
+description:
+  "Manage flexible-custody wallets with Turnkey and connect them to Brale for stablecoin
+  on/off-ramps, transfers, and workflows."
+sidebarTitle: "Turnkey Wallet integration"
+---
+
+## Overview
+
+Turnkey is a key management platform that pairs naturally with Brale's stablecoin rails. Turnkey
+handles wallet creation and transaction signing inside hardware-backed secure enclaves; Brale
+handles the regulated issuance, on/off-ramps, and transfer orchestration.
+
+The integration is straightforward: Turnkey wallets are registered with Brale as external Addresses
+(`type=external`), giving you a Brale `address_id` you can use as a source or destination in any
+Transfer. On-ramped stablecoins land directly in the user's Turnkey wallet, and any outbound
+transactions—including offramp deposits back to Brale—are signed with Turnkey before being broadcast
+onchain.
+
+## What is Turnkey?
+
+[Turnkey](https://turnkey.com) is a secure key management infrastructure for provisioning and
+managing wallets at any scale. Every private key is exists inside a
+[hardware-backed secure enclave](https://docs.turnkey.com/security/secure-enclaves) (TEE), with
+typical usage never directly handling private key material.
+
+**Why teams choose Turnkey:**
+
+- **Hardware-backed security**: Private keys live in verifiable secure enclaves and are never
+  directly exposed
+- **Programmable signing policies**: Define fine-grained rules governing which transactions can be
+  signed, by whom, and under what conditions
+- **Per-user sub-organizations**: Give each team or end-user an isolated key hierarchy for embedded
+  wallet applications
+- **Server-side or client-side**: Works equally well for backend automation (treasury, B2B) and
+  user-facing embedded wallet flows
+
+## Prerequisites
+
+- A [Brale account](https://app.brale.xyz/signup) with KYB started or completed, and an API client
+  created in the Dashboard
+- A [Turnkey account](https://app.turnkey.com) with an organization and API key pair
+
+## Authenticate with Brale
+
+Exchange your Brale `client_id` and `client_secret` for a short-lived bearer token (~60 minutes):
+
+```bash
+curl --request POST \
+  --url https://auth.brale.xyz/oauth2/token \
+  --header 'Authorization: Basic ${BASE_64_OF(client_id:client_secret)}' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data grant_type=client_credentials
+```
+
+Store the returned `access_token` as `AUTH_TOKEN`. Refresh it using `expires_in` before it expires.
+
+## Get your Brale account_id
+
+```bash
+curl --request GET \
+  --url https://api.brale.xyz/accounts \
+  --header "Authorization: Bearer ${AUTH_TOKEN}"
+```
+
+Response:
+
+```json
+{
+  "id": ["2VcUIIsgARwVbEGlIYbhg6fGG57"]
+}
+```
+
+Store this as `ACCOUNT_ID`.
+
+## Get the wallet address from Turnkey
+
+The examples below cover the two most common patterns. Turnkey supports additional SDKs—see the
+[SDK overview](https://docs.turnkey.com/sdks/introduction) for the full list.
+
+### Option A: Embedded wallet with `@turnkey/react-wallet-kit`
+
+Once your user is authenticated, read the wallet address from the `wallets` array returned by the
+`useTurnkey` hook:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+const { wallets } = useTurnkey();
+const walletAddress = wallets[0]?.accounts[0]?.address;
+// e.g. "0xb518d4d6221d9a41d23d71cbce8e106e7aab8f9b"
+```
+
+See
+[Getting started with the Embedded Wallet Kit](https://docs.turnkey.com/sdks/react/getting-started)
+for the full provider and authentication setup.
+
+### Option B: Server-side wallet with `@turnkey/sdk-server`
+
+For server-side or treasury use cases, retrieve addresses from the Turnkey API using
+`@turnkey/sdk-server`:
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-server";
+...
+const { accounts } = await client.getWalletAccounts({
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  walletId,
+});
+const walletAddress = accounts[0].address;
+// e.g. "0xb518d4d6221d9a41d23d71cbce8e106e7aab8f9b"
+```
+
+See the [TypeScript Server SDK docs](https://docs.turnkey.com/sdks/javascript-server) for
+authentication and wallet creation.
+
+## Register the Turnkey wallet in Brale
+
+Create an external address and capture the returned `address_id`:
+
+```bash
+curl --request POST \
+  --url "https://api.brale.xyz/accounts/${ACCOUNT_ID}/addresses/external" \
+  --header "Authorization: Bearer ${AUTH_TOKEN}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: $(uuidgen)" \
+  --data '{
+    "name": "User Turnkey Wallet (EVM)",
+    "address": "0xb518d4d6221d9a41d23d71cbce8e106e7aab8f9b",
+    "transfer_types": ["base", "ethereum"]
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "2VcUIIsgARwVbEGlIYbhg6fGG57"
+}
+```
+
+Persist the returned `id` as the user's Brale `address_id`—it's the reference you'll pass into every
+Transfer involving this wallet.
+
+EVM addresses work across multiple chains, so you can list all relevant `transfer_types` (`base`,
+`ethereum`, `polygon`, etc.) in a single call. Non-EVM wallets (Solana, Stellar, etc.) each need
+their own external Address entry with their own `address_id`.
+
+> **Note:** Balance queries are only supported for `type=internal` (Brale-custodied) addresses.
+> External addresses don't expose a balance endpoint—your app should read balances directly from the
+> chain.
+
+## Onramp: send stablecoins to the Turnkey wallet
+
+### Option A: Wire → stablecoin
+
+```bash
+DESTINATION_ADDRESS_ID="2VcUIIsgARwVbEGlIYbhg6fGG57"  # Turnkey wallet address_id from above
+
+curl --request POST \
+  --url "https://api.brale.xyz/accounts/${ACCOUNT_ID}/transfers" \
+  --header "Authorization: Bearer ${AUTH_TOKEN}" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: $(uuidgen)" \
+  --data '{
+    "amount": { "value": "100", "currency": "USD" },
+    "source": { "value_type": "USD", "transfer_type": "wire" },
+    "destination": {
+      "address_id": "'"${DESTINATION_ADDRESS_ID}"'",
+      "value_type": "SBC",
+      "transfer_type": "base"
+    }
+  }'
+```
+
+Replace `SBC` with your stablecoin ticker (e.g., `USDGLO`, `USDB`, `USDC`) and `base` with your
+target chain (`ethereum`, `polygon`, etc.).
+
+### Option B: ACH debit → stablecoin
+
+ACH debit flows require additional setup (end-user funding addresses, Plaid flows, etc.). Once
+configured, the Transfer pattern is the same—the destination is your Turnkey `address_id`. See:
+[ach_debit to end user wallet](https://docs.brale.xyz/guides/ach-on-ramp).
+
+## Sign and send from the Turnkey wallet
+
+With stablecoins in the Turnkey wallet, all onchain activity is signed by Turnkey. The keys never
+leave the enclave—you build the transaction, `signTransaction` produces a signed payload, and you
+broadcast it.
+
+<Accordion title="ERC-20 transfer example (viem, react-wallet-kit)">
+
+Use viem to encode the ERC-20 transfer calldata, sign it with `signTransaction` from `useTurnkey`,
+then broadcast via a public client:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+import {
+  createPublicClient,
+  encodeFunctionData,
+  erc20Abi,
+  http,
+  parseUnits,
+  serializeTransaction,
+} from "viem";
+import { base } from "viem/chains";
+
+const publicClient = createPublicClient({ chain: base, transport: http() });
+
+function SendStablecoinButton() {
+  const { signTransaction, wallets } = useTurnkey();
+
+  const handleSend = async () => {
+    const walletAccount = wallets[0]?.accounts[0];
+    const walletAddress = walletAccount?.address;
+
+    const STABLECOIN_ADDRESS = "0x..."; // your stablecoin contract on Base
+    const RECIPIENT_ADDRESS = "0x..."; // destination
+    const AMOUNT = "..."; // amount to send
+
+    const data = encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [RECIPIENT_ADDRESS, parseUnits(AMOUNT, 6)],
+    });
+
+    const nonce = await publicClient.getTransactionCount({ address: walletAddress });
+    const gasPrice = await publicClient.getGasPrice();
+
+    const unsignedTx = serializeTransaction({
+      to: STABLECOIN_ADDRESS,
+      data,
+      nonce,
+      gasPrice,
+      gas: 100000n,
+      chainId: base.id,
+    });
+
+    const signedTx = await signTransaction({
+      walletAccount,
+      unsignedTransaction: unsignedTx,
+      transactionType: "TRANSACTION_TYPE_ETHEREUM",
+    });
+
+    const txHash = await publicClient.sendRawTransaction({
+      serializedTransaction: signedTx,
+    });
+    console.log("Transfer:", `https://basescan.org/tx/${txHash}`);
+  };
+
+  return <button onClick={handleSend}>Send</button>;
+}
+```
+
+</Accordion>
+
+Turnkey's policy engine can restrict which contracts and recipients are signable. See
+[Turnkey policies](https://docs.turnkey.com/concepts/policies/overview) for how to configure signing
+controls.
+
+## Offramping (stablecoin → USD)
+
+Brale's offramp requires stablecoins to be held in a Brale-custodied address (`type=internal`). For
+a Turnkey wallet, that means signing a token transfer to move funds into the Brale deposit address
+first, then triggering the fiat payout via the API.
+
+**Get your Brale custodial deposit address:**
+
+```bash
+curl --request GET \
+  --url "https://api.brale.xyz/accounts/${ACCOUNT_ID}/addresses" \
+  --header "Authorization: Bearer ${AUTH_TOKEN}"
+```
+
+Find the entry with `"type": "internal"` and `transfer_types` containing your target chain (e.g.,
+`base`). Copy its `address` field—that's the onchain deposit address Turnkey will send to.
+
+**Transfer stablecoins from the Turnkey wallet to the Brale custodial address:**
+
+<Accordion title="ERC-20 transfer to Brale custodial address (viem, react-wallet-kit)">
+
+Use the same `signTransaction` pattern from above, pointing the transfer at the Brale custodial
+address:
+
+```tsx
+const BRALE_CUSTODIAL_ADDRESS = "0x..."; // internal Brale address from above
+const STABLECOIN_ADDRESS = "0x..."; // your stablecoin contract on Base
+const AMOUNT = "..."; // amount to send
+
+const data = encodeFunctionData({
+  abi: erc20Abi,
+  functionName: "transfer",
+  args: [BRALE_CUSTODIAL_ADDRESS, parseUnits(AMOUNT, 6)],
+});
+
+const nonce = await publicClient.getTransactionCount({ address: walletAddress });
+const gasPrice = await publicClient.getGasPrice();
+
+const unsignedTx = serializeTransaction({
+  to: STABLECOIN_ADDRESS,
+  data,
+  nonce,
+  gasPrice,
+  gas: 100000n,
+  chainId: base.id,
+});
+
+const signedTx = await signTransaction({
+  walletAccount,
+  unsignedTransaction: unsignedTx,
+  transactionType: "TRANSACTION_TYPE_ETHEREUM",
+});
+
+const txHash = await publicClient.sendRawTransaction({ serializedTransaction: signedTx });
+console.log("Sent to Brale custodial address:", `https://basescan.org/tx/${txHash}`);
+```
+
+</Accordion>
+
+Once Brale sees the inbound transfer credited to the custodial address, you can initiate the
+stablecoin-to-fiat conversion. See:
+[Stablecoin to Fiat (Offramp)](https://docs.brale.xyz/guides/stablecoin-to-fiat-offramp).
+
+## References
+
+**Brale**
+
+- [Quick Start — Your First Brale Stablecoin Transfer](https://docs.brale.xyz/overview/quick-start)
+- [Authentication](https://docs.brale.xyz/key-concepts/authentication)
+- [Add an External Destination](https://docs.brale.xyz/guides/how-to/add-external-destination)
+- [Self-custody Wallets](https://docs.brale.xyz/guides/self-custody-wallets)
+- [Stablecoin to Fiat (Offramp)](https://docs.brale.xyz/guides/stablecoin-to-fiat-offramp)
+- [ach_debit to end user wallet](https://docs.brale.xyz/guides/ach-on-ramp)
+
+**Turnkey**
+
+- [Quickstart](https://docs.turnkey.com/getting-started/quickstart)
+- [React Wallet Kit — Getting started](https://docs.turnkey.com/sdks/react/getting-started)
+- [React Wallet Kit — Using embedded wallets](https://docs.turnkey.com/sdks/react/using-embedded-wallets)
+- [React Wallet Kit — Signing](https://docs.turnkey.com/sdks/react/signing)
+- [TypeScript Server SDK](https://docs.turnkey.com/sdks/javascript-server)
+- [Policies overview](https://docs.turnkey.com/concepts/policies/overview)
+- [Security model](https://docs.turnkey.com/security/non-custodial-key-mgmt)
