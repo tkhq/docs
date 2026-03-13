@@ -1,0 +1,193 @@
+---
+title: "OTP within Secure Enclaves"
+sidebarTitle: "OTP Enclave Security"
+description: "How Turnkey generates, delivers, and verifies one-time passwords entirely inside the TLS Fetcher Enclave, ensuring the coordinator never sees a plaintext OTP."
+---
+
+Turnkey's OTP system (email and SMS) has been redesigned so that the entire lifecycle of a one-time password — generation, delivery, and verification — happens inside the **TLS Fetcher Enclave**. This page explains the security architecture, the cryptographic invariants that protect your users, and how the SDK enforces them on the client side.
+
+## Overview
+
+Turnkey supports two OTP use cases, each using a different init activity:
+
+| Use case | Init activity | Verify activity | OTP generator |
+|---|---|---|---|
+| Contact verification & signup | `ACTIVITY_TYPE_INIT_OTP_V3` | `ACTIVITY_TYPE_VERIFY_OTP_V2` | TLS Fetcher Enclave |
+| Login (existing user auth) | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3` | `ACTIVITY_TYPE_VERIFY_OTP_V2` | Coordinator (legacy) |
+
+In the **enclave-first flow** (`INIT_OTP_V3` + `VERIFY_OTP_V2`), the OTP code is generated, encrypted, delivered, and verified entirely inside the TLS Fetcher Enclave. The coordinator handles orchestration but **never observes the plaintext OTP**.
+
+## Key invariant: what the coordinator never sees
+
+In `INIT_OTP_V3` + `VERIFY_OTP_V2`:
+
+- The coordinator renders the email/SMS template with a placeholder string (`TURNKEY_OTP_CODE_PLACEHOLDER`) **before** sending it to the enclave.
+- The enclave generates the real OTP, substitutes the placeholder, sends the message directly via AWS SES/SNS, and returns only **encrypted artifacts**.
+- Redis stores `enclaveEncryptedOtpCode` and `enclaveEncryptedTargetKey` — both opaque to the coordinator.
+- During verification, the coordinator passes these encrypted blobs back to the enclave, which decrypts and compares — then issues a signed verification token.
+
+**The coordinator never has access to the plaintext OTP at any point in the modern flow.**
+
+## Activity types
+
+| Activity | Description |
+|---|---|
+| `ACTIVITY_TYPE_INIT_OTP_V3` | Enclave generates & sends OTP, returns encrypted artifacts + `otpEncryptionTargetBundle` |
+| `ACTIVITY_TYPE_INIT_OTP_AUTH_V3` | Coordinator generates & sends OTP for existing-user login (legacy model) |
+| `ACTIVITY_TYPE_VERIFY_OTP_V2` | Enclave verifies OTP attempt, issues a signed verification token (JWT) |
+| `ACTIVITY_TYPE_OTP_LOGIN_V2` | Consumes verification token, creates a session (signs with the verification token key) |
+
+## INIT_OTP_V3: enclave-generated OTP flow
+
+Used for **contact verification and signup**. The OTP is generated inside the enclave.
+
+```
+Client → Coordinator: InitOtpIntent(contact, otpType, appName, customizations)
+Coordinator → Coordinator: Render email/SMS template with TURNKEY_OTP_CODE_PLACEHOLDER
+Coordinator → Enclave: InitOtp RPC (ruling, awsKeys, dnsResolvers, otpMessage[placeholder])
+
+Enclave:
+  - Generate OTP code (6–9 chars, numeric or alphanumeric)
+  - Reject weak/predictable codes
+  - Generate ephemeral P-256 Target Key
+  - Encrypt OTP with Target Key (HPKE)
+  - Encrypt Target Key with Quorum Key
+  - Substitute placeholder with real OTP
+  - Send email/SMS via AWS SES/SNS
+
+Enclave → Coordinator: otpId, enclaveEncryptedOtpCode, enclaveEncryptedTargetKey, otpEncryptionTargetBundle
+Coordinator → Redis: store OtpInfo (enclaveEncryptedOtpCode + enclaveEncryptedTargetKey), TTL=5min
+Coordinator → Redis: enforce inflight limit (≤3 per contact)
+Coordinator → Client: otpId + otpEncryptionTargetBundle
+```
+
+The `otpEncryptionTargetBundle` contains the enclave's ephemeral public key, which the client **must** use to encrypt the OTP attempt before submitting it back for verification.
+
+<Warning>
+Before trusting `otpEncryptionTargetBundle`, the client SDK **verifies the bundle signature against the TLS Fetcher signing key**. This prevents a compromised coordinator from substituting a tampered target key and intercepting the user's OTP attempt. See [Client-side security](#client-side-security) below.
+</Warning>
+
+## INIT_OTP_AUTH_V3: coordinator-generated OTP (legacy)
+
+Used for **existing-user login**. The OTP is generated in the coordinator, not the enclave.
+
+```
+Client → Coordinator: InitOtpAuthIntent(contact, otpType, appName, customizations)
+Coordinator → Database: look up user by contact
+Coordinator: Generate OTP code (9 chars, alphanumeric), reject weak codes
+Coordinator: AES-GCM encrypt OTP with OtpAuthEncryptionKey
+Coordinator → Redis: store encrypted OTP, TTL=5min
+Coordinator → Redis: enforce inflight limit (≤3 per contact)
+Coordinator → AWS SES/SNS: send email/SMS with real OTP
+Coordinator → Client: otpId
+```
+
+**Key difference:** The coordinator generates and sees the plaintext OTP. The OTP is AES-GCM encrypted before Redis storage, but the coordinator holds the encryption key. This is the legacy model and is why we consider `INIT_OTP_AUTH_V3` a transitional path rather than the preferred one.
+
+## VERIFY_OTP_V2: enclave verification
+
+Verification always happens inside the enclave, regardless of which init activity was used.
+
+```
+Client: encrypt OTP attempt using otpEncryptionTargetBundle public key (HPKE)
+Client → Coordinator: VerifyOtpIntent(otpId, encryptedAttempt, publicKey)
+Coordinator → Redis: GET otp:{orgId}:{otpId} → OtpInfo
+Coordinator → Enclave: VerifyOtp RPC (ruling, enclaveEncryptedTargetKey, enclaveEncryptedOtpCode)
+
+Enclave:
+  - Decrypt Target Key (Quorum Key)
+  - Decrypt stored OTP (Target Key)
+  - Decrypt user attempt (Target Key)
+  - Constant-time compare
+  - Check OtpAttemptLimiter (brute-force guard)
+
+  If OTP matches:
+    - Generate verification token {id, orgId, contact, type, publicKey, exp}
+    - Sign with Quorum Key (P-256 ECDSA)
+    - Return otpVerificationToken (signed JWT)
+
+Coordinator → Redis: remove otpId from inflight set, store token metadata
+Coordinator → Client: verificationToken
+```
+
+The client holds the signed `verificationToken` after a successful verification. This token is consumed in login/signup activities.
+
+## Token consumption: login and signup
+
+After `VERIFY_OTP_V2`, the verification token is consumed via:
+
+| Activity | Purpose |
+|---|---|
+| `ACTIVITY_TYPE_OTP_LOGIN_V2` | Validate token, create session (login existing user) |
+| `ACTIVITY_TYPE_OTP_SIGNUP` | Validate token, link contact to new user (signup) |
+
+Token validation checks:
+- **Signature**: signed by TLS Fetcher Enclave's Quorum Key
+- **Expiration**: `exp` field (default 1 hour, max 24 hours)
+- **Contact and type**: match expected values
+- **Replay protection**: `verificationId` not already consumed
+
+## Security controls
+
+### Bundle signature verification
+
+When the SDK receives the `otpEncryptionTargetBundle` from `INIT_OTP_V3`, it verifies the bundle's signature against the TLS Fetcher Enclave's signing key before trusting the enclosed public key. This prevents a malicious coordinator from substituting a controlled key to intercept the user's OTP attempt.
+
+This check is performed via `verifyEnclaveSignature` (exported from `@turnkey/crypto`) before `encryptOtpCode` is called.
+
+### HPKE encryption of OTP attempt
+
+The client encrypts its OTP attempt using the enclave's ephemeral public key (from `otpEncryptionTargetBundle`) via HPKE before submitting it. This means even a compromised coordinator cannot read the user's plaintext OTP attempt in transit.
+
+The SDK's `encryptOtpCode` function requires `publicKey` as a mandatory parameter — generating throwaway keypairs whose private keys are immediately discarded is explicitly disallowed to preserve key provenance.
+
+### Constant-time comparison
+
+OTP comparison inside the enclave uses constant-time equality checks to prevent timing-based side channels that could leak information about how many characters matched.
+
+### Brute-force protection
+
+An `OtpAttemptLimiter` inside the enclave tracks failed attempts per OTP and locks out further attempts after a configurable threshold (default: 3 retries).
+
+### Inflight limits
+
+At most 3 active OTP codes can be in-flight per contact at any time. Requesting a 4th code invalidates the oldest.
+
+### Short TTL
+
+OTP codes expire after **5 minutes** by default (configurable up to 10 minutes). Verification tokens expire after **1 hour** (configurable up to 24 hours).
+
+## Client-side security (SDK changes)
+
+These security invariants are enforced by the Turnkey client SDK starting with `v2026.2.8`:
+
+| Change | Why |
+|---|---|
+| `publicKey` is required in `encryptOtpCode` | Prevents throwaway keypairs with discarded private keys; key provenance is tracked |
+| Bundle signature verified before `encryptOtpCode` | Prevents coordinator from substituting a tampered `otpEncryptionTargetBundle` |
+| `verifyOtp` creates and persists the key via `apiKeyStamper.createKeyPair()` | Returns a `publicKey` in `VerifyOtpResult` for use in subsequent `loginWithOtp`/`signUpWithOtp` |
+| `loginWithOtp`/`signUpWithOtp` sign with the **verification token key** | Previously used the session key; now uses the key tied to the verification result |
+| `verifyEnclaveSignature` exported from `@turnkey/crypto` | Available for reuse by integrators who want to verify enclave signatures independently |
+| HPKE (`encryptOtpCode`) replaces `quorumKeyEncrypt` for OTP | Standard HPKE provides stronger security properties for the OTP attempt encryption |
+
+## Delivery: email and SMS
+
+Both email (via AWS SES) and SMS (via AWS SNS) are supported. The delivery mechanism is the same regardless of OTP type — the enclave sends the message directly, not the coordinator.
+
+For sandbox testing, see the [email auth](/authentication/email#one-time-password-sandbox-environment) and [SMS auth](/authentication/sms#one-time-password-sandbox-environment) docs for fixed test credentials.
+
+## Error codes
+
+| Error | Cause |
+|---|---|
+| `UNAUTHENTICATED` | OTP mismatch or attempt limit exceeded |
+| `RESOURCE_EXHAUSTED` | Inflight OTP limit (3 per contact) exceeded |
+| `DEADLINE_EXCEEDED` | OTP or verification token expired |
+| `ALREADY_EXISTS` | Verification token already consumed (replay attempt) |
+
+## Related
+
+- [Enclave secure channels](/security/enclave-secure-channels) — the HPKE protocol used for secure delivery
+- [Secure enclaves](/security/secure-enclaves) — how Turnkey's TLS Fetcher and other enclaves work
+- [Email auth & recovery](/authentication/email) — implementation guide for email OTP
+- [SMS authentication](/authentication/sms) — implementation guide for SMS OTP
