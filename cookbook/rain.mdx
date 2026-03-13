@@ -1,0 +1,225 @@
+---
+title: 'Use Turnkey wallets with Rain'
+sidebarTitle: "Rain integration"
+---
+
+## Overview
+
+[Rain](https://rain.xyz) is a card infrastructure platform that lets you issue credit cards backed by crypto wallets. In this guide, we'll walk through using Turnkey to create a self-custody wallet, apply for a Rain credit card linked to that wallet, and sign a funding authorization so the card is ready to spend.
+
+We'll use `@turnkey/react-wallet-kit` for browser-based authentication and wallet creation, and Turnkey's `signMessage` to authorize card funding. The user's keys never leave Turnkey's secure infrastructure.
+
+## Demo: Rain x Turnkey
+
+Watch a walkthrough of creating a self-custody wallet with Turnkey, linking a Rain credit card, and signing a funding authorization.
+
+<Frame>
+  <video
+  src="/images/cookbook/rain-demo.mov"
+  width="100%"
+  height="420"
+  controls
+></video>
+</Frame>
+
+---
+
+## Getting started
+
+Before you begin, make sure you've followed the [Turnkey Quickstart guide](/getting-started/quickstart).
+You should have:
+
+- A Turnkey **organization** and **Auth Proxy Config ID**
+- A **Rain API key** from the [Rain Developer Portal](https://docs.rain.xyz)
+
+You'll also need a backend proxy to safely forward requests to the Rain API without exposing your API key to the client.
+
+---
+
+## Install dependencies
+
+<CodeGroup>
+
+```bash npm
+npm i @turnkey/react-wallet-kit @turnkey/core react
+```
+
+```bash pnpm
+pnpm add @turnkey/react-wallet-kit @turnkey/core react
+```
+
+```bash yarn
+yarn add @turnkey/react-wallet-kit @turnkey/core react
+```
+
+</CodeGroup>
+
+## Setting up the Turnkey wallet
+
+We'll use `@turnkey/react-wallet-kit` to authenticate users via email OTP and create a wallet in one step.
+
+```tsx
+"use client";
+
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+import { OtpType } from "@turnkey/core";
+
+export default function AuthPage() {
+  const {
+    initOtp,
+    completeOtp,
+    createApiKeyPair,
+    user,
+    wallets,
+    signMessage,
+  } = useTurnkey();
+
+  async function handleSignup(email: string, name: string) {
+    // 1. Send a verification code to the user's email
+    const otpId = await initOtp({
+      otpType: OtpType.Email,
+      contact: email,
+    });
+
+    // 2. After the user enters the code, verify and create the wallet
+    const publicKey = await createApiKeyPair();
+
+    await completeOtp({
+      otpId,
+      otpCode: "<user-entered-code>",
+      contact: email,
+      otpType: OtpType.Email,
+      publicKey,
+      createSubOrgParams: {
+        userName: name,
+        userEmail: email,
+        subOrgName: email,
+        customWallet: {
+          walletName: `${name} Wallet`,
+          walletAccounts: [
+            {
+              curve: "CURVE_SECP256K1",
+              pathFormat: "PATH_FORMAT_BIP32",
+              path: "m/44'/60'/0'/0",
+              addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+            },
+          ],
+        },
+      },
+    });
+
+    // wallets[0].accounts[0].address now contains the new wallet address
+  }
+}
+```
+
+## Setting up the Rain API proxy
+
+Rain API calls require a server-side API key. Create an Express proxy to forward requests securely:
+
+```tsx
+import express from "express";
+
+const app = express();
+app.use(express.json());
+
+const RAIN_BASE = "https://api.raincards.xyz/v1";
+const API_KEY = process.env.RAIN_API_KEY!;
+
+async function rainFetch(path: string, body: object) {
+  const res = await fetch(`${RAIN_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Api-Key": API_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, data: await res.json() };
+}
+
+// Submit consumer application
+app.post("/api/rain/application", async (req, res) => {
+  const result = await rainFetch("/issuing/applications/user", req.body);
+  res.status(result.status).json(result.data);
+});
+
+// Create virtual card for a user
+app.post("/api/rain/users/:userId/cards", async (req, res) => {
+  const result = await rainFetch(
+    `/issuing/users/${req.params.userId}/cards`,
+    req.body
+  );
+  res.status(result.status).json(result.data);
+});
+```
+
+## Applying for a Rain card
+
+With the wallet created, submit a consumer application to Rain and then issue a virtual card:
+
+```tsx
+const walletAddress = wallets[0].accounts[0].address;
+
+// 1. Submit the consumer application
+const appRes = await fetch("/api/rain/application", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    firstName: "Alex",
+    lastName: "Demo",
+    birthDate: "1990-01-15",
+    email: "alex@example.com",
+    walletAddress,
+    // ... additional required fields
+  }),
+});
+
+const { id: userId } = await appRes.json();
+
+// 2. Issue a virtual credit card
+const cardRes = await fetch(`/api/rain/users/${userId}/cards`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ type: "virtual" }),
+});
+
+const card = await cardRes.json();
+// card.last4, card.expirationMonth, card.expirationYear
+```
+
+## Signing a funding authorization
+
+To fund the card, use Turnkey's `signMessage` to sign an authorization payload from the user's wallet. The signature proves the wallet owner has approved the transfer. No private key ever leaves Turnkey's infrastructure.
+
+```tsx
+const account = wallets[0].accounts[0];
+
+const message = JSON.stringify({
+  action: "authorize_funding",
+  amount: 100,
+  currency: "rUSD",
+  wallet: account.address,
+  timestamp: new Date().toISOString(),
+});
+
+const signature = await signMessage({
+  message,
+  walletAccount: account,
+});
+
+// signature.r, signature.s, signature.v
+// Submit this signature to your backend to complete the funding
+```
+
+## Summary
+
+✅ You've now learned how to:
+
+- Authenticate users and create Turnkey wallets via email OTP using `@turnkey/react-wallet-kit`
+
+- Submit a consumer application to Rain and issue a virtual credit card linked to the wallet
+
+- Sign a funding authorization with `signMessage` so the card is ready to spend
+
+- Keep Rain API keys secure behind a server-side proxy
