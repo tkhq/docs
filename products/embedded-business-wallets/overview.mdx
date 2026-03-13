@@ -1,0 +1,195 @@
+---
+title: "Embedded Business Wallets"
+description: "Turnkey provides non-custodial business wallets that allow multiple employees or operators to access a shared wallet with customizable permissions and signing controls."
+---
+
+Turnkey provides non-custodial business wallets that allow multiple employees or operators to access a shared wallet with customizable permissions and signing controls. With Embedded Business Wallets, businesses can grant different levels of access to team members, enabling business operations like seamless onchain payroll automation, vendor payments, merchant settlements, and more.
+
+## Why Turnkey for Embedded Business Wallets?
+
+Turnkey's [Embedded Wallet Kit](/embedded-wallets/overview) powers some of the largest consumer applications in crypto, creating user accounts and accompanying wallets using familiar authentication like passkeys, email, and social login. Embedded Business Wallets bring that same infrastructure to business operations.
+
+Assign roles to users within your customers' organizations such as `finance-team`, `operator`, or `accounts-payable`. Then, write policies that reference those roles to control who can sign, what they can sign, and under what conditions. For example, require two finance approvers for large transfers or restrict a backend service to paying only pre-approved vendors.
+
+## Core Principles
+
+**Instant wallet provisioning**
+Create secure wallets for businesses with familiar authentication methods, plug & play UI components, and options for white-labeling using [Embedded Wallet Kit](/embedded-wallets/overview).
+
+**Scoped org hierarchy**
+Parent organizations can create fully isolated [sub-organizations](/concepts/sub-organizations) for each business customer — each with their own wallets, users, and policies, all managed from a single integration.
+
+**Role-based access controls (RBAC)**
+Restrict actions based on a user's assigned role rather than their individual identity. Roles are represented by tags assigned to users and services. [Policies](/concepts/policies/overview) reference these tags to determine wallet access, transaction signing permissions, and approval conditions for each role.
+
+**Transaction management & gas sponsorship**
+Sponsor gas fees and manage the transaction lifecycle end-to-end from construction to broadcast. See [Transaction Management](/concepts/transaction-management).
+
+## Architecture
+
+<Frame>
+  <img src="/images/embedded-wallets/embedded-business-wallets-diagram.png" alt="Embedded Business Wallets architecture showing sub-organizations with users, roles, and policies per business" />
+</Frame>
+
+## How to Get Started on Embedded Business Wallets with Turnkey
+
+1. **Set up Turnkey and end-user authentication:** Create a Turnkey org and configure how users will authenticate (e.g., email OTP, passkeys, OAuth).
+2. **Integrate Turnkey into the application and initialize the client:** Add Turnkey to the app so authentication, sessions, and wallet operations are available at runtime.
+3. **Provision a sub-organization per business or account:** Create a sub-org that represents the business entity and will contain its wallets, users, and policies.
+4. **Expose roles and permissions in the application UI:** Build UI that allows business users to manage roles (admin, operator, viewer) which map to Turnkey users and policies within the sub-org.
+5. **Enable business-grade wallet actions:** Surface wallet functionality (send/receive, signing, recovery) with policy-backed controls that reflect the business's internal approval structure.
+
+## Example Policies Your Customers Can Configure
+
+| Need | RBAC Configuration |
+| :--- | :--- |
+| Treasury Manager initiates high-value transactions, requiring sign-off from both the CFO and Controller before processing. | **Multi-approval workflow:** Require 2+ approvers for high-value transactions |
+| The Controller or Head of Finance needs to maintain approved vendors and spending limits without manual review. | **Contractor and vendor payments:** Payments to allowlisted addresses with set spending limits. Manage the allowlist to add or remove recipients. |
+| Finance or Treasury needs to automatically execute recurring payments with set schedules, recipients, and amounts. | **Scheduled payments:** Restrict backend services to send recurring disbursements to approved recipients. |
+| Any changes to policies or admin permissions should require more than one executive approval. | **Organization admin / Root Quorum:** Require 2+ executives to approve changes to policies, permissions, or user access. |
+
+<Steps>
+  <Step title="Set up Turnkey and configure end-user authentication">
+    Create a [Turnkey organization](https://app.turnkey.com/dashboard/auth/initial) and choose which authentication methods to offer your business users. Turnkey supports [passkeys](/authentication/passkeys/introduction), [email OTP](/authentication/email), [phone OTP](/authentication/sms), and [social logins](/authentication/social-logins) out of the box. Enable your preferred methods in the [dashboard](https://app.turnkey.com) or via API. This determines how business users will log in, create sessions, and authorize wallet operations within their sub-organizations.
+  </Step>
+
+  <Step title="Integrate Turnkey into your application using our SDK">
+    Add Turnkey to your application to enable authentication, sessions, and wallet operations for your business users. Our [React Wallet Kit](/sdks/react) provides a drop-in provider component that handles client initialization, session management, and wallet UI.
+
+    ```tsx
+    import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+    const turnkeyConfig = {
+      organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+      authProxyConfigId: process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID!,
+    };
+
+    export function Providers({ children }: { children: React.ReactNode }) {
+      return (
+        <TurnkeyProvider config={turnkeyConfig}>
+          {children}
+        </TurnkeyProvider>
+      );
+    }
+    ```
+
+    For server-side operations like provisioning sub-organizations or creating policies, use the [@turnkey/sdk-server](https://www.npmjs.com/package/@turnkey/sdk-server) package.
+  </Step>
+
+  <Step title="Provision a sub-organization per business or account">
+    Create a sub-organization for each of your business customers. Each sub-organization is an isolated environment containing its own wallets, users, and policies. One business cannot access the resources of another. When creating a sub-organization, you can provision an initial [root user](/concepts/users/root-quorum) and wallet in a single API call. Root users can execute any action or bypass policies if a defined [quorum](/concepts/users/root-quorum) is met. Non-root users can be added after and are recommended for day-to-day operations. They are governed by the policies defined in the sub-organization.
+
+    ```ts
+    import { Turnkey } from "@turnkey/sdk-server";
+
+    const turnkey = new Turnkey({
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    });
+
+    const apiClient = turnkey.apiClient();
+
+    const { subOrganizationId } = await apiClient.createSubOrganization({
+      subOrganizationName: "Northstar Logistics",
+      rootUsers: [
+        {
+          userName: "James Rivera",
+          userEmail: "james.rivera@northstarlogistics.com",
+          authenticators: [],
+          apiKeys: [],
+          oauthProviders: [],
+        },
+      ],
+      rootQuorumThreshold: 1,
+      wallet: {
+        walletName: "Northstar Treasury",
+        accounts: [
+          {
+            curve: "CURVE_SECP256K1",
+            pathFormat: "PATH_FORMAT_BIP32",
+            path: "m/44'/60'/0'/0/0",
+            addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+          },
+        ],
+      },
+    });
+    ```
+
+    Your application logic manages resources in each sub-org such as users, tags, and policies on behalf of your business customers. See [Sub-Organizations](/concepts/sub-organizations) for more detail.
+  </Step>
+
+  <Step title="Expose roles and permissions in the application UI">
+    Build UI that allows the root user(s) to add team members and assign roles (admin, operator, viewer) represented by Turnkey users and policies in the sub-organization. When a root user adds a team member or updates a policy, your backend executes the corresponding action in their sub-organization.
+
+    <Frame>
+      <img src="/images/embedded-wallets/northstar-example.png" alt="Example application UI showing team members and role assignments for Northstar Logistics" />
+    </Frame>
+
+    ```ts
+    // Create role tags
+    const { userTagId: financeTagId } = await apiClient.createUserTag({
+      userTagName: "finance-team",
+      userIds: [],
+    });
+
+    const { userTagId: operatorTagId } = await apiClient.createUserTag({
+      userTagName: "operator",
+      userIds: [],
+    });
+
+    // Add the Head of Finance with the finance role
+    await apiClient.createUsers({
+      users: [
+        {
+          userName: "Sarah Chen",
+          userEmail: "sarah.chen@northstarlogistics.com",
+          userTags: [financeTagId],
+          apiKeys: [],
+          authenticators: [],
+          oauthProviders: [],
+        },
+      ],
+    });
+    ```
+
+    Business users assign roles through your UI, and your application creates the corresponding tags and policies in their sub-org. Once roles are in place, create policies that reference them. See [Policy Quickstart](/concepts/policies/quickstart) for guidance.
+  </Step>
+
+  <Step title="Enable business-grade wallet actions">
+    Surface wallet functions like sending payments, signing transactions, and recovery. Combine these with policy-backed controls that reflect the business's internal approval structure. If a transaction doesn't match an allowed policy, it's rejected.
+
+    **Top-level policy:** Enforce a maximum transaction size of $100,000 USDC across all business wallets.
+
+    ```json
+    {
+      "policyName": "Global per-transaction USDC limit",
+      "effect": "EFFECT_DENY",
+      "consensus": "approvers.any(user, true)",
+      "condition": "eth.tx.to == '<USDC_CONTRACT_ADDRESS>' && eth.tx.function_name == 'transfer' && eth.tx.contract_call_args['value'] > 100000000000"
+    }
+    ```
+
+    **User-configured policy:** When your customers add approved vendors, they dynamically create a policy in their sub-organization.
+
+    ```ts
+    await apiClient.createPolicy({
+      policyName: "Auto-approve payments to allowlisted vendors",
+      effect: "EFFECT_ALLOW",
+      consensus: "approvers.any(user, user.tags.contains('accounts-payable'))",
+      condition: `wallet.id == '${walletId}' && eth.tx.to == '${usdcContractAddress}' && eth.tx.function_name == 'transfer' && eth.tx.contract_call_args['to'] in [${vendorAddresses.map(a => `'${a}'`).join(', ')}]`,
+    });
+    ```
+
+    Our policy engine covers a wide range of uses. See [Policy Language](/concepts/policies/language) to start creating policies for your business users.
+  </Step>
+</Steps>
+
+## The Result: Secure, Automated Onchain Payments
+
+Embedded Business Wallets with Turnkey enables you to launch business wallets built for how your customers operate. Power onchain payroll, vendor payments, and settlements using white-labeled, non-custodial wallets with role-based permissions for secure, automated business transactions.
+
+## Case Study
+
+[Mural Pay](https://www.turnkey.com/customers/mural-pay-cross-border-payments), a payments platform, uses Embedded Business Wallets with Turnkey to deliver a simplified experience. They can spin up non-custodial embedded wallets in minutes with familiar login methods like passkey or email authentication. Without seed phrases, business users can rely on email-based flows to recover access to lost wallets. Using Turnkey, Mural Pay simplifies cross-border payments for global businesses, fintechs, and banks.
