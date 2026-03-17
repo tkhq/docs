@@ -6,21 +6,21 @@ sidebarTitle: "Rent Sponsorship"
 
 ## Overview
 
-On Solana, fee sponsorship and rent sponsorship are separate.
+On Solana, fee sponsorship and rent sponsorship are separate concepts.
 
-Fee sponsorship covers the network fee for a transaction. Rent sponsorship covers the rent-exempt lamports needed when instructions create new accounts.
+Fee sponsorship covers the network fee for a transaction. Rent sponsorship covers the rent-exempt lamports needed when instructions create new accounts. Rent sponsorship is disabled by default and must be enabled separately in the Turnkey dashboard.
 
-If an instruction creates a new account and the user signer is the payer, Turnkey pre-funds that signer for the rent-exempt amount. The amount is based on the size of the new account data and is intended to make the account rent exempt.
+When rent is enabled:
 
-When enabled, sponsored rent is added to your monthly gas bill and counts toward the same spend limits used for sponsored transaction fees. See [Spend limits](/concepts/transaction-management#spend-limits).
+- If an instruction creates a new account and the user signer is the payer, Turnkey pre-funds that signer for the rent-exempt amount. The amount is based on the size of the new account data and is intended to make the account rent exempt.
 
-Rent sponsorship is disabled by default and must be enabled separately in the Turnkey dashboard.
+- Sponsored rent is added to your monthly gas bill and counts toward the same spend limits used for sponsored transaction fees. See [Spend limits](/concepts/transaction-management#spend-limits).
 
 For the broader transaction-construction model behind sponsored Solana flows, including payer behavior and account-creation caveats, see [Solana transaction construction for sponsored flows](/networks/solana-transaction-construction).
 
 ## Enable rent sponsorship
 
-If your sponsored Solana transactions may create accounts, you must explicitly enable rent sponsorship in the Turnkey dashboard.
+If your product sponsors transactions that create accounts and you want rent covered for your users, you must enable rent sponsorship in the Turnkey dashboard. Here is how you can do this:
 
 1. Enable gas sponsorship.
 2. Turn on `Sponsor Solana Rent`.
@@ -31,20 +31,22 @@ If your sponsored Solana transactions may create accounts, you must explicitly e
   alt="Turnkey dashboard showing Sponsor Solana Rent enabled"
 />
 
-<Note>
+<Warning>
   Refunded rent from later-closed accounts follows Solana account rules. It
   does not automatically return to the sponsor.
-</Note>
+</Warning>
 
 ## Rent extraction risk
 
-On Solana, when an account is later closed, the rent previously deposited into that account is returned according to Solana account rules, usually to the configured destination for the close operation.
+Solana accounts can be closed after they're created, and when that happens, the rent previously deposited into the account is returned according to Solana account rules, usually to the configured destination for the close operation.
 
 That destination is usually the signer or account owner, not the sponsor that originally funded the rent.
 
 This creates a rent extraction risk for sponsored Solana transactions: the sponsor covers the rent needed to create the account, but the refunded rent can later flow back to the signer instead.
 
-This is not necessarily malicious. It can happen in ordinary product flows.
+This means that when your organization pays for rent upfront, and those accounts are later closed, the refunded lamports may go to the signer, not back to you.
+
+This can be exploited maliciously, but it also happens naturally in ordinary product flows.
 
 A common example is a swap that temporarily wraps SOL into wSOL, uses that account during execution, and then closes the temporary account before the transaction completes.
 
@@ -52,12 +54,13 @@ In a self-funded flow, the rent simply returns to the user. In a sponsored flow,
 
 ## Mitigations and guardrails
 
-The best mitigation depends on how much transaction flexibility your product allows.
+How you mitigate depends on how much transaction flexibility your product allows, but there are several approaches:
 
 - Reuse a constrained set of token accounts where possible instead of creating and closing them repeatedly.
 - Avoid or strip `CloseAccount` patterns from sponsored flows when that works for your product.
 - Prefer backend-generated or backend-validated transactions for higher-control flows.
 - Use spend caps, rate limits, monitoring, and alerts to bound and detect repeated leakage.
+- Apply policies that constrain account creation and closure in sponsored Solana transactions.
 - Treat account creation and account closure as first-class review criteria for sponsored Solana transactions.
 
 ### Strip `CloseAccount` instructions before submission
@@ -120,11 +123,9 @@ For products with tighter controls, the strongest approach is usually to combine
 
 ## Key custody matters
 
-These mitigations are weaker if end users can export or independently control the signer key.
+If end users can export or independently control the signer key, these mitigations are less effective. A user who controls the signer can submit their own transaction to close previously created accounts and reclaim rent, bypassing any filtering your application applies.
 
-Even if your application removes account-close instructions from the original sponsored flow, a user who later controls the signer can submit a separate transaction to close previously created accounts and reclaim rent.
-
-If you need stronger protection, keep transaction submission behind your backend and avoid giving end users independent signer control.
+In these architectures, server-side mitigations like instruction filtering are no longer sufficient on their own. Spend caps, rate limits, monitoring, and policies become your primary line of defense.
 
 ## Policy guidance
 
