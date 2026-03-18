@@ -43,11 +43,10 @@ Turnkey provides a cryptographically secure foundation for enterprise disaster r
 
 ## How to Get Started on Enterprise Disaster Recovery with Turnkey
 
-1. **Secure organization setup:** Create your Turnkey org, configure the root quorum, and define recovery policies.
+1. **Secure organization setup and recovery policies:** Create your Turnkey org, configure the root quorum, and define policies that restrict recovery operations.
 2. **Set up the Turnkey SDK:** Integrate [React Wallet Kit](/sdks/react) or [@turnkey/sdk-server](https://www.npmjs.com/package/@turnkey/sdk-server) into your application.
 3. **Import wallets:** Use `handleImportWallet()` to import wallet keys into Turnkey's secure enclave.
-4. **Configure policies for recovered wallets:** Restrict signing and fund movement to approved addresses with quorum approvals.
-5. **Sweep funds to treasury:** Execute policy-controlled fund movement to approved treasury addresses.
+4. **Sweep funds to treasury:** Execute policy-controlled fund movement to approved treasury addresses.
 
 ## Use Cases
 
@@ -58,15 +57,25 @@ Turnkey provides a cryptographically secure foundation for enterprise disaster r
 | Operations need to continue even if a primary signer or infrastructure goes down. | **Redundancy and failover:** Import backup copies of critical wallet keys into Turnkey so a secondary signing path is always available. |
 
 <Steps>
-  <Step title="Secure organization setup">
+  <Step title="Secure organization setup and recovery policies">
     Create a [Turnkey organization](https://app.turnkey.com/dashboard/auth/initial) and establish the security foundation for recovery operations:
 
     - Create dedicated recovery users with specific, limited permissions
     - Configure the [Root Quorum](/concepts/users/root-quorum) to require multiple approvers for sensitive operations
-    - Define [policies](/concepts/policies/overview) that restrict recovery operations to approved treasury addresses
     - Distribute authenticators ([passkeys](/authentication/passkeys/introduction), YubiKeys) across geographic locations
 
-    This ensures no single credential compromise can trigger unauthorized recovery.
+    Define [policies](/concepts/policies/overview) that restrict what can be done with recovered wallets. For example, limit fund sweeping to pre-approved treasury addresses only:
+
+    ```json
+    {
+      "policyName": "DR-Sweep-Only-Policy",
+      "effect": "EFFECT_ALLOW",
+      "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && eth.tx.to in ['<SAFE_TREASURY_1>', '<SAFE_TREASURY_2>']",
+      "consensus": "approvers.any(user, user.id == '<DR_AUTOMATION_USER_ID>')"
+    }
+    ```
+
+    Require [quorum approval](/concepts/users/root-quorum) for high-value operations to prevent any single person from unilaterally moving recovered funds. This ensures no single credential compromise can trigger unauthorized recovery. See [Policy Quickstart](/concepts/policies/quickstart) for setup guidance.
   </Step>
 
   <Step title="Set up the Turnkey SDK">
@@ -110,21 +119,6 @@ Turnkey provides a cryptographically secure foundation for enterprise disaster r
     ```
 
     The imported wallet immediately inherits the full security model: quorum approvals, transaction whitelists, spending limits, and audit logging. See [Import Wallets](/wallets/import-wallets) for more detail.
-  </Step>
-
-  <Step title="Configure policies for recovered wallets">
-    Define [policies](/concepts/policies/overview) that restrict what can be done with the recovered wallet. For example, limit fund sweeping to pre-approved treasury addresses only:
-
-    ```json
-    {
-      "policyName": "DR-Sweep-Only-Policy",
-      "effect": "EFFECT_ALLOW",
-      "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && eth.tx.to in ['<SAFE_TREASURY_1>', '<SAFE_TREASURY_2>']",
-      "consensus": "approvers.any(user, user.id == '<DR_AUTOMATION_USER_ID>')"
-    }
-    ```
-
-    Require [quorum approval](/concepts/users/root-quorum) for high-value operations to prevent any single person from unilaterally moving recovered funds. See [Policy Quickstart](/concepts/policies/quickstart) for setup guidance.
   </Step>
 
   <Step title="Sweep funds to treasury">
