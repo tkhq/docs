@@ -34,15 +34,17 @@ Make sure you have set up your primary Turnkey organization with at least one AP
 
 SMS authentication uses three activities:
 
-1. `INIT_OTP` - sends a 6-9 digit or bech32 alphanumeric OTP code to the specified phone number
-2. `VERIFY_OTP` - verifies the code and returns a verificationToken JWT
-3. `OTP_LOGIN` - verified the verificationToken and returns a session JWT
+1. `INIT_OTP_V3` —  initiates a secure OTP flow and sends a 6–9 digit or alphanumeric OTP to the specified phone number. The response includes an `otpEncryptionTargetBundle` which is in OTP verification.
+2. `VERIFY_OTP_V2` — securely verifies the code and returns a signed verificationToken JWT
+3. `OTP_LOGIN_V2` — validates the verificationToken and returns a session (signs with the verification token key)
+
+<Note>If you are migrating from a legacy OTP flow to the new updated flow, check out the [OTP Migration Guide](/authentication/otp-migration-guide) for details on required changes.</Note>
 
 ## Implementation
 
 ### Initiating SMS authentication
 
-The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP` using the parent organization id with these parameters:
+The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP_V3` using the parent organization id with these parameters:
 
 - `otpType`: specify `"OTP_TYPE_SMS"`
 - `contact`: user's phone number
@@ -63,18 +65,21 @@ To test OTP codes in our sandbox environment you can use the following:
 - Phone Number: +1 999-999-9999
 - OTP Code: `000000`
 
-In the sandbox environment, SMS delivery is simulated. Use the fixed OTP code `000000` (with the returned otpId) when calling `ACTIVITY_TYPE_VERIFY_OTP` with the parent organization ID to obtain a verificationToken JWT:
+In the sandbox environment, SMS delivery is simulated. Use the fixed OTP code `000000` (with the returned otpId) when calling `ACTIVITY_TYPE_VERIFY_OTP_V2` with the parent organization ID to obtain a verificationToken JWT:
 
 - `otpId`: ID from the init activity
-- `otpCode`: the 6-9 digit or alphanumeric code received via SMS
+- `encryptedOtpBundle`: bundle generated using the otpEncryptionTargetBundle received during `ACTIVITY_TYPE_INIT_OTP_V3` and contains the 6-9 digit or alphanumeric code received via email, and a the public key of a client-side generated keypair.
 - `expirationSeconds`: optional validity window (defaults to 1 hour)
 
-After receiving the verification token, users complete OTP authentication flow with with `ACTIVITY_TYPE_OTP_LOGIN` using the sub orgazanition ID associated with the contact from the first step:
+After receiving the verification token, users complete OTP authentication flow with `ACTIVITY_TYPE_OTP_LOGIN_V2` using the sub-organization ID associated with the contact from the first step:
 
 - `publicKey`: public key to add to organization data associated with the signing key in IndexedDB or SecureStorage.
 - `verificationToken`: JWT returned from successfull `VERIFY_OTP` activity
+- `clientSignature`: This proves authorization for the verification token being used, and is generated using the keypair whose public key was provided in the `encryptedOtpBundle` during verification.
 - `expirationSeconds`: optional validity window (defaults to 15 minutes)
 - `invalidateExisting`: optional boolean to invalidate previous login sessions
+
+<Note>If you are migrating from a legacy OTP flow to the new updated flow, check out the [OTP Migration Guide](/authentication/otp-migration-guide) for details on required changes.</Note>
 
 ## Authorization
 
