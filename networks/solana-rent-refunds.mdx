@@ -1,0 +1,157 @@
+---
+title: "Solana Rent Sponsorship"
+description: "Understand how Solana rent sponsorship works, when rent is pre-funded, and how to reduce rent-refund leakage in sponsored flows."
+sidebarTitle: "Rent Sponsorship"
+---
+
+## Overview
+
+On Solana, fee sponsorship and rent sponsorship are separate concepts.
+
+Fee sponsorship covers the network fee for a transaction. Rent sponsorship covers the rent-exempt lamports needed when instructions create new accounts. Rent sponsorship is disabled by default and must be enabled separately in the Turnkey dashboard.
+
+When rent is enabled:
+
+- If an instruction creates a new account and the user signer is the payer, Turnkey pre-funds that signer for the rent-exempt amount. The amount is based on the size of the new account data and is intended to make the account rent exempt.
+
+- Sponsored rent is added to your monthly gas bill and counts toward the same spend limits used for sponsored transaction fees. See [Spend limits](/concepts/transaction-management#spend-limits).
+
+For the broader transaction-construction model behind sponsored Solana flows, including payer behavior and account-creation caveats, see [Solana transaction construction for sponsored flows](/networks/solana-transaction-construction).
+
+## Enable rent sponsorship
+
+If your product sponsors transactions that create accounts and you want rent covered for your users, you must enable rent sponsorship in the Turnkey dashboard. Here is how you can do this:
+
+1. Enable gas sponsorship.
+2. Turn on `Sponsor Solana Rent`.
+3. Click `Save Configuration`.
+
+<img
+  src="/images/concepts/network/enable_rent_sponsorship.png"
+  alt="Turnkey dashboard showing Sponsor Solana Rent enabled"
+/>
+
+<Warning>
+  Refunded rent from later-closed accounts follows Solana account rules. It
+  does not automatically return to the sponsor.
+</Warning>
+
+## Rent extraction risk
+
+Solana accounts can be closed after they're created, and when that happens, the rent previously deposited into the account is returned according to Solana account rules, usually to the configured destination for the close operation.
+
+That destination is usually the signer or account owner, not the sponsor that originally funded the rent.
+
+This creates a rent extraction risk for sponsored Solana transactions: the sponsor covers the rent needed to create the account, but the refunded rent can later flow back to the signer instead.
+
+This means that when your organization pays for rent upfront, and those accounts are later closed, the refunded lamports may go to the signer, not back to you.
+
+This can be exploited maliciously, but it also happens naturally in ordinary product flows.
+
+A common example is a swap that temporarily wraps SOL into wSOL, uses that account during execution, and then closes the temporary account before the transaction completes.
+
+In a self-funded flow, the rent simply returns to the user. In a sponsored flow, that same rent may have been pre-funded by the sponsor and then refunded back to the signer.
+
+## Mitigations and guardrails
+
+How you mitigate depends on how much transaction flexibility your product allows, but there are several approaches:
+
+- Reuse a constrained set of token accounts where possible instead of creating and closing them repeatedly.
+- Avoid or strip `CloseAccount` patterns from sponsored flows when that works for your product.
+- Prefer backend-generated or backend-validated transactions for higher-control flows.
+- Use spend caps, rate limits, monitoring, and alerts to bound and detect repeated leakage.
+- Apply policies that constrain account creation and closure in sponsored Solana transactions.
+- Treat account creation and account closure as first-class review criteria for sponsored Solana transactions.
+
+### Strip `CloseAccount` instructions before submission
+
+One practical guardrail is to inspect the transaction payload before submission and remove SPL Token `CloseAccount` instructions.
+
+This is especially useful when you receive a prebuilt transaction from a routing service such as Jupiter and want to keep your sponsored flow from immediately refunding rent back to the signer.
+
+In the SPL Token program, `CloseAccount` is instruction discriminator `9`. A simple filter can remove those instructions before you hand the transaction to Turnkey:
+
+```ts
+const SPL_TOKEN_PROGRAM_IDS = new Set([
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+]);
+
+const CLOSE_ACCOUNT_INSTRUCTION_DISCRIMINATOR = 9;
+
+function isCloseAccountInstruction(ix: TransactionInstruction): boolean {
+  return (
+    SPL_TOKEN_PROGRAM_IDS.has(ix.programId.toBase58()) &&
+    ix.data[0] === CLOSE_ACCOUNT_INSTRUCTION_DISCRIMINATOR
+  );
+}
+
+const filteredInstructions = txMessage.instructions.filter(
+  (ix) => !isCloseAccountInstruction(ix),
+);
+```
+
+This does not eliminate all rent-related risk, but it removes one of the most common leakage paths in sponsored swap flows.
+
+### Disable Jupiter auto wrap and unwrap for SOL flows
+
+Another useful guardrail is to disable Jupiter's automatic SOL wrapping and unwrapping behavior when you request the swap transaction.
+
+When `wrapAndUnwrapSol` is enabled, Jupiter may create a temporary wSOL account for the transaction and then close it before completion. In a sponsored flow, that pattern can create a rent refund path back to the signer.
+
+To prevent that, set `wrapAndUnwrapSol` to `false` in the Jupiter API request:
+
+```ts
+body: JSON.stringify({
+  quoteResponse,
+  userPublicKey: request.signWith,
+  wrapAndUnwrapSol: false,
+  dynamicComputeUnitLimit: true,
+  prioritizationFeeLamports: "auto",
+})
+```
+
+With this setting disabled, your application should manage wSOL explicitly instead of relying on Jupiter to create and close a temporary account on the user's behalf.
+
+This higher-control approach is often a better fit for sponsored flows because it lets you:
+
+- reuse a persistent wSOL account instead of creating a fresh one per swap
+- avoid automatic close-account behavior in the routed transaction
+- review account lifecycle decisions on the backend before submission
+
+For products with tighter controls, the strongest approach is usually to combine both mitigations: disable auto wrap and unwrap where possible, and still validate or sanitize the final instruction payload before sending it.
+
+## Key custody matters
+
+If end users can export or independently control the signer key, these mitigations are less effective. A user who controls the signer can submit their own transaction to close previously created accounts and reclaim rent, bypassing any filtering your application applies.
+
+In these architectures, server-side mitigations like instruction filtering are no longer sufficient on their own. Spend caps, rate limits, monitoring, and policies become your primary line of defense.
+
+## Policy guidance
+
+These example deny policies can help reduce common Solana rent-leakage patterns in sponsored flows.
+
+### Deny sponsored Solana `CloseAccount`
+
+```json
+{
+  "effect": "EFFECT_DENY",
+  "condition": "solana.tx.instructions.any(i, (i.program_key == 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' || i.program_key == 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') && i.instruction_data_hex == '09')"
+}
+```
+
+### Deny sponsored Solana account lifecycle ops
+
+```json
+{
+  "effect": "EFFECT_DENY",
+  "condition": "solana.tx.instructions.any(i, i.program_key == 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL') || solana.tx.instructions.any(i, (i.program_key == 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' || i.program_key == 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') && (i.instruction_data_hex == '09' || i.instruction_data_hex == '11'))"
+}
+```
+
+## Next steps
+
+- See [Solana (SVM) support on Turnkey](/networks/solana)
+- See [Solana transaction construction for sponsored flows](/networks/solana-transaction-construction)
+- See [Sending Sponsored Solana Transactions](/embedded-wallets/code-examples/sending-sponsored-solana-transactions)
+- See [Solana policy examples](/concepts/policies/examples/solana)

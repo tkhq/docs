@@ -3,110 +3,152 @@
 Traditionally, sending blockchain transactions onchain has been painful:
 
 - You need to fund wallets with native gas tokens, creating onboarding friction
-- Network congestion and gas spikes can cause transactions to stall or get dropped altogether
+- Network congestion and fee spikes can cause transactions to stall or get dropped altogether
 
-Turnkey reduces this to a couple of API calls. We handle gassing and our battle-tested broadcast logic ensures inclusion even under adverse network conditions. You and your users never touch gas tokens or deal with stuck transactions.
+Turnkey reduces this to a couple of API calls. We handle fees and our battle-tested broadcast logic ensures inclusion even under adverse network conditions. You and your users never touch gas tokens or deal with stuck transactions.
 
-**Chain Support:**
+## Supported chains
+
+**EVM (sponsored):**
 
 - **Base** - eip155:8453
 - **Polygon** - eip155:137
 - **Ethereum** - eip155:1
 
-> Interested in another chain? Reach out to us!
-
-**Testnet Chain Support:**
+**EVM testnets (sponsored):**
 
 - **Base (Sepolia)** - eip155:84532
 - **Polygon (Amoy)** - eip155:80002
 - **Ethereum (Sepolia)** - eip155:11155111
 
+**Solana (sponsored):**
+
+- **Solana mainnet** - solana:mainnet
+- **Solana devnet** - solana:devnet
+
+> Interested in another chain? Reach out to us!
+
 <Note>
-  To access the supported networks, ensure that Gas Sponsorship is first enabled within your Turnkey dashboard. Then update the caip2 parameter with the corresponding chain ID.
+  To access sponsored transactions, ensure that Gas Sponsorship is first enabled within your Turnkey dashboard. Then set `sponsor: true` and update the `caip2` parameter with the corresponding chain identifier.
 </Note>
 
 ## Concepts
 
 ### Gas sponsorship (aka gas abstraction, gasless transactions, fee abstraction)
 
-A single endpoint lets you toggle between standard EIP-1559 transactions and sponsored transactions. EIP-1559 is the modern Ethereum fee model where transactions specify a base fee (determined by network congestion) and a priority fee (a tip to validators for faster inclusion). With sponsorship enabled, your users never need to hold native tokens to pay these fees—Turnkey covers them. Set `sponsor: true` to enable sponsorship.
+A single endpoint lets you toggle between standard and sponsored transactions. With sponsorship enabled, your users never need to hold native tokens to pay transaction fees — Turnkey covers them. Set `sponsor: true` to enable sponsorship, or `sponsor: false` to have fees paid by the sender's wallet.
+
+Either way, Turnkey handles construction, signing, broadcast, and status monitoring. The `sponsor` flag only controls who pays the fee.
 
 ### Construction and Broadcast
 
-A successful EVM transaction requires several components:
+#### EVM
+
+A successful EVM transaction requires:
 
 - **Transaction construction**: assembling the payload (recipient, value, calldata)
-- **Nonce, gas and tip fee**: setting the correct nonce to order transactions, estimating gas usage and tip fees to ensure inclusion even during network congestion
+- **Nonce**: set correctly to order transactions and prevent conflicts
+- **Gas and tip fee**: estimated to ensure inclusion even during network congestion
 - **Signature**: cryptographically signing the transaction with the sender's private key
 - **Broadcast**: submitting the signed transaction to the network and monitoring for inclusion
 
-Turnkey handles all of this for you. Whether or not you use sponsorship, you pass through minimal payloads that define the contents of your transaction and we take care of construction, signing, and broadcast. We auto-fill any fields you omit.
+Turnkey handles all of this for you via `ethSendTransaction`. Whether or not you use sponsorship, you pass through minimal payloads and we take care of the rest. We auto-fill any fields you omit.
 
-This endpoint supports arbitrary EVM transactions, not just simple sends. You can interact with smart contracts, deploy contracts, or execute any valid EVM operation.
+This endpoint supports arbitrary EVM transactions — not just simple sends. You can interact with smart contracts, deploy contracts, or execute any valid EVM operation.
 
-### Transaction status and enriched transaction errors
+#### Solana
 
-After you send a transaction, Turnkey monitors its status until it fails or gets included in a block.
+A successful Solana transaction requires:
 
-For transactions that experience reversion errors, Turnkey runs a transaction simulation to produce structured execution traces and decode common revert reasons. The result: actionable error messages that tell you exactly what went wrong, so you can debug and fix issues quickly instead of parsing opaque hex data.
+- **Transaction construction**: assembling the list of instructions (program, accounts, data)
+- **Recent blockhash**: fetched and attached at broadcast time to ensure the transaction is valid
+- **Compute unit limit**: estimated and set to prevent failed transactions due to insufficient compute
+- **Priority fee**: set to ensure timely inclusion under current network conditions
+- **Signature**: cryptographically signing the transaction with the sender's private key
+- **Broadcast**: submitting the signed transaction to the network and monitoring for confirmation
 
-### **Transaction Statuses**
-
-| **Status**   | **Description**                                                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| INITIALIZED  | Turnkey has constructed and signed the transaction, and prepared gas sponsorship, but the transaction has not yet been broadcast. |
-| BROADCASTING | Turnkey is actively broadcasting the sponsored transaction to the network and awaiting inclusion.                                 |
-| INCLUDED     | The sponsored transaction has been included in a block.                                                                           |
-| FAILED       | The sponsored transaction could not be included on-chain and will not be retried automatically.                                   |
-
-### **Ethereum Smart Contract Transaction Errors**
-
-| **Status** | **Description**                                                                                                                                         |
-| :--------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| UNKNOWN    | The transaction reverted during on-chain execution or simulation, but the revert reason could not be decoded (e.g. missing ABI or unverified contract). |
-| NATIVE     | The transaction reverted due to a built-in Solidity error, such as `require()`, `assert()`, or a plain `revert()`.                                      |
-| CUSTOM     | The transaction reverted due to a contract-defined custom error declared using Solidity’s `error` keyword.                                              |
+Turnkey handles all of this for you via `solSendTransaction`. Whether or not you use sponsorship, you pass through a minimal payload and we manage the rest.
 
 <Note>
-  **Note:** Turnkey application-level errors (e.g. signing failures, policy rejections) are not classified under these error types and are instead surfaced via `Error.Message`.
+  On Solana, fee sponsorship and rent sponsorship are separate. `Sponsor Solana
+  Rent` is disabled by default and must be enabled in the dashboard before
+  Turnkey will pre-fund rent for account creation. If created accounts are later
+  closed, refunded rent can go back to the signer rather than the sponsor. See
+  [Solana Rent Sponsorship](/networks/solana-rent-refunds). For payer behavior,
+  static-key requirements, and account-creation caveats in sponsored flows, see
+  [Solana transaction construction for sponsored flows](/networks/solana-transaction-construction).
+</Note>
+
+### Transaction status and enriched errors
+
+After you send a transaction, Turnkey monitors its status until it fails or is confirmed on-chain.
+
+### Transaction Statuses
+
+The following statuses apply to both EVM and Solana transactions:
+
+| **Status**   | **Description**                                                                                                              |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| INITIALIZED  | Turnkey has constructed and signed the transaction and prepared fees, but it has not yet been broadcast.                     |
+| BROADCASTING | Turnkey is actively broadcasting the transaction to the network and awaiting inclusion.                                      |
+| INCLUDED     | The transaction has been included in a block (EVM) or confirmed on-chain (Solana).                                           |
+| FAILED       | The transaction could not be included on-chain and will not be retried automatically.                                        |
+
+### EVM Smart Contract Transaction Errors
+
+For EVM transactions that revert, Turnkey runs a simulation to produce structured execution traces and decode common revert reasons — giving you actionable error messages instead of opaque hex data.
+
+| **Error type** | **Description**                                                                                                                                         |
+| :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| UNKNOWN        | The transaction reverted during on-chain execution or simulation, but the revert reason could not be decoded (e.g. missing ABI or unverified contract). |
+| NATIVE         | The transaction reverted due to a built-in Solidity error, such as `require()`, `assert()`, or a plain `revert()`.                                      |
+| CUSTOM         | The transaction reverted due to a contract-defined custom error declared using Solidity's `error` keyword.                                              |
+
+<Note>
+  These error types describe how an EVM smart contract reverted during on-chain execution or pre-flight simulation. Turnkey application-level errors (e.g. signing failures, policy rejections) are not classified here and are instead surfaced via `Error.Message`.
 </Note>
 
 ### Spend limits
 
-Turnkey provides tools to manage your gas sponsorship budget. You configure USD gas limits at two levels: across all orgs and per sub-org. This gives you control over both total spend and per-user spend. You can set limit values and time windows through the dashboard.
+Turnkey provides tools to manage your gas sponsorship budget. You configure USD fee limits at two levels: across all orgs and per sub-org. This gives you control over both total spend and per-user spend. You can set limit values and time windows through the dashboard.
 
 You can query current gas usage and limits through our endpoints.
 
 <Tip>
-  Turnkey provides paymaster (gas sponsorship) and transaction broadcasting services only. In high-fee or congested network conditions, delays or non-inclusion may occur. It is the developer's responsability to ensure appropriate spend limits are in place.
+  Turnkey provides fee sponsorship and transaction broadcasting services only. In high-fee or congested network conditions, delays or non-inclusion may occur. It is the developer's responsibility to ensure appropriate spend limits are in place.
 </Tip>
 
 ### Policy engine
 
-You can write policies against both sponsored and non-sponsored transactions using the normal `eth.tx` namespace in Turnkey's policy DSL. This means you can seamlessly switch between sponsored and non-sponsored transactions and still use the same policies.
+You can write policies against both sponsored and non-sponsored transactions using Turnkey's policy DSL:
 
-_Note:_ Turnkey sets all gas-related fields to 0 for sponsored transactions.
+- **EVM**: use the `eth.tx` namespace
+- **Solana**: use the `solana.tx` namespace
+
+This means you can seamlessly switch between sponsored and non-sponsored transactions and still use the same policies.
+
+_Note:_ Turnkey sets all fee-related fields to 0 for sponsored transactions.
 
 ### Billing
 
-Turnkey passes gas costs through to you and includes them as a line item at the end of the month. You pay based on the USD value of gas at time of broadcast; Turnkey internalizes the inventory risk of gas token price changes. Our battle-tested gas estimation aims to be cost efficient while ensuring quick transaction inclusion.
+Turnkey passes transaction fee costs through to you as a line item at the end of the month. You pay based on the USD value of fees at time of broadcast; Turnkey internalizes the inventory risk of token price changes. Our battle-tested fee estimation aims to be cost-efficient while ensuring quick transaction inclusion.
 
 ### Advanced
 
-#### Gas sponsorship smart contracts
+#### Gas sponsorship smart contracts (EVM)
 
-We could not find a satisfactory setup for gas sponsorship contracts that were both fast and safe, so we made our own. The contracts are open source and you can check them out on [github](https://github.com/tkhq/gas-station).
+We could not find a satisfactory setup for gas sponsorship contracts that were both fast and safe, so we made our own. The contracts are open source and you can check them out on [GitHub](https://github.com/tkhq/gas-station).
 
-Based on our benchmarks, these are the most efficient gas sponsorship contracts on the market. They achieve this through optimized logic, calldata encoding, and using assembly extensively, which reduces gas overhead per sponsored transaction. The result: lower costs for you and faster execution for your users.
+Based on our benchmarks, these are the most efficient gas sponsorship contracts on the market. They achieve this through optimized logic, calldata encoding, and extensive use of assembly, which reduces gas overhead per sponsored transaction. The result: lower costs for you and faster execution for your users.
 
 #### Security
 
-Some gas sponsorship setups by other providers are subject to replay attacks. If a malicious actor compromises the provider infrastructure, they can replay the gas sponsorship request multiple times with different nonces to create multiple transactions from a single request. Concretely, this means if Bob signs a request to send Alice 1 ETH, a malicious actor could replay that request many times, draining all of Bob's ETH.
+Some gas sponsorship setups by other providers are subject to replay attacks. If a malicious actor compromises the provider infrastructure, they can replay the gas sponsorship request multiple times with different nonces to create multiple transactions from a single request.
 
-At Turnkey, we never cut corners on security: we perform transaction construction in enclaves, and as long as the request includes the relevant nonce, only one transaction can be created from it. Since the user's authenticator signs requests and the enclave verifies signatures, a malicious actor cannot modify or replay the request. This is inline with Turnkey's core system design principal: everything can be compromised outside of the enclaves and funds will still be safe.
+At Turnkey, we never cut corners on security: we perform transaction construction in enclaves, and as long as the request includes the relevant nonce or blockhash, only one transaction can be created from it. Since the user's authenticator signs requests and the enclave verifies signatures, a malicious actor cannot modify or replay the request. This is in line with Turnkey's core system design principle: everything can be compromised outside of the enclaves and funds will still be safe.
 
 By default, our SDKs include a special gas station nonce for sponsored transaction requests.
 
 ### RPCs
 
-Turnkey's send transaction and transaction status endpoints eliminate the need for third-party RPC providers. You save costs and reduce latency because we holistically incorporate internal data and minimize calls.
+Turnkey's send transaction and transaction status endpoints eliminate the need for third-party RPC providers. You save costs and reduce latency because we holistically incorporate internal data and minimize external calls.
