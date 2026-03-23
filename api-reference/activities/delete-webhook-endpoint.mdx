@@ -1,6 +1,6 @@
 ---
-title: "Remove organization feature"
-description: "Remove an organization feature. This activity must be approved by the current root quorum."
+title: "Delete webhook endpoint"
+description: "Delete a webhook endpoint for an organization."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="remove_organization_feature" />
+<EndpointPath type="submit" path="delete_webhook_endpoint" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`
+Enum options: `ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,8 +32,8 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="name" type="enum<string>" required={true} default="">
-    Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`
+    <NestedParam parentKey="parameters" childKey="endpointId" type="string" required={true} default="">
+    Unique identifier of the webhook endpoint to delete.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -64,14 +64,11 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="removeOrganizationFeatureIntent" type="object" required={true}>
-      The removeOrganizationFeatureIntent object
-      <Expandable title="removeOrganizationFeatureIntent details">
-        <NestedParam parentKey="activity.intent.removeOrganizationFeatureIntent" childKey="name" type="enum" required={true}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`
-
+        <NestedParam parentKey="activity.intent" childKey="deleteWebhookEndpointIntent" type="object" required={true}>
+      The deleteWebhookEndpointIntent object
+      <Expandable title="deleteWebhookEndpointIntent details">
+        <NestedParam parentKey="activity.intent.deleteWebhookEndpointIntent" childKey="endpointId" type="string" required={true}>
+Unique identifier of the webhook endpoint to delete.
 </NestedParam>
 
       </Expandable>
@@ -82,24 +79,12 @@ Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_OR
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="removeOrganizationFeatureResult" type="object" required={true}>
-      The removeOrganizationFeatureResult object
-      <Expandable title="removeOrganizationFeatureResult details">
-        <NestedParam parentKey="activity.result.removeOrganizationFeatureResult" childKey="features" type="array" required={true}>
-      Resulting list of organization features.
-      <Expandable title="features details">
-        <NestedParam parentKey="activity.result.removeOrganizationFeatureResult.features" childKey="name" type="enum" required={false}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`
-
+        <NestedParam parentKey="activity.result" childKey="deleteWebhookEndpointResult" type="object" required={true}>
+      The deleteWebhookEndpointResult object
+      <Expandable title="deleteWebhookEndpointResult details">
+        <NestedParam parentKey="activity.result.deleteWebhookEndpointResult" childKey="endpointId" type="string" required={true}>
+Unique identifier of the deleted webhook endpoint.
 </NestedParam>
-<NestedParam parentKey="activity.result.removeOrganizationFeatureResult.features" childKey="value" type="string" required={false}>
-value field
-</NestedParam>
-
-      </Expandable>
-    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -132,16 +117,16 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/remove_organization_feature \
+  --url https://api.turnkey.com/public/v1/submit/delete_webhook_endpoint \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>"
+        "endpointId": "<string>"
     }
 }'
 ```
@@ -156,8 +141,8 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().removeOrganizationFeature({
-  name: "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>" // name field
+const response = await turnkeyClient.apiClient().deleteWebhookEndpoint({
+  endpointId: "<string> (Unique identifier of the webhook endpoint to delete.)"
 });
 ```
 
@@ -170,7 +155,7 @@ const response = await turnkeyClient.apiClient().removeOrganizationFeature({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -180,18 +165,13 @@ const response = await turnkeyClient.apiClient().removeOrganizationFeature({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "removeOrganizationFeatureIntent": {
-            "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>"
+          "deleteWebhookEndpointIntent": {
+            "endpointId": "<string>"
           }
         },
         "result": {
-          "removeOrganizationFeatureResult": {
-            "features": [
-              {
-                "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-                "value": "<string>"
-              }
-            ]
+          "deleteWebhookEndpointResult": {
+            "endpointId": "<string>"
           }
         },
         "votes": "<array>",
