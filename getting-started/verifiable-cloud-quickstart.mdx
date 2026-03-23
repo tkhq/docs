@@ -58,7 +58,7 @@ A modal should appear:
 </Frame>
 
 Name your app something identifiable; for this demo it can be `"TVC Hello World"`.
-Paste in your operator public key from the login step, then click "Create new TVC App" to create your app.
+Paste in your operator public key from the TVC CLI login step, then click "Create new TVC App" to create your app.
 
 <Accordion title="CLI steps (same functionality as dashboard)">
 Create a local app template by running
@@ -115,9 +115,7 @@ Check out your new app on the [TVC dashboard](https://app.turnkey.com/dashboard/
 Once your app is created, click into it on the [dashboard](https://app.turnkey.com/dashboard/tvc). Click on "Create deployment"
 to start a new deployment for your app. 
 
-<Frame>
-  ![Create deployment button](/assets/files/tvc_create-deployment.png)
-</Frame>
+<img src="/assets/files/tvc_create-deployment.png" alt="Create deployment button" width="200"/>
 
 This should open a modal with all your deployment settings:
 
@@ -126,21 +124,25 @@ This should open a modal with all your deployment settings:
 </Frame>
 
 If you do not have your own app, try our helloworld template:
-- **Container Image URL** 
-  ```
-  ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d
-  ```
+- **Container Image URL**: `ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d`
+  - If you are bringing private container images, TVC supports uploading pull secrets by encrypting them to a known public key. This will be used by TVC infrastructure to access your container images. Read more about pull secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
 - **Executable Path**: `/helloworld`
-- **Executable Args**: leave blank
-- **Executable bind address**: `3000`
-- **Executable digest**: same as the sha256 hash in the container URL
+- **Executable Args**: `--host 0.0.0.0 --port 3000`. These arguments are passed to the executable on startup. Here we are telling the `helloworld` binary to start on port 3000
+- **Public ingress port**: `3000`. This is the port that will be exposed to the outside world
+- **Health check port**: `3000`. Our `helloworld` binary answers healthchecks on `/health` on the same port (3000)
+- **Health check type**: `HTTP`.
+- **Executable digest**: the hash of the binary file inside the container. For our helloworld example this should be `cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1`. You can compute it locally with:
   ```
-  f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d
-  ```
+  # Pull the container image, create a "tmp-extract" container, and extract our helloworld binary
+  docker create --name tmp-extract ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d /bin/true \
+        && docker cp tmp-extract:/helloworld ./helloworld \
+        && docker rm tmp-extract
 
-If you are bringing your own private container, TVC supports uploading pull secrets by encrypting them to
-a known public key. As a security measure, it also compares the executable digest to the pulled binary to ensure
-TVC is running the exact code you want.
+  # Locally compute the digest of the binary file
+  sha256sum ./helloworld
+  cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1
+  ```
+  This digest will be to ensure TVC is running the code you expect.
 
 When ready, click "Deploy TVC App"!
 
@@ -162,11 +164,15 @@ a name after the `--output` flag. Open it and fill in each field:
   "ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d"
   ```
 - `pivotPath`: location of your binary in the container. Use `"/helloworld"` for the demo app.
-- `pivotArgs`: leave this empty unless you have arguments to pass to your application.
+- `pivotArgs`: leave this empty unless you have arguments to pass to your application
 - `expectedPivotDigest`: for the demo, use 
   ```json
   "f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d"
   ```
+- `pivotContainerEncryptedPullSecret`: your pull secret, if your container image isn't public. Delete this field otherwise.
+- `publicIngressPort`: 3000
+- `healthCheckPort`: 3000
+- `healthCheckType`: `TVC_HEALTH_CHECK_TYPE_HTTP`
 
   For an arbitrary app, compute the expected digest with
   ```bash
@@ -176,7 +182,6 @@ a name after the `--output` flag. Open it and fill in each field:
 
   sha256sum ./binary
   ```
-- `pivotContainerEncryptedPullSecret`: if you don't have a pull secret to the pivot container, delete this field.
 
 Deploy to TVC by running
 
@@ -194,11 +199,9 @@ Find the newly created deployment by clicking into your app on the [TVC dashboar
 By design, your deployment is not live yet. TVC requires approvals by the manifest set to fully deploy your application.
 Your app should be at the `Approve` stage on the dashboard:
 
-<Frame>
-  ![Approve stage on the dashboard](/assets/files/tvc_approve-stage.png)
-</Frame>
+<img src="/assets/files/tvc_approve-stage.png" alt="Approve stage on the dashboard" width="400"/>
 
-For this demo app, your manifest set is the public key you created at login, so you may approve your deployment through the CLI:
+For this demo app, your manifest set is the public key you created at login. To approve your deployment, use the TVC CLI:
 
 ```bash
 tvc deploy approve \
@@ -208,6 +211,9 @@ tvc deploy approve \
 This command generates an approval from the public keys created in step 1.
 If you didn't change anything during the demo, that should be the only required approval from your manifest set.
 Your app is now live on Turnkey Verifiable Cloud!
+
+Our infrastructure automatically provisions network ingress for your application. You can visit `https://app-<YOUR_APP_UUID>.turnkey.cloud` to interact with it. If you used our `helloworld` template, try visiting `/time`.
+
 </Step>
 </Steps>
 
