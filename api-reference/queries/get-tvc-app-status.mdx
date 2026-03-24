@@ -1,0 +1,125 @@
+---
+title: "Get TVC App status"
+description: "Get live runtime status for a TVC App from the cluster."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="get_app_status" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="appId" type="string" required={true}>
+
+Unique identifier for a given TVC App.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="appStatus" type="object" required={true}>
+  appStatus field
+  <Expandable title="appStatus details">
+    <NestedParam parentKey="appStatus" childKey="appId" type="string" required={true}>
+Unique identifier for this TVC App
+</NestedParam>
+<NestedParam parentKey="appStatus" childKey="deployments" type="array" required={true}>
+      List of deployment statuses for this app
+      <Expandable title="deployments details">
+        <NestedParam parentKey="appStatus.deployments" childKey="deploymentId" type="string" required={true}>
+Unique identifier for this deployment (corresponds to k8s deployment label)
+</NestedParam>
+<NestedParam parentKey="appStatus.deployments" childKey="readyReplicas" type="number" required={true}>
+Number of ready replicas
+</NestedParam>
+<NestedParam parentKey="appStatus.deployments" childKey="desiredReplicas" type="number" required={true}>
+Desired number of replicas
+</NestedParam>
+<NestedParam parentKey="appStatus.deployments" childKey="lastUpdatedTime" type="object" required={true}>
+      lastUpdatedTime field
+      <Expandable title="lastUpdatedTime details">
+        <NestedParam parentKey="appStatus.deployments.lastUpdatedTime" childKey="seconds" type="string" required={true}>
+seconds field
+</NestedParam>
+<NestedParam parentKey="appStatus.deployments.lastUpdatedTime" childKey="nanos" type="string" required={true}>
+nanos field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="appStatus" childKey="targetedDeploymentId" type="string" required={true}>
+The deployment ID currently serving traffic for this app
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_app_status \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "appId": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().getAppStatus({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  appId: "<string> (Unique identifier for a given TVC App.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "appStatus": {
+    "appId": "<string>",
+    "deployments": [
+      {
+        "deploymentId": "<string>",
+        "readyReplicas": "<number>",
+        "desiredReplicas": "<number>",
+        "lastUpdatedTime": {
+          "seconds": "<string>",
+          "nanos": "<string>"
+        }
+      }
+    ],
+    "targetedDeploymentId": "<string>"
+  }
+}
+```
+
+</ResponseExample>
