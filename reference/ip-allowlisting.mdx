@@ -1,0 +1,371 @@
+---
+title: "IP Allowlisting"
+description: "Restrict API access to your Turnkey organization based on the source IP address of incoming requests."
+---
+
+IP Allowlist is a security feature that lets you define a set of trusted CIDR blocks (IP ranges), ensuring that only requests originating from known, authorized networks can interact with your organization's resources.
+
+<CardGroup cols={2}>
+  <Card title="Organization-level" icon="building">
+    Applies to all API requests made to your organization, regardless of which API key is used. Acts as a global default.
+  </Card>
+
+  <Card title="API key-level" icon="key">
+    Applies only to requests authenticated with a specific API key. Overrides the organization-level allowlist for that key when present.
+  </Card>
+</CardGroup>
+
+<Note>
+  API key-level allowlists are only evaluated when the organization-level allowlist is enabled. If the org-level allowlist is disabled, API key-level rules are not enforced.
+</Note>
+
+This feature is ideal for:
+
+- Locking down production API keys to specific server IPs
+- Preventing API access from outside your organization's network
+- Enforcing per-key access controls across different environments
+
+## How it works
+
+<Steps>
+  <Step title="Define your CIDRs">
+    Submit one or more CIDR blocks (e.g., `192.168.1.0/24`) with optional human-readable labels (e.g., `"Office VPN"`).
+  </Step>
+  <Step title="Enable the allowlist">
+    For org-level allowlists, set `enabled: true` to begin enforcing. You can define rules with `enabled: false` first to stage your configuration before going live.
+  </Step>
+  <Step title="Requests are validated">
+    Any API request whose source IP does not fall within an allowed CIDR block is rejected automatically.
+  </Step>
+  <Step title="Update as needed">
+    Query the current allowlist with `get_ip_allowlist`, then resubmit the full updated rule set via `set_ip_allowlist`. There is no partial-update operation — each call fully replaces the existing rules.
+  </Step>
+</Steps>
+
+<Note>
+  IP Allowlist operations follow Turnkey's [activity model](/concepts/transaction-management). Creating or removing an allowlist is an auditable activity that goes through policy evaluation and approval before execution.
+</Note>
+
+## Organization-level vs. API key-level
+
+| Aspect | Organization-level | API key-level |
+| --- | --- | --- |
+| Scope | All API requests for the org | Requests using a specific API key only |
+| `publicKey` parameter | Omitted or `null` | Set to the API key's public key |
+| `enabled` parameter | Required (`true` or `false`) | Not applicable — always enforced if present |
+| Precedence | Default for all keys | Overrides the org-level allowlist for that key |
+| Limit | One per organization | One per API key |
+
+### Precedence rules
+
+- The org-level allowlist **must be enabled** for API key-level allowlists to be evaluated.
+- If an API key has its own allowlist, only that key-level allowlist is checked for requests using that key.
+- If an API key does not have its own allowlist, the org-level allowlist is checked (if enabled).
+- If neither exists, requests are allowed from any IP.
+
+### Dashboard management
+
+Both org-level and API key-level allowlists can be managed from the Turnkey dashboard.
+
+<Note>
+  Actions taken from the dashboard are **not** validated against an IP allowlist. This is intentional — it ensures you cannot accidentally lock yourself out of managing your allowlist configuration.
+</Note>
+
+## CIDR rules
+
+### Format
+
+Both IPv4 and IPv6 are supported. The maximum prefix length is `/20` for IPv4 and `/48` for IPv6.
+
+| Format | Examples |
+| --- | --- |
+| IPv4 | `10.0.0.0/20`, `192.168.1.0/24`, `203.0.113.42/32` (single IP) |
+| IPv6 | `2001:db8::/48`, `::1/128` (single IP) |
+
+CIDRs are normalized on submission — e.g., `192.168.1.100/24` becomes `192.168.1.0/24`.
+
+### Labels
+
+Each rule accepts an optional `label` string for human-readable identification (e.g., `"Office VPN"`, `"Production Server"`). Labels are stored and returned in responses but have no effect on enforcement.
+
+### Limits and validation
+
+- Maximum of **10 IPv4 CIDRs** and **10 IPv6 CIDRs** per allowlist (20 total)
+- Duplicate CIDRs within a single submission are automatically deduplicated — only the first occurrence and its label are kept
+- The `rules` array can be empty (creates an allowlist with no rules)
+- Invalid CIDRs are rejected with an error indicating the index and value that failed
+
+### Replacement semantics
+
+`set_ip_allowlist` always **fully replaces** the existing rule set. To add a single rule without losing existing ones, first retrieve the current rules with `get_ip_allowlist`, append your new rule, then resubmit the complete list.
+
+---
+
+## API reference
+
+All endpoints use `HTTP POST` and require a signed request body stamped with your API key.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /public/v1/submit/set_ip_allowlist` | Create or update an IP allowlist |
+| `POST /public/v1/submit/remove_ip_allowlist` | Remove an IP allowlist |
+| `POST /public/v1/query/get_ip_allowlist` | Retrieve the current IP allowlist |
+
+### Set IP allowlist
+
+Creates or updates an IP allowlist. If one already exists for the specified scope, it is fully replaced.
+
+```json Request body
+{
+  "type": "ACTIVITY_TYPE_SET_IP_ALLOWLIST",
+  "timestampMs": "<current-time-in-milliseconds>",
+  "organizationId": "<your-organization-id>",
+  "parameters": {
+    "rules": [
+      {
+        "cidr": "<cidr-block>",
+        "label": "<optional-label>"
+      }
+    ],
+    "enabled": true,
+    "publicKey": "<optional-api-key-public-key>",
+    "onEvaluationError": "ALLOW"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | string | Yes | Must be `"ACTIVITY_TYPE_SET_IP_ALLOWLIST"` |
+| `timestampMs` | string | Yes | Current timestamp in milliseconds (epoch) — used for request liveness verification |
+| `organizationId` | string | Yes | Your Turnkey organization ID |
+| `parameters.rules` | array | Yes | Array of allowlist rules. Can be empty. |
+| `parameters.rules[].cidr` | string | Yes | CIDR block (e.g., `"192.168.1.0/24"`, `"2001:db8::/48"`) |
+| `parameters.rules[].label` | string | No | Optional human-readable label (e.g., `"Office VPN"`) |
+| `parameters.enabled` | boolean | No | Whether the allowlist is enforced. Only meaningful for org-level policies. |
+| `parameters.publicKey` | string | No | Public key of an API key. If omitted, the allowlist applies at the org level. |
+| `parameters.onEvaluationError` | string | No | `"ALLOW"` or `"DENY"` — controls behavior when the source IP cannot be determined |
+
+```json Response
+{
+  "activity": {
+    "id": "<activity-id>",
+    "organizationId": "<organization-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_SET_IP_ALLOWLIST",
+    "intent": {
+      "setIpAllowlistIntent": {
+        "rules": [
+          { "cidr": "10.0.0.0/20", "label": "Office" },
+          { "cidr": "192.168.1.0/24", "label": "VPN" }
+        ],
+        "enabled": true
+      }
+    },
+    "result": {
+      "setIpAllowlistResult": {}
+    }
+  }
+}
+```
+
+### Remove IP allowlist
+
+Deletes an IP allowlist and all its associated rules. After removal, access falls back to the next applicable allowlist or is allowed from all IPs.
+
+```json Request body
+{
+  "type": "ACTIVITY_TYPE_REMOVE_IP_ALLOWLIST",
+  "timestampMs": "<current-time-in-milliseconds>",
+  "organizationId": "<your-organization-id>",
+  "parameters": {
+    "publicKey": "<optional-api-key-public-key>"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | string | Yes | Must be `"ACTIVITY_TYPE_REMOVE_IP_ALLOWLIST"` |
+| `timestampMs` | string | Yes | Current timestamp in milliseconds (epoch) |
+| `organizationId` | string | Yes | Your Turnkey organization ID |
+| `parameters.publicKey` | string | No | If omitted, removes the org-level allowlist. If set, removes the allowlist for that specific API key. |
+
+### Get IP allowlist
+
+Retrieves the current IP allowlist and rules for an organization or specific API key.
+
+```json Request body
+{
+  "organizationId": "<your-organization-id>",
+  "publicKey": "<optional-api-key-public-key>"
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `organizationId` | string | Yes | Your Turnkey organization ID |
+| `publicKey` | string | No | If provided, returns the allowlist for that API key. If omitted, returns the org-level allowlist. |
+
+```json Response
+{
+  "allowlist": {
+    "organizationId": "<organization-id>",
+    "publicKey": "<api-key-public-key-or-null>",
+    "enabled": true,
+    "rules": [
+      {
+        "cidr": "10.0.0.0/20",
+        "label": "Office",
+        "createdAt": "1717000000000"
+      },
+      {
+        "cidr": "192.168.1.0/24",
+        "label": "VPN",
+        "createdAt": "1717000000000"
+      }
+    ]
+  }
+}
+```
+
+<Note>
+  If the allowlist has been removed, `get_ip_allowlist` returns an `allowlist` object with an empty `rules` array.
+</Note>
+
+## Code examples
+
+<Tabs>
+  <Tab title="Set org-level allowlist">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/submit/set_ip_allowlist \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "type": "ACTIVITY_TYPE_SET_IP_ALLOWLIST",
+        "timestampMs": "1717000000000",
+        "organizationId": "<your-organization-id>",
+        "parameters": {
+          "enabled": true,
+          "rules": [
+            { "cidr": "10.0.0.0/20", "label": "Office" },
+            { "cidr": "192.168.1.0/24", "label": "VPN" }
+          ]
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Set API key-level allowlist">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/submit/set_ip_allowlist \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "type": "ACTIVITY_TYPE_SET_IP_ALLOWLIST",
+        "timestampMs": "1717000000000",
+        "organizationId": "<your-organization-id>",
+        "parameters": {
+          "publicKey": "<api-key-public-key>",
+          "rules": [
+            { "cidr": "10.0.1.0/24", "label": "Production Server" }
+          ]
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Get allowlist">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/query/get_ip_allowlist \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "organizationId": "<your-organization-id>"
+      }'
+    ```
+  </Tab>
+  <Tab title="Add a rule (fetch + resubmit)">
+    Since `set_ip_allowlist` always replaces all rules, adding a single rule requires fetching first, then resubmitting the full list.
+
+    ```shell
+    # 1. Get the current allowlist
+    curl -X POST https://api.turnkey.com/public/v1/query/get_ip_allowlist \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "organizationId": "<your-organization-id>"
+      }'
+    
+    # 2. Resubmit with existing rules + new rule appended
+    curl -X POST https://api.turnkey.com/public/v1/submit/set_ip_allowlist \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "type": "ACTIVITY_TYPE_SET_IP_ALLOWLIST",
+        "timestampMs": "1717000000000",
+        "organizationId": "<your-organization-id>",
+        "parameters": {
+          "enabled": true,
+          "rules": [
+            { "cidr": "10.0.0.0/20", "label": "Office" },
+            { "cidr": "192.168.1.0/24", "label": "VPN" },
+            { "cidr": "203.0.113.0/24", "label": "New Rule" }
+          ]
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Remove allowlist">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/submit/remove_ip_allowlist \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "type": "ACTIVITY_TYPE_REMOVE_IP_ALLOWLIST",
+        "timestampMs": "1717000000000",
+        "organizationId": "<your-organization-id>",
+        "parameters": {}
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Data types
+
+### `IpAllowlistIntentRule` (request)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `cidr` | string | Yes | CIDR block (e.g., `"192.168.1.0/24"`, `"2001:db8::/48"`) |
+| `label` | string | No | Optional human-readable label (e.g., `"Office VPN"`) |
+
+### `IpAllowlistRule` (response)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `cidr` | string | Yes | CIDR block |
+| `label` | string | No | Human-readable label (empty string if not set) |
+| `createdAt` | string | No | Creation timestamp as millisecond epoch string |
+
+### `IpAllowlist` (response)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `organizationId` | string | Yes | The organization this allowlist belongs to |
+| `publicKey` | string | No | The API key this applies to. `null` for org-level policies. |
+| `enabled` | boolean | No | Whether the allowlist is active. Only present for org-level policies. |
+| `rules` | `IpAllowlistRule[]` | Yes | Array of allowlist rules |
+
+### `SetIpAllowlistIntent` (request parameters)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `publicKey` | string | No | API key public key. Omit for org-level. |
+| `enabled` | boolean | No | Enable/disable enforcement. Org-level only. |
+| `rules` | `IpAllowlistIntentRule[]` | Yes | Array of rules. Can be empty. |
+| `onEvaluationError` | string | No | `"ALLOW"` or `"DENY"` — behavior when source IP cannot be determined |
+
+### `RemoveIpAllowlistIntent` (request parameters)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `publicKey` | string | No | API key public key. Omit to remove the org-level allowlist. |
