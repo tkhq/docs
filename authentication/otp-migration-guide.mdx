@@ -1,16 +1,20 @@
 ---
-title: "Updated OTP Login and Signup Flow"
-sidebarTitle: "OTP Login and Signup"
+title: "Updated OTP login and signup flow"
+sidebarTitle: "OTP login and signup"
 description: "How to migrate to Turnkey's new security-upgraded OTP authentication flows."
 ---
 
-Turnkey's OTP authentication flows (email and SMS) have been upgraded to pass OTP code attempts as encrypted bundles rather than in plaintext — raising the bar for security and ensuring that server compromises can no longer be leveraged to compromise an OTP login process. The new flow is recommended for it's security improvements, and we've included a migration guide from legacy flows to the new flow below.
+Turnkey's OTP authentication flows (email and SMS) have been upgraded to pass OTP code attempts as encrypted bundles rather than in plaintext — raising the bar for security and ensuring that server compromises can no longer be leveraged to compromise an OTP login process. The new flow is recommended for its security improvements, and we've included a migration guide from legacy flows to the new flow below.
 
 ## Migration guide
 
 For implementations using Turnkey's legacy OTP flows, migrating to the updated OTP flows is a breaking change and will require some tweaks to implementations beyond just upgrading SDK versions. 
 
-### Updated OTP flow Activity types
+<Warning>
+    If you have policies written against specific versions of the activities mentioned below, you will need to update those policies to reference the new activity versions.
+</Warning>
+
+### Updated OTP flow activity types
 
 The following activities (and any subsequent versions) use the updated OTP flow: 
 
@@ -18,8 +22,8 @@ The following activities (and any subsequent versions) use the updated OTP flow:
 |---|---|
 | `ACTIVITY_TYPE_INIT_OTP_V3` | Initiates an OTP flow via email or SMS, returns an encryption bundle to be used during OTP verification |
 | `ACTIVITY_TYPE_VERIFY_OTP_V2` | Verifies OTP attempt securely, returns a verification token (JWT) |
-| `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` | Used to signup, consumes verification token received after successful verification |
-| `ACTIVITY_TYPE_OTP_LOGIN_V2` | Used to login and generate a session, consumes verification token received after successful verification |
+| `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` | Used to sign up; consumes verification token received after successful `VERIFY_OTP_V2` activity |
+| `ACTIVITY_TYPE_OTP_LOGIN_V2` | Used to log in and generate a session; consumes verification token received after successful `VERIFY_OTP_V2` activity |
 
 NOTE: Older activity versions such as `ACTIVITY_TYPE_INIT_OTP_V2`, `ACTIVITY_TYPE_VERIFY_OTP` use our legacy OTP flow and are not interchangeable with the new ones due to the new encryption protocol. Notably, for sub organization creation, which accepts OTP verification tokens, `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` can be used as part of the legacy flow and the new updated flow, while `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` onwards will no longer be compatible with legacy OTP verification tokens.
 
@@ -32,3 +36,5 @@ The following updates are required to legacy OTP implementations to migrate to t
 - The verification token received in the response of `ACTIVITY_TYPE_VERIFY_OTP_V2` is signed by a different key than legacy OTP verification tokens. This key is included in our updated SDKs.
 - Login and signup flows initiated using OTP verification tokens now require client signature objects, generated using the client generated keypair whose public key was used during OTP verification. This process is handled by our updated SDKs.
 - Finally, users managing OTP flows with policies will need to update any policies referencing a specific OTP-related activity type so they point to the new activity versions.
+
+For more information and a diagram of the new OTP flow, please refer to additional documentation [here](../security/enclave-secure-channels.mdx#otp-login-flow).
