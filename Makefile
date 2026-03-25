@@ -55,8 +55,7 @@ sync-sdk-gen-docs:
 		SDK_TAG=$$(git describe --tags --exact-match) && \
 		sed -i.bak "s/\"gitRevision\": \"[^\"]*\"/\"gitRevision\": \"$$SDK_TAG\"/" typedoc.json && \
 		rm -f typedoc.json.bak && \
-		pnpm exec typedoc --options typedoc.json && \
-		git restore typedoc.json
+		pnpm exec typedoc --options typedoc.json
 
 	cd $(JS_SDK_ROOT) && pnpm exec typedoc --options typedoc.json
 
