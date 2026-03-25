@@ -118,6 +118,41 @@ Our OTP flows work similarly, except the bundle is not emailed to the user direc
   />
 </Frame>
 
+## OTP login flow
+
+Turnkey's OTP login flow is fully secure — OTP code attempts are never sent unencrypted. OTP codes are generated, emails/SMS messages are sent, and verification is performed entirely within Turnkey's secure enclaves. During verification, the client encrypts the OTP code attempt using an HPKE-based secure channel (as described above), ensuring that even a compromised server cannot intercept OTP codes in transit.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant TE as Turnkey Enclave
+    participant AWS as AWS SES/SNS
+
+    rect rgb(220, 235, 255)
+        Note over C,AWS: INIT_OTP_V3
+        C->>TE: {contact, otpType, appName, customizations}
+        Note over TE: Generate Target Encryption Key (TEK)<br/>Generate OTP code
+        TE->>AWS: Email/SMS with OTP code
+        TE-->>C: {otpId, otpEncryptionTargetBundle}
+    end
+
+    Note over C: User reads OTP from email/SMS
+    Note over C: HPKE-encrypt {otpCode, publicKey}<br/>using otpEncryptionTargetBundle<br/>(P256 + AES-256-GCM)
+
+    rect rgb(220, 255, 230)
+        Note over C,TE: VERIFY_OTP_V2
+        C->>TE: {otpId, encryptedBundle: {clientPublicKey, otpCodeAttempt}}
+        Note over TE: Decrypt bundle using TEK<br/>Verify OTP code<br/>Issue verificationToken bound to clientPublicKey
+        TE-->>C: {verificationToken}
+    end
+
+    rect rgb(255, 245, 220)
+        Note over C,TE: OTP_LOGIN_V2
+        C->>TE: {verificationToken, publicKey, clientSignature, expirationSeconds?}
+        TE-->>C: {session}
+    end
+```
+
 ## Security details
 
 ### Receiver pre-flight authentication

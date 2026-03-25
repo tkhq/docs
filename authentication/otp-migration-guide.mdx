@@ -1,0 +1,40 @@
+---
+title: "Updated OTP login and signup flow"
+sidebarTitle: "OTP login and signup"
+description: "How to migrate to Turnkey's new security-upgraded OTP authentication flows."
+---
+
+Turnkey's OTP authentication flows (email and SMS) have been upgraded to pass OTP code attempts as encrypted bundles rather than in plaintext — raising the bar for security and ensuring that server compromises can no longer be leveraged to compromise an OTP login process. The new flow is recommended for its security improvements, and we've included a migration guide from legacy flows to the new flow below.
+
+## Migration guide
+
+For implementations using Turnkey's legacy OTP flows, migrating to the updated OTP flows is a breaking change and will require some tweaks to implementations beyond just upgrading SDK versions. 
+
+<Warning>
+    If you have policies written against specific versions of the activities mentioned below, you will need to update those policies to reference the new activity versions.
+</Warning>
+
+### Updated OTP flow activity types
+
+The following activities (and any subsequent versions) use the updated OTP flow: 
+
+| Activity | Description |
+|---|---|
+| `ACTIVITY_TYPE_INIT_OTP_V3` | Initiates an OTP flow via email or SMS, returns an encryption bundle to be used during OTP verification |
+| `ACTIVITY_TYPE_VERIFY_OTP_V2` | Verifies OTP attempt securely, returns a verification token (JWT) |
+| `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` | Used to sign up; consumes verification token received after successful `VERIFY_OTP_V2` activity |
+| `ACTIVITY_TYPE_OTP_LOGIN_V2` | Used to log in and generate a session; consumes verification token received after successful `VERIFY_OTP_V2` activity |
+
+NOTE: Older activity versions such as `ACTIVITY_TYPE_INIT_OTP_V2`, `ACTIVITY_TYPE_VERIFY_OTP` use our legacy OTP flow and are not interchangeable with the new ones due to the new encryption protocol. Notably, for sub organization creation, which accepts OTP verification tokens, `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` can be used as part of the legacy flow and the new updated flow, while `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` onwards will no longer be compatible with legacy OTP verification tokens.
+
+### Required updates to implementations
+
+The following updates are required to legacy OTP implementations to migrate to the updated OTP flow, after bumping SDK versions: 
+
+- The response shape for `ACTIVITY_TYPE_INIT_OTP_V3` now includes an `otpEncryptionTargetBundle` which is to be used during otp verification. This requires persisting state between `INIT_OTP` and `VERIFY_OTP` which means OTP flows need to be initiated and verified by the same service, or the service initiating OTP needs to pass the encryption bundle received in the response to the app client which will verify the OTP code.
+- The request shape for `ACTIVITY_TYPE_VERIFY_OTP_V2` now includes an `encryptedOtpBundle` which is generated using the `otpEncryptionTargetBundle` received from `ACTIVITY_TYPE_INIT_OTP_V3`. This bundle will include a client-generated public key and the OTP code attempt. The `encryptOtpCodeToBundle` helper function from [@turnkey/crypto](https://www.npmjs.com/package/@turnkey/crypto) is used to generate the `encryptedOtpBundle` used during OTP verification.
+- The verification token received in the response of `ACTIVITY_TYPE_VERIFY_OTP_V2` is signed by a different key than legacy OTP verification tokens. This key is included in our updated SDKs.
+- Login and signup flows initiated using OTP verification tokens now require client signature objects, generated using the client generated keypair whose public key was used during OTP verification. This process is handled by our updated SDKs.
+- Finally, users managing OTP flows with policies will need to update any policies referencing a specific OTP-related activity type so they point to the new activity versions.
+
+For more information and a diagram of the new OTP flow, please refer to additional documentation [here](../security/enclave-secure-channels.mdx#otp-login-flow).
