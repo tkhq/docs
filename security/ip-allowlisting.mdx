@@ -15,15 +15,23 @@ IP Allowlist is a security feature that lets you define a set of trusted CIDR bl
   </Card>
 </CardGroup>
 
-<Note>
-  API key-level allowlists are only evaluated when the organization-level allowlist is enabled. If the org-level allowlist is disabled, API key-level rules are not enforced.
-</Note>
-
 This feature is ideal for:
 
 - Locking down production API keys to specific server IPs
 - Preventing API access from outside your organization's network
 - Enforcing per-key access controls across different environments
+
+## Before you begin
+
+<Warning>
+  Enabling an organization-level allowlist with no CIDR rules configured will **block all API traffic**. Stage your rules with `enabled: false` first, verify they're correct, then set `enabled: true`.
+</Warning>
+
+- **The org-level allowlist must be enabled for API key-level rules to take effect.** If the org-level allowlist is disabled, API key-level allowlists are not enforced.
+
+- **Dashboard actions are never subject to IP allowlisting.** You can always use the Dashboard to manage your configuration, even if you misconfigure your rules.
+
+- **Unresolvable source IPs default to fail-open.** In rare cases, intermediary infrastructure may prevent Turnkey from resolving a request's source IP. The `onEvaluationError` parameter controls whether these requests are allowed (fail-open) or denied (fail-closed). It defaults to `ALLOW`.
 
 ## How it works
 
@@ -32,7 +40,7 @@ This feature is ideal for:
     Submit one or more CIDR blocks (e.g., `192.168.1.0/24`) with optional human-readable labels (e.g., `"Office VPN"`).
   </Step>
   <Step title="Enable the allowlist">
-    For org-level allowlists, set `enabled: true` to begin enforcing. You can define rules with `enabled: false` first to stage your configuration before going live.
+    When you're ready, set `enabled: true` to begin enforcement. Via the Dashboard, you can add rules and enable separately. Via the API, you can define rules and enable in a single `set_ip_allowlist` call — but we recommend staging rules with `enabled: false` first to verify your configuration.
   </Step>
   <Step title="Requests are validated">
     Any API request whose source IP does not fall within an allowed CIDR block is rejected automatically.
@@ -62,14 +70,6 @@ This feature is ideal for:
 - If an API key has its own allowlist, only that key-level allowlist is checked for requests using that key.
 - If an API key does not have its own allowlist, the org-level allowlist is checked (if enabled).
 - If neither exists, requests are allowed from any IP.
-
-### Dashboard management
-
-Both org-level and API key-level allowlists can be managed from the Turnkey dashboard.
-
-<Note>
-  Actions taken from the dashboard are **not** validated against an IP allowlist. This is intentional — it ensures you cannot accidentally lock yourself out of managing your allowlist configuration.
-</Note>
 
 ## CIDR rules
 
@@ -233,6 +233,25 @@ Retrieves the current IP allowlist and rules for an organization or specific API
   If the allowlist has been removed, `get_ip_allowlist` returns an `allowlist` object with an empty `rules` array.
 </Note>
 
+### Data types
+
+#### `IpAllowlistRule` (response)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `cidr` | string | Yes | CIDR block |
+| `label` | string | No | Human-readable label (empty string if not set) |
+| `createdAt` | string | No | Creation timestamp as millisecond epoch string |
+
+#### `IpAllowlist` (response)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `organizationId` | string | Yes | The organization this allowlist belongs to |
+| `publicKey` | string | No | The API key this applies to. `null` for org-level policies. |
+| `enabled` | boolean | No | Whether the allowlist is active. Only present for org-level policies. |
+| `rules` | `IpAllowlistRule[]` | Yes | Array of allowlist rules |
+
 ## Code examples
 
 <Tabs>
@@ -328,44 +347,3 @@ Retrieves the current IP allowlist and rules for an organization or specific API
     ```
   </Tab>
 </Tabs>
-
-## Data types
-
-### `IpAllowlistIntentRule` (request)
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `cidr` | string | Yes | CIDR block (e.g., `"192.168.1.0/24"`, `"2001:db8::/48"`) |
-| `label` | string | No | Optional human-readable label (e.g., `"Office VPN"`) |
-
-### `IpAllowlistRule` (response)
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `cidr` | string | Yes | CIDR block |
-| `label` | string | No | Human-readable label (empty string if not set) |
-| `createdAt` | string | No | Creation timestamp as millisecond epoch string |
-
-### `IpAllowlist` (response)
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `organizationId` | string | Yes | The organization this allowlist belongs to |
-| `publicKey` | string | No | The API key this applies to. `null` for org-level policies. |
-| `enabled` | boolean | No | Whether the allowlist is active. Only present for org-level policies. |
-| `rules` | `IpAllowlistRule[]` | Yes | Array of allowlist rules |
-
-### `SetIpAllowlistIntent` (request parameters)
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `publicKey` | string | No | API key public key. Omit for org-level. |
-| `enabled` | boolean | No | Enable/disable enforcement. Org-level only. |
-| `rules` | `IpAllowlistIntentRule[]` | Yes | Array of rules. Can be empty. |
-| `onEvaluationError` | string | No | `"ALLOW"` or `"DENY"` — behavior when source IP cannot be determined |
-
-### `RemoveIpAllowlistIntent` (request parameters)
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `publicKey` | string | No | API key public key. Omit to remove the org-level allowlist. |
