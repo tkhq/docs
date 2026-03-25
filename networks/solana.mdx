@@ -63,6 +63,25 @@ Turnkey has built a Solana parser which runs in a secure enclave, to parse unsig
 
 As a bonus, Turnkey also takes care of combining the signature with the original payload if you use the `SIGN_TRANSACTION` activity types: the input is the unsigned payload, and the output is the signed Solana transaction, ready to be broadcast onchain.
 
+### SIGN_TRANSACTION vs SIGN_RAW_PAYLOAD
+
+These two signing endpoints have different behaviors that are worth understanding:
+
+- **`SIGN_TRANSACTION`** passes the transaction through Turnkey's parser before signing. This enables Solana transaction policies (e.g. restricting which programs or accounts can be interacted with) and produces a fully-assembled signed transaction as output. Any transaction that does not parse successfully will return an error before signing occurs.
+- **`SIGN_RAW_PAYLOAD`** does not parse the transaction — it blindly signs the bytes provided. This means no parsing errors, but also no policy evaluation against transaction contents. You receive the raw signature as output and must assemble it back into the transaction yourself.
+
+If you do not need Solana transaction policies and are working with transactions from third-party APIs that may not conform to common instruction patterns, `SIGN_RAW_PAYLOAD` is a viable fallback.
+
+### System Program Transfer instructions with extra accounts
+
+The Solana System Program Transfer instruction canonically takes two accounts: `from` (the funding address) and `to` (the recipient). However, the Solana runtime is permissive — any accounts beyond the first two are silently ignored during execution.
+
+Turnkey's parser matches this permissive behavior: if a System Program Transfer instruction includes more than two accounts, the extra accounts are ignored and the transaction is accepted.
+
+<Note>
+  This is relevant when using third-party transaction builders. For example, [Jupiter Limit Order v2 deposit transactions](https://dev.jup.ag/api-reference/trigger/v2/deposit-craft) include a third signer account in the System Program Transfer instruction. Turnkey handles these correctly — no pre-processing is required before calling `SIGN_TRANSACTION`.
+</Note>
+
 ### Solana IDLs
 
 You can use Solana IDLs in conjunction with our policy engine to secure users' transactions. See [the guide](/concepts/policies/smart-contract-interfaces) for more details.
