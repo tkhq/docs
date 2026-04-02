@@ -1,30 +1,31 @@
 ---
 title: "Embedded WaaS"
 description:
-  "Build a white-labeled Wallet-as-a-Service product on Turnkey for your developer platform. This
-  guide covers the step-by-step implementation for embedding non-custodial wallets into your
-  platform."
+  "Build a white-labeled Wallet-as-a-Service product on Turnkey. This guide covers the step-by-step
+  implementation for embedding dedicated, non-custodial wallets with authenticators and signing
+  rules into your platform."
 ---
 
 ## Why Turnkey for Embedded WaaS?
 
-Turnkey provides the infrastructure to embed wallets into your developer product. Use it to
-provision isolated user wallets within secure enclaves, enforce signing policies and spending
-limits, and build white-labeled SDKs and UI components on top of Turnkey's API.
+Turnkey provides the infrastructure to embed wallets directly into your developer product without
+building or managing key management yourself. Use it to provision isolated user wallets, enforce
+signing policies, and create your own APIs, SDKs, and UI components on top of Turnkey.
 
 ## Core Principles
 
 - **Segregated environments per end user:** Each end user's wallets, credentials, policies, and
   activity logs are fully isolated from other users and from your platform's management layer.
-- **Configurable admin and billing controls:** Every fund-moving transaction requires sign-off from
-  both the end user and your platform, to enforce billing and compliance at the signing layer, not
-  only in application code.
+- **Configurable admin and billing controls:** For every fund-moving transaction, you can require
+  approval from both the end user and your platform, enforced directly at the signing layer.
 - **User-authenticated action:** No transaction executes without the end user’s authentication
   (e.g., passkey).
-- **Non-custodial by design:** Your platform controls allow you to block transactions but cannot
-  move funds without user sign-off.
+- **Non-custodial by design:** End users remain in control of their keys, while platform controls
+  allow you to manage transaction-level approvals.
 - **User-controlled key export:** End users can [export their wallet](/wallets/export-wallets)
-  independently, even if your platform goes offline or they choose to leave.
+  independently if they choose to leave, or if your platform goes offline.
+- **Quorum control:** 2-of-2 root quorum ensures billing, compliance, and risk controls are enforced
+  at the cryptographic layer, while guaranteeing explicit user consent on every transaction.
 
 ## Architecture
 
@@ -42,13 +43,13 @@ quorum signing.
 
 The sequence below describes the default funds-moving flow under the 2-of-2 root quorum model:
 
-- End user initiates a transaction from the embedded wallet UI.
-- End user approves via their authenticator (e.g. passkey). Turnkey records the activity as
+- End user initiates a transaction from your embedded wallet UI.
+- End user approves via their authenticator (e.g., passkey). Turnkey records the activity as
   partially approved.
 - Your platform evaluates on its own backend: billing status, risk/compliance rules, and any other
   checks.
-- Provider approves via API key. The transaction executes.
-- If the provider withholds approval, the transaction does not execute.
+- Your platform approves via API key and the transaction executes.
+- If the platform withholds approval, the transaction does not execute.
 
 <Frame>
   <img
@@ -64,7 +65,8 @@ Relevant docs: [Activities & approvals](/concepts/overview#activities) |
 
 ### Step 1: Define the Tenant Model and Ownership Boundaries
 
-Map each end user to a [Turnkey sub-organization](/concepts/sub-organizations).
+Map each end user to a [Turnkey sub-organization](/concepts/sub-organizations). The standard
+approach is one sub-org per end user.
 
 - **Isolated tenants:** Each sub-org is a self-contained data boundary, with wallets, policies,
   authenticators, and activity logs fully isolated from one another.
@@ -73,25 +75,12 @@ Map each end user to a [Turnkey sub-organization](/concepts/sub-organizations).
 - **External mapping:** Track the relationship between your platform's user IDs and their
   corresponding Turnkey sub-org IDs in your own database.
 
-### Choose Your Custody Model
-
-Turnkey's primitives are flexible enough to support a wide range of custody configurations, which
-can be combined with other models (e.g., self-custody or custodial) to support your needs. For
-embedded WaaS, we recommend a co-managed custody model:
-
-| Consideration          | Co-managed (Recommended)                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Transaction control    | Both end user and your platform must approve. Cryptographic enforcement of billing, compliance, and risk controls. |
-| Custody classification | Non-custodial. Your platform can block but not move funds alone.                                                   |
-| Setup complexity       | Staged sub-org creation (create at 1-of-2, configure policies, raise to 2-of-2).                                   |
-| Best fit               | Most WaaS products needing billing gates, compliance holds, or service-level transaction approval.                 |
-
 Relevant docs: [Sub-organizations](/concepts/sub-organizations) |
 [Root quorum](/concepts/users/root-quorum)
 
 ### Step 2: Design the Sub-Organization Control Model
 
-Define what lives inside each sub-org and how control is shared between the platform and the end
+Define what lives inside each sub-org and how control is shared between your platform and the end
 user.
 
 - **End user (root):** Authenticated via passkey or equivalent user-controlled authenticator.
@@ -112,12 +101,11 @@ and baseline policies.
 
 For the 2-of-2 quorum model, establish the threshold last so the backend can configure policies
 (including export) with only your platform’s approval. Start by creating a sub-org with both root
-users and wallets. Then, create the export policy while the platform has sole root access (Step 3b).
-Once the 2-of-2 quorum is established (step 3c), the end user can trigger exports via this policy
-without needing your platform’s co-signature.
-
-This keeps the co-managed model non-custodial because end users can always export their keys and
-access their funds directly, independent of your platform.
+users and wallets (Step 3a). Then, create the export policy while the platform has sole root access
+(Step 3b). Once the 2-of-2 quorum is established (Step 3c), the end user can trigger exports via
+this policy without needing your platform’s co-signature. This keeps the co-managed model
+non-custodial because end users can always export their keys and access their funds directly,
+independent of your platform.
 
 | Step | Action                                        | Quorum State |
 | ---- | --------------------------------------------- | ------------ |
@@ -132,7 +120,7 @@ const subOrg = await turnkeyClient.createSubOrganization({
   parameters: {
     subOrganizationName: `User Wallet - ${userId}`,
     rootUsers: [
-      { userName: "WaaS Provider", apiKeys: [{ publicKey: PROVIDER_KEY }] },
+      { userName: "Platform", apiKeys: [{ publicKey: PROVIDER_KEY }] },
       {
         userName: "End User",
         authenticators: [
@@ -187,13 +175,13 @@ Relevant docs: [Export wallets](/wallets/export-wallets) |
 
 ### Step 4: Build the Developer-Facing SDK or Integration Surface
 
-Create the SDK, APIs, or UI components that downstream developers integrate with. Abstract away
+Create the SDK, APIs, or UI components that downstream developers will integrate with. Abstract away
 Turnkey and expose only your platform's intended wallet, auth, and signing flows.
 
 - **Embedded Wallet Kit (EWK):** Fork or wrap [Embedded Wallet Kit](/sdks/react/index) components
-  (e.g. authentication, wallet UI, and approval prompts) with your branding and surface "pending
-  provider approval" states.
-- **Backend service:** Handle provider root approvals (via API key), billing and risk evaluation,
+  (e.g., authentication, wallet UI, and approval prompts) with your branding and surface "pending
+  platform approval" states.
+- **Backend service:** Handle platform root approvals (via API key), billing and risk evaluation,
   and activity monitoring through your backend.
 - **SDK abstraction layer:** Wrap Turnkey's SDK calls behind your own interface for full control
   over the developer experience, with flexibility to swap or upgrade infrastructure without breaking
@@ -223,7 +211,7 @@ working embedded wallet.
 
 | Need                                               | Configuration                                                                                                                                                                                      |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fintech or neobank with card-linked crypto wallets | **Co-managed with billing gates:** Provider co-signs after verifying account standing. Export policy as user escape hatch. Passkey auth for consumer UX.                                           |
+| Fintech or neobank with card-linked crypto wallets | **Co-managed with billing gates:** Platform co-signs after verifying account standing. Export policy as user escape hatch. Passkey auth for consumer UX.                                           |
 | Dev tooling platform reselling embedded wallets    | **White-labeled EWK with SDK abstraction:** Downstream developers integrate with your SDK, never touching Turnkey directly. Segregated environments per end user, provider co-sign for compliance. |
 | Self-custody consumer wallet                       | **Self-custody model:** Maximum user sovereignty. Provider handles auth initiation and UX but has no signing authority. Application-layer controls for billing.                                    |
 | Institutional or high-value accounts               | **Co-managed with policy-based limits:** Transaction-aware policies for amount thresholds, sanctioned address deny-lists, and chain restrictions.                                                  |
@@ -252,15 +240,13 @@ With Turnkey, DIMO delivered:
 - **Passkey-first onboarding:** DIMO replaced seed phrases and external wallet installs with
   Turnkey's passkey authentication, cutting sign-in time from 2 minutes to 10 seconds and boosting
   onboarding completion by 30%.
+- **Fully branded interface:** DIMO built a native auth and signing experience on an open-source
+  [transactions SDK](https://github.com/DIMO-Network/transactions), powered by Turnkey’s Embedded
+  WaaS passkey-based signing.
 - **Sub-org per user with full ownership:** Each driver gets an independent sub-organization, giving
   them complete control of their credentials and transactions while DIMO retains the governance
   layer needed for enterprise compliance.
-- **On-chain transaction SDK:** DIMO's open-source
-  [transactions SDK](https://github.com/DIMO-Network/transactions) uses Turnkey's stamper and signer
-  primitives directly, supporting vehicle registration, data permissions (SACD), staking, and device
-  pairing, all backed by smart account sessions to minimize signature prompts.
-- **2-3 week integration:** Full deployment into DIMO's global login stack completed in under three
-  weeks using Turnkey's SDKs and responsive support.
+- **2-3 week integration:** DIMO deployed into their global login stack in under three weeks.
 
 Read the full case study:
 [How DIMO is bringing transportation solutions onchain with Turnkey](https://www.turnkey.com/customers/how-dimo-is-bringing-transportation-solutions-onchain-with-turnkey)
