@@ -1,32 +1,27 @@
 ---
 title: "Enterprise Disaster Recovery"
-description: "Import and recover wallets in Turnkey’s secure enclaves with controlled access. "
+description: "Import and recover wallets with strict access controls. "
 ---
 
-This guide covers how to migrate or replicate your wallet infrastructure for incident response,
-provider migration, and wallet backups.
+This guide covers how to backup your wallets on Turnkey for incident response, provider migration,
+and wallet backups.
 
 ## Why Turnkey for Enterprise Disaster Recovery?
 
-Turnkey provides a secure foundation for enterprise disaster recovery that eliminates the tradeoffs
-between security and operability. Our approach combines
+Turnkey provides a secure foundation for disaster recovery. Our approach combines
 [secure enclaves](/security/secure-enclaves), end-to-end encryption, and
 [programmable policies](/concepts/policies/overview) to ensure recovery material is protected at
 rest, in transit, and during use.
 
 ## Core principles
 
-Bulleted list of key components to keep in mind for this solution:
-
 - **End-to-end encryption:** All key import material is encrypted directly to Turnkey's secure
   enclave using [HPKE (Hybrid Public Key Encryption)](/security/enclave-secure-channels). The
   plaintext never exists outside the enclave boundary.
-- **Zero exposure during import:** When importing wallets or private keys, the material is encrypted
-  on the user's device before transmission. Turnkey's infrastructure only ever sees encrypted blobs.
 - **Cryptographic audit trail:** Every recovery operation during transmission and import is
   cryptographically stamped, ensuring that recoveries can not be tampered with along the way.
-- **Policy-based guardrails:** Turnkey’s [policy engine](/concepts/policies/overview) restricts what
-  recovered wallets can do, like limiting fund movement to allowed addresses or requiring multiple
+- **Policy-based guardrails:** Turnkey’s [policy engine](/concepts/policies/overview) restricts how
+  wallets are accessed, like limiting fund movement to allowed addresses or requiring multiple
   approvals from your organization.
 
 ## Direct Import Flow
@@ -40,13 +35,12 @@ Bulleted list of key components to keep in mind for this solution:
 
 ## How to Get Started on Enterprise Disaster Recovery with Turnkey
 
-1. **Secure organization setup and recovery policies**: Create your Turnkey org, configure the root
-   quorum, and define recovery policies.
+1. **Secure organization & policy setup**: Create your Turnkey org, configure the root quorum, and
+   define recovery policies.
 2. **Set up the Turnkey SDK**: Integrate
    [React Wallet Kit](/sdks/react/using-embedded-wallets#importing-and-exporting-wallets) or
    [@turnkey/sdk-server](/embedded-wallets/code-examples/import#nodejs) into your application.
 3. **Import wallets**: Use handleImportWallet() to import wallet keys into Turnkey's secure enclave.
-4. **Sweep funds to a treasury**: Execute policy-controlled fund movement to approved addresses.
 
 ## **Use Cases**
 
@@ -69,84 +63,46 @@ security foundation for recovery operations:
     compromise can trigger unauthorized recovery. See [Policy overview](/concepts/policies/overview)
     for setup guidance.
 
-```json
-{
-  "policyName": "DR-Sweep-Only-Policy",
-  "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && eth.tx.to in ['<SAFE_TREASURY_1>', '<SAFE_TREASURY_2>']",
-  "consensus": "approvers.any(user, user.id == '<DR_AUTOMATION_USER_ID>')"
-}
-```
-
 - Distribute authenticators ([passkeys](/authentication/passkeys/introduction), YubiKeys) across
   geographic locations if possible
 - Define [policies](/concepts/policies/examples/signing-control) that restrict what can be done with
-  recovered wallets. For example, limit fund sweeping to pre-approved treasury addresses only:
+  recovered wallets.
 
 ### 2. Set up the Turnkey SDK
 
-Integrate Turnkey into your application to enable wallet import and recovery operations. The React
-Wallet Kit provides a drop-in component that handles the entire import flow, including encryption
-and secure transport.
+Integrate Turnkey into your application to enable wallet import and recovery operations. The
+[NodeJS server SDK](https://github.com/tkhq/sdk/tree/main/examples/import-in-node) is well oriented
+to handle the entire import flow, including encryption and secure transport.
 
 ```ts
+import { Turnkey } from "@turnkey/sdk-server";
+import { encryptPrivateKeyToBundle, encryptWalletToBundle } from "@turnkey/crypto";
 
-import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+const initResult = await turnkeyClient.apiClient().initImportWallet({
+  userId,
+});
 
-const turnkeyConfig = {
-  organizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
-  authProxyConfigId: process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID!,
-};
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <TurnkeyProvider config={turnkeyConfig}>
-      {children}
-    </TurnkeyProvider>
-  );
-}
+const walletBundle = await encryptWalletToBundle({
+  mnemonic,
+  importBundle: initResult.importBundle,
+  userId,
+  organizationId,
+});
 ```
-
-For server-side recovery operations, use the
-[@turnkey/sdk-server](/embedded-wallets/code-examples/import#nodejs) package.
 
 ### 3. Import Wallets
 
-Use handleImportWallet() to import wallet keys into Turnkey's secure enclave. Behind the scenes, the
-SDK encrypts the mnemonic or private key to Turnkey's enclave public key using
-[HPKE (Hybrid Public Key Encryption)](/security/enclave-secure-channels), transmits the encrypted
-bundle, and the enclave decrypts and stores the key material. Plaintext key material never leaves
-the user's device.
+Use [importWallet()](/generated-docs/core/turnkey-client-import-wallet) to import wallet keys into
+Turnkey's secure enclave. In the last step the SDK encrypts the mnemonic or private key to Turnkey's
+enclave public key using [HPKE (Hybrid Public Key Encryption)](/security/enclave-secure-channels),
+and now transmits the encrypted bundle. The enclave decrypts and stores the key material.
 
 ```ts
-const handleImportWallet = async () => {
-  const defaultWalletAccounts = ["ADDRESS_FORMAT_ETHEREUM", "ADDRESS_FORMAT_SOLANA"];
-
-  await turnkey.handleImportWallet({
-    defaultWalletAccounts,
-    successPageDuration: 5000,
-  });
-};
-```
-
-### 4. Sweep funds to treasury
-
-With policies in place, execute fund movement to approved treasury addresses. See example for sweep
-native ETH
-
-```ts
-const txStatusId = await apiClient.ethSendTransaction({
-  transaction: {
-    from: "<RECOVERED_WALLET_ADDRESS>",
-    to: "<SAFE_TREASURY_ADDRESS>",
-    caip2: "eip155:1",
-    value: "<SWEEP_AMOUNT_IN_WEI>",
-    data: "0x",
-  },
-});
-
-const result = await apiClient.pollTransactionStatus({
-  sendTransactionStatusId: txStatusId,
+const walletImportResult = await turnkeyClient.apiClient().importWallet({
+  userId: userId,
+  walletName: "Your imported wallet!",
+  encryptedBundle: walletBundle,
+  accounts: [],
 });
 ```
 
