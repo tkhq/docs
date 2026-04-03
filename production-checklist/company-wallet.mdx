@@ -3,19 +3,16 @@ title: "Company Wallets implementation guide"
 description: "Implementing Company Wallets with Turnkey"
 ---
 
-Turnkey's infrastructure provides a secure, flexible way to manage crypto operations at scale, letting you automate everything from
-routine payments and treasury transfers to smart contract deployments and NFT minting.
+Turnkey's infrastructure provides a secure, flexible way to manage crypto operations at scale, letting you automate everything from routine payments and treasury transfers to smart contract deployments and NFT minting.
 
-In this guide, we'll walk through the key decisions you'll face integrating Turnkey, and how to design a high-throughput workflow
-without compromising on security or user experience.
+In this guide, we'll walk through the key decisions you'll face integrating Turnkey, and how to design a high-throughput workflow without compromising on security or user experience.
 
 ## Wallet structure: how to organize and scale your wallets
 
 Every transaction starts with a wallet. The way you structure them will shape how scalable and maintainable your automation setup is.
 
-**Option 1:** Single wallet with many accounts (HD path fan-out)  
-By default, Turnkey wallets use a hierarchical deterministic (HD) structure. That means you can generate unlimited accounts
-from a single wallet seed, each with its own address. This is ideal for:
+**Option 1:** Single wallet with many accounts (HD path fan-out)\
+By default, Turnkey wallets use a hierarchical deterministic (HD) structure. That means you can generate unlimited accounts from a single wallet seed, each with its own address. This is ideal for:
 
 - Managing multiple user deposit addresses
 - Creating large numbers of accounts for batching or privacy
@@ -23,20 +20,17 @@ from a single wallet seed, each with its own address. This is ideal for:
 
 This approach scales well and stays simple: one wallet, one policy, multiple accounts.
 
-**Option 2:** Multiple wallets in a single org  
+**Option 2:** Multiple wallets in a single org\
 Use this when you need separation by use case. For example:
 
 - One wallet for treasury ops
 - One for NFT mints
 - One for sequencing contracts
 
-Policies can be set at the wallet level to enforce clear boundaries (e.g. only certain users or services can touch the NFT minting wallet).
-Note Turnkey's [resource limits](https://docs.turnkey.com/concepts/resource-limits#resource-limits) and ensure your intended
-scaled implementation fits within those limits.
+Policies can be set at the wallet level to enforce clear boundaries (e.g. only certain users or services can touch the NFT minting wallet). Note Turnkey's [resource limits](https://docs.turnkey.com/concepts/resource-limits#resource-limits) and ensure your intended scaled implementation fits within those limits.
 
-**Option 3:** Separate sub-orgs per wallet  
-This option is best when you need strict isolation — e.g. multi-tenant environments, or wallets with different authentication requirements.
-Each sub-org has its own root users and policy namespace. Downside: more setup, more moving parts.
+**Option 3:** Separate sub-orgs per wallet\
+This option is best when you need strict isolation — e.g. multi-tenant environments, or wallets with different authentication requirements. Each sub-org has its own root users and policy namespace. Downside: more setup, more moving parts.
 
 Most teams use a combination: they generate many accounts under a few wallets and reserve sub-orgs for user-facing or high-risk cases.
 
@@ -44,7 +38,7 @@ Most teams use a combination: they generate many accounts under a few wallets an
 
 Transaction automation can be reactive, proactive, or user-driven. The right model depends on your use case.
 
-**Event-driven (most common):**  
+**Event-driven (most common):**\
 A transaction is triggered by an external event — a webhook, an internal job, or an offchain signal. Examples:
 
 - Market resolution triggers a payout
@@ -53,21 +47,21 @@ A transaction is triggered by an external event — a webhook, an internal job, 
 
 Use a background worker or event system to translate that trigger into a signing request.
 
-**Scheduled:**  
+**Scheduled:**\
 Useful for treasury management, yield compounding, or periodic distribution flows. Run a job hourly/daily and trigger signing from there.
 
-**Manual with automation fallback:**  
-Sometimes a human should have the final say, but you want the transaction to be ready to go. You can submit a tx to Turnkey
-that requires approval, then notify a signer via Slack, email, or dashboard.
+**Manual with automation fallback:**\
+Sometimes a human should have the final say, but you want the transaction to be ready to go. You can submit a tx to Turnkey that requires approval, then notify a signer via Slack, email, or dashboard.
 
-Tip: Think in terms of "intent capture" (when does your system decide something needs to happen) vs. "signing execution"
-(when and how does it actually get signed).
+Tip: Think in terms of "intent capture" (when does your system decide something needs to happen) vs. "signing execution" (when and how does it actually get signed).
 
 ## Policy model: what rules do you want enforced?
 
 Policies are your automation safety net. Every action goes through the policy engine before it's allowed, and is explicitly denied by default.
 
-You'll want to decide:  
+For an additional layer of network-level protection, consider enabling [IP allowlisting](/security/ip-allowlisting) to restrict which source IPs can make API requests in the first place — a useful complement to policy rules for backend automation keys.
+
+You'll want to decide:\
 **How many approvers?**
 
 - Use single-party approvals for low-risk flows (e.g. daily payouts)
@@ -98,17 +92,16 @@ Most automation systems have 3-5 core policies and evolve them as their product 
 
 All interfaces (CLI, SDK, API) go through the same policy and enclave flow. The only difference is where your logic lives.
 
-**CLI:**  
+**CLI:**\
 Best for prototyping or scripting internal workflows (e.g. rotate a key, create a wallet). You can also use it in CI pipelines.
 
-**SDK:**  
-Ideal for integrating into apps or backend services. Available in multiple programming languages. Handles signing, retries,
-and activity submission.
+**SDK:**\
+Ideal for integrating into apps or backend services. Available in multiple programming languages. Handles signing, retries, and activity submission.
 
-**Direct API:**  
+**Direct API:**\
 Use this if you want full control or are building from a non-standard language. Slightly more effort to get right, but fully supported.
 
-**Dashboard:**  
+**Dashboard:**\
 Not for automation — but useful for manual approval flows, audit trails, and monitoring.
 
 **Common pattern:**
@@ -120,22 +113,17 @@ Not for automation — but useful for manual approval flows, audit trails, and m
 
 Graveyard - add back when IndexedDb launches
 
-By default, session keys are stored in IndexedDB when running in the browser. These keys are non-extractable and can't be accessed by your app,
-by Turnkey, or by anything else running on the page. On mobile, session keys will typically be stored in the device's secure storage layer
-(e.g. Keychain or Keystore) depending on the SDK and environment.
+By default, session keys are stored in IndexedDB when running in the browser. These keys are non-extractable and can't be accessed by your app, by Turnkey, or by anything else running on the page. On mobile, session keys will typically be stored in the device's secure storage layer (e.g. Keychain or Keystore) depending on the SDK and environment.
 
-The biggest decision is how long sessions should last. Longer-lived sessions reduce friction, enabling users to stay signed in across reloads,
-tabs, or app restarts. For most embedded wallet use cases, long-lived sessions in IndexedDB strike a good balance between usability and safety.
+The biggest decision is how long sessions should last. Longer-lived sessions reduce friction, enabling users to stay signed in across reloads, tabs, or app restarts. For most embedded wallet use cases, long-lived sessions in IndexedDB strike a good balance between usability and safety.
 
-Scoping  
+Scoping\
 You'll also want to decide whether your sessions should be scoped.
 
-Scoped sessions allow you to define exactly what a given session key is allowed to do — and enforce it via Turnkey's policy engine. For example,
-you can issue sessions that:
+Scoped sessions allow you to define exactly what a given session key is allowed to do — and enforce it via Turnkey's policy engine. For example, you can issue sessions that:
 
 - are read-only
 - can only sign transactions below a certain value
 - can only interact with specific contracts or functions (e.g. a swap function on Uniswap)
 
-This gives you a flexible way to enforce step-up authentication flows (e.g. OTP for read-only, passkey + OTP for full signing),
-build approval-based transaction flows, or safely grant session access in more complex environments.
+This gives you a flexible way to enforce step-up authentication flows (e.g. OTP for read-only, passkey \+ OTP for full signing), build approval-based transaction flows, or safely grant session access in more complex environments.
