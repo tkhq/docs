@@ -1,5 +1,5 @@
 ---
-title: "Client-side Signing"
+title: "Client-side signing"
 ---
 
 This guide covers how to set up client-side signing using Turnkey's `@turnkey/iframe-stamper` package and the `export-and-sign` iframe. This architecture enables secure transaction and message signing directly in the browser without exposing private keys to your application code. Note that mishandling of exported private keys introduces inherent risks; please proceed with caution.
@@ -35,7 +35,7 @@ flowchart TB
     stamper <-->|"MessageChannel"| iframe
 ```
 
-### Security Model
+### Security model
 
 1. **Iframe Isolation**: Private keys never touch your application's JavaScript context
 2. **HPKE Encryption**: Export bundles are encrypted end-to-end using RFC 9180
@@ -56,7 +56,7 @@ flowchart TB
 npm install @turnkey/iframe-stamper @turnkey/sdk-server
 ```
 
-## Environment Variables
+## Environment variables
 
 ```bash
 # .env.local
@@ -70,11 +70,11 @@ API_PUBLIC_KEY=<your-api-public-key>
 API_PRIVATE_KEY=<your-api-private-key>
 ```
 
-## Sample Implementation
+## Sample implementation
 
 Note: the following is for a NextJS application with a separate frontend and backend. The foundations should be applicable for other configurations.
 
-### Step 1: Initialize the IframeStamper
+### Step 1: initialize the IframeStamper
 
 Create a component that initializes the iframe and manages its lifecycle.
 
@@ -115,7 +115,7 @@ function SigningComponent() {
 
 For an example in context, we highly recommend taking a look at the [wallet-export-sign example app](https://github.com/tkhq/sdk/blob/0af0303ca4714cf65f5177cdb05f824877713d2a/examples/wallet-export-sign/src/components/Export.tsx#L62-L107).
 
-### Step 2: Create the Export Caller (Backend or Client-side)
+### Step 2: create the export caller (backend or client-side)
 
 The export call can be made from a backend API route or a trusted client-side environment. The example below shows a server-side API route; if you call from the client, avoid exposing key material.
 
@@ -149,7 +149,7 @@ export default async function handler(
 }
 ```
 
-### Step 3: Export a Private Key to the Iframe
+### Step 3: export a private key to the iframe
 
 ```typescript
 import { KeyFormat } from "@turnkey/iframe-stamper";
@@ -190,7 +190,7 @@ async function exportKeyToIframe(
 }
 ```
 
-### Step 4: Sign Messages
+### Step 4: sign messages
 
 ```typescript
 import { MessageType } from "@turnkey/iframe-stamper";
@@ -212,7 +212,7 @@ async function signMessage(
 }
 ```
 
-### Step 5: Sign Transactions
+### Step 5: sign transactions
 
 ```typescript
 import { TransactionType } from "@turnkey/iframe-stamper";
@@ -234,11 +234,11 @@ async function signTransaction(
 }
 ```
 
-## Multi-Key Support
+## Multi-key support
 
 One of the key capabilities of client-side signing is the ability to load and manage multiple private keys simultaneously within the iframe.
 
-### Loading Multiple Keys
+### Loading multiple keys
 
 Since the embedded key persists across bundle injections, you can export multiple keys using the same embedded key (as long as it hasn't expired):
 
@@ -270,7 +270,7 @@ async function loadMultipleKeys(
 }
 ```
 
-### Signing with Different Keys
+### Signing with different keys
 
 ```typescript
 // Sign with the first address
@@ -286,7 +286,7 @@ const sig2 = await iframeStamper.signMessage(
 );
 ```
 
-### Clearing Keys
+### Clearing keys
 
 ```typescript
 // Clear a specific key
@@ -296,25 +296,25 @@ await iframeStamper.clearEmbeddedPrivateKey("address1...");
 await iframeStamper.clearEmbeddedPrivateKey();
 ```
 
-## Key Lifecycle and Expiration
+## Key lifecycle and expiration
 
 Understanding the key lifecycle is important for building reliable applications.
 
-### Embedded Key (P-256 ECDH)
+### Embedded key (P-256 ECDH)
 
 - **Storage**: localStorage within the iframe
 - **TTL**: 48 hours (default)
 - **Purpose**: Decrypt incoming export bundles via HPKE
 - **Behavior**: Persists across bundle injections - the same embedded key can decrypt multiple export bundles until it expires or is explicitly cleared
 
-### In-Memory Private Keys
+### In-memory private keys
 
 - **Storage**: JavaScript memory only (never persisted)
 - **TTL**: 24 hours
 - **Purpose**: Sign messages and transactions
 - **Behavior**: Lost on page reload, cleared on expiration
 
-### Handling Expiration
+### Handling expiration
 
 ```typescript
 // Re-export flow when keys expire or page reloads
@@ -336,14 +336,14 @@ async function ensureKeyLoaded(
 }
 ```
 
-## Key Formats
+## Key formats
 
 | Format                  | Description                                      | Use Case                       |
 | ----------------------- | ------------------------------------------------ | ------------------------------ |
 | `KeyFormat.Solana`      | Base58-encoded 64-byte format (private + public) | Phantom, Solflare, Solana keys |
 | `KeyFormat.Hexadecimal` | 64 hexadecimal digits (32 bytes)                 | Non-Solana                     |
 
-## Complete Example
+## Complete example
 
 Here's a complete React component demonstrating the full flow:
 
@@ -474,7 +474,7 @@ The embedded key may have expired (48-hour TTL) or been explicitly cleared. Call
 
 The bundle was created for a different organization. Ensure your backend uses the same organization ID as passed to `injectKeyExportBundle`.
 
-## Best Practices
+## Best practices
 
 1. **Always pass the address parameter**: When using multi-key support, always specify which address to sign with
 2. **Reuse the embedded key**: The embedded key persists across bundle injections, so you can export multiple keys without re-initializing
@@ -484,7 +484,7 @@ The bundle was created for a different organization. Ensure your backend uses th
 
 ## Reference
 
-### IframeStamper Methods
+### IframeStamper methods
 
 | Method                                                    | Description                            |
 | --------------------------------------------------------- | -------------------------------------- |
@@ -498,14 +498,14 @@ The bundle was created for a different organization. Ensure your backend uses th
 | `signTransaction(transaction, address?)`                  | Sign a transaction                     |
 | `clearEmbeddedPrivateKey(address?)`                       | Clear in-memory keys                   |
 
-### Supported Operations
+### Supported operations
 
 | Operation           | Solana | Ethereum |
 | ------------------- | ------ | -------- |
 | Message signing     | Yes    | Planned  |
 | Transaction signing | Yes    | Planned  |
 
-## Additional Resources
+## Additional resources
 
 - [Example: wallet-export-sign](https://github.com/tkhq/sdk/tree/main/examples/wallet-export-sign) - Sample Next.js app
 - [@turnkey/iframe-stamper](https://github.com/tkhq/sdk/tree/main/packages/iframe-stamper) - Package source code
