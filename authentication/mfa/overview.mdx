@@ -1,0 +1,121 @@
+---
+title: "Multi-Factor Authentication (MFA)"
+description: "Learn about multi-factor authentication (MFA) in Turnkey and how to use MFA policies to require multiple forms of authentication for specific activities."
+sidebarTitle: "Overview"
+---
+
+## What is multi-factor authentication (MFA)?
+
+Requests made to Turnkey's public API are required to be authenticated using [an API key or WebAuthn stamp](/developer-reference/api-overview/stamps). MFA adds an additional layer of security by requiring users to provide multiple forms of authentication before they can perform specific activities. 
+
+MFA is highly customizable and can be configured to require any combination of supported authentication methods for different activities.
+
+## MFA policies
+MFA policies are a unique resource type in Turnkey that allows configuation of authentication requirements, scoped to a specific condition.
+
+MFA policies can be created by parent, or sub-organization users and are tied to the targetted user. 
+
+Once an MFA policy is created, it is immediately enforced for the user.
+
+### MFA policy structure
+
+An MFA policy can be created using the `CreateMfaPolicy` activity and passing in the following parameters:
+- `userId`: The ID of the user the policy applies to
+- `mfaPolicyName`: The name of the MFA policy
+- `condition`: A string of [policy language](/concepts/policies/language) that evaluates to true or false based on the context of an activity. If the condition evaluates to true, the specified authentication methods are required.
+- `requiredAuthenticationMethods`: An array of authentication methods that are required when the policy condition is met. Methods can be logically "OR-ed" together by grouping them in nested "ANY" blocks.
+- `order`: An integer that specifies the order of evaluation for multiple MFA policies. Policies with lower order values are evaluated first. 
+- `notes`: Optional field for any additional information about the policy
+
+### Condition
+
+The `condition` field is a string written in Turnkey's [policy language](/concepts/policies/language). It determines **when** the MFA policy applies based on the context of the incoming activity.
+
+When a user submits a request, each of their MFA policies are evaluated in order. If a policy's condition evaluates to `true`, the authentication requirements defined in that policy must be satisfied before the activity can proceed.
+
+Conditions have access to the same [keywords available in regular policy conditions](/concepts/policies/language#keywords).
+
+**Examples:**
+
+``` ts
+// Require MFA for all signing activities
+activity.action == 'SIGN'
+
+// Require MFA for high-value Ethereum transfers (value > 1 ETH in wei)
+activity.action == 'SIGN' && eth.tx.value > 1000000000000000000
+
+// Require MFA for everything
+true
+```
+
+You can find more examples [here](./examples).
+
+### Required authentication methods
+
+The `requiredAuthenticationMethods` field defines an **ordered list of authentication steps** that the user must complete when the policy's condition is met. Each step is a `RequiredAuthenticationMethodParams` object containing an `any` array of `AuthenticationMethodParams`.
+
+The structure works as follows:
+
+- Each entry in `requiredAuthenticationMethods` represents a **sequential step** - all steps must be satisfied in order.
+- Within each step, the `any` array contains one or more authentication methods. If multiple methods are listed, the user must satisfy **any one of them** (logical OR).
+
+```json
+{
+  "requiredAuthenticationMethods": [
+    {
+      "any": [
+        { "type": "AUTHENTICATION_TYPE_API_KEY" }
+      ]
+    },
+    {
+      "any": [
+        { "type": "AUTHENTICATION_TYPE_PASSKEY" },
+        { "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }
+      ]
+    }
+  ]
+}
+```
+
+In the example above, the user must:
+1. Authenticate with an API key
+2. Authenticate with **either** a passkey **or** email OTP
+
+You can find more examples [here](./examples).
+
+Each `AuthenticationMethodParams` accepts:
+- `type` (required): The authentication type. Supported values:
+  - `AUTHENTICATION_TYPE_PASSKEY`
+  - `AUTHENTICATION_TYPE_API_KEY`
+  - `AUTHENTICATION_TYPE_SESSION`
+  - `AUTHENTICATION_TYPE_EMAIL_OTP`
+  - `AUTHENTICATION_TYPE_SMS_OTP`
+  - `AUTHENTICATION_TYPE_OAUTH`
+- `id` (optional): A specific authentication method's ID. When provided, only that specific authentication method satisfies the requirement. When omitted, any authentication method of the specified type can be used.
+
+### Evaluation order
+
+The `order` field is an integer that determines the evaluation priority when a user has multiple MFA policies. Policies with **lower order values are evaluated first**.
+
+When a request is made, each MFA policy is checked in order. The first policy whose condition evaluates to `true` determines the authentication requirements for that request. This allows you to create specific policies for sensitive operations with lower order values, and broader catch-all policies with higher order values.
+
+```json
+// Order 1: Strict MFA for signing - evaluated first
+{
+  "condition": "activity.action == 'SIGN'",
+  "order": 1,
+  "requiredAuthenticationMethods": [
+    { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }] },
+    { "any": [{ "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }] }
+  ]
+}
+
+// Order 2: Lighter MFA for everything else - evaluated second
+{
+  "condition": "true",
+  "order": 2,
+  "requiredAuthenticationMethods": [
+    { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }, { "type": "AUTHENTICATION_TYPE_API_KEY" }] }
+  ]
+}
+```
