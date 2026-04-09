@@ -8,9 +8,9 @@ Note: see the [language section](/concepts/policies/language#tempo) for more det
 
 ## Overview
 
-Tempo transactions have limited policy support compared to other blockchain types. Unlike Ethereum, Solana, Bitcoin, and Tron, Tempo does not expose transaction-specific fields (such as `tempo.tx`) in the policy engine. The primary way to govern Tempo transactions is through the `activity.params.type` field and other general policy attributes.
+Tempo transactions are fully parsed by the policy engine via the `tempo.tx` namespace. Tempo natively supports batched calls — a single transaction can contain multiple calls that execute atomically. The `tempo.tx.calls` list gives you granular access to each call's destination, input data, and function selector.
 
-## Policy examples
+## Transaction-level policies
 
 #### Allow Tempo transactions
 
@@ -19,6 +19,26 @@ Tempo transactions have limited policy support compared to other blockchain type
   "policyName": "Allow Tempo transactions",
   "effect": "EFFECT_ALLOW",
   "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
+}
+```
+
+#### Restrict to a specific chain ID
+
+```json
+{
+  "policyName": "Only allow Tempo testnet",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.chain_id == 42431"
+}
+```
+
+#### Allow specific fee token
+
+```json
+{
+  "policyName": "Only allow specific fee token",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.fee_token == '0xdAC17F958D2ee523a2206206994597C13D831ec7'"
 }
 ```
 
@@ -31,6 +51,148 @@ Tempo transactions have limited policy support compared to other blockchain type
   "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
 }
 ```
+
+#### Cap gas limit
+
+```json
+{
+  "policyName": "Deny high gas limit",
+  "effect": "EFFECT_DENY",
+  "condition": "tempo.tx.gas_limit > 100000"
+}
+```
+
+#### Cap max fee per gas
+
+```json
+{
+  "policyName": "Deny high max fee per gas",
+  "effect": "EFFECT_DENY",
+  "condition": "tempo.tx.max_fee_per_gas > 15000000000"
+}
+```
+
+#### Restrict validity window
+
+```json
+{
+  "policyName": "Deny transactions with specific valid_before",
+  "effect": "EFFECT_DENY",
+  "condition": "tempo.tx.valid_before == 9999999999"
+}
+```
+
+## Call-level policies
+
+Tempo transactions contain one or more calls in `tempo.tx.calls`. You can target individual calls by index or use quantifiers (`all`, `any`) to apply rules across all calls.
+
+#### Allow calls to a specific contract
+
+```json
+{
+  "policyName": "Allow calls to approved contract",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.calls[0].to == '0x40f008f4c17075EFcA092aE650655f6693AECEd0'"
+}
+```
+
+#### Allow ERC-20 transfer function selector
+
+```json
+{
+  "policyName": "Allow ERC-20 transfer calls",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.calls[0].function_signature == '0xa9059cbb'"
+}
+```
+
+#### Deny a specific call destination
+
+```json
+{
+  "policyName": "Deny calls to blocked address",
+  "effect": "EFFECT_DENY",
+  "condition": "tempo.tx.calls[0].to == '0x40f008f4c17075EFcA092aE650655f6693AECEd0'"
+}
+```
+
+#### Deny single-call transactions (require batching)
+
+```json
+{
+  "policyName": "Deny single-call transactions",
+  "effect": "EFFECT_DENY",
+  "condition": "tempo.tx.calls.count() == 1"
+}
+```
+
+## Batch call policies with quantifiers
+
+#### Allow only when all calls target an approved address
+
+```json
+{
+  "policyName": "All calls must target approved address",
+  "effect": "EFFECT_ALLOW",
+  "condition": "private_key.id == '<PRIVATE_KEY_ID>' && tempo.tx.calls.all(call, call.to == '0x40f008f4c17075EFcA092aE650655f6693AECEd0')"
+}
+```
+
+#### Allow only when all call destinations are known addresses
+
+```json
+{
+  "policyName": "All calls must target known address",
+  "effect": "EFFECT_ALLOW",
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls.all(call, call.to == '<ALLOWED_ADDRESS>')"
+}
+```
+
+## Raw calldata inspection
+
+Since Tempo does not support [Smart Contract Interfaces](/concepts/policies/smart-contract-interfaces) (ABI parsing), you can use slicing on `tempo.tx.calls[i].input` to inspect encoded arguments directly. The `input` field is case-insensitive, so hex comparisons work regardless of casing.
+
+In standard ABI encoding, each argument occupies a 32-byte (64 hex character) word. The function selector occupies the first 4 bytes (8 hex characters, plus the `0x` prefix), so the first argument word starts at position 10. For an `address` argument, the address value itself starts at position 34, because it is right-aligned within the 32-byte word and preceded by 12 bytes (24 hex characters) of left-padding. Each subsequent argument word starts 64 hex characters later.
+
+#### Restrict ERC-20 transfer recipient via calldata
+
+This example allows an ERC-20 `transfer(address,uint256)` only when the recipient (first ABI argument) matches a specific address:
+
+```json
+{
+  "policyName": "Allow ERC-20 transfer to relay address only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls[0].to == '<TOKEN_CONTRACT>' && tempo.tx.calls[0].input[34..74] == '<RECIPIENT_ADDRESS_NO_0x_PREFIX>'"
+}
+```
+
+#### Verify calldata recipient address
+
+Combine calldata slicing with an address comparison to ensure the encoded recipient matches an expected address:
+
+```json
+{
+  "policyName": "Allow when encoded recipient matches expected address",
+  "effect": "EFFECT_ALLOW",
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls[0].input[34..74] == '<RECIPIENT_ADDRESS_NO_0x_PREFIX>'"
+}
+```
+
+#### Verify both `from` and `to` in `transferFrom` calldata
+
+For `transferFrom(address,address,uint256)`, the `from` is the first argument (positions 34..74) and `to` is the second (positions 98..138):
+
+```json
+{
+  "policyName": "Allow transferFrom only between known addresses",
+  "effect": "EFFECT_ALLOW",
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls[0].input[34..74] == '<FROM_ADDRESS_NO_0x_PREFIX>' && tempo.tx.calls[0].input[98..138] == '<TO_ADDRESS_NO_0x_PREFIX>'"
+}
+```
+
+## Wallet and key scoping
+
+These policies work the same as other blockchain types — you can combine `tempo.tx` conditions with wallet, private key, and consensus rules.
 
 #### Allow Tempo transactions for a specific wallet
 

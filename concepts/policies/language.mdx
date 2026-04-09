@@ -47,6 +47,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | **solana.tx**                  | SolanaTransaction    | The parsed Solana transaction payload (see Appendix below)                  |
 | **tron.tx**                    | TronTransaction      | The parsed Tron transaction payload (see Appendix below)                    |
 | **bitcoin.tx**                 | BitcoinTransaction   | The parsed Bitcoin transaction payload (see Appendix below)                 |
+| **tempo.tx**                   | TempoTransaction     | The parsed Tempo transaction payload (see Appendix below)                   |
 | **wallet**                     | Wallet               | The target wallet used in sign + export requests                            |
 | **wallets**                    | list\<Wallet\>       | The target wallets associated with requests involving with multiple wallets |
 | **private_key**                | PrivateKey           | The target private key used in sign + export requests                       |
@@ -134,6 +135,16 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | outputs                  | list\<BitcoinTxOutput\>                   | All outputs created by this Bitcoin transaction                                                                                                                                                                                                                                        |
 |                          | locktime                 | BitcoinTxLocktime                         | The locktime of this bitcoin transaction                                                                                                                                                                                                                                               |
 |                          | fee                      | int                                       | The total fee for this Bitcoin transaction in satoshis (computed as sum of input values minus sum of output values)                                                                                                                                                                    |
+| **TempoTransaction**     | chain_id                 | int                                       | The chain identifier for the transaction                                                                                                                                                                                                                                               |
+|                          | from                     | string                                    | The signer address of the transaction                                                                                                                                                                                                                                                  |
+|                          | nonce                    | int                                       | The nonce for the transaction                                                                                                                                                                                                                                                          |
+|                          | gas_limit                | int                                       | The maximum allowed gas for the transaction                                                                                                                                                                                                                                            |
+|                          | max_fee_per_gas          | int                                       | The maximum fee per unit of gas for the transaction                                                                                                                                                                                                                                    |
+|                          | max_priority_fee_per_gas | int                                       | The maximum priority fee (tip) per unit of gas                                                                                                                                                                                                                                         |
+|                          | fee_token                | string                                    | The token address used to pay transaction fees (empty string when paying with the native token)                                                                                                                                                                                        |
+|                          | valid_before             | int                                       | Upper validity bound (timestamp). Defaults to 0 when not set                                                                                                                                                                                                                           |
+|                          | valid_after              | int                                       | Lower validity bound (timestamp). Defaults to 0 when not set                                                                                                                                                                                                                           |
+|                          | calls                    | list\<TempoCall\>                         | The list of calls in the transaction. Tempo transactions natively support batched calls — a single transaction can contain multiple calls that execute atomically                                                                                                                      |
 
 <Note>
   {" "}
@@ -149,7 +160,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **Eip712Domain**                | name                    | string                                | The name                                                                                                                                                                                                                                                   |
 |                                 | version                 | string                                | The version                                                                                                                                                                                                                                                |
 |                                 | chain_id                | uint                                  | The chain ID                                                                                                                                                                                                                                               |
-|                                 | verifying_contract      | string (case insensitive)             | The address of the verifying contract                                                                                                                                                                                                                      |
+|                                 | verifying_contract      | string                                | The address of the verifying contract                                                                                                                                                                                                                      |
 | **Instruction**                 | program_key             | string                                | The program (public key) involved in the instruction                                                                                                                                                                                                       |
 |                                 | accounts                | list\<Account\>                       | A list of Accounts involved in the instruction                                                                                                                                                                                                             |
 |                                 | instruction_data_hex    | string                                | Raw hex bytes corresponding to instruction data                                                                                                                                                                                                            |
@@ -209,9 +220,12 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **BitcoinTxOutput**             | value                   | int                                   | The value of this output in Satoshis                                                                                                                                                                                                                       |
 |                                 | script_pubkey           | string                                | The locking code for this transaction output                                                                                                                                                                                                               |
 |                                 | address                 | string                                | The on chain address representation for this transaction output                                                                                                                                                                                            |
-|                                 | address_type            | string (case insensitive)             | The address derivation type of the address for this transaction output                                                                                                                                                                                     |
+|                                 | address_type            | string                                | The address derivation type of the address for this transaction output                                                                                                                                                                                     |
 | **BitcoinTxLocktime**           | amount                  | int                                   | The amount represented in this transaction's locktime                                                                                                                                                                                                      |
 |                                 | type                    | string                                | The type of locktime represented (either 'Seconds' or 'Blocks')                                                                                                                                                                                            |
+| **TempoCall**                   | to                      | string                                | The destination address of the call (empty string for contract creation)                                                                                                                                                                                   |
+|                                 | input                   | string                                | The raw call data as a hex string (supports slicing, e.g. `tempo.tx.calls[0].input[34..74]`)                                                                                                                                                               |
+|                                 | function_signature      | string                                | The 4-byte function selector derived from the call input (e.g. `0xa9059cbb` for ERC-20 `transfer`). Empty string when input is absent or too short                                                                                                         |
 
 ## Activity breakdown
 
@@ -304,19 +318,19 @@ For example, suppose you're looking to construct a policy with the condition `wa
 
 The `activity.params` field exposes specific parameters based on the activity type. Most activities do not expose any parameters, but certain activities expose fields that can be used in policy conditions.
 
-| Category          | Activity Type                       | Field           | Type           | Description                                                                                                                                                  |
-| ----------------- | ----------------------------------- | --------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Signing           | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD`    | `hash_function` | string         | The hash function used (e.g., `HASH_FUNCTION_NO_OP`, `HASH_FUNCTION_KECCAK256`)                                                                              |
-|                   |                                     | `encoding`      | string         | The payload encoding (e.g., `PAYLOAD_ENCODING_HEXADECIMAL`, `PAYLOAD_ENCODING_EIP712`)                                                                       |
-|                   | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2` | `hash_function` | string         | The hash function used                                                                                                                                       |
-|                   |                                     | `encoding`      | string         | The payload encoding                                                                                                                                         |
-|                   | `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS`   | `hash_function` | string         | The hash function used                                                                                                                                       |
-|                   |                                     | `encoding`      | string         | The payload encoding                                                                                                                                         |
+| Category          | Activity Type                       | Field           | Type           | Description                                                                                                                                                   |
+| ----------------- | ----------------------------------- | --------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Signing           | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD`    | `hash_function` | string         | The hash function used (e.g., `HASH_FUNCTION_NO_OP`, `HASH_FUNCTION_KECCAK256`)                                                                               |
+|                   |                                     | `encoding`      | string         | The payload encoding (e.g., `PAYLOAD_ENCODING_HEXADECIMAL`, `PAYLOAD_ENCODING_EIP712`)                                                                        |
+|                   | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2` | `hash_function` | string         | The hash function used                                                                                                                                        |
+|                   |                                     | `encoding`      | string         | The payload encoding                                                                                                                                          |
+|                   | `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS`   | `hash_function` | string         | The hash function used                                                                                                                                        |
+|                   |                                     | `encoding`      | string         | The payload encoding                                                                                                                                          |
 |                   | `ACTIVITY_TYPE_SIGN_TRANSACTION_V2` | `type`          | string         | The transaction type (one of `[TRANSACTION_TYPE_ETHEREUM, TRANSACTION_TYPE_SOLANA, TRANSACTION_TYPE_BITCOIN, TRANSACTION_TYPE_TRON, TRANSACTION_TYPE_TEMPO`]) |
-| User Management   | `ACTIVITY_TYPE_DELETE_USERS`        | `user_ids`      | list\<string\> | The list of user IDs being deleted                                                                                                                           |
-| Wallet Management | `ACTIVITY_TYPE_UPDATE_WALLET`       | `wallet_id`     | string         | The ID of the wallet being updated                                                                                                                           |
-| Authentication    | `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`    | `otp_length`    | int            | The length of the OTP code                                                                                                                                   |
-|                   | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`    | `otp_length`    | int            | The length of the OTP code                                                                                                                                   |
+| User Management   | `ACTIVITY_TYPE_DELETE_USERS`        | `user_ids`      | list\<string\> | The list of user IDs being deleted                                                                                                                            |
+| Wallet Management | `ACTIVITY_TYPE_UPDATE_WALLET`       | `wallet_id`     | string         | The ID of the wallet being updated                                                                                                                            |
+| Authentication    | `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`    | `otp_length`    | int            | The length of the OTP code                                                                                                                                    |
+|                   | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`    | `otp_length`    | int            | The length of the OTP code                                                                                                                                    |
 
 #### Examples
 
@@ -351,8 +365,12 @@ Our Ethereum policy language (accessible via `eth.tx`) allows for the granular g
 
 See the [Ethereum policy examples](/concepts/policies/examples/ethereum) for sample scenarios.
 
-
-<Note> The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart contracts support signed integers up to 256 bits (`int256`), but values exceeding the 128-bit signed range cannot be used in policy conditions. </Note>
+<Note>
+  {" "}
+  The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart
+  contracts support signed integers up to 256 bits (`int256`), but values
+  exceeding the 128-bit signed range cannot be used in policy conditions.{" "}
+</Note>
 
 #### EIP-712
 
@@ -373,9 +391,11 @@ Here are some approaches you might take to govern transfers:
 - Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
 
 #### Account address lookups
+
 Solana transactions can reference onchain address lookup tables for account addresses. Turnkey surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP` in Solana address fields (`account_keys`, instruction accounts, `transfers`, and `spl_transfers`). The `solana.tx.address_table_lookups` array indicates when lookups are present, but the specific addresses are not resolved. If you rely on allowlists or denylists of addresses, add a guard for this placeholder (for example, require `solana.tx.address_table_lookups.count == 0` before comparing addresses, or explicitly deny when `ADDRESS_TABLE_LOOKUP` appears with something like `solana.tx.transfers.any(t, t.to == 'ADDRESS_TABLE_LOOKUP')`) so that dynamic lookups cannot bypass or unexpectedly fail your policy. See the [address table lookup examples](/concepts/policies/examples/solana#deny-all-address-table-lookups) for examples on how to enforce this.
 
 #### Program address lookups
+
 Turnkey rejects Solana transactions where program addresses are resolved via address lookup tables. Program IDs must be statically defined in the transaction to enable static analysis of instructions without requiring on-chain data lookups. If your transaction references a program via an address table lookup, the signing request will fail. Account addresses (non-program) can still be dynamically resolved via lookup tables as described above.
 
 See the [Solana policy examples](/concepts/policies/examples/solana) for sample scenarios.
@@ -406,27 +426,19 @@ See the [Bitcoin policy examples](/concepts/policies/examples/bitcoin) for sampl
 
 ### Tempo
 
-Tempo has a limited set of applicable policies. Unlike other blockchain types (Ethereum, Solana, Bitcoin, Tron), Tempo transactions do not have their own namespace keyword (such as `tempo.tx`) or exposed transaction fields for policy evaluation.
+Our Tempo policy language (accessible via `tempo.tx`) allows for policy control over signing Tempo transactions. Tempo transactions natively support batched calls — a single transaction can contain one or more calls that execute atomically. The `tempo.tx.calls` list gives you access to each individual call, including its destination and raw input data.
 
-The primary way to govern Tempo transactions is by targeting the transaction type itself using the `activity.params.type` field:
+The `tempo.tx` namespace exposes the following transaction-level fields: `chain_id`, `from`, `nonce`, `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas`, `fee_token`, `valid_before`, and `valid_after`. Each call in `tempo.tx.calls` exposes: `to`, `input`, and `function_signature`.
 
-```json
-{
-  "policyName": "Allow Tempo transactions",
-  "effect": "EFFECT_ALLOW",
-  "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
-}
-```
+You can also govern Tempo transactions at the activity level using `activity.params.type == 'TRANSACTION_TYPE_TEMPO'`, combined with other fields such as specific wallets, private keys, or consensus rules.
 
-Or to deny Tempo transactions:
+<Note>
+  Tempo does not currently support [Smart Contract
+  Interfaces](/concepts/policies/smart-contract-interfaces) (ABI parsing). To
+  inspect encoded arguments within call data, you can use slicing on the `input`
+  field (e.g. `tempo.tx.calls[0].input[34..74]` to extract the first ABI-encoded
+  address argument). The `input` field is case-insensitive, so hex comparisons
+  work regardless of casing.
+</Note>
 
-```json
-{
-  "policyName": "Deny Tempo transactions",
-  "effect": "EFFECT_DENY",
-  "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
-}
-```
-
-Since Tempo transactions don't expose granular transaction details in the policy engine, governance must rely on other available policy fields such as targeting specific wallets, private keys, or requiring specific approvers through consensus rules. 
-
+See the [Tempo policy examples](/concepts/policies/examples/tempo) for sample scenarios.
