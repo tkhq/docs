@@ -22,16 +22,6 @@ Tempo transactions are fully parsed by the policy engine via the `tempo.tx` name
 }
 ```
 
-#### Deny Tempo transactions
-
-```json
-{
-  "policyName": "Deny Tempo transactions",
-  "effect": "EFFECT_DENY",
-  "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
-}
-```
-
 #### Restrict to a specific chain ID
 
 ```json
@@ -39,6 +29,26 @@ Tempo transactions are fully parsed by the policy engine via the `tempo.tx` name
   "policyName": "Only allow Tempo testnet",
   "effect": "EFFECT_ALLOW",
   "condition": "tempo.tx.chain_id == 42431"
+}
+```
+
+#### Allow specific fee token
+
+```json
+{
+  "policyName": "Only allow specific fee token",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.fee_token == '0xdAC17F958D2ee523a2206206994597C13D831ec7'"
+}
+```
+
+#### Deny Tempo transactions
+
+```json
+{
+  "policyName": "Deny Tempo transactions",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
 }
 ```
 
@@ -62,16 +72,6 @@ Tempo transactions are fully parsed by the policy engine via the `tempo.tx` name
 }
 ```
 
-#### Restrict fee token
-
-```json
-{
-  "policyName": "Deny specific fee token",
-  "effect": "EFFECT_DENY",
-  "condition": "tempo.tx.fee_token == '0xdAC17F958D2ee523a2206206994597C13D831ec7'"
-}
-```
-
 #### Restrict validity window
 
 ```json
@@ -86,6 +86,26 @@ Tempo transactions are fully parsed by the policy engine via the `tempo.tx` name
 
 Tempo transactions contain one or more calls in `tempo.tx.calls`. You can target individual calls by index or use quantifiers (`all`, `any`) to apply rules across all calls.
 
+#### Allow calls to a specific contract
+
+```json
+{
+  "policyName": "Allow calls to approved contract",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.calls[0].to == '0x40f008f4c17075EFcA092aE650655f6693AECEd0'"
+}
+```
+
+#### Allow ERC-20 transfer function selector
+
+```json
+{
+  "policyName": "Allow ERC-20 transfer calls",
+  "effect": "EFFECT_ALLOW",
+  "condition": "tempo.tx.calls[0].function_signature == '0xa9059cbb'"
+}
+```
+
 #### Deny a specific call destination
 
 ```json
@@ -93,26 +113,6 @@ Tempo transactions contain one or more calls in `tempo.tx.calls`. You can target
   "policyName": "Deny calls to blocked address",
   "effect": "EFFECT_DENY",
   "condition": "tempo.tx.calls[0].to == '0x40f008f4c17075EFcA092aE650655f6693AECEd0'"
-}
-```
-
-#### Deny based on call value
-
-```json
-{
-  "policyName": "Deny first call with specific value",
-  "effect": "EFFECT_DENY",
-  "condition": "tempo.tx.calls[0].value == 500000000"
-}
-```
-
-#### Deny ERC-20 transfer function selector
-
-```json
-{
-  "policyName": "Deny ERC-20 transfer calls",
-  "effect": "EFFECT_DENY",
-  "condition": "tempo.tx.calls[0].function_signature == '0xa9059cbb'"
 }
 ```
 
@@ -138,13 +138,13 @@ Tempo transactions contain one or more calls in `tempo.tx.calls`. You can target
 }
 ```
 
-#### Allow only when all call destinations are wallet accounts
+#### Allow only when all call destinations are known addresses
 
 ```json
 {
-  "policyName": "All calls must target wallet accounts",
+  "policyName": "All calls must target known address",
   "effect": "EFFECT_ALLOW",
-  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls.all(call, IsGuaranteedWalletAccountInWallet(call.to, '<WALLET_ID>'))"
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls.all(call, call.to == '<ALLOWED_ADDRESS>')"
 }
 ```
 
@@ -166,15 +166,15 @@ This example allows an ERC-20 `transfer(address,uint256)` only when the recipien
 }
 ```
 
-#### Verify calldata recipient is a wallet account
+#### Verify calldata recipient address
 
-Combine calldata slicing with `IsGuaranteedWalletAccountInWallet` to ensure the encoded recipient belongs to your wallet:
+Combine calldata slicing with an address comparison to ensure the encoded recipient matches an expected address:
 
 ```json
 {
-  "policyName": "Allow when encoded recipient is a wallet account",
+  "policyName": "Allow when encoded recipient matches expected address",
   "effect": "EFFECT_ALLOW",
-  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && IsGuaranteedWalletAccountInWallet(tempo.tx.calls[0].input[34..74], '<WALLET_ID>')"
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls[0].input[34..74] == '<RECIPIENT_ADDRESS_NO_0x_PREFIX>'"
 }
 ```
 
@@ -184,9 +184,9 @@ For `transferFrom(address,address,uint256)`, the `from` is the first argument (p
 
 ```json
 {
-  "policyName": "Allow transferFrom only between wallet accounts",
+  "policyName": "Allow transferFrom only between known addresses",
   "effect": "EFFECT_ALLOW",
-  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && IsGuaranteedWalletAccountInWallet(tempo.tx.calls[0].input[34..74], '<WALLET_ID>') && IsGuaranteedWalletAccountInWallet(tempo.tx.calls[0].input[98..138], '<WALLET_ID>')"
+  "condition": "wallet_account.address == '<SIGNER_ADDRESS>' && tempo.tx.calls[0].input[34..74] == '<FROM_ADDRESS_NO_0x_PREFIX>' && tempo.tx.calls[0].input[98..138] == '<TO_ADDRESS_NO_0x_PREFIX>'"
 }
 ```
 
