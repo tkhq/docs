@@ -47,6 +47,7 @@ Keywords are reserved words that are dynamically interchanged for real values at
 | **solana.tx**                  | SolanaTransaction    | The parsed Solana transaction payload (see Appendix below)                  |
 | **tron.tx**                    | TronTransaction      | The parsed Tron transaction payload (see Appendix below)                    |
 | **bitcoin.tx**                 | BitcoinTransaction   | The parsed Bitcoin transaction payload (see Appendix below)                 |
+| **tempo.tx**                   | TempoTransaction     | The parsed Tempo transaction payload (see Appendix below)                   |
 | **wallet**                     | Wallet               | The target wallet used in sign + export requests                            |
 | **wallets**                    | list\<Wallet\>       | The target wallets associated with requests involving with multiple wallets |
 | **private_key**                | PrivateKey           | The target private key used in sign + export requests                       |
@@ -134,6 +135,16 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | outputs                  | list\<BitcoinTxOutput\>                   | All outputs created by this Bitcoin transaction                                                                                                                                                                                                                                        |
 |                          | locktime                 | BitcoinTxLocktime                         | The locktime of this bitcoin transaction                                                                                                                                                                                                                                               |
 |                          | fee                      | int                                       | The total fee for this Bitcoin transaction in satoshis (computed as sum of input values minus sum of output values)                                                                                                                                                                    |
+| **TempoTransaction**     | chain_id                 | int                                       | The chain identifier for the transaction                                                                                                                                                                                                                                               |
+|                          | from                     | string (case insensitive)                 | The signer address of the transaction                                                                                                                                                                                                                                                  |
+|                          | nonce                    | int                                       | The nonce for the transaction                                                                                                                                                                                                                                                          |
+|                          | gas_limit                | int                                       | The maximum allowed gas for the transaction                                                                                                                                                                                                                                            |
+|                          | max_fee_per_gas          | int                                       | The maximum fee per unit of gas for the transaction                                                                                                                                                                                                                                    |
+|                          | max_priority_fee_per_gas | int                                       | The maximum priority fee (tip) per unit of gas                                                                                                                                                                                                                                         |
+|                          | fee_token                | string (case insensitive)                 | The token address used to pay transaction fees (empty string when paying with the native token)                                                                                                                                                                                        |
+|                          | valid_before             | int                                       | Upper validity bound (timestamp). Defaults to 0 when not set                                                                                                                                                                                                                           |
+|                          | valid_after              | int                                       | Lower validity bound (timestamp). Defaults to 0 when not set                                                                                                                                                                                                                           |
+|                          | calls                    | list\<TempoCall\>                         | The list of calls in the transaction. Tempo transactions natively support batched calls — a single transaction can contain multiple calls that execute atomically                                                                                                                       |
 
 <Note>
   {" "}
@@ -212,6 +223,10 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                                 | address_type            | string (case insensitive)             | The address derivation type of the address for this transaction output                                                                                                                                                                                     |
 | **BitcoinTxLocktime**           | amount                  | int                                   | The amount represented in this transaction's locktime                                                                                                                                                                                                      |
 |                                 | type                    | string                                | The type of locktime represented (either 'Seconds' or 'Blocks')                                                                                                                                                                                            |
+| **TempoCall**                   | to                      | string (case insensitive)             | The destination address of the call (empty string for contract creation)                                                                                                                                                                                   |
+|                                 | value                   | int                                   | The value carried by this call (in wei)                                                                                                                                                                                                                    |
+|                                 | input                   | string (case insensitive)             | The raw call data as a hex string (supports slicing, e.g. `tempo.tx.calls[0].input[34..74]`)                                                                                                                                                              |
+|                                 | function_signature      | string                                | The 4-byte function selector derived from the call input (e.g. `0xa9059cbb` for ERC-20 `transfer`). Empty string when input is absent or too short                                                                                                        |
 
 ## Activity breakdown
 
@@ -406,27 +421,15 @@ See the [Bitcoin policy examples](/concepts/policies/examples/bitcoin) for sampl
 
 ### Tempo
 
-Tempo has a limited set of applicable policies. Unlike other blockchain types (Ethereum, Solana, Bitcoin, Tron), Tempo transactions do not have their own namespace keyword (such as `tempo.tx`) or exposed transaction fields for policy evaluation.
+Our Tempo policy language (accessible via `tempo.tx`) allows for policy control over signing Tempo transactions. Tempo transactions natively support batched calls — a single transaction can contain one or more calls that execute atomically. The `tempo.tx.calls` list gives you access to each individual call, including its destination, value, and raw input data.
 
-The primary way to govern Tempo transactions is by targeting the transaction type itself using the `activity.params.type` field:
+The `tempo.tx` namespace exposes the following transaction-level fields: `chain_id`, `from`, `nonce`, `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas`, `fee_token`, `valid_before`, and `valid_after`. Each call in `tempo.tx.calls` exposes: `to`, `value`, `input`, and `function_signature`.
 
-```json
-{
-  "policyName": "Allow Tempo transactions",
-  "effect": "EFFECT_ALLOW",
-  "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
-}
-```
+You can also govern Tempo transactions at the activity level using `activity.params.type == 'TRANSACTION_TYPE_TEMPO'`, combined with other fields such as specific wallets, private keys, or consensus rules.
 
-Or to deny Tempo transactions:
+<Note>
+  Tempo does not currently support [Smart Contract Interfaces](/concepts/policies/smart-contract-interfaces) (ABI parsing). To inspect encoded arguments within call data, you can use slicing on the `input` field (e.g. `tempo.tx.calls[0].input[34..74]` to extract the first ABI-encoded address argument). The `input` field is case-insensitive, so hex comparisons work regardless of casing.
+</Note>
 
-```json
-{
-  "policyName": "Deny Tempo transactions",
-  "effect": "EFFECT_DENY",
-  "condition": "activity.action == 'SIGN' && activity.params.type == 'TRANSACTION_TYPE_TEMPO'"
-}
-```
-
-Since Tempo transactions don't expose granular transaction details in the policy engine, governance must rely on other available policy fields such as targeting specific wallets, private keys, or requiring specific approvers through consensus rules. 
+See the [Tempo policy examples](/concepts/policies/examples/tempo) for sample scenarios.
 
