@@ -42,8 +42,8 @@ export function determineEndpointType(path: string): EndpointType {
     return "query";
   }
 
-  // Default to activity if we can't determine from path
-  return "activity";
+  // Default to query for unknown paths (e.g. auth proxy endpoints)
+  return "query";
 }
 
 /**
