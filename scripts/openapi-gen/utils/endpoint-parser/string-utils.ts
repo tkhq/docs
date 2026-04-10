@@ -42,7 +42,9 @@ export function determineEndpointType(path: string): EndpointType {
     return "query";
   }
 
-  // Default to query for unknown paths (e.g. auth proxy endpoints)
+  // Default to query for unknown paths — auth proxy endpoints (/v1/*) don't match
+  // either pattern, and the activity parser requires intent/result components that
+  // don't exist in the auth proxy spec, producing zero endpoints if typed as activity.
   return "query";
 }
 
