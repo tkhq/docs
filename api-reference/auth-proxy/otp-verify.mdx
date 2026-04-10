@@ -1,0 +1,66 @@
+---
+title: "Verify OTP"
+description: "Verify the OTP code previously sent to the user's contact and return a verification token."
+---
+
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+
+<div class="flex w-full flex-col bg-background-light dark:bg-background-dark border-standard rounded-2xl p-1.5 mb-4">
+  <div class="flex items-center space-x-1.5">
+    <div class="relative flex-1 flex gap-2 min-w-0 rounded-xl items-center cursor-pointer p-1.5 border-standard">
+      <div class="rounded-lg font-bold px-1.5 py-0.5 text-sm leading-5 bg-blue-400/20 dark:bg-blue-400/20 text-blue-700 dark:text-blue-400">POST</div>
+      <div class="text-sm font-mono text-gray-800 dark:text-white">https://authproxy.turnkey.com/v1/otp_verify_v2</div>
+    </div>
+  </div>
+</div>
+
+<H3Bordered text="Authorizations" />
+
+<ParamField header="X-Auth-Proxy-Config-Id" type="string" required={true}>
+  Your Auth Proxy config ID, found in **Dashboard → AUTH**. See [Auth Proxy reference](/reference/auth-proxy) for setup.
+</ParamField>
+
+<H3Bordered text="Body" />
+
+<ParamField body="otpId" type="string" required={true}>
+
+ID representing the result of an init OTP activity.
+</ParamField>
+
+<ParamField body="encryptedOtpBundle" type="string" required={true}>
+
+Encrypted bundle containing the OTP code and a client-generated public key. Turnkey's secure enclaves will decrypt this bundle, verify the OTP code, and issue a new Verification Token. Encrypted using the target encryption key provided in the INIT_OTP activity result.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="verificationToken" type="string" required={true}>Verification Token containing a unique id, expiry, verification type, contact signed by Turnkey's enclaves. Verification status of a user is updated when the token is consumed (in OTP_LOGIN requests)</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://authproxy.turnkey.com/v1/otp_verify_v2 \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Auth-Proxy-Config-Id: <string> (see Authorizations)" \
+  --data '{
+    "otpId": "<string>",
+    "encryptedOtpBundle": "<string>"
+}'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "verificationToken": "<string>"
+}
+```
+
+</ResponseExample>

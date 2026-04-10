@@ -48,7 +48,7 @@ We provide the following Make targets to generate API reference content:
 
 - `make install`: Install dependencies needed to run OpenAPI commands
 - `make openapi-gen`: Run the OpenAPI generator CLI with custom arguments. See [scripts/openapi-gen/README.md](scripts/openapi-gen/README.md) for details.
-- `make gen`: Default MDX generation for API reference under `api-reference/`.
+- `make gen`: MDX generation for all API references (main API + Auth Proxy) under `api-reference/`.
 - `make tags`: Generate the endpoint-tags MDX snippet at `snippets/data/endpoint-tags.mdx`.
 - `make mintlify-check`: This attempts to compare the locally installed version of mintlify cli against the latest published version on NPM. If the local version is behind this will attempt to update the version to the latest. This command gets run before `make gen`, `make openapi-gen`, and `make tags` to prevent parsing errors.
 
@@ -58,7 +58,7 @@ These commands require Node.js and `ts-node`.
 
 ### Mono Releases & Updating API Reference
 
-1. Checkout the specific [Mono Release tag](https://github.com/tkhq/mono/tags) and copy over [public_api.swagger.json](https://github.com/tkhq/mono/blob/main/src/js/internal/http/src/__internal__/services/coordinator/public/v1/public_api.swagger.json) to docs
+1. Checkout the specific [Mono Release tag](https://github.com/tkhq/mono/tags) and copy both swagger files `public_api.swagger.json` and `proxy_api.swagger.json` into the docs
    - `git checkout {latest_release_tag}` i.e. `v2025.12.1`
    - `make -C proto sync/docs`
 2. Run `make gen`

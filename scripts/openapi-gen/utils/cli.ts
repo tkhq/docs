@@ -22,7 +22,11 @@ export interface CliOptions {
   requiredOnly?: boolean;
   generateMdx?: boolean;
   mdxOutputDir?: string;
-  mdxAddOnly?: boolean; // Add the new option
+  mdxAddOnly?: boolean;
+  /** Nav group name in docs.json, e.g. "Auth Proxy" */
+  navGroup?: string;
+  /** If true, use the auth-proxy generator (flat output, custom URL/auth header, version deduplication) */
+  authProxy?: boolean;
 }
 
 /**
@@ -76,6 +80,15 @@ export function configureCLI(): Command {
     .option(
       "--mdx-add-only",
       "Only add new MDX files, do not overwrite existing ones",
+      false
+    )
+    .option(
+      "--nav-group <name>",
+      "Navigation group name in docs.json"
+    )
+    .option(
+      "--auth-proxy",
+      "Use the auth-proxy generator (flat output, custom URL/auth header, version deduplication)",
       false
     );
 
