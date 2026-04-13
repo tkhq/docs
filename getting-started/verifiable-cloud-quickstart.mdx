@@ -16,12 +16,10 @@ as described in the [account setup](/getting-started/quickstart) section.
 
 ## Installation
 
-Install the TVC CLI in the [Rust SDK](https://github.com/tkhq/rust-sdk) to get started:
+Install the TVC CLI from crates.io ([`tvc` crate](https://crates.io/crates/tvc)):
 
 ```bash
-git clone git@github.com:tkhq/rust-sdk.git
-cd rust-sdk
-cargo install --path tvc
+cargo install tvc
 ```
 
 ## Create your first verifiable app
@@ -124,22 +122,22 @@ This should open a modal with all your deployment settings:
 </Frame>
 
 If you do not have your own app, try our helloworld template:
-- **Container Image URL**: `ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d`
+- **Container Image URL**: `ghcr.io/tkhq/helloworld:latest@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd`
   - If you are bringing private container images, TVC supports uploading pull secrets by encrypting them to a known public key. This will be used by TVC infrastructure to access your container images. Read more about pull secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
-- **Executable Path**: `/helloworld`
+- **Executable Path**: `/tvc_app`
 - **Executable Args**: `--host 0.0.0.0 --port 3000`. These arguments are passed to the executable on startup. Here we are telling the `helloworld` binary to start on port 3000
 - **Public ingress port**: `3000`. This is the port that will be exposed to the outside world
-- **Health check port**: `3000`. Our `helloworld` binary answers healthchecks on `/health` on the same port (3000)
+- **Health check port**: `3000`. Our `tvc_app` binary answers healthchecks on `/health` on the same port (3000)
 - **Health check type**: `HTTP`.
 - **Executable digest**: the hash of the binary file inside the container. For our helloworld example this should be `cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1`. You can compute it locally with:
   ```
   # Pull the container image, create a "tmp-extract" container, and extract our helloworld binary
-  docker create --name tmp-extract ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d /bin/true \
-        && docker cp tmp-extract:/helloworld ./helloworld \
+  docker create --name tmp-extract ghcr.io/tkhq/helloworld@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd /bin/true \
+        && docker cp tmp-extract:/tvc_app ./tvc_app \
         && docker rm tmp-extract
 
   # Locally compute the digest of the binary file
-  sha256sum ./helloworld
+  sha256sum ./tvc_app
   cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1
   ```
   This digest will be to ensure TVC is running the code you expect.
@@ -158,16 +156,15 @@ The generated JSON file is named by its time of creation, but you can name it an
 a name after the `--output` flag. Open it and fill in each field:
 
 - `appId` is populated with the last app you created. You may edit it to be the id of any app you've created in the past.
-- `qosVersion`: use `"v2026.2.6"`
 - `pivotContainerImageUrl`: link to a public image. For this demo, feel free to use 
   ```json
-  "ghcr.io/tkhq/helloworld@sha256:f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d"
+  "ghcr.io/tkhq/helloworld@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd"
   ```
-- `pivotPath`: location of your binary in the container. Use `"/helloworld"` for the demo app.
+- `pivotPath`: location of your binary in the container. Use `"/tvc_app"` for the demo app.
 - `pivotArgs`: leave this empty unless you have arguments to pass to your application
 - `expectedPivotDigest`: for the demo, use 
   ```json
-  "f8132a6236609e4c67d9d29e5694989f18e528240844638e850897ee6319676d"
+  "cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1"
   ```
 - `pivotContainerEncryptedPullSecret`: your pull secret, if your container image isn't public. Delete this field otherwise.
 - `publicIngressPort`: 3000
@@ -214,9 +211,12 @@ You may find your operator ID by clicking into your app, then under **Manifest O
 
 This command generates an approval from the public keys created in step 1.
 If you didn't change anything during the demo, that should be the only required approval from your manifest set.
-Your app is now live on Turnkey Verifiable Cloud!
 
-Our infrastructure automatically provisions network ingress for your application. You can visit `https://app-<YOUR_APP_UUID>.turnkey.cloud` to interact with it. If you used our `helloworld` template, try visiting `/time`.
+In the dashboard you will see the "stage" transition to "LIVE". This means everything is done on your side. You can look at the deployment details in the recap table on on the individual deployment page to know whether your deployment is coming up healthy and whether it's receiving traffic.
+
+<img src="/assets/files/tvc_live_deployment_details.png" alt="Deployment details when LIVE" width="620"/>
+
+Our infrastructure automatically provisions network ingress for your application. You can visit `https://app-<YOUR_APP_UUID>.turnkey.cloud` to interact with it. If you used our `helloworld` template, try visiting `/time` in your browser!
 
 </Step>
 </Steps>
