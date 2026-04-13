@@ -1,0 +1,69 @@
+---
+title: "Spark support on Turnkey"
+sidebarTitle: "Spark"
+---
+
+[Spark](https://www.spark.money/) is a Bitcoin Layer 2 network that uses an identity key system for on-chain addressing. Turnkey supports Spark address derivation and signing via plain [BIP-340 Schnorr](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) signatures.
+
+The supported address formats are:
+
+| Network  | Address Format                   | HRP       |
+| -------- | -------------------------------- | --------- |
+| Mainnet  | `ADDRESS_FORMAT_SPARK_MAINNET`   | `spark`   |
+| Regtest  | `ADDRESS_FORMAT_SPARK_REGTEST`   | `sparkrt` |
+
+### BIP-32 derivation path
+
+Spark uses a unique BIP-32 purpose number (`8797555`) rather than the standard BIP-44 coin type system. The default derivation path for the identity key is:
+
+```
+m/8797555'/{account}'/0'
+```
+
+When creating a wallet account via the Turnkey dashboard or API, select `ADDRESS_FORMAT_SPARK_MAINNET` or `ADDRESS_FORMAT_SPARK_REGTEST` and the path will be set automatically.
+
+<Note>
+  Only `secp256k1` keys are supported for Spark. Attempting to use an ed25519 key will result in an error.
+</Note>
+
+## Schnorr signing
+
+Spark transactions are signed using **plain BIP-340 Schnorr** — specifically, without the Taproot key tweak described [here](/bitcoin#schnorr-signatures-and-tweaks) that Bitcoin P2TR addresses require. This is an important distinction: passing a Spark address as the `signWith` parameter to `SIGN_RAW_PAYLOAD` triggers plain Schnorr signing, while passing a Bitcoin Taproot (P2TR) address triggers tweaked Schnorr signing per [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki).
+
+Use the [`SIGN_RAW_PAYLOAD`](/api-reference/activities/sign-raw-payload) or [`SIGN_RAW_PAYLOAD_V2`](/api-reference/activities/sign-raw-payload) activity to sign Spark payloads. The `hashFunction` field should match how the payload was prepared (e.g. `HASH_FUNCTION_NO_OP` if you are passing a pre-hashed payload).
+
+The returned signature will always have `V = "00"` since Schnorr signatures do not use a recovery ID.
+
+### Signing scheme selection
+
+Turnkey automatically selects the correct signing scheme based on the address format associated with your key:
+
+| Address type        | Signing scheme         |
+| ------------------- | ---------------------- |
+| Bitcoin P2TR        | Tweaked Schnorr (BIP-341) |
+| Spark Mainnet/Regtest | Plain Schnorr (BIP-340) |
+| All others          | ECDSA                  |
+
+## Networks supported
+
+- **Spark Mainnet** — `ADDRESS_FORMAT_SPARK_MAINNET`
+- **Spark Regtest** — `ADDRESS_FORMAT_SPARK_REGTEST`
+
+## Key features
+
+- **secp256k1 signing**: Turnkey fully supports the secp256k1 curve used by Spark
+- **Plain BIP-340 Schnorr**: Distinct from the tweaked Schnorr used for Bitcoin Taproot — no key tweak is applied
+- **Bech32m addressing**: Spark identity key addresses are Bech32m-encoded canonical protobuf payloads
+- **Spark-specific BIP-32 purpose**: Derivation path uses purpose `8797555` per the Spark protocol spec
+
+## SDK Example
+
+- [`examples/with-spark-schnorr`](https://github.com/tkhq/sdk/tree/main/examples/with-spark-schnorr): demonstrates wallet initialization, SO authentication and token minting + sending on Spark using Turnkey!
+
+## Additional resources
+
+- [Spark addressing specification](https://docs.spark.money/wallets/addressing)
+- [Spark CLI reference](https://docs.spark.money/tools/cli)
+- [BIP-340: Schnorr Signatures for secp256k1](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+
+If you're building on Spark and have questions about integrating with Turnkey, contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).
