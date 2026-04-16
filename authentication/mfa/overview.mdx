@@ -6,14 +6,14 @@ sidebarTitle: "Overview"
 
 ## What is multi-factor authentication (MFA)?
 
-Requests made to Turnkey's public API are required to be authenticated using [an API key or WebAuthn stamp](/developer-reference/api-overview/stamps). MFA adds an additional layer of security by requiring users to provide multiple forms of authentication before they can perform specific activities. 
+Requests made to Turnkey's public API are required to be authenticated using [an API key or WebAuthn stamp](/developer-reference/api-overview/stamps). MFA adds an additional layer of security by requiring users to provide multiple forms of authentication before they can perform specific activities or establish a [session with elevated permissions](../sessions/session-profiles). 
 
-MFA is highly customizable and can be configured to require any combination of supported authentication methods for different activities.
+Turnkey's MFA policies can be configured to require any combination of supported authentication methods.
 
 ## MFA policies
-MFA policies are a unique resource type in Turnkey that allows configuation of authentication requirements, scoped to a specific condition.
+MFA policies are a unique resource type in Turnkey that allows configuration of authentication requirements, scoped to a specific condition.
 
-MFA policies can be created by parent, or sub-organization users and are tied to the targetted user. 
+MFA policies can be configured in both parent and sub-organizations, and are enforced at the user level rather than the organization level.
 
 Once an MFA policy is created, it is immediately enforced for the user.
 
@@ -23,7 +23,7 @@ An MFA policy can be created using the `CreateMfaPolicy` activity and passing in
 - `userId`: The ID of the user the policy applies to
 - `mfaPolicyName`: The name of the MFA policy
 - `condition`: A string of [policy language](/concepts/policies/language) that evaluates to true or false based on the context of an activity. If the condition evaluates to true, the specified authentication methods are required.
-- `requiredAuthenticationMethods`: An array of authentication methods that are required when the policy condition is met. Methods can be logically "OR-ed" together by grouping them in nested "ANY" blocks.
+- `requiredAuthenticationMethods`: An array of authentication methods that are required when the policy condition is met. Grouping methods within nested ANY blocks enables logical OR behavior.
 - `order`: An integer that specifies the order of evaluation for multiple MFA policies. Policies with lower order values are evaluated first. 
 - `notes`: Optional field for any additional information about the policy
 
@@ -97,7 +97,9 @@ Each `AuthenticationMethodParams` accepts:
 
 The `order` field is an integer that determines the evaluation priority when a user has multiple MFA policies. Policies with **lower order values are evaluated first**.
 
-When a request is made, each MFA policy is checked in order. The first policy whose condition evaluates to `true` determines the authentication requirements for that request. This allows you to create specific policies for sensitive operations with lower order values, and broader catch-all policies with higher order values.
+When a request is made, Turnkey evaluates a user's MFA policies in order (from lowest `order` to highest). **The first policy whose condition evaluates to `true` is the one that applies**: its `requiredAuthenticationMethods` define the authentication requirements for that request, and later policies are not considered.
+
+This lets you place narrowly-scoped, high-sensitivity policies first, and keep broader “catch-all” policies with higher order values as a fallback.
 
 ```json
 // Order 1: Strict MFA for signing - evaluated first

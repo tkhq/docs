@@ -1,11 +1,20 @@
 ---
 title: "Satisfying MFA"
-description: "Learn how to satisfy multi-factor authentication (MFA) policies in Turnkey by proving ownership of required authentication methods."
+description: "Learn how a user can satisfy multi-factor authentication (MFA) policies by proving control of the required authentication methods."
 ---
 
-When a user submits an activity and one of their MFA policies evaluates to `true`, the activity is placed in `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` status. The activity will not execute until the user proves they have the required authentication methods.
+When a user submits an activity and an MFA policy evaluates to `true`, the activity enters `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` status. The activity will not execute until the user satisfies the authentication challenges.
 
-To satisfy MFA, the user must call the `APPROVE_ACTIVITY` activity, passing in the `fingerprint` of the original activity. The way the user stamps this approval request determines which authentication method is proven. 
+The user must call the `APPROVE_ACTIVITY` activity, passing in the `fingerprint` of the original activity:
+
+```ts
+// This endpoint can be found in any of Turnkey's SDKs, within a client access point or provider.
+approveActivity({
+  fingerprint: "<fingerprint-of-original-activity>",
+});
+```
+
+The credential used to stamp this approval request determines which authentication method is being proven.
 
 You can learn more about stamps [here](/developer-reference/api-overview/stamps).
 
@@ -39,9 +48,9 @@ MFA works alongside Turnkey's [consensus](/concepts/users/root-quorum) system fo
 
 When an activity requires both MFA and consensus:
 
-1. **The proposing user must satisfy their own MFA first.** If the proposer has an MFA policy that matches the activity, the activity is returned with `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED`. The proposer must satisfy their MFA requirements before the activity can proceed to consensus.
+1. **The activity initiator must satisfy their own MFA requirements first.** If the proposer has an MFA policy that matches the activity, the activity is returned with `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED`. The proposer must satisfy their MFA requirements before the activity can proceed to consensus.
 2. **Subsequent approvers vote on the activity as normal.** Once the proposer's MFA is satisfied, other users in the quorum can approve or reject the activity.
-3. **Approving users must also satisfy their own MFA.** If an approving user has an MFA policy that matches the activity, they will receive `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` when they attempt to vote. They must satisfy their own MFA requirements before their vote is recorded.
+3. **Approving users must also satisfy their own MFA requirements.** If an approver has an MFA policy that matches the activity, their vote will return `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED`. The approver must satisfy their MFA requirements before their vote is recorded. 
 4. **The activity executes only after all required users have satisfied MFA and consensus is met.**
 
 This ensures that every user involved in an activity is individually held to their own MFA requirements, regardless of whether they are the proposer or an approver.
