@@ -3,7 +3,7 @@ import path from "path";
 import { ApiEndpoint, ApiField, EnumOption } from "../endpoint-parser/types";
 
 // --- Helper: Escape HTML Chars ---
-function escapeHtmlChars(text: string): string {
+export function escapeHtmlChars(text: string): string {
   if (!text) return "";
   return text
     .replace(/</g, "&lt;")
@@ -13,7 +13,7 @@ function escapeHtmlChars(text: string): string {
 }
 
 // --- Helper: Get Enum Details ---
-function getEnumDetails(field: ApiField): {
+export function getEnumDetails(field: ApiField): {
   isEnum: boolean;
   displayType: string;
   options: EnumOption[]; // Always return an array, even if empty
@@ -44,7 +44,7 @@ function getEnumDetails(field: ApiField): {
 }
 
 // --- Helper: Generate Enum Options MDX ---
-function generateEnumOptionsMdx(options: EnumOption[]): string {
+export function generateEnumOptionsMdx(options: EnumOption[]): string {
   if (!options || options.length === 0) {
     return "";
   }
@@ -57,7 +57,7 @@ function generateEnumOptionsMdx(options: EnumOption[]): string {
 }
 
 // --- Helper: Generate Request Parameter MDX Recursive ---
-function generateParamMdxRecursive(
+export function generateParamMdxRecursive(
   fieldName: string,
   field: ApiField,
   parentPath: string
@@ -169,7 +169,7 @@ function generateParamMdxRecursive(
 
 // --- Helper: Generate Response Field MDX Recursively ---
 // Uses built-in <ResponseField> for top-level, imported <NestedParam> for nested.
-function generateResponseFieldMdxRecursive(
+export function generateResponseFieldMdxRecursive(
   field: ApiField,
   parentKey: string = ""
 ): string {
@@ -240,7 +240,7 @@ function generateResponseFieldMdxRecursive(
 }
 
 // --- Helper: Generate JSON Payload Object ---
-function generateJsonPayloadRecursive(
+export function generateJsonPayloadRecursive(
   fields: ApiField[] | undefined,
   endpointPath?: string,
   parentPath: string = ""
@@ -316,7 +316,7 @@ function generateJsonPayloadRecursive(
       if (fieldDetails.isEnum && fieldDetails.options.length > 0) {
         // Simple Enum
         let enumValue = `<${fieldDetails.options[0].value}>`;
-        
+
         // Special handling for credential type in get-api-key and get-api-keys endpoints.
         // Current behavior: for enum types, we grab the first (which defaults to CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR).
         // However, for `get_api_key` and `get_api_keys` endpoints, we want to use CREDENTIAL_TYPE_API_KEY_P256.
@@ -327,7 +327,7 @@ function generateJsonPayloadRecursive(
         ) {
           enumValue = "<CREDENTIAL_TYPE_API_KEY_P256>";
         }
-        
+
         value = enumValue;
       } else {
         // Simple Type (non-enum)
@@ -362,13 +362,13 @@ function getSdkMethodName(endpoint: ApiEndpoint): string {
     return op.slice(0, 1).toLowerCase() + op.slice(1);
   }
   const path = endpoint.path || "";
-  
+
   // Extract the last part of the path (e.g., "approve_activity" from "/public/v1/submit/approve_activity")
   const pathParts = path.split("/").filter(Boolean);
   const lastPart = pathParts[pathParts.length - 1];
-  
+
   if (!lastPart) return "unknownMethod";
-  
+
   // Convert snake_case to camelCase
   return lastPart.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
@@ -379,10 +379,10 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
   const fieldName = field.name;
   const fieldType = field.type;
   const description = field.description ? ` // ${field.description}` : "";
-  
+
   // Check if this is an enum field
   const { isEnum, options } = getEnumDetails(field);
-  
+
   if (isEnum && options.length > 0) {
     // For enum fields, show the first option as an example
     const firstOption = options[0].value;
@@ -437,7 +437,7 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
       return `${indentStr}${fieldName}: { /* object */ }${description}`;
     }
   }
-  
+
   return `${indentStr}${fieldName}: "<unknown>"${description}`;
 }
 
@@ -445,7 +445,7 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
 function generateSdkParameters(endpoint: ApiEndpoint): string {
   const fields = endpoint.requestBody?.fields || [];
   const parametersWrapper = fields.find((f) => f.name === "parameters");
-  
+
   if (parametersWrapper) {
     if (parametersWrapper.childFields && parametersWrapper.childFields.length > 0) {
       // For activity endpoints, extract parameters from the parameters wrapper only
@@ -462,7 +462,7 @@ function generateSdkParameters(endpoint: ApiEndpoint): string {
     // For query endpoints, use all top-level fields (excluding only type and timestampMs)
     const commonFields = ["type", "timestampMs"]; // organizationId should be included for queries
     const endpointSpecificFields = fields.filter(f => !commonFields.includes(f.name));
-    
+
     if (endpointSpecificFields.length === 0) {
       return ""; // No endpoint-specific parameters
     }
@@ -515,7 +515,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   // Stringify carefully, handle potential BigInts if they arise
   const dataPayloadString = JSON.stringify(
     dataPayloadObject,
-    (key, value) => (typeof value === "bigint" ? value.toString() : value),
+    (_key, value) => (typeof value === "bigint" ? value.toString() : value),
     4
   ); // Pretty print with 4 spaces
 
@@ -538,7 +538,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const jsParams = sdkParameters.trim() === "" ? "{}" : `{
 ${sdkParameters}
 }`;
-  const javascriptExample = 
+  const javascriptExample =
     "```javascript title=\"JavaScript\"\n" +
     "import { Turnkey } from \"@turnkey/sdk-server\";\n\n" +
     "const turnkeyClient = new Turnkey({\n" +
@@ -598,14 +598,14 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
     };
     responseJsonString = JSON.stringify(
       responsePayloadObject,
-      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
       2
     ); // 2-space indent
   } else {
     // Query endpoints: just the result object
     responseJsonString = JSON.stringify(
       resultPayload,
-      (key, value) => (typeof value === "bigint" ? value.toString() : value),
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
       2
     );
   }
