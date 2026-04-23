@@ -1,0 +1,68 @@
+---
+title: "MFA Enforcement and Recovery"
+description: "Learn how to enforce multi-factor authentication (MFA) policies for end-users in your sub-organizations, and how to set up recovery mechanisms in case users lose access to their authentication methods."
+sidebarTitle: "Enforcement and Recovery"
+---
+
+## Enforcing MFA for end users
+
+Enforcing MFA for an end user on a sub-organization can be done using a [delegated access user](/concepts/policies/delegated-access-overview). 
+
+A delegated access user is a non-root user created in the sub-organization whose API key is controlled by the parent organization and has carefully scoped permissions to perform only specific actions.
+
+To set this up:
+
+1. The sub-organization's root user creates a delegated access user with an API key controlled by the parent org.
+2. The sub-organization's root user creates a policy that allows the delegated access user to manage MFA policies.
+3. The delegated access user can then create MFA policies for the sub-organization's root user.
+
+The policy assigned to the delegated access user should be scoped to only allow MFA policy management:
+
+``` ts
+// Policy condition: only allow MFA policy activities
+activity.resource == 'MFA_POLICY'
+```
+
+Once this is in place, the delegated access user (controlled by the parent org) can create MFA policies on behalf of the end user. For example, to require MFA for all activities:
+
+```json
+{
+  "userId": "<suborg-root-user-id>",
+  "mfaPolicyName": "MFA for everything",
+  "condition": "true",
+  "requiredAuthenticationMethods": /* The authentication methods you want to require */,
+  "order": 1
+}
+```
+
+## MFA recovery
+
+If an end user loses access to one of their authentication methods, they may be unable to complete activities that require MFA. Because Turnkey cannot write to organizations directly, Turnkey is unable to recover access for end-users. **Organizations must set up a recovery mechanism in advance.**
+
+The recommended approach is to use [delegated access users](/concepts/policies/delegated-access-overview) to delete the MFA policy that is locking the user out. The delegated access user must have permission to delete MFA policies:
+
+``` ts
+// Policy condition: only allow deleting MFA policies
+activity.resource == 'MFA_POLICY' && activity.action == 'DELETE'
+```
+
+### Quorum-based recovery
+
+It is strongly recommended that your Organization considers setting up **two or more delegated access users** for MFA recovery, with a consensus policy requiring both or more to approve before an MFA policy can be deleted. This prevents any single party from removing a user's MFA protections.
+
+To set this up:
+
+1. Create two delegated access users in the sub-organization, each with an API key controlled by different parties in the parent organization.
+2. Create a policy scoped to MFA policy deletion with a consensus requirement:
+
+``` ts
+// Policy condition
+activity.resource == 'MFA_POLICY' && activity.action == 'DELETE'
+```
+
+```ts
+// Consensus requirement: both delegated users must approve
+approvers.count() >= 2
+```
+
+With this configuration, deleting an MFA policy requires both delegated access users to approve the `DeleteMfaPolicy` activity.

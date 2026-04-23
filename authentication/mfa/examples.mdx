@@ -1,0 +1,507 @@
+---
+title: "MFA Examples"
+description: "Explore examples of multi-factor authentication (MFA) policies in Turnkey, including how to require MFA for specific activities, how to set up recovery mechanisms, and how MFA interacts with Turnkey's consensus system."
+sidebarTitle: "Examples"
+---
+
+Here are some examples of how MFA policies can be used in practice on your end-users' sub-organization. MFA policies are highly customizable and can be configured to fit the specific needs of your organization and users. Feel free to tweak these examples to fit your use case!
+
+### Only require MFA for signing activities
+In this example, we require users to satisfy MFA only when performing signing activities. For all other activities, no MFA is required. In this case, the user can use their existing session along with a passkey to satisfy MFA when signing.
+
+``` ts
+mfaPolicy: {
+  userId: "<target-user-id>", // Required: the user this MFA policy applies to
+  condition: "activity.action == 'SIGN'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATOR_TYPE_SESSION" },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATOR_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 0,
+}
+```
+
+
+### Two factor authentication
+In this example, we require users to authenticate with both a passkey and an email OTP to retrieve a session. Every other activity requires only a session.
+
+``` ts
+// Require users to authenticate with both a passkey and an email OTP to retrieve a session
+mfaPolicy: {
+  condition: "activity.action == 'AUTH'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_EMAIL_OTP" },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 0,
+}
+
+// Everything else only requires the session (recieved after satisfying the above MFA requirements to authenticate)
+mfaPolicy: {
+  condition: "true",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SESSION" },
+      ]
+    }
+  ],
+  order: 1,
+}
+```
+
+### Two factor authentication, exporting requires stronger MFA
+
+In this example, we require users to authenticate with both a passkey and an email OTP to retrieve a session. For exporting, we require users to authenticate with their passkey and their existing session. For all other activities, only a session is required.
+
+``` ts
+// Require users to authenticate with both a passkey and an email OTP to retrieve a session
+mfaPolicy: {
+  condition: "activity.action == 'AUTH'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_EMAIL_OTP" },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 0,
+}
+
+// Exporting requires both session and passkey
+mfaPolicy: {
+  condition: "activity.action == 'EXPORT'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SESSION" },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 1,
+}
+
+// Everything else only requires the session 
+mfaPolicy: {
+  condition: "true",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SESSION" },
+      ]
+    }
+  ],
+  order: 2,
+}
+```
+
+### Two factor authentication, signing requires MFA every 15 minutes
+
+In this example, MFA is required for authentication. Signing requires MFA but, a session profile with a 15 minute expiration is used so that users only need to satisfy MFA every 15 minutes when signing. 
+
+In order to get this session profile, the user must authenticate with their existing default session (retrieved by using email OTP and a passkey) and a passkey. All other activities only require a session.
+
+First, we set up the session profile with a 15 minute expiration on the parent organization:
+``` ts
+// The UUID for this session will be generated on creation. Let's assume it is `11111111-1111-1111-1111-111111111111` for this example!
+sessionProfile: {
+  name: 'colossal session',
+  capability: "true",   // This session profile can be used for any activity
+  expirationSeconds: 900, // 15 minutes
+}
+```
+
+Then, we set up the MFA policies on the sub-organization:
+``` ts
+// Requires users to authenticate with the default session and a passkey in order to retrieve the "colossal session" that has a 15 minute expiration
+mfaPolicy: {
+  condition: "activity.action == 'AUTH' && activity.params.session_profile_id == '11111111-1111-1111-1111-111111111111'",   // This condition ensures that the MFA requirements only apply when the user is trying to retrieve the "colossal session"
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { 
+            type: "AUTHENTICATION_TYPE_SESSION",
+            id: "00000000-0000-0000-0000-000000000000" // This is the default read/write session that is issued if no session profile is specified during authentication
+        },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 0,
+}
+
+
+// Require users to authenticate with both a passkey and email OTP to retrieve a default read/write session 
+mfaPolicy: {
+  condition: "activity.action == 'AUTH'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_EMAIL_OTP" },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 1,
+}
+
+// Signing requires a session issued with the session profile (which requires MFA every 15 minutes), but not the passkey
+mfaPolicy: {
+  condition: "activity.action == 'SIGN'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { 
+            type: "AUTHENTICATION_TYPE_SESSION",
+            id: "11111111-1111-1111-1111-111111111111" // Must use the "colossal session" that has a 15 minute expiration, so that MFA is required every 15 minutes when signing
+        },
+      ]
+    }
+  ],
+  order: 2,
+}
+
+mfaPolicy: {
+  condition: "true",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SESSION" }, // All other activities can be satisfied with any session, so users can use the "colossal session" that requires MFA every 15 minutes, or the default read/write session that doesn't require MFA
+      ]
+    }
+  ],
+  order: 3,
+}
+```
+
+### By-factor login capabilities
+
+In this example, different login methods grant different levels of access:
+
+- **SMS OTP login**: grants a session that can do all activities **except** export
+- **Passkey login**: grants a session that can do **all activities** including export
+- **SMS user wants to export**: must upgrade their session by proving they also have a passkey. The upgraded session lasts 15 minutes, after which they must re-authenticate to export again.
+
+First, we set up the session profiles on the parent organization:
+
+``` ts
+// SMS basic session (assume uuid: 11111111-1111-1111-1111-111111111111)
+// Can do everything except export
+sessionProfile: {
+  name: 'sms-basic-session',
+  capability: "activity.action != 'EXPORT'",
+  expirationSeconds: 25200, // 7 hours
+}
+
+// SMS upgraded session (assume uuid: 22222222-2222-2222-2222-222222222222)
+// Only used for exporting, expires quickly to force re-authentication
+sessionProfile: {
+  name: 'sms-upgraded-session',
+  capability: "activity.action == 'EXPORT'",
+  expirationSeconds: 900, // 15 minutes
+}
+
+// Passkey login session (assume uuid: 33333333-3333-3333-3333-333333333333)
+// Full access to all activities
+sessionProfile: {
+  name: 'passkey-login-session',
+  capability: "true",
+  expirationSeconds: 25200, // 7 hours
+}
+```
+
+Then, we set up the MFA policies on the sub-organization:
+
+``` ts
+// SMS basic login: requires SMS OTP to get the basic session
+mfaPolicy: {
+  condition: "activity.action == 'AUTH' && activity.params.session_profile_id == '11111111-1111-1111-1111-111111111111'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SMS_OTP" },
+      ]
+    }
+  ],
+  order: 0,
+}
+
+// Passkey login: requires passkey to get the passkey session
+mfaPolicy: {
+  condition: "activity.action == 'AUTH' && activity.params.session_profile_id == '33333333-3333-3333-3333-333333333333'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 1,
+}
+
+// SMS upgrade: requires the existing SMS basic session AND a passkey to get the upgraded export session
+mfaPolicy: {
+  condition: "activity.action == 'AUTH' && activity.params.session_profile_id == '22222222-2222-2222-2222-222222222222'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        {
+          type: "AUTHENTICATION_TYPE_SESSION",
+          id: "11111111-1111-1111-1111-111111111111", // Must use the SMS basic session
+        },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 2,
+}
+
+// Export: requires either the upgraded SMS session or the passkey session
+mfaPolicy: {
+  condition: "activity.action == 'EXPORT'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        {
+          type: "AUTHENTICATION_TYPE_SESSION",
+          id: "22222222-2222-2222-2222-222222222222", // SMS upgraded session
+        },
+        {
+          type: "AUTHENTICATION_TYPE_SESSION",
+          id: "33333333-3333-3333-3333-333333333333", // Passkey session (already has full access)
+        },
+      ]
+    }
+  ],
+  order: 3,
+}
+
+// Everything else: requires any session
+mfaPolicy: {
+  condition: "true",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SESSION" },
+      ]
+    }
+  ],
+  order: 4,
+}
+```
+
+### Explicit downgrade
+
+In this example, users log in with SMS OTP and receive a safe session that allows all activities **except** signing. To sign, they must upgrade to a signing session by proving they have a passkey. The signing session lasts 15 minutes, after which the user falls back to the safe session. In the UX, the user can also explicitly "downgrade" back to the safe session at any time by simply discarding the signing session.
+
+- **SMS OTP login**: grants a safe session that can do all activities except sign
+- **User wants to sign**: uses the safe session and a passkey to get a signing session that can only be used for signing activities. The signing session lasts 15 minutes.
+- **Explicit downgrade**: user discards the signing session in the UX and switches back to the safe session. No Turnkey API call is needed - the app simply stops using the signing session.
+- **Automatic downgrade**: after 15 minutes, the signing session expires. Any signing attempts will require the user to go through the upgrade flow again.
+
+First, we set up the session profiles on the parent organization:
+
+``` ts
+// SMS safe session (assume uuid: 11111111-1111-1111-1111-111111111111)
+// Can do everything except sign
+sessionProfile: {
+  name: 'sms-safe-session',
+  capability: "activity.action != 'SIGN'",
+  expirationSeconds: 25200, // 7 hours
+}
+
+// SMS signing session (assume uuid: 22222222-2222-2222-2222-222222222222)
+// Used for signing, expires quickly
+sessionProfile: {
+  name: 'sms-signing-session',
+  capability: "true",
+  expirationSeconds: 900, // 15 minutes
+}
+```
+
+Then, we set up the MFA policies on the sub-organization:
+
+``` ts
+// SMS safe login: requires SMS OTP to get the safe session
+mfaPolicy: {
+  condition: "activity.action == 'AUTH' && activity.params.session_profile_id == '11111111-1111-1111-1111-111111111111'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SMS_OTP" },
+      ]
+    }
+  ],
+  order: 0,
+}
+
+// SMS signing session creation: requires the existing safe session AND a passkey
+mfaPolicy: {
+  condition: "activity.action == 'AUTH' && activity.params.session_profile_id == '22222222-2222-2222-2222-222222222222'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        {
+          type: "AUTHENTICATION_TYPE_SESSION",
+          id: "11111111-1111-1111-1111-111111111111", // Must use the SMS safe session
+        },
+      ]
+    },
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 1,
+}
+
+// Sign action: requires the signing session
+mfaPolicy: {
+  condition: "activity.action == 'SIGN'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        {
+          type: "AUTHENTICATION_TYPE_SESSION",
+          id: "22222222-2222-2222-2222-222222222222", // Must use the signing session
+        },
+      ]
+    }
+  ],
+  order: 2,
+}
+
+// Everything else: requires any session
+mfaPolicy: {
+  condition: "true",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_SESSION" },
+      ]
+    }
+  ],
+  order: 3,
+}
+```
+
+### Enforcing MFA via delegated access
+
+In this example, a parent organization enforces MFA on an end-user's sub-organization using a [delegated access user](../../concepts/policies/delegated-access-overview). The delegated access user is controlled by the parent org and has a narrowly scoped policy that only allows it to manage MFA policies.
+
+- **Parent org** creates a sub-organization with a root user
+- **Sub-org root user** creates a delegated access user whose API key is controlled by the parent org
+- **Sub-org root user** assigns a policy to the delegated access user that only allows MFA policy management
+- **Delegated access user** creates an MFA policy requiring the end user to authenticate with a passkey for all signing activities
+
+First, the sub-org root user creates a policy for the delegated access user:
+
+``` ts
+// Policy for the delegated access user
+policy: {
+  policyName: "Allow MFA policy management",
+  effect: "EFFECT_ALLOW",
+  condition: "activity.resource == 'MFA_POLICY' && activity.action == 'CREATE'",    // Only allow creating MFA policies to prevent the delegated access user from doing anything else
+  notes: "Allows the delegated access user to create MFA policies",
+}
+```
+
+Then, the delegated access user (controlled by the parent org) creates an MFA policy for the sub-org root user:
+
+``` ts
+// MFA policy created by the delegated access user
+mfaPolicy: {
+  userId: "<suborg-root-user-id>",
+  mfaPolicyName: "Require passkey for signing",
+  condition: "activity.action == 'SIGN'",
+  requiredAuthenticationMethods: [
+    {
+      any: [
+        { type: "AUTHENTICATION_TYPE_PASSKEY" },
+      ]
+    }
+  ],
+  order: 0,
+}
+```
+
+### Quorum-based MFA recovery via delegated access
+
+In this example, a parent organization sets up a recovery mechanism using two [delegated access users](../../concepts/policies/delegated-access-overview). Both must approve before an MFA policy can be deleted, preventing any single party from removing a user's MFA protections. See [MFA Recovery](./enforcement-and-recovery#mfa-recovery) for more details.
+
+- **Sub-org root user** creates two delegated access users, each with an API key controlled by a different party in the parent org
+- **Sub-org root user** assigns a policy requiring both delegated users to approve MFA policy deletions
+- When the end user is locked out, **both** delegated access users must approve the `DeleteMfaPolicy` activity
+
+The sub-org root user creates a consensus policy for recovery:
+
+``` ts
+// Policy for the delegated access users - requires both to approve
+policy: {
+  policyName: "Quorum MFA recovery",
+  effect: "EFFECT_ALLOW",
+  condition: "activity.resource == 'MFA_POLICY' && activity.action == 'DELETE'",    // Only allow deleting MFA policies to prevent the delegated access users from doing anything else
+  consensus: "approvers.count() >= 2",
+  notes: "Requires both delegated access users to approve before an MFA policy can be deleted",
+}
+```
+
+To recover a locked-out user, the first delegated access user proposes the deletion:
+
+``` ts
+// First delegated access user proposes deleting the MFA policy
+deleteMfaPolicy: {
+  userId: "<suborg-root-user-id>",
+  mfaPolicyId: "<mfa-policy-id-to-delete>",
+}
+// Activity is returned with ACTIVITY_STATUS_CONSENSUS_NEEDED
+```
+
+Then the second delegated access user approves:
+
+``` ts
+// Second delegated access user approves the deletion
+approveActivity: {
+  fingerprint: "<fingerprint-from-delete-activity>",
+}
+// Activity completes - MFA policy is deleted, user is no longer locked out
+```
