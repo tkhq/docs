@@ -6,7 +6,11 @@ sidebarTitle: "Multi-sig approvals"
 
 ## Introduction to co-signing
 
-Co-signing, often referred to as multi-signature (multi-sig), provides an enhanced layer of security for blockchain transactions. It requires approvals from multiple parties before a transaction can be executed. This guide details how to implement a 2/2 co-signing setup using Turnkey, where both the end-user (via passkey) and your application backend (via API key) must approve transactions.
+Co-signing, often referred to as multi-signature (multi-sig), provides an enhanced layer of security for blockchain transactions. It requires approvals from multiple parties before a transaction can be executed. This guide details how to implement a 2/2 co-signing setup using Turnkey, where both the end-user and your application backend (via API key) must approve transactions.
+
+<Note>
+  See the [with-cosigning example](https://github.com/tkhq/sdk/tree/main/examples/with-cosigning) for a full working implementation using Next.js, OTP login, SSE webhooks, and a 2-of-2 root quorum.
+</Note>
 
 ## Co-signing architecture
 
@@ -66,25 +70,30 @@ sequenceDiagram
 
     <CodeGroup>
 
-    ```typescript app.ts [expandable] {43}
-    import { turnkeyServer } from "./turnkey";
-    import { DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-browser";
+    ```typescript app.ts [expandable]
+    import { Turnkey, DEFAULT_ETHEREUM_ACCOUNTS } from "@turnkey/sdk-server";
+
+    const turnkeyServer = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    }).apiClient();
 
     async function createMultiSigWallet(
-      userId,
-      userEmail,
-      userPasskeyChallenge,
-      userPasskeyAttestation
+      userId: string,
+      userEmail: string,
+      userPasskeyChallenge: string,
+      userPasskeyAttestation: object,
     ) {
-      // Create a sub-organization with two root users and a threshold of 2
       const subOrg = await turnkeyServer.createSubOrganization({
-        organizationId: process.env.TURNKEY_ORGANIZATION_ID,
+        organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
         subOrganizationName: `Multi-Sig Wallet for ${userEmail}`,
         rootUsers: [
           // First root user - the end user with their passkey
           {
             userName: "End User",
-            userEmail: userEmail,
+            userEmail,
             apiKeys: [],
             authenticators: [
               {
@@ -101,8 +110,8 @@ sequenceDiagram
             apiKeys: [
               {
                 apiKeyName: "Service API Key",
-                publicKey: process.env.SERVICE_API_PUBLIC_KEY,
-                curveType: "API_KEY_CURVE_SECP256K1",
+                publicKey: process.env.SERVICE_API_PUBLIC_KEY!,
+                curveType: "API_KEY_CURVE_P256",
               },
             ],
             authenticators: [],
@@ -116,7 +125,7 @@ sequenceDiagram
         },
       });
 
-      // Save the sub-organization ID in your database
+      // Store the sub-org ID against the user in your database
       await db.users.update({
         where: { id: userId },
         data: { turnkeySubOrgId: subOrg.organizationId },
@@ -124,19 +133,6 @@ sequenceDiagram
 
       return subOrg;
     }
-    ```
-
-    ```typescript turnkey.ts
-    import { Turnkey } from "@turnkey/sdk-server";
-
-    // Initialize server-side client
-    export const turnkeyServer = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    }).apiClient();
-
     ```
 
     </CodeGroup>
@@ -152,58 +148,45 @@ sequenceDiagram
     - Receiving an activity fingerprint that needs further approval
     - Forwarding this fingerprint to your backend for the second signature
     
-    The transaction won't be fully signed yet - it will be in a "requires consensus" state until your backend approves it.
+    The transaction won't be fully signed yet - it will be in a `CONSENSUS_NEEDED` status until your backend approves it.
     Here's how to implement this flow in your frontend:
 
 
-    <CodeGroup>
+    ```typescript
+    import { useTurnkey, StamperType } from "@turnkey/react-wallet-kit";
 
-    ```typescript app.ts [expandable]
-    import { turnkeyPasskeyClient } from "./turnkey";
+    function SignButton({ walletAddress, subOrgId }: { walletAddress: string; subOrgId: string }) {
+      const { httpClient } = useTurnkey();
 
+      const handleSign = async () => {
+        const payload = "0x" + Buffer.from("Hello from Turnkey!").toString("hex");
 
-    // User initiates a transaction signing
-    async function initiateTransaction(txData, walletAddress) {
-      // This will trigger the user's passkey authentication
-      const signActivity = await turnkeyPasskeyClient.signTransaction({
-        organizationId: subOrgId,
-        parameters: {
-          type: "TRANSACTION_TYPE_ETHEREUM",
-          signWith: walletAddress,
-          unsignedTransaction: txData,
-        },
-      });
+        // StamperType.Passkey ensures this request is stamped with the user's passkey.
+        // With a 2-of-2 quorum the activity lands in CONSENSUS_NEEDED after this call —
+        // it won't complete until the backend approves it.
+        const res = await httpClient!.signRawPayload(
+          {
+            organizationId: subOrgId,
+            signWith: walletAddress,
+            payload,
+            encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+            hashFunction: "HASH_FUNCTION_SHA256",
+          },
+          StamperType.Passkey,
+        );
 
-      // The activity needs approval from the backend service
-      // Send the activity fingerprint to your backend
-      const response = await fetch("/api/proxy/turnkey/approve-transaction", {
-        method: "POST",
-        body: JSON.stringify({
-          activityFingerprint: signActivity.fingerprint,
-          subOrgId: subOrgId,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Include cookies for JWT authentication
-      });
+        // Forward the activity fingerprint to your backend for the second approval
+        const fingerprint = (res as any).activity?.fingerprint;
+        await fetch("/api/approve-transaction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fingerprint, subOrgId }),
+        });
+      };
 
-      const result = await response.json();
-      return result;
+      return <button onClick={handleSign}>Sign</button>;
     }
-      ```
-
-    ```typescript turnkey.ts
-    import { Turnkey } from "@turnkey/sdk-browser";
-
-    // Initialize server-side client
-    export const turnkeyPasskeyClient = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    });
     ```
-
-    </CodeGroup>
 
   </Step>
 
@@ -213,8 +196,15 @@ sequenceDiagram
     <CodeGroup>
 
     ```typescript app.ts [expandable]
-    import { turnkeyServer } from "./turnkey";
+    import { Turnkey } from "@turnkey/sdk-server";
     import { verifyJwt } from "./authMiddleware"; // Assume standard JWT middleware
+
+    const turnkeyServer = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    }).apiClient();
 
     // Endpoint to approve a transaction activity
     app.post(
@@ -237,24 +227,15 @@ sequenceDiagram
         // --- End Authorization ---
 
         try {
-          // TODO: Validate the transaction details from the activity
-          // Fetch the activity from Turnkey to inspect its contents
-          // const activity = await turnkeyServer.getActivity({
-          //   activityId: activityId, // Need activityId from fingerprint?
-          //   organizationId: subOrgId
-          // });
-          // if (activity.details.isInvalid) { throw new Error(...) }
-          
           // Approve the activity using the backend service's API key
-          const approvalActivity = await turnkeyServer.approveActivity({
+          await turnkeyServer.approveActivity({
             organizationId: subOrgId,
             fingerprint: activityFingerprint,
           });
 
-          // Once approved, the transaction is signed
-          // You might want to poll getActivity or use Webhooks to get the signed tx
-          // For simplicity, we assume success here
-          return res.status(200).json({ success: true, message: "Transaction approved by backend" });
+          // Once both parties have approved, Turnkey completes the signing.
+          // Use Webhooks to get notified when the activity reaches a terminal status.
+          return res.status(200).json({ success: true });
         } catch (error) {
           console.error("Error approving transaction:", error);
           return res.status(500).json({ error: "Failed to approve transaction" });
@@ -263,21 +244,13 @@ sequenceDiagram
     );
     ```
 
-    ```typescript turnkey.ts
-    import { Turnkey } from "@turnkey/sdk-server";
-
-    // Initialize server-side client
-    export const turnkeyServer = new Turnkey({
-      apiBaseUrl: "https://api.turnkey.com",
-      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-    }).apiClient();
-    ```
-
     </CodeGroup>
   </Step>
 </Steps>
+
+<Note>
+  The quorum is symmetric — the backend can also initiate signing (vote 1) and the user approves (vote 2). See the [with-cosigning example](https://github.com/tkhq/sdk/tree/main/examples/with-cosigning) for a full walkthrough of both flows.
+</Note>
 
 #### Security considerations and best practices
 
