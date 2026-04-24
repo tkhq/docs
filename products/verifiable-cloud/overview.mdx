@@ -2,25 +2,26 @@
 title: "Overview"
 ---
 
-## What is TVC?
+## What is Turnkey Verifiable Cloud (“TVC”)?
 
-Turnkey Verifiable Cloud ("TVC") is a new offering to externalize the [Foundations](https://whitepaper.turnkey.com/foundations) of our TEE-based key management system.
+Turnkey Verifiable Cloud is a new offering to externalize the [Foundations](https://whitepaper.turnkey.com/foundations) of our TEE-based key management system.
 
 Turnkey started as a key management system with a drastic [threat model](https://whitepaper.turnkey.com/architecture#threat-model), and we placed a bet on TEEs early on. More specifically, Turnkey uses [AWS Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/) to deploy all sensitive workloads.
 
-To build the foundations for our key management system we had to dig deep into build systems, deployment tooling, verification tooling, provisioning, performance, and scaling. This work, performed over the course of 3+ years, is valuable and highly general: anyone building within TEEs at scale will encounter similar issues.
+To establish the foundations for our key management system, we had to dig deep into build systems, deployment tooling, verification tooling, provisioning, performance, and scaling.
+This work, developed over 3+ years, is broadly applicable. Any team building at scale within Trusted Execution Environments will encounter the same challenges.
 
-TVC is our attempt at solving these problems transparently for the industry at large, within and outside of crypto. A few of the hard problems solved by TVC:
-* Reproducible builds are crucial to leverage remote attestations (see [this blog post](https://quorum.tkhq.xyz/posts/remote-attestations-useless-without-reproducible-builds/)). We have bootstrapped [StageX](https://stagex.tools), an open-source distro focused on reproducibility. Learn more about it [here](https://quorum.tkhq.xyz/posts/reproducible-builds-made-easy-introducing-stagex/). TVC works with StageX so that you do not have to think about reproducibility. It just works.
-* Packaging applications into EIF files is [easy on the surface](https://docs.aws.amazon.com/enclaves/latest/user/building-eif.html) but leaves application developers with load-bearing security decisions: which base OS do I use? How do I handle application upgrades? How do I persist state? Turnkey built [QuorumOS](https://github.com/tkhq/qos) to solve these problems in the context of our own key management platform. TVC is integrated with QOS to handle these problems for you. In TVC you provide the binary application you'd like to run, and we take care of the rest.
-* Running enclaves in Kubernetes is hard. Turnkey has invested years of engineering time to get this right. We are running enclaves with autoscaling so ensure your application can transparently scale up and down with traffic. We have automated provisioning at boot and invented [key forwarding](https://github.com/tkhq/qos/blob/main/src/qos_core/KEY_FORWARDING.MD) to ensure enclaves going down do not wake up operators in the middle of the night. An enclave going down is automatically replaced and provisioned from already-running enclaves.
-* Verification tooling and workflows are sensitive and hard to get right. Turnkey is regularly audited by top security firms to guarantee verification procedures and the code implementing them remains secure and correct over time.
+TVC solves these problems transparently for the industry at large, within and outside of crypto. A few of the hard problems solved by TVC:
+* **Reproducible builds**: These are crucial to leverage remote attestations (see [this blog post](https://quorum.tkhq.xyz/posts/remote-attestations-useless-without-reproducible-builds/)). To support this, we bootstrapped [StageX](https://stagex.tools), an open-source distro focused on reproducibility. TVC works with StageX so reproducibility is handled for you. Learn more about it [here](https://quorum.tkhq.xyz/posts/reproducible-builds-made-easy-introducing-stagex/).
+* **EIF Files**: Packaging applications into EIF files is [easy on the surface](https://docs.aws.amazon.com/enclaves/latest/user/building-eif.html) but leaves application developers with load-bearing security decisions: which base OS do I use? How do I handle application upgrades? How do I persist state? Turnkey built [QuorumOS](https://github.com/tkhq/qos) to solve these problems in the context of our own key management platform. TVC is integrated with QOS to handle these problems for you. In TVC, you provide the binary application you'd like to run, and we take care of the rest.
+* **Running enclaves in Kubernetes**: Turnkey has invested years of engineering time to get this right. We are running enclaves with autoscaling to ensure your application can transparently scale up and down with traffic. We have automated provisioning and invented [key forwarding](https://github.com/tkhq/qos/blob/main/src/qos_core/KEY_FORWARDING.MD) to ensure enclaves going down are automatically replaced and provisioned from already-running enclaves, Operators do not have to wake up in the middle of the night.
+* **Verification tooling**: Turnkey is regularly audited by top security firms to guarantee verification procedures and the code implementing them remains secure and correct over time.
 
 TVC applications get this (and more!) by default because they run on the same infrastructure as Turnkey's own secure workloads.
 
 ## Use-cases
 
-Many different types of workloads can benefit from verifiability. Below is a list of use-cases we've discussed internally or externally already.
+Many different types of workloads can benefit from verifiability. Below is a list of use cases supported by TVC.
 
 | Workload type             | Advantages to verifiability                                                                         |
 | :-------------------------| :-------------------------------------------------------------------------------------------------- |
@@ -41,7 +42,7 @@ We’ve engineered TVC to fit within the existing Turnkey products and APIs. You
 
 ## Applications
 
-TVC is programmable infrastructure, enabling you to create and manage verifiable apps. Each TVC App is deployed on Turnkey infrastructure in the exact same was as Turnkey's own [core enclave apps](https://github.com/tkhq/core-enclaves).
+TVC is programmable infrastructure, enabling you to create and manage verifiable apps. Each TVC App is deployed on Turnkey infrastructure in the exact same way as Turnkey's own [core enclave apps](https://github.com/tkhq/core-enclaves).
 * TVC Applications are deployed within a Kubernetes cluster operated by Turnkey, using [QuorumOS](https://github.com/tkhq/qos) ("QOS") as a base OS.
 * Key provisioning, high-availability deployments (minimum of 3 replicas), and in-depth verification workflows are supported by default.
 * Because TVC relies on Turnkey for its own operations, it's possible to use Consensus in the context of TVC activities (with [Turnkey Policies](/concepts/policies) or [Root Quorum](/concepts/users/root-quorum))
@@ -52,10 +53,10 @@ A TVC Application has a stable [Quorum Key](https://github.com/tkhq/qos#quorum-k
 
 Each TVC application can be deployed many times. For every TVC deployment, you will specify:
 
-* an OCI image URL (e.g. `ghcr.io/myorg/myrepo:tag@sha256:…`). This container is pulled by our Kubernetes infrastructure. If the container is private, TVC supports uploading encrypted [pull secrets](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
-* an executable path + args: within the container, you must indicate where the desired binary lives such that Turnkey’s infrastructure can extract this binary from its OCI container, and run it within a TEE on your behalf.
-* the port on which external requests should be forwarded. This is typically port 3000. For convenience TVC lets you specify different ports for user requests and health requests made by Turnkey infrastructure.
-* your expected executable digest: this is a security measure, to ensure the binary pulled by Turnkey's infrastructure is the binary you expect.
+* An OCI image URL (e.g. `ghcr.io/myorg/myrepo:tag@sha256:…`). This container is pulled by our Kubernetes infrastructure. If the container is private, TVC supports uploading encrypted [pull secrets](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+* An executable path + args: within the container, you must indicate where the desired binary lives such that Turnkey’s infrastructure can extract this binary from its OCI container, and run it within a TEE on your behalf.
+* The port on which external requests should be forwarded. This is typically port 3000. For convenience TVC lets you specify different ports for user requests and health requests made by Turnkey infrastructure.
+* Your expected executable digest: this is a security measure, to ensure the binary pulled by Turnkey's infrastructure is the binary you expect.
 
 Once the deployment is submitted and approved, our infrastructure deploys and makes it available on a dedicated subdomain.
 
@@ -97,6 +98,4 @@ Get in touch with us for more details.
 
 ## Getting access to TVC
 
-TVC is current in Beta. We're working with few customers to build the platform and improve it as we go.
-
-If you're interested in being an early design partner, or if you want to be notified when TVC is generally available for all, please [join the waitlist](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist).
+TVC is currently in Beta. If you're interested in being an early design partner, or if you want to be notified when TVC is generally available for all, please [join the waitlist](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist).
