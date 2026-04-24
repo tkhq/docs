@@ -8,7 +8,7 @@ Turnkey Verifiable Cloud is a new offering to externalize the [Foundations](http
 
 Turnkey started as a key management system with a drastic [threat model](https://whitepaper.turnkey.com/architecture#threat-model), and we placed a bet on TEEs early on. More specifically, Turnkey uses [AWS Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/) to deploy all sensitive workloads, and we plan to support other major cloud providers in the future.
 
-To establish the foundations for our key management system, we had to dig deep into build systems, deployment tooling, verification tooling, provisioning, performance, and scaling.
+To establish the foundations for our key management system, we went deep on build systems, deployment tooling, verification tooling, provisioning, performance, and scaling.
 This work, developed over 3+ years, is broadly applicable. Any team building at scale within Trusted Execution Environments will encounter the same challenges.
 
 TVC solves these problems transparently for the industry at large, within and outside of web3. A few of the hard problems solved by TVC:
@@ -17,7 +17,7 @@ TVC solves these problems transparently for the industry at large, within and ou
 * **Running at production scale**: Turnkey has invested years of engineering time to get this right. We are running enclaves with autoscaling to ensure your application can transparently scale up and down with traffic. We have automated provisioning and invented [key forwarding](https://github.com/tkhq/qos/blob/main/src/qos_core/KEY_FORWARDING.MD) to ensure enclaves going down are automatically replaced and provisioned from already-running enclaves, Operators do not have to wake up in the middle of the night.
 * **Verification tooling**: Turnkey is regularly audited by top security firms to guarantee verification procedures and the code implementing them remains secure and correct over time.
 
-TVC applications get this (and more!) by default because they run on the same infrastructure as Turnkey's own secure workloads.
+TVC is the first TEE platform to offer autoscaling and strong security defaults. Your secure workloads run at scale, on the same infrastructure as Turnkey's own secure workloads.
 
 ## Use-cases
 
@@ -79,12 +79,18 @@ Each TVC deployment is ultimately specified with a QOS manifest. The information
 
 This manifest document is the source of truth used by QOS to boot your application. It is also the document which must be cryptographically signed for each deployment. QOS Manifests are returned along with the AWS attestation document, within [Boot Proofs](https://whitepaper.turnkey.com/foundations#boot-proofs-and-app-proofs). More on this in the next section.
 
+## Operators
+
+Operators are humans or systems. In TVC, an operator is represented by an alias and a public key. Operator keys can be created and managed externally via our TVC CLI, or managed via Turnkey's own key management APIs.
+
+QuorumOS uses operators to cryptographically control deployments: operators must approve QOS manifests and take part in deployments where Quorum Keys must be injected.
+
 ## Keys, Signatures, and Verification
 
 Your TVC app has access to two keys when it boots:
 
-* Ephemeral Key: a key which is created at boot. This key **never leaves the enclave** and is different for every enclave. A signature by this key is a signature bound to a particular enclave, hence bound to a particular **code version** of your TVC application.
-* Quorum Key: a key which is injected at boot and is the same across all enclaves. This key can be used to encrypt state which needs to survive application upgrades. Internally at Turnkey we use this key to sign or encrypt long-lived data.
+* **Ephemeral Key**: a key which is created at boot. This key **never leaves the enclave** and is different for every enclave. A signature by this key is a signature bound to a particular enclave, hence bound to a particular **code version** of your TVC application.
+* **Quorum Key**: a key which is injected at boot and is the same across all enclaves. This key can be used to encrypt state which needs to survive application upgrades. Internally at Turnkey we use this key to sign or encrypt long-lived data.
 
 Both of these keys follow the [QOS Key Set](https://github.com/tkhq/qos/blob/main/src/qos_p256/SPEC.md) specification. Ephemeral Keys and Quorum Keys can be used to sign data, or to encrypt/decrypt data.
 
