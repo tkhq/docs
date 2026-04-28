@@ -1,0 +1,111 @@
+---
+title: "Overview"
+---
+
+## What is Turnkey Verifiable Cloud (“TVC”)?
+
+Turnkey Verifiable Cloud is a new offering to externalize the [Foundations](https://whitepaper.turnkey.com/foundations) of our TEE-based key management system. With TVC, you can run any code in isolated, verifiable secure enclaves powered by Turnkey’s trusted infrastructure.
+
+Turnkey started as a key management system with a drastic [threat model](https://whitepaper.turnkey.com/architecture#threat-model), and we placed a bet on TEEs early on. More specifically, Turnkey uses [AWS Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/) to deploy all sensitive workloads, and we plan to support other major cloud providers in the future.
+
+To establish the foundations for our key management system, we went deep on build systems, deployment tooling, verification tooling, provisioning, performance, and scaling.
+This work, developed over 3+ years, is broadly applicable. Any team building at scale within Trusted Execution Environments will encounter the same challenges.
+
+TVC solves these problems transparently for the industry at large, within and outside of web3. A few of the hard problems solved by TVC:
+* **Reproducible builds**: These are crucial to leverage remote attestations (see [this blog post](https://quorum.tkhq.xyz/posts/remote-attestations-useless-without-reproducible-builds/)). To support this, we bootstrapped [StageX](https://stagex.tools), an open-source distro focused on reproducibility. TVC works with StageX so reproducibility is handled for you. Learn more about it [here](https://quorum.tkhq.xyz/posts/reproducible-builds-made-easy-introducing-stagex/).
+* **Packaging**: Packaging applications into EIF files is [easy on the surface](https://docs.aws.amazon.com/enclaves/latest/user/building-eif.html) but leaves application developers with load-bearing security decisions: which base OS do I use? How do I handle application upgrades? How do I persist state? Turnkey built [QuorumOS](https://github.com/tkhq/qos) to solve these problems in the context of our own key management platform. TVC is integrated with QOS to handle these problems for you. In TVC, you provide the binary application you'd like to run, and we take care of the rest.
+* **Running at production scale**: Turnkey has invested years of engineering time to get this right. We are running enclaves with autoscaling to ensure your application can transparently scale up and down with traffic. We have automated provisioning and invented [key forwarding](https://github.com/tkhq/qos/blob/main/src/qos_core/KEY_FORWARDING.MD) to ensure enclaves going down are automatically replaced and provisioned from already-running enclaves, Operators do not have to wake up in the middle of the night.
+* **Verification tooling**: Turnkey is regularly audited by top security firms to guarantee verification procedures and the code implementing them remains secure and correct over time.
+
+TVC is the first TEE platform to offer autoscaling and strong security defaults. Your secure workloads run at scale, on the same infrastructure as Turnkey's own secure workloads.
+
+## Use cases
+
+Many different types of workloads can benefit from verifiability. Below is a list of use cases supported by TVC.
+
+| Workload type             | Advantages to verifiability                                                                         |
+| :-------------------------| :-------------------------------------------------------------------------------------------------- |
+| Chain Abstraction         | Trustworthy cosigners for cross-chain resource locks (e.g. [OneBalance](https://www.onebalance.io)) |
+| Transaction Construction  | Users know that the unsigned transaction bytes are legitimate. |
+| Transaction Parsing       | Provide accurate metadata about the effects of a transaction. This is critical for trusted wallet UX. See [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser/).  |
+| Oracles                   | Leverage external data without the overhead of full decentralization, on-chain or off-chain. Replace economic incentives with verifiability. |
+| Blockchain nodes          | Allow for private balance lookups, verifiable mempool inclusion, and more. |
+| Web2 data bridging        | Import and use data from web2 providers (centralized exchange balances, credit scores, X follower counts) in decentralized computation |
+| AI training & inference   | Verifiable training to prove no hidden backdoors; guarantee user prompts remain private |
+| Sequencers                | Prove correct behavior and eliminate the need for challenge periods and economic incentives around them (e.g. [Base sequencer](https://github.com/base/base/tree/main/crates/proof/tee)) |
+| Identity verification     | Prove no identity is leaked as part of the verification process. |
+| VPN nodes                 | Guarantees privacy by proving that forwarded traffic isn't logged anywhere. |
+| Exchanges                 | Ensure no malicious behavior (frontrunning), and create verifiable order books. |
+| PII processing            | Prove that processing does not leak or misuse PII (Personally Identifiable Information). |
+
+These are just a subset of possible use cases. Any computation where two parties need to agree on what was executed can benefit from or require verifiability.
+
+## Architecture
+
+We’ve engineered TVC to fit within the existing Turnkey products and APIs. You will interact with TVC via our [dashboard](https://app.turnkey.com/), via the [TVC CLI](https://github.com/tkhq/rust-sdk/tree/main/tvc), or programmatically via [APIs](/api-reference/overview).
+
+## Applications
+
+TVC is programmable infrastructure, enabling you to create and manage verifiable apps. Each TVC App is deployed on Turnkey infrastructure in the exact same way as Turnkey's own [core enclave apps](https://github.com/tkhq/core-enclaves).
+* TVC Applications are deployed within Kubernetes clusters operated by Turnkey, using [QuorumOS](https://github.com/tkhq/qos) ("QOS") as a base OS.
+* Key provisioning, high-availability deployments (minimum of 3 replicas), and in-depth verification workflows are supported by default.
+* Because TVC relies on Turnkey for its own operations, it's possible to use Consensus in the context of TVC activities (with [Turnkey Policies](/concepts/policies) or [Root Quorum](/concepts/users/root-quorum))
+
+A TVC Application has a stable [Quorum Key](https://github.com/tkhq/qos#quorum-key) and set of approvers.
+
+## Deployments
+
+Each TVC application can be deployed many times. For every TVC deployment, you will specify:
+
+* An OCI image URL (e.g. `ghcr.io/myorg/myrepo:tag@sha256:…`). This container is pulled by our Kubernetes infrastructure. If the container is private, TVC supports uploading encrypted [pull secrets](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+* An executable path + args: within the container, you must indicate where the desired binary lives such that Turnkey’s infrastructure can extract this binary from its OCI container, and run it within a TEE on your behalf.
+* The port on which external requests should be forwarded. This is typically port 3000. For convenience TVC lets you specify different ports for user requests and health requests made by Turnkey infrastructure.
+* Your expected executable digest: this is a security measure, to ensure the binary pulled by Turnkey's infrastructure is the binary you expect.
+
+Once the deployment is submitted and approved, our infrastructure deploys and makes it available on a dedicated subdomain.
+
+| Resource    | Default Allocation   |
+| :-----------| :----------- |
+| vCPUs       | 2 |
+| RAM         | 1 GiB |
+| Filesystem  | RAM-based (no persistence) |
+| Replicas    | 3 |
+| Ingress     | Load-balanced across all replicas |
+| Sub-domain  | Automated (`<UUID>.turnkey.cloud`) |
+
+## Manifests
+
+Each TVC deployment is ultimately specified with a QOS manifest. The information you provide to TVC APIs (expected digest, executable arguments, and so on) is used to create a new QOS Manifest document. See [`Manifest`](https://github.com/tkhq/qos/blob/d69bcd348073ed7322c0d0423a35b7ab56831de8/src/qos_core/src/protocol/services/boot.rs#L414) for a full definition of the fields within it.
+
+This manifest document is the source of truth used by QOS to boot your application. It is also the document which must be cryptographically signed for each deployment. QOS Manifests are returned along with the AWS attestation document, within [Boot Proofs](https://whitepaper.turnkey.com/foundations#boot-proofs-and-app-proofs). More on this in the next section.
+
+## Operators
+
+Operators are humans or systems. In TVC, an operator is represented by an alias and a public key. Operator keys can be created and managed externally via our TVC CLI, or managed via Turnkey's own key management APIs.
+
+QuorumOS uses operators to cryptographically control deployments: operators must approve QOS manifests and take part in deployments where Quorum Keys must be injected.
+
+## Keys, Signatures, and Verification
+
+Your TVC app has access to two keys when it boots:
+
+* **Ephemeral Key**: a key which is created at boot. This key **never leaves the enclave** and is different for every enclave. A signature by this key is a signature bound to a particular enclave, hence bound to a particular **code version** of your TVC application.
+* **Quorum Key**: a key which is injected at boot and is the same across all enclaves. This key can be used to encrypt state which needs to survive application upgrades. Internally at Turnkey we use this key to sign or encrypt long-lived data.
+
+Both of these keys follow the [QOS Key Set](https://github.com/tkhq/qos/blob/main/src/qos_p256/SPEC.md) specification. Ephemeral Keys and Quorum Keys can be used to sign data, or to encrypt/decrypt data.
+
+App Proofs are signed statements by enclave Ephemeral Keys; Boot Proofs are bundles composed of an AWS attestation document and a QOS manifest.
+
+Together, App Proofs and Boot Proofs can be used to verify workloads end-to-end. See [our documentation](https://docs.turnkey.com/security/turnkey-verified#turnkey-verified) for more on this subject. We’ve already released tooling for proof verification in [Rust](https://crates.io/crates/turnkey_proofs), [JS](https://github.com/tkhq/sdk/blob/main/packages/crypto/src/proof.ts), and [Golang](https://github.com/tkhq/go-sdk/tree/main/pkg/proofs).
+
+## Pricing
+
+TVC pricing has two components:
+* A fixed per-month platform fee.
+* Variable pricing based on wall-clock enclave uptime
+
+[Get in touch with us](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist) for more details.
+
+## Getting access to TVC
+
+TVC is currently in private Beta. A select group of design partners are already building on it and getting exclusive access to the latest features and capabilities. If you're interested in being an early design partner, or if you want to be notified when TVC is generally available for all, please [join the waitlist](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist).
