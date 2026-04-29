@@ -44,6 +44,18 @@ These are just a subset of possible use cases. Any computation where two parties
 
 We’ve engineered TVC to fit within the existing Turnkey products and APIs. You will interact with TVC via our [dashboard](https://app.turnkey.com/), via the [TVC CLI](https://github.com/tkhq/rust-sdk/tree/main/tvc), or programmatically via [APIs](/api-reference/overview).
 
+TVC provides a secure harness ([QuorumOS](https://github.com/tkhq/qos)) to verifiably run a **single program**. This program is also called "binary", "executable" or sometimes "pivot", and contains the secure workload to execute in TEEs. TVC relies on [OCI container images](https://github.com/opencontainers/image-spec) to transport this executable program from where it's built (typically, Github Action, or other CI platforms) to within TVC. This has several advantages:
+* OCI containers can be hosted on many container image registries. These registries ensure integrity of the images, and clients can "pin" an image to ensure that they download the image they expect. Typically a container image URL will look like `registry.com/org/repo:some-tag@sha256:digest`.
+* Registries also support authentication, which means TVC supports private image registries. Our infrastructure is Kubernetes-based: we support [Pull Secrets](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/) generically to allow for maximum flexibility: [Docker Hub](https://hub.docker.com/), [ECR](https://aws.amazon.com/ecr/), [GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry), [ACR](https://azure.microsoft.com/en-us/products/container-registry), [GAR](https://docs.cloud.google.com/artifact-registry/docs) are all supported.
+
+Once the container image details and other configuration (ports, protocol, program path, arguments, etc) are received, a QOS manifest is generated. The QOS manifest has to be cryptographically approved by operator(s) before TVC infrastructure can proceed with the deployment.
+
+<Frame>
+  ![TVC Deployment Overview](/assets/files/tvc_overview_diagram.png)
+</Frame>
+
+Read more about Applications, Deployments, Manifests, and Operators in the following sections.
+
 ## Applications
 
 TVC is programmable infrastructure, enabling you to create and manage verifiable apps. Each TVC App is deployed on Turnkey infrastructure in the exact same way as Turnkey's own [core enclave apps](https://github.com/tkhq/core-enclaves).
