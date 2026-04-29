@@ -1,0 +1,255 @@
+---
+title: "Use Turnkey wallets with Brale"
+sidebarTitle: "Brale integration"
+---
+
+## Overview
+
+[Brale](https://brale.xyz) is a stablecoin platform that provides regulated stablecoin issuance,
+compliance, reserve management, custody, on and offramps, and transfers through a unified API.
+
+In this guide we'll show how to:
+
+- Use Turnkey to provision a Base EVM address, then constrain signing with a Turnkey policy.
+- Register that address in Brale as an `Address`.
+- Use Brale to fund the address via an inbound USD `Automation`.
+- Use Brale to send stablecoins out via a direct `Transfer`.
+
+## Getting started
+
+### Prerequisites
+
+- A Turnkey organization with:
+  - A root user API key (admin operations)
+  - A non-root user API key (day-to-day signing)
+  - An EVM wallet with a Base address, funded with a small amount of ETH for gas
+- Brale API credentials (`client_id` and `client_secret`). See
+  [Authentication](https://docs.brale.xyz/key-concepts/authentication).
+- Brale sandbox or testnet first, then mainnet. See
+  [Sandbox and testnet](https://docs.brale.xyz/overview/sandbox-and-testnet).
+- A stablecoin and chain to test with, for example SBC on Base. See
+  [transfer_type](https://docs.brale.xyz/coverage/transfer-types) and
+  [value_type](https://docs.brale.xyz/coverage/value-types).
+
+### Environment variables
+
+You will reference these throughout.
+
+```bash
+# Turnkey
+export TURNKEY_ORGANIZATION_ID="..."
+export TURNKEY_BASE_URL="https://api.turnkey.com"
+
+# Root user key, only for admin actions like creating policies
+export TURNKEY_ROOT_API_PUBLIC_KEY="..."
+export TURNKEY_ROOT_API_PRIVATE_KEY="..."
+
+# Non-root user key, use this for signing so policies are enforced
+export TURNKEY_NONROOT_API_PUBLIC_KEY="..."
+export TURNKEY_NONROOT_API_PRIVATE_KEY="..."
+
+# Wallet identifier inside your Turnkey org
+export TURNKEY_SIGN_WITH="..."
+
+# Base
+export BASE_RPC_URL="..."
+
+# Brale
+export BRALE_CLIENT_ID="..."
+export BRALE_CLIENT_SECRET="..."
+```
+
+## Set up a constrained Turnkey signer (EVM, Base)
+
+### Create a policy for the non-root user
+
+Use the root API key to create a policy, but use the non-root API key for signing transactions so
+the policy engine is enforced.
+
+This example policy restricts the non-root user to sending transactions only to a small allowlist of
+contracts.
+
+Replace the allowlist with whatever your application needs.
+
+```typescript
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
+
+const rootClient = new TurnkeyServerSDK({
+  apiBaseUrl: process.env.TURNKEY_BASE_URL!,
+  apiPrivateKey: process.env.TURNKEY_ROOT_API_PRIVATE_KEY!,
+  apiPublicKey: process.env.TURNKEY_ROOT_API_PUBLIC_KEY!,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+}).apiClient();
+
+const nonRootUserId = "<TURNKEY_NONROOT_USER_ID>";
+
+const ALLOWLIST = [
+  "0x0000000000000000000000000000000000000000", // replace
+];
+
+const { policyId } = await rootClient.createPolicy({
+  policyName: "Restrict non-root signing",
+  effect: "EFFECT_ALLOW",
+  consensus: `approvers.any(user, user.id == '${nonRootUserId}')`,
+  condition: `eth.tx.to in ${JSON.stringify(ALLOWLIST)}`,
+  notes: "Restrict signing to an allowlist of contracts",
+});
+
+console.log("Created policy", policyId);
+```
+
+### Create a viem account backed by Turnkey
+
+```typescript
+import { createAccount } from "@turnkey/viem";
+import { Turnkey as TurnkeyServerSDK } from "@turnkey/sdk-server";
+import { base } from "viem/chains";
+import { createPublicClient, createWalletClient, http, type Account } from "viem";
+
+const nonRootClient = new TurnkeyServerSDK({
+  apiBaseUrl: process.env.TURNKEY_BASE_URL!,
+  apiPrivateKey: process.env.TURNKEY_NONROOT_API_PRIVATE_KEY!,
+  apiPublicKey: process.env.TURNKEY_NONROOT_API_PUBLIC_KEY!,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+});
+
+const turnkeyAccount = await createAccount({
+  client: nonRootClient.apiClient(),
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: process.env.TURNKEY_SIGN_WITH!,
+});
+
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(process.env.BASE_RPC_URL!),
+});
+
+const walletClient = createWalletClient({
+  chain: base,
+  account: turnkeyAccount as Account,
+  transport: http(process.env.BASE_RPC_URL!),
+});
+
+const turnkeyEvmAddress = (turnkeyAccount as Account).address;
+console.log("Turnkey EVM address", turnkeyEvmAddress);
+```
+
+## Authenticate to Brale
+
+Brale uses a bearer token obtained from `client_id` and `client_secret`. See
+[Authentication](https://docs.brale.xyz/key-concepts/authentication).
+
+Store the resulting token as `BRALE_ACCESS_TOKEN`.
+
+## Create a Brale Account
+
+An `Account` represents your customer (end user or business) in Brale. See
+[Accounts](https://docs.brale.xyz/key-concepts/accounts).
+
+Capture `ACCOUNT_ID`.
+
+## Register the Turnkey EVM address as a Brale Address
+
+In Brale, an `Address` is the universal source and destination primitive for onchain and offchain
+endpoints. See [Addresses](https://docs.brale.xyz/key-concepts/addresses).
+
+Create an `Address` for `turnkeyEvmAddress` on Base, capture `TURNKEY_ADDRESS_ID`.
+
+## Inbound USD funding via Brale Automations (event-driven)
+
+Automations provision a unique set of USD funding instructions.
+
+When USD arrives, Brale automatically creates a `Transfer` to mint and send stablecoins to your
+configured destination address. See [Automations](https://docs.brale.xyz/key-concepts/automations).
+
+### Create an Automation
+
+Create an automation that mints SBC on Base to your Turnkey address.
+
+```bash
+curl -s -X POST "https://api.brale.xyz/accounts/${ACCOUNT_ID}/automations" \
+  -H "Authorization: Bearer ${BRALE_ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "name": "Turnkey Base Onramp",
+    "source": { "value_type": "USD" },
+    "destination": {
+      "address_id": "'"${TURNKEY_ADDRESS_ID}"'",
+      "value_type": "SBC",
+      "transfer_type": "base"
+    }
+  }'
+```
+
+### Fetch funding instructions
+
+Once the automation is active, Brale populates `source.funding_instructions`.
+
+```bash
+curl -s "https://api.brale.xyz/accounts/${ACCOUNT_ID}/automations" \
+  -H "Authorization: Bearer ${BRALE_ACCESS_TOKEN}"
+```
+
+### Reconcile inbound activity via Transfers
+
+When USD hits the automation's virtual account, Brale will create a `Transfer` automatically.
+
+## Outbound stablecoin payout via Transfers (API-driven)
+
+A `Transfer` moves value between fiat and stablecoins, between stablecoins, and to external
+addresses. See [Transfers](https://docs.brale.xyz/key-concepts/transfers).
+
+### Register the recipient address
+
+Create a second Brale `Address` for the external recipient on Base, capture `RECIPIENT_ADDRESS_ID`.
+
+### Create a payout transfer
+
+This example sends SBC on Base from your Turnkey address to the external recipient.
+
+```bash
+curl -s -X POST "https://api.brale.xyz/accounts/${ACCOUNT_ID}/transfers" \
+  -H "Authorization: Bearer ${BRALE_ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "amount": { "value": "10", "currency": "USD" },
+    "source": {
+      "address_id": "'"${TURNKEY_ADDRESS_ID}"'",
+      "value_type": "SBC",
+      "transfer_type": "base"
+    },
+    "destination": {
+      "address_id": "'"${RECIPIENT_ADDRESS_ID}"'",
+      "value_type": "SBC",
+      "transfer_type": "base"
+    }
+  }'
+```
+
+Capture `TRANSFER_ID` from the response.
+
+### Retrieve the transfer until terminal
+
+Use GET to retrieve a single transfer and check `status` (`pending`, `processing`, `complete`,
+`failed`).
+
+```bash
+curl -s "https://api.brale.xyz/accounts/${ACCOUNT_ID}/transfers/${TRANSFER_ID}" \
+  -H "Authorization: Bearer ${BRALE_ACCESS_TOKEN}"
+```
+
+### List transfers for reconciliation
+
+```bash
+curl -s "https://api.brale.xyz/accounts/${ACCOUNT_ID}/transfers?value_type=SBC&transfer_type=base&page[size]=10" \
+  -H "Authorization: Bearer ${BRALE_ACCESS_TOKEN}"
+```
+
+## Security considerations
+
+- Use Turnkey non-root users plus policies for least-privilege signing.
+- Never ship Brale `client_secret` to browsers.
+- Always include `Idempotency-Key` on Brale create POSTs, and reuse the same key when retrying the
+  same logical operation.
