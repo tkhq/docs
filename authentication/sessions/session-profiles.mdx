@@ -1,0 +1,82 @@
+---
+title: "Session Profiles"
+description: "Learn how to use session profiles to issue sessions with limited capabilities."
+---
+
+## What are session profiles?
+
+Session profiles are resources created by the parent organization that allow sessions to be issued with limited capabilities. When a session is issued with a session profile, the profile's capability is evaluated on every request made with that session. If the capability evaluates to `false`, the request is denied.
+
+Session profiles are **immutable** - once created, they cannot be edited or deleted. If you need to change a session profile, you must create a new one and update your login flows to use the new profile.
+
+Session profiles can be created using the `CreateSessionProfile` activity, via the public API or the [Turnkey dashboard](https://app.turnkey.com).
+
+## Session profile structure
+
+The `CreateSessionProfile` activity has the following parameters:
+
+- `sessionProfileName` (required): A human-readable name for the session profile. This name will also be used as the `session_type` in the resulting [session JWT](./overview#creating-a-read-write-session).
+- `capability` (required): A string of [policy language](/concepts/policies/language) that is evaluated on every request made with this session. If the capability evaluates to `true`, the request is allowed. If it evaluates to `false`, the request is denied.
+- `expirationSeconds` (optional): The maximum duration in seconds for sessions created with this profile. If not set, the expiration is determined by the value passed into the login activity intent.
+- `notes` (optional): Notes for the session profile.
+
+### Capability
+
+The `capability` field uses the same [policy language](/concepts/policies/language) as policy conditions and MFA conditions. It has access to the same keywords, including `activity.type`, `activity.action`, `eth.tx`, and others.
+
+**Examples:**
+
+``` ts
+// Allow all activities
+true
+
+// Only allow signing activities
+activity.action == 'SIGN'
+
+// Allow everything except exporting
+activity.action != 'EXPORT'
+
+// Only allow signing with a specific wallet
+activity.action == 'SIGN' && wallet.id == '11111111-1111-1111-1111-111111111111'
+```
+
+### Expiration
+
+The final session expiration is determined by taking the **minimum** of the login intent's expiration and the session profile's expiration:
+
+- If **both** are set: the shorter of the two is used
+- If **only the intent expiration** is set: the intent expiration is used
+- If **only the profile expiration** is set: the profile expiration is used
+- If **neither** is set: a default expiration is used (900 seconds / 15 minutes)
+
+This ensures that a session profile's expiration acts as a ceiling - the login intent can request a shorter session, but never a longer one than the profile allows.
+
+## Issuing sessions with a session profile
+
+To issue a session with a session profile, pass the `sessionProfileId` into any login activity:
+
+- `STAMP_LOGIN`
+- `OTP_LOGIN`
+- `OAUTH_LOGIN`
+
+{/* TODO (Amir/Moe): if the jwt looks different at some point. CHANGE THIS! */}
+The resulting session JWT will include the following claims, unique to sessions issued with a session profile:
+- `session_profile_id`: the ID of the session profile
+- `capability`: the capability string from the profile
+- `session_type`: set to the session profile's name (instead of the default `SESSION_TYPE_READ_WRITE`)
+
+If no `sessionProfileId` is passed, the session is issued as a default read-write session with no capability restrictions.
+
+## Querying session profiles
+
+Session profiles can be queried using:
+- `GetSessionProfile`: retrieve a single session profile by ID
+- `GetSessionProfiles`: list all session profiles for an organization
+
+Sub-organizations can see session profiles created by their parent organization as well as their own.
+
+## Using session profiles with MFA
+
+Session profiles are commonly used alongside [MFA policies](../mfa/overview) to create tiered authentication flows. For example, you can require MFA to obtain a session with elevated capabilities, while allowing a basic session without MFA.
+
+See [Satisfying MFA](../mfa/satsifying-mfa#session) for how sessions interact with MFA authentication methods, and the [MFA examples](../mfa/examples) for complete configurations that combine session profiles with MFA policies.
