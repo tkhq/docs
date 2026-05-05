@@ -10,109 +10,99 @@ This guide assumes you've completed the steps to create an account, organization
 
 ## Installation
 
-Install the Turnkey CLI to get started:
+<CodeGroup>
 
-```bash
-brew install tkhq/tap/turnkey
+```bash npm
+npm install @turnkey/sdk-server @turnkey/viem viem
 ```
 
-We use Homebrew for a quick installation process. For a more secure installation that requires no trust in external parties, see our [CLI repository](https://github.com/tkhq/tkcli).
+```bash yarn
+yarn add @turnkey/sdk-server @turnkey/viem viem
+```
+
+</CodeGroup>
 
 ## Transaction signing
 
 <Steps>
-<Step title="Setup">
+<Step title="Initialize the Turnkey client">
 
-Set the `ORGANIZATION_ID` environment variable to your organization ID. This will be used to identify your organization in the API requests.
-
-```bash
-export ORGANIZATION_ID=<YOUR_ORGANIZATION_ID>
-```
-
-An API keypair is required to authenticate requests to the Turnkey API.
-
-Create a new key named `quickstart` using the turnkey CLI:
+Add your API credentials to a `.env` file:
 
 ```bash
-turnkey generate api-key --organization $ORGANIZATION_ID --key-name quickstart
+TURNKEY_ORGANIZATION_ID=<your-organization-id>
+TURNKEY_API_PRIVATE_KEY=<your-api-private-key>
+TURNKEY_API_PUBLIC_KEY=<your-api-public-key>
 ```
 
-You'll see output like this:
+Then initialize the client in your application:
 
-```json
-{
-  "privateKeyFile": "/home/user/.config/turnkey/keys/quickstart.private",
-  "publicKey": "03...72",
-  "publicKeyFile": "/home/user/.config/turnkey/keys/quickstart.public"
-}
-```
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
 
-Follow the instructions in this [guide](/sdks/cli#add-your-public-api-key) to add your new public API key to your organization via the dashboard.
-
-</Step>
-<Step title="Create wallet">
-
-Wallets are collections of cryptographic key pairs typically used for sending and receiving digital assets. To create one, we need to provide a name:
-
-```bash
-turnkey wallets create --name default --key-name quickstart
-```
-
-<Note>
-  This command requires a key named `quickstart` to exist in your configuration. This key should have been created during the [Quickstart](/getting-started/quickstart) guide. If you haven't created it yet, please complete the initial setup steps first.
-
-If the key doesn't exist, you'll see an error like this:
-
-```json
-{
-  "error": "failed to load key bytes \"quickstart\": failed to read from \"/.config/turnkey/keys/quickstart.private\": open /.config/turnkey/keys/quickstart.private: no such file or directory"
-}
-```
-
-If the key exists but has not been added to your organization, you'll see an error like this:
-
-```json
-{
-  "error": "failed to associate the API key with an organization; please manually specify the organization ID"
-}
-```
-
-</Note>
-</Step>
-<Step title="Create Ethereum account">
-
-To create a cryptographic key pair on our new wallet, we need to pass our desired address format:
-
-```bash
-turnkey wallets accounts create --wallet default --address-format ADDRESS_FORMAT_ETHEREUM --key-name quickstart
-```
-
-This command will produce an Ethereum address (e.g. `0x08cb1216C95149DF66978b574E484869512CE2bF`) that we'll need to sign a transaction. You can see your new Wallet account with:
-
-```bash
-turnkey wallets accounts list --wallet default --key-name quickstart
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+});
 ```
 
 </Step>
-<Step title="Sign a transaction">
+<Step title="Create a wallet">
 
-Now you can sign an Ethereum transaction with this new address with our [`sign_transaction` endpoint](/api-reference/signing/sign-transaction). Make sure to replace the `unsignedTransaction` below with your own. You can use our [simple transaction generator](https://build.tx.xyz) if you need a quick transaction for testing:
+Create a wallet and derive an Ethereum address in a single call:
 
-```bash
-turnkey request --path /public/v1/submit/sign_transaction --body '{
-    "timestampMs": "'"$(date +%s)"'000",
-    "type": "ACTIVITY_TYPE_SIGN_TRANSACTION_V2",
-    "organizationId": "'"$ORGANIZATION_ID"'",
-    "parameters": {
-      "type": "TRANSACTION_TYPE_ETHEREUM",
-      "signWith": "<Your Ethereum address>",
-      "unsignedTransaction": "<Your Transaction>"
-    }
-}' --key-name quickstart
+```ts
+const { walletId, addresses } = await turnkeyClient.apiClient().createWallet({
+  walletName: "default",
+  accounts: [
+    {
+      curve: "CURVE_SECP256K1",
+      pathFormat: "PATH_FORMAT_BIP32",
+      path: "m/44'/60'/0'/0/0",
+      addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+    },
+  ],
+});
+
+const ethereumAddress = addresses[0];
+console.log("Ethereum address:", ethereumAddress);
 ```
 
-If you'd like to broadcast your transaction, you can easily do so
-via [Etherscan](https://etherscan.io/pushTx).
+</Step>
+<Step title="Initialize a Viem wallet client">
+
+```ts
+import { createAccount } from "@turnkey/viem";
+import { createWalletClient, http } from "viem";
+import { mainnet } from "viem/chains";
+
+const turnkeyAccount = await createAccount({
+  client: turnkeyClient.apiClient(),
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: ethereumAddress,
+});
+
+const walletClient = createWalletClient({
+  account: turnkeyAccount,
+  chain: mainnet,
+  transport: http(),
+});
+```
+
+</Step>
+<Step title="Sign and broadcast a transaction">
+
+```ts
+import { parseEther } from "viem";
+
+const txHash = await walletClient.sendTransaction({
+  to: "<destination address>",
+  value: parseEther("<amount to send>"),
+});
+console.log("Transaction hash:", txHash);
+```
 
 </Step>
 </Steps>
