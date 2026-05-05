@@ -44,7 +44,7 @@ Turnkey handles all of this for you via `solSendTransaction`. Whether or not you
 
 ## Transaction status and enriched errors
 
-After you send a transaction, Turnkey monitors its status until it fails or is confirmed on-chain.
+After you send a transaction, Turnkey monitors its status until it fails or is confirmed on-chain. You can [query the transaction status](./broadcasting#querying-via-api) or subscribe to status updates [via webhooks](./broadcasting#webhooks). 
 
 ### Transaction Statuses
 
@@ -70,3 +70,109 @@ For EVM transactions that revert, Turnkey runs a simulation to produce structure
 <Note>
   These error types describe how an EVM smart contract reverted during on-chain execution or pre-flight simulation. Turnkey application-level errors (e.g. signing failures, policy rejections) are not classified here and are instead surfaced via `Error.Message`.
 </Note>
+
+### Querying via API
+
+Use the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status) endpoint to poll for the current status of any transaction by its `sendTransactionStatusId` (returned when you call `ethSendTransaction` or `solSendTransaction`).
+
+The response includes a `txStatus` field with the current status and, when applicable, an `error` object with the same structure as the `error` field in webhook payloads — containing a human-readable `message` and either `eth.revertChain` (for EVM reverts) or `solana` (for Solana failures) with full structured details.
+
+### Webhooks
+
+Turnkey Webhooks let you react to transaction status updates in real time, without polling. Instead of repeatedly calling the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status) API to check for updates, you register an endpoint and Turnkey pushes the data to you; an HTTP POST fires when a transaction status changes (e.g. from `BROADCASTING` to `INCLUDED` or `FAILED`). Webhook payloads deliver rich transaction status updates as soon as they occur, so you can keep your users informed and react to failures immediately.
+
+You subscribe to webhooks at the parent organization level. Subscriptions cover all transactions initiated across the parent organization and all of its sub-organizations. In other words, once you subscribe you'll receive webhook notifications for all transactions within your entire Turnkey instance.
+
+#### Subscribing
+
+Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the `SEND_TRANSACTION_STATUS_UPDATES` event type to register your endpoint. Create the webhook endpoint on the parent organization. Balance webhook delivery is scoped to wallet-account addresses within your parent organization and its sub-organizations. This includes both addresses generated through Turnkey and addresses imported into your Turnkey organization.
+
+#### Delivery payload
+
+Each delivery is an HTTP POST with a JSON body containing a `type` and a `msg` object. The `type` is always `"transaction:status"`. The fields present in `msg` depend on the status:
+
+- **BROADCASTING**: base fields only — no `txHash`, no `error`
+- **INCLUDED**: base fields + `txHash`. If the transaction was included but reverted on-chain, `error` is also present with full revert details.
+- **FAILED**: base fields + `error`. No `txHash` (the transaction never landed on-chain).
+
+| **Field**                 | **Description**                                                                                     |
+| :------------------------ | :-------------------------------------------------------------------------------------------------- |
+| `type`                    | Always `"transaction:status"`.                                                                      |
+| `msg.sendTransactionStatusId` | The ID of the send transaction status record.                                                   |
+| `msg.activityId`          | The ID of the originating Turnkey activity.                                                         |
+| `msg.orgID`               | The sub-organization ID that initiated the transaction.                                             |
+| `msg.status`              | One of `BROADCASTING`, `INCLUDED`, or `FAILED`.                                                     |
+| `msg.caip2`               | The chain identifier where the transaction was sent.                                                |
+| `msg.idempotencyKey`      | A stable, unique key for this status event. Use this to safely deduplicate webhook deliveries.      |
+| `msg.timestamp`           | Unix timestamp (seconds) when the notification was generated.                                       |
+| `msg.txHash`              | _(INCLUDED only)_ The on-chain transaction hash or Solana signature.                                |
+| `msg.error`               | _(FAILED only)_ Structured error object. Contains `message`, and either `eth.revertChain` (EVM) or `solana` (Solana) details. |
+
+**BROADCASTING**
+
+```json
+{
+  "type": "transaction:status",
+  "msg": {
+    "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
+    "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
+    "orgID": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+    "status": "BROADCASTING",
+    "caip2": "eip155:1",
+    "idempotencyKey": "3f4a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3",
+    "timestamp": 1746000000
+  }
+}
+```
+
+**INCLUDED**
+
+```json
+{
+  "type": "transaction:status",
+  "msg": {
+    "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
+    "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
+    "orgID": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+    "status": "INCLUDED",
+    "caip2": "eip155:1",
+    "idempotencyKey": "7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8",
+    "timestamp": 1746000042,
+    "txHash": "0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+  }
+}
+```
+
+**FAILED**
+
+```json
+{
+  "type": "transaction:status",
+  "msg": {
+    "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
+    "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
+    "orgID": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+    "status": "FAILED",
+    "caip2": "eip155:1",
+    "idempotencyKey": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2",
+    "timestamp": 1746000015,
+    "error": {
+      "message": "Execution reverted on chain: insufficient balance for transfer",
+      "eth": {
+        "revertChain": [
+          {
+            "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "errorType": "native",
+            "nativeType": "error_string",
+            "displayMessage": "insufficient balance for transfer"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+<Tip>
+  See the [with-balance-confirmed-webhooks](https://github.com/tkhq/sdk/tree/main/examples/with-balance-confirmed-webhooks) SDK example for a working integration.
+</Tip>
