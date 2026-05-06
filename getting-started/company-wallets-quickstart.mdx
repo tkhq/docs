@@ -1,6 +1,6 @@
 ---
 title: "Company Wallets quickstart"
-description: "Turnkey's Company Wallets enable you to build secure, programmatic signing workflows directly into your applications. With features like customizable policies, multi-party approvals, and support for any blockchain, you can confidently automate complex signing operations while maintaining enterprise-grade security."
+description: "Get from zero to a signed transaction with Turnkey's Company Wallets. Initialize the server SDK, create a wallet, and sign your first Ethereum transaction using Viem or Ethers."
 sidebarTitle: "Quickstart"
 ---
 
@@ -10,19 +10,25 @@ This guide assumes you've completed the steps to create an account, organization
 
 ## Installation
 
+Install the server SDK and your preferred Ethereum library:
+
 <CodeGroup>
 
-```bash npm
+```bash Viem
 npm install @turnkey/sdk-server @turnkey/viem viem
 ```
 
-```bash yarn
-yarn add @turnkey/sdk-server @turnkey/viem viem
+```bash Ethers
+npm install @turnkey/sdk-server @turnkey/ethers ethers
 ```
 
 </CodeGroup>
 
-## Transaction signing
+<Tip>
+  This quickstart uses Ethereum, but Turnkey supports all EVM and SVM chains, along with Bitcoin, Tron, and [more](/networks/overview). To sign Solana transactions, derive a Solana address using `ADDRESS_FORMAT_SOLANA` with `CURVE_ED25519` and use [`@turnkey/solana`](https://www.npmjs.com/package/@turnkey/solana) or the server SDK's [`solSendTransaction`](/networks/solana) method.
+</Tip>
+
+## Sign your first transaction
 
 <Steps>
 <Step title="Initialize the Turnkey client">
@@ -71,8 +77,10 @@ console.log("Ethereum address:", ethereumAddress);
 ```
 
 </Step>
-<Step title="Initialize a Viem wallet client">
+<Step title="Initialize a wallet signer">
 
+<Tabs>
+  <Tab title="Viem">
 ```ts
 import { createAccount } from "@turnkey/viem";
 import { createWalletClient, http } from "viem";
@@ -90,10 +98,28 @@ const walletClient = createWalletClient({
   transport: http(),
 });
 ```
+  </Tab>
+  <Tab title="Ethers">
+```ts
+import { ethers } from "ethers";
+import { TurnkeySigner } from "@turnkey/ethers";
+
+const provider = new ethers.JsonRpcProvider("YOUR_RPC_URL");
+const turnkeySigner = new TurnkeySigner({
+  client: turnkeyClient.apiClient(),
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: ethereumAddress,
+});
+const connectedSigner = turnkeySigner.connect(provider);
+```
+  </Tab>
+</Tabs>
 
 </Step>
-<Step title="Sign and broadcast a transaction">
+<Step title="Send a transaction">
 
+<Tabs>
+  <Tab title="Viem">
 ```ts
 import { parseEther } from "viem";
 
@@ -103,11 +129,35 @@ const txHash = await walletClient.sendTransaction({
 });
 console.log("Transaction hash:", txHash);
 ```
+  </Tab>
+  <Tab title="Ethers">
+```ts
+const txHash = await connectedSigner.sendTransaction({
+  to: "<destination address>",
+  value: ethers.parseEther("<amount to send>"),
+  type: 2,
+});
+console.log("Transaction hash:", txHash.hash);
+```
+  </Tab>
+</Tabs>
 
 </Step>
 </Steps>
 
 ## Next steps
 
-Learn more about integrating Company Wallets and our powerful
-features [here](/company-wallets/overview).
+<CardGroup cols={2}>
+  <Card title="Payment Orchestration" icon="money-bill-transfer" href="/company-wallets/code-examples/payment-orchestration">
+    Build deposit wallets, sweep automations, and treasury flows with policy-enforced access control.
+  </Card>
+  <Card title="Smart Contract Management" icon="file-contract" href="/company-wallets/code-examples/smart-contract-management">
+    Secure the full contract lifecycle from deployment to upgrades with granular RBAC.
+  </Card>
+  <Card title="Policies" icon="shield-check" href="/concepts/policies/quickstart">
+    Define who can sign what with Turnkey's default-deny policy engine.
+  </Card>
+  <Card title="Server SDKs" icon="server" href="/sdks/introduction">
+    Explore server SDKs for TypeScript, Go, Ruby, Rust, and Python.
+  </Card>
+</CardGroup>
