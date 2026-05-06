@@ -1,0 +1,280 @@
+---
+title: "Spark claim transfer"
+description: "Verify the sender's signature, decrypt the leaf key ciphertext, derive the receiver's new leaf key, and produce encrypted claim packages for Spark Operators — all inside the Turnkey enclave."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="submit" path="spark_claim_transfer" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}>
+
+Enum options: `ACTIVITY_TYPE_SPARK_CLAIM_TRANSFER`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required={true}>
+
+Timestamp (in milliseconds) of the request, used to verify liveness of user requests.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="parameters" type="object" required={true} path="parameters">
+  <p>The parameters object containing the specific intent data for this activity.</p>
+  <Expandable title="details">
+    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
+    The Spark address of the receiver's signing identity. The enclave uses the corresponding identity private key to ECIES-decrypt the leaf key ciphertext sent by the sender.
+    </NestedParam>
+
+    <ParamField body="packageRequest" type="object" required={true} path="parameters.packageRequest">
+      <p>Wraps the claim descriptor.</p>
+      <Expandable title="packageRequest details">
+        <ParamField body="claim" type="object" required={true} path="parameters.packageRequest.claim">
+          <p>The claim descriptor specifying the transfer to claim and the leaves to take ownership of.</p>
+          <Expandable title="claim details">
+            <NestedParam parentKey="parameters.packageRequest.claim" childKey="transferId" type="string" required={true} default="">
+              The UUID of the transfer to claim. Must match the `transferId` used by the sender in `SPARK_PREPARE_TRANSFER`.
+            </NestedParam>
+            <NestedParam parentKey="parameters.packageRequest.claim" childKey="senderIdentityPublicKey" type="string" required={true} default="">
+              The sender's Spark identity public key, hex-encoded (compressed secp256k1). The enclave uses this to verify the sender's per-leaf ECDSA signature before decrypting.
+            </NestedParam>
+            <NestedParam parentKey="parameters.packageRequest.claim" childKey="threshold" type="number" required={true} default="">
+              The Shamir secret sharing threshold for splitting the claim tweak across Spark Operators. Must match the threshold used by the sender.
+            </NestedParam>
+            <ParamField body="operatorRecipients" type="array" required={true} path="parameters.packageRequest.claim.operatorRecipients">
+              <p>The Spark Operators that will receive the receiver's encrypted claim tweak shares. Each operator's share is ECIES-encrypted to its individual encryption public key.</p>
+              <Expandable title="item details">
+                <NestedParam parentKey="parameters.packageRequest.claim.operatorRecipients" childKey="operatorId" type="string" required={true} default="">
+                  The Spark Operator identifier (e.g. `"SO1"`).
+                </NestedParam>
+                <NestedParam parentKey="parameters.packageRequest.claim.operatorRecipients" childKey="encryptionPublicKey" type="string" required={true} default="">
+                  The operator's ECIES encryption public key, hex-encoded.
+                </NestedParam>
+              </Expandable>
+            </ParamField>
+            <ParamField body="leaves" type="array" required={true} path="parameters.packageRequest.claim.leaves">
+              <p>The individual leaves being claimed. Each entry provides the ECIES-encrypted current leaf key (stored by the Spark Operators on the sender's behalf) and the sender's per-leaf authorization signature.</p>
+              <Expandable title="item details">
+                <NestedParam parentKey="parameters.packageRequest.claim.leaves" childKey="leafId" type="string" required={true} default="">
+                  The identifier of the leaf being claimed.
+                </NestedParam>
+                <NestedParam parentKey="parameters.packageRequest.claim.leaves" childKey="ciphertext" type="string" required={true} default="">
+                  The ECIES-encrypted blob containing the current leaf private key, hex-encoded. This blob was produced by the sender's enclave during `SPARK_PREPARE_TRANSFER` and stored by the Spark Operators. Retrieve it by polling the Spark Operators for pending transfers.
+                </NestedParam>
+                <NestedParam parentKey="parameters.packageRequest.claim.leaves" childKey="senderSignature" type="string" required={true} default="">
+                  The sender's compact ECDSA signature over `SHA256(leafId || transferId || ciphertext)`, hex-encoded. The enclave verifies this signature against `senderIdentityPublicKey` before decrypting the ciphertext.
+                </NestedParam>
+              </Expandable>
+            </ParamField>
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="generateAppProofs" type="boolean" required={false}>
+
+Enable to have your activity generate and return App Proofs, enabling verifiability.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="activity" type="object" required={true}>
+  The activity object containing type, intent, and result
+  <Expandable title="activity details">
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+The activity type
+</NestedParam>
+<NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
+      The intent of the activity
+      <Expandable title="intent details">
+        <NestedParam parentKey="activity.intent" childKey="claimSparkTransferIntent" type="object" required={true}>
+      The claimSparkTransferIntent object
+      <Expandable title="claimSparkTransferIntent details">
+        <NestedParam parentKey="activity.intent.claimSparkTransferIntent" childKey="signWith" type="string" required={true}>
+The Spark address of the receiver's signing identity.
+</NestedParam>
+<NestedParam parentKey="activity.intent.claimSparkTransferIntent" childKey="packageRequest" type="object" required={true}>
+The claim package request submitted.
+</NestedParam>
+      </Expandable>
+    </NestedParam>
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="result" type="object" required={true}>
+      The result of the activity
+      <Expandable title="result details">
+        <NestedParam parentKey="activity.result" childKey="claimSparkTransferResult" type="object" required={true}>
+      The claimSparkTransferResult object
+      <Expandable title="claimSparkTransferResult details">
+        <NestedParam parentKey="activity.result.claimSparkTransferResult" childKey="operatorPackages" type="array" required={true}>
+      One encrypted package per Spark Operator containing the receiver's Feldman-split claim tweak share, ECIES-encrypted to each operator's encryption public key. Send each package to its corresponding operator to complete the key rotation.
+      <Expandable title="operatorPackages details">
+        <NestedParam parentKey="activity.result.claimSparkTransferResult.operatorPackages" childKey="operatorId" type="string" required={true}>
+The Spark Operator identifier this package is addressed to.
+</NestedParam>
+<NestedParam parentKey="activity.result.claimSparkTransferResult.operatorPackages" childKey="encryptedPackage" type="string" required={true}>
+The ECIES-encrypted claim tweak share for this operator, hex-encoded.
+</NestedParam>
+      </Expandable>
+    </NestedParam>
+      </Expandable>
+    </NestedParam>
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/spark_claim_transfer \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_SPARK_CLAIM_TRANSFER",
+    "timestampMs": "<string> (e.g. 1746736509954)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "signWith": "<receiver-spark-address>",
+        "packageRequest": {
+            "claim": {
+                "transferId": "<uuid>",
+                "senderIdentityPublicKey": "<sender-identity-pubkey-hex>",
+                "threshold": 2,
+                "operatorRecipients": [
+                    { "operatorId": "SO1", "encryptionPublicKey": "<so1-pubkey-hex>" },
+                    { "operatorId": "SO2", "encryptionPublicKey": "<so2-pubkey-hex>" }
+                ],
+                "leaves": [
+                    {
+                        "leafId": "<leaf-id>",
+                        "ciphertext": "<ecies-blob-hex>",
+                        "senderSignature": "<compact-ecdsa-sig-hex>"
+                    }
+                ]
+            }
+        }
+    }
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().sparkClaimTransfer({
+  signWith: "<receiver-spark-address>",
+  packageRequest: {
+    claim: {
+      transferId: "<uuid>",
+      senderIdentityPublicKey: "<sender-identity-pubkey-hex>",
+      threshold: 2,
+      operatorRecipients: [
+        { operatorId: "SO1", encryptionPublicKey: "<so1-pubkey-hex>" },
+        { operatorId: "SO2", encryptionPublicKey: "<so2-pubkey-hex>" },
+      ],
+      leaves: [{
+        leafId: "<leaf-id>",
+        ciphertext: "<ecies-blob-hex>",
+        senderSignature: "<compact-ecdsa-sig-hex>",
+      }],
+    },
+  },
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_SPARK_CLAIM_TRANSFER",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g. 1746736509954)",
+    "result": {
+      "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
+        "type": "<string>",
+        "intent": {
+          "claimSparkTransferIntent": {
+            "signWith": "<receiver-spark-address>",
+            "packageRequest": "<object>"
+          }
+        },
+        "result": {
+          "claimSparkTransferResult": {
+            "operatorPackages": [
+              { "operatorId": "SO1", "encryptedPackage": "<hex>" },
+              { "operatorId": "SO2", "encryptedPackage": "<hex>" }
+            ]
+          }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>
