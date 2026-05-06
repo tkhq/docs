@@ -1,8 +1,86 @@
 ---
-title: "Skills"
-description: "PLACEHOLDER -- Turnkey Skills for AI agent integrations."
+title: "Agent Skills"
+description: "Opinionated instructions that tell AI agents how to interact with Turnkey through conversation, not code."
 ---
 
-# Skills
+Each agent skill is a `SKILL.md` file with opinionated, step-by-step instructions for a specific Turnkey operation. Instead of an agent reasoning about API docs, parameter formatting, and chain-specific details on its own, skills give it exactly what it needs to execute correctly. They work with Claude Code, Codex, Gemini, and any AI assistant that can read files.
 
-> **This is a placeholder page.** Content will be written in a future phase.
+Skills are for interacting with Turnkey directly through an AI assistant, not for building the application layer on top of Turnkey. If you're using a coding agent to develop a Turnkey integration, connect it to the [Docs MCP server](/developer-reference/using-llms) instead.
+
+Skills are open source at [**tkhq/turnkey-agent-skills**](https://github.com/tkhq/turnkey-agent-skills) on GitHub. Distribution through plugin marketplaces is coming soon.
+
+## Use cases
+
+Skills are composable. Each skill handles a single domain (wallets, signing, policies, etc.) and can be combined for any workflow. Common starting points:
+
+| Use case | What you can do | Start with |
+| :--- | :--- | :--- |
+| **Explore and test** | Create wallets, sign transactions, and set policies without writing integration code | `getting-started` |
+| **Administer your org** | Manage users, rotate API keys, configure policies, and monitor activities conversationally | `managing-users`, `managing-policies` |
+| **Provision autonomous agents** | Set up a scoped wallet with constrained credentials and governance policies for on-chain automation | `provisioning-agent` |
+
+## Credentials and security
+
+<Warning>
+  Read the following carefully before giving any AI agent access to your Turnkey organization.
+</Warning>
+
+- **LLMs are unpredictable.** They can misinterpret instructions or execute unintended actions. Always review what an agent is doing before approving it.
+- **Root credentials are dangerous to give to an AI agent.** A root API key bypasses all policies and has full access to your organization. Only use root credentials with an interactive assistant where you approve each action. This is entirely at your own risk.
+  - For best security, create a non-root user with specifically scoped permissions and approval flows. When testing against a non-production organization, root keys are more acceptable.
+- **Never test against wallets holding real funds** unless you have appropriate safeguards in place (scoped credentials, spending caps, destination allowlists).
+
+All skills require an API key pair and organization ID from the [Turnkey Dashboard](https://app.turnkey.com) (**Settings > API Keys**). Which credentials you use depends on your setup:
+
+| Setup | Credential type | When to use |
+| :--- | :--- | :--- |
+| **Interactive assistant** (human approves each action) | Root API key (with extreme caution) | Organization administration, testing, and exploration. Acceptable because a human is reviewing every action before it executes. |
+| **Autonomous agent** (acts without human review) | Scoped, non-root API key | Production automation. **Never use root credentials for autonomous agents.** Root keys bypass all policies. Create a non-root user with scoped policies instead. See [Agentic Wallets](/company-wallets/use-cases/agentic-wallets) and the `provisioning-agent` skill. |
+
+## Available skills
+
+Skills are organized into **workflows** (guided multi-step procedures) and **primitives** (individual operations).
+
+### Workflows
+
+| Skill | Description |
+| :--- | :--- |
+| **Getting Started** | Day-0 onboarding: verify credentials, create your first wallet |
+| **Provisioning Agent** | Create a scoped agent with constrained credentials and policies |
+| **Managing Agent** | Debug denied transactions, rotate keys, update agent policies |
+
+### Primitives
+
+| Skill | Description |
+| :--- | :--- |
+| **Managing Wallets** | Create wallets, derive addresses, add chains, import/export |
+| **Signing Transactions** | Sign and broadcast on any supported chain (EVM, Solana, Bitcoin, and more) |
+| **Managing Users** | Create users, rotate API keys, manage user tags |
+| **Managing Policies** | Access control, spending limits, allowlists, multi-party approval |
+| **Monitoring Activities** | Activity status, consensus approvals, audit logs |
+
+## Getting started
+
+Clone the repo and point your AI assistant at the skill files:
+
+```bash
+git clone https://github.com/tkhq/turnkey-agent-skills.git
+cd turnkey-agent-skills
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Agentic Wallets" icon="robot" href="/company-wallets/use-cases/agentic-wallets">
+    Give AI agents scoped signing authority with policy-enforced access control.
+  </Card>
+  <Card title="Policy Engine" icon="shield-check" href="/concepts/policies/quickstart">
+    Define granular access controls for every signing action in your organization.
+  </Card>
+  <Card title="Using LLMs" icon="message-bot" href="/developer-reference/using-llms">
+    MCP server, docs context, and other ways to use LLMs with Turnkey.
+  </Card>
+  <Card title="Company Wallets Quickstart" icon="key" href="/getting-started/company-wallets-quickstart">
+    Sign your first transaction with the Turnkey server SDK.
+  </Card>
+</CardGroup>
