@@ -1,110 +1,212 @@
 ---
-title: "Activity webhooks"
-description: "Webhooks provide a powerful mechanism to receive notifications about activity requests in your Turnkey organization. Additionally, you'll be able to receive all activity requests for both the parent organization and all its child organizations. This functionality can be enabled via the organization feature capabilities of our platform, as detailed in the section on [organization features](/concepts/organizations#features)."
+title: "Webhooks"
+description: "Use Webhooks V2 to receive signed notifications for activity and balance events in your Turnkey organization."
 sidebarTitle: "Webhooks"
 ---
 
-This guide is designed to walk you through the process of setting up webhooks, from environment preparation to verification of successful event capturing.
+Webhooks V2 sends HTTPS `POST` requests to endpoints that you register with Turnkey. Each endpoint can subscribe to one or more event types, and every delivery includes Turnkey headers. Signed deliveries also include Ed25519 signature headers so your receiver can verify that the request came from Turnkey before processing it.
 
-## Prerequisites
+<Info>
+  Webhooks V2 is the recommended integration path for new webhook integrations. Legacy activity webhooks configured with `FEATURE_NAME_WEBHOOK` are still described at the end of this page for existing integrations.
+</Info>
 
-Before diving into webhook configuration, ensure you have completed the necessary preliminary steps outlined in our [Quickstart Guide](/getting-started/quickstart#create-your-turnkey-organization). This guide will assist you in setting up a new organization and installing the Turnkey CLI. Note: We'll create a new API Key for testing webhooks below.
+## Create an endpoint
 
-## Environment setup
+Create webhook endpoints from a server-side client using an API key, or from any Turnkey client that can submit signed activities for your organization. The endpoint URL must be HTTPS and must resolve to a public destination.
 
-Begin by setting the necessary environment variables:
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
 
-```bash
-ORGANIZATION_ID=<your-organization-id>KEY_NAME=webhook-test
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const activityWebhook = await turnkey.apiClient().createWebhookEndpoint({
+  type: "ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT",
+  timestampMs: Date.now().toString(),
+  organizationId: process.env.ORGANIZATION_ID!,
+  parameters: {
+    url: "https://example.com/webhooks/turnkey",
+    name: "Activity updates",
+    subscriptions: [{ eventType: "ACTIVITY_UPDATES" }],
+  },
+});
 ```
 
-### API key generation
+For balance webhooks, use the same endpoint API with the balance event type:
 
-Generate a new API key using the Turnkey CLI with the following command:
-
-```bash
-turnkey generate api-key --organization $ORGANIZATION_ID --key-name $KEY_NAME
+```ts
+const balanceWebhook = await turnkey.apiClient().createWebhookEndpoint({
+  type: "ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT",
+  timestampMs: Date.now().toString(),
+  organizationId: process.env.ORGANIZATION_ID!,
+  parameters: {
+    url: "https://example.com/webhooks/balances",
+    name: "Balance confirmations",
+    subscriptions: [{ eventType: "BALANCE_CONFIRMED_UPDATES" }],
+  },
+});
 ```
 
-### Ngrok installation and setup
+The `name` field is required. Event types must be passed in `subscriptions[]`; do not pass a top-level `eventTypes` field.
 
-Ngrok is a handy tool that allows you to expose your local server to the internet. Follow these steps to set it up:
+## Event types
 
-<Steps>
-  <Step>Download Ngrok from [their website](https://ngrok.com/download).</Step>
-  <Step>
-    Follow the provided instructions to install Ngrok and configure your auth
-    token.
-  </Step>
-</Steps>
+| Event type | Description | Configuration scope |
+| --- | --- | --- |
+| `ACTIVITY_UPDATES` | Sends activity status updates. Parent-owned subscriptions receive parent and sub-organization activity events. Sub-organization-owned subscriptions receive only that sub-organization's activity events. | Organization-scoped |
+| `BALANCE_CONFIRMED_UPDATES` | Sends confirmed balance update events for tracked wallet account addresses. | Billing organization / parent organization scoped |
 
-### Local server setup
+Balance webhook endpoints must be managed from the billing organization. Sub-organization attempts to create, update, or delete balance-scoped endpoints return `PermissionDenied`.
 
-Open a new terminal window and set up a local server to listen for incoming webhook events:
+## Delivery contract
 
-```bash
-nc -l 8000
+Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON and the `Content-Type` header is `application/json`. Your endpoint should return a `2xx` status code after it accepts the delivery.
+
+Only active endpoints and active subscriptions receive deliveries. Turnkey sets the canonical value for each `X-Turnkey-` header on every delivery.
+
+Turnkey includes these headers on Webhooks V2 deliveries:
+
+| Header | Description |
+| --- | --- |
+| `X-Turnkey-Organization-Id` | Organization associated with the delivered event. |
+| `X-Turnkey-Event-Type` | Event type, such as `ACTIVITY_UPDATES` or `BALANCE_CONFIRMED_UPDATES`. |
+| `X-Turnkey-Timestamp` | Unix timestamp in milliseconds. For signed V2 deliveries, this is the delivery-attempt time. |
+| `X-Turnkey-Webhook-Version` | Webhook delivery contract version. The current value is `1`. |
+
+Signed Webhooks V2 deliveries also include:
+
+| Header | Description |
+| --- | --- |
+| `X-Turnkey-Event-Id` | Stable event identifier for this webhook event. |
+| `X-Turnkey-Signature-Key-Id` | Identifier for the Turnkey signing key. |
+| `X-Turnkey-Signature-Algorithm` | Signature algorithm. The current value is `ed25519`. |
+| `X-Turnkey-Signature-Version` | Signature contract version. The current value is `v1`. |
+| `X-Turnkey-Signature` | Hex-encoded Ed25519 signature. |
+
+Turnkey treats `2xx` responses as successful. Network errors and `5xx` responses are retried. `3xx`, `4xx`, and `429` responses are terminal failures and are not retried. Redirects are not followed. Signed retries receive a fresh timestamp and signature, so deduplicate by the event or payload idempotency fields rather than by signature value.
+
+## Verify signatures
+
+Verify the signature before parsing or trusting the webhook body. Signature verification requires the exact raw request body bytes that Turnkey sent. Re-serializing parsed JSON, changing whitespace, or changing key order causes verification to fail.
+
+The signed message is:
+
+```text
+v1.ed25519.<signing_key_id>.<timestamp_ms>.<event_id>.<raw_body>
 ```
 
-### Ngrok tunneling
+Use the SDK helper to verify the headers, timestamp freshness, and raw body. The default freshness window is 5 minutes, so make sure your webhook receiver's clock is synchronized.
 
-In another terminal, initiate Ngrok to forward HTTP requests to your local server:
+```ts
+import { verifyWebhookSignature } from "@turnkey/sdk-server/webhooks";
 
-```bash
-ngrok http 8000
+app.post(
+  "/webhooks/turnkey",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const verified = await verifyWebhookSignature({
+      headers: req.headers,
+      rawBody: req.body,
+      verificationKeys: await loadTurnkeyWebhookVerificationKeys(),
+    });
+
+    if (!verified) {
+      return res.status(401).send("invalid signature");
+    }
+
+    const event = JSON.parse(req.body.toString("utf8"));
+
+    // Process the event idempotently.
+    res.sendStatus(204);
+  },
+);
 ```
 
-Here's an output of the above command:
+{/* TODO(ENG-4112): Replace loadTurnkeyWebhookVerificationKeys() placeholder with the final public unauthenticated key-discovery endpoint once that API shape is finalized. */}
 
-```bash
-Session Status                online
-Account                       Satoshi Nakamoto (Plan: Free)
-Update                        update available (version 3.7.0, Ctrl-U to update)
-Version                       3.6.0
-Region                        United States (us)
-Latency                       22ms
-Web Interface                 http://127.0.0.1:4041
-Forwarding                    https://04b2-121-74-183-35.ngrok-free.app -> http://localhost:8000
+## Permissions
 
-Connections                   ttl     opn     rt1     rt5     p50     p90
-                              0       0       0.00    0.00    0.00    0.00
+Creating, updating, and deleting webhook endpoints are standard Turnkey write activities. Root users can approve them by default. Use Turnkey policies to delegate webhook management to non-root users.
+
+For example, to allow a non-root user to create webhook endpoints, create an allow policy with this condition:
+
+```text
+activity.type == 'ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT'
 ```
 
-Save the ngrok URL as an environment variable:
+Use the same pattern for updates and deletes:
 
-```bash
-WEBHOOK_URL=https://04•••35.ngrok-free.app # Replace with the URL provided by ngrok
+```text
+activity.type == 'ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT'
+activity.type == 'ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT'
 ```
 
-### Verifying Ngrok setup
+Read operations, such as listing webhook endpoints, use standard authenticated query access.
 
-To ensure Ngrok is correctly forwarding requests, perform a test using curl:
+## Manage endpoints
 
-```bash
-curl -X POST $WEBHOOK_URL -d "{}"
+Use the webhook endpoint APIs to manage existing endpoints:
+
+| Operation | Path | Notes |
+| --- | --- | --- |
+| Create endpoint | [`/public/v1/submit/create_webhook_endpoint`](/api-reference/activities/create-webhook-endpoint) | Requires `url`, `name`, and `subscriptions[]`. |
+| Update endpoint | [`/public/v1/submit/update_webhook_endpoint`](/api-reference/activities/update-webhook-endpoint) | Updates `url`, `name`, or `isActive`. |
+| Delete endpoint | [`/public/v1/submit/delete_webhook_endpoint`](/api-reference/activities/delete-webhook-endpoint) | Deletes an endpoint and its subscriptions. |
+| List endpoints | [`/public/v1/query/list_webhook_endpoints`](/api-reference/queries/list-webhook-endpoints) | Returns endpoints and their subscriptions for an organization. |
+
+Set `isActive` to `false` if you want to pause delivery without deleting the endpoint.
+
+## Payloads
+
+`ACTIVITY_UPDATES` deliveries contain the external activity representation for the activity that changed. Use the activity `id` and the webhook `X-Turnkey-Event-Id` header to process deliveries idempotently.
+
+`BALANCE_CONFIRMED_UPDATES` deliveries use this top-level shape:
+
+```json
+{
+  "type": "balances:confirmed",
+  "msg": {
+    "operation": "deposit",
+    "caip2": "eip155:1",
+    "txHash": "0x...",
+    "address": "0x...",
+    "orgID": "<organization-id>",
+    "parentOrgID": "<billing-organization-id>",
+    "idempotencyKey": "<idempotency-key>",
+    "asset": {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "decimals": 18,
+      "caip19": "eip155:1/slip44:60",
+      "amount": "1000000000000000000"
+    },
+    "block": {
+      "number": 12345678,
+      "hash": "0x...",
+      "timestamp": "2026-05-05T12:34:56Z"
+    }
+  }
+}
 ```
 
-Example output:
+## Troubleshooting
 
-```bash
-POST / HTTP/1.1
-Host:04b2-121-74-183-35.ngrok-free.app
-User-Agent: curl/8.4.0
-Content-Length: 2
-Accept: */*
-Content-Type: application/x-www-form-urlencoded
-X-Forwarded-For: 195.88.127.47
-X-Forwarded-Host: 04b2-121-74-183-35.ngrok-free.app
-X-Forwarded-Proto: https
-Accept-Encoding: gzip
-{}
-```
+| Symptom | What to check |
+| --- | --- |
+| `createWebhookEndpoint` is unavailable in your SDK | Upgrade to a Webhooks V2-capable SDK release. The minimum SDK version will be listed in the SDK changelog once published. |
+| `PermissionDenied` on create/update/delete | Confirm the user has a standard allow policy for the webhook activity type, and confirm balance webhooks are being managed from the billing organization. |
+| Missing required field errors | Confirm `parameters.name` is set. |
+| Subscription shape errors | Pass event types inside `parameters.subscriptions[]`, not as top-level `eventTypes`. |
+| Invalid webhook URL errors | Use an HTTPS URL that resolves to a public destination. Localhost, private IPs, link-local addresses, metadata endpoints, and URLs with user info are rejected. |
+| Signature verification fails | Verify against the exact raw request body bytes, use the millisecond timestamp and event id from the headers, check clock skew, and select the public key matching the signature key id. |
 
-After executing this command, you should see the request appear in the terminal where `nc` is running. Terminate the `nc` session by pressing CTRL+C and restart it by rerunning the `nc` command.
+## Legacy activity webhooks
 
-## Configuring the webhook URL
-
-Set your webhook URL using the Turnkey CLI with the following command:
+Legacy activity webhooks are configured with the `FEATURE_NAME_WEBHOOK` organization feature. They send activity notifications to a single URL and do not include the Webhooks V2 endpoint/subscription model or Webhooks V2 signature headers.
 
 ```bash
 turnkey request --path /public/v1/submit/set_organization_feature --body '{
@@ -117,11 +219,3 @@ turnkey request --path /public/v1/submit/set_organization_feature --body '{
   }
 }' --key-name=$KEY_NAME
 ```
-
-### Testing your webhook
-
-Assuming the previous request executed successfully it's time to test out your webhook! In order to verify that your webhook is correctly configured and receiving data, we can simply execute the previous turnkey request command again which creates a new activity request that will be captured by your webhook. Monitor the terminal with `nc` running to observe the incoming webhook data.
-
-## Conclusion
-
-By following these steps, you should now have a functioning webhook setup that captures all activity requests for your organization and its sub-organizations. If you encounter any issues or have feedback about this feature, reach out on [slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ)!
