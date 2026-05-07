@@ -10,6 +10,16 @@ For quick-reference code examples, see the [Spark network overview](/networks/sp
 
 ---
 
+## Understanding Spark Operators (SOs)
+
+Spark leaves are jointly controlled by your identity key and the Spark Operator collective (the SE), using [FROST threshold signing](https://docs.spark.money/learn/frost-signing). SOs never hold your complete key — they hold threshold shares — and the protocol is designed around a [1-of-n trust assumption](https://docs.spark.money/learn/trust-model): as long as one operator is honest, funds cannot be stolen. The worst case if all operators are unavailable is that you cannot transact, not that funds are lost.
+
+The current operators are **Lightspark** and **Flashnet**. For definitions of SE, SO, and SSP (Spark Service Provider), see [Spark core concepts](https://docs.spark.money/spark/core-concepts). For a deeper protocol walkthrough, see the [Spark technical overview](https://www.spark.money/technical-overview).
+
+**SO communication happens outside Turnkey.** Steps labeled **SO call** or **SSP call** throughout this page are direct client-to-operator API calls — Turnkey is not involved in those steps. Turnkey only handles the enclave key operations (`SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER`, etc.). For a working example of how to wire the Turnkey signer into the Spark SDK, refer to the JS code example provided with your Spark integration.
+
+---
+
 ## 1. Deposit: Bitcoin L1 → Spark
 
 **Turnkey activities:** `CREATE_WALLET_ACCOUNTS` ×1, `SPARK_SIGN_FROST` ×1 (batch of 2)
@@ -34,7 +44,7 @@ The response contains the compressed deposit public key. This account now exists
 
 ### Step 2 — Get SO public key shares
 
-Call the Spark Operators (SOs): "I want to start a deposit." The SOs return their key share for this leaf.
+> **SO call:** Request SO public key shares for this deposit leaf. The SOs respond with their key share, which you combine with your deposit public key to compute the aggregate Taproot address. See [Deposits from L1](https://docs.spark.money/learn/deposits).
 
 ### Step 3 — Compute aggregate public key and Taproot deposit address
 
@@ -46,7 +56,7 @@ Client-side: build unsigned `Txn1` (branch) and `Txn2` (exit, timelocked) using 
 
 ### Step 5 — Get SO signing commitments
 
-Call the SOs: "I need to sign a branch transaction and an exit transaction." The SOs return two sets of `operatorCommitments[]`.
+> **SO call:** Request FROST nonce commitments for the branch and exit transaction signing sessions. The SOs return two sets of `operatorCommitments[]`. See [Deposits from L1](https://docs.spark.money/learn/deposits).
 
 ### Step 6 — FROST sign branch and exit transactions
 
@@ -98,7 +108,7 @@ Client-side: build an unsigned Bitcoin L1 transaction spending from the leaf's T
 
 ### Step 2 — Get SO signing commitments
 
-Call the SOs: "I want to cooperatively withdraw leaf X." The SOs return `operatorCommitments[]`.
+> **SO call:** Request FROST nonce commitments for the cooperative withdrawal signing session. The SOs return `operatorCommitments[]`. See [Withdrawals](https://docs.spark.money/learn/withdrawals).
 
 ### Step 3 — FROST sign withdrawal transaction
 
@@ -151,7 +161,7 @@ Wait approximately 100 blocks (~16 hours).
 Broadcast `Txn2`. BTC arrives at the user's L1 address.
 
 <Note>
-  The unilateral exit path does not require any Turnkey API calls because the exit transactions were fully signed at deposit time using `SPARK_SIGN_FROST`.
+  The unilateral exit path requires no Turnkey API calls and no SO cooperation — exit transactions were fully signed at deposit time using `SPARK_SIGN_FROST` and can be broadcast directly to Bitcoin L1. This is the property that makes SO unavailability a liveness concern rather than a safety concern. See [Trust model](https://docs.spark.money/learn/trust-model).
 </Note>
 
 ---
@@ -162,11 +172,11 @@ Broadcast `Txn2`. BTC arrives at the user's L1 address.
 
 ### Step 1 — Select input leaves
 
-Query the SOs for the sender's active leaves and select which cover the transfer amount. No Turnkey call.
+> **SO call:** Query the SOs for the sender's active leaf set to determine which leaves cover the transfer amount. See [Transfers](https://docs.spark.money/learn/transfers).
 
 ### Step 2 — Get SO signing commitments for all new exit transactions
 
-Call the SOs: "I need to sign refund transactions for N new leaves." The SOs return `operatorCommitments[]` for each of 3 refund transaction types per new leaf (CPFP, direct, direct-from-CPFP). For 2 new leaves (recipient leaf + change leaf) this yields 6 sets of commitments.
+> **SO call:** Request FROST nonce commitments for refund transactions across all new leaves. The SOs return `operatorCommitments[]` for each of 3 refund transaction types per new leaf (CPFP, direct, direct-from-CPFP). For 2 new leaves (recipient leaf + change leaf) this yields 6 sets of commitments. See [FROST signing](https://docs.spark.money/learn/frost-signing).
 
 ### Step 3 — FROST sign all refund transactions
 
@@ -267,12 +277,7 @@ Returns `operatorPackages[]` and `transferUserSignature`.
 
 ### Step 5 — Submit to Spark Operators
 
-Send to the SOs:
-- The aggregated refund signatures from Step 3
-- The encrypted operator packages from Step 4
-- The `transferUserSignature` from Step 4
-
-The SOs verify, rotate key shares, delete old shares, store the ECIES blob for Bob, register new leaves, and activate watchtowers.
+> **SO call:** Send the aggregated refund signatures from Step 3, the encrypted operator packages from Step 4, and the `transferUserSignature` from Step 4 to each SO. The SOs verify, rotate key shares, delete old shares, store the ECIES blob for Bob, register new leaves, and activate watchtowers. See [Transfers](https://docs.spark.money/learn/transfers) and [Trust model](https://docs.spark.money/learn/trust-model).
 
 ---
 
@@ -282,7 +287,7 @@ The SOs verify, rotate key shares, delete old shares, store the ECIES blob for B
 
 ### Step 1 — Poll SOs for pending transfers
 
-Call the SOs: "Any pending transfers for me?" The SOs return the encrypted blob, leaf ID, transfer ID, and sender identity public key. No Turnkey call.
+> **SO call:** Query the SOs for pending inbound transfers. The SOs return the encrypted blob, leaf ID, transfer ID, and sender identity public key for each pending transfer. See [Transfers](https://docs.spark.money/learn/transfers).
 
 ### Step 2 — Claim the transfer
 
@@ -322,7 +327,7 @@ Returns `operatorPackages[]`.
 
 ### Step 3 — Submit claim packages to SOs
 
-Send the encrypted packages to the SOs. Each SO applies the tweak, rotating the leaf key to Bob's HD-derived key.
+> **SO call:** Send the encrypted claim packages to each SO. Each SO applies the tweak, rotating the leaf key to Bob's HD-derived key. See [Transfers](https://docs.spark.money/learn/transfers).
 
 ### Step 4 — Store new leaf in local wallet state
 
@@ -361,7 +366,7 @@ Returns `operatorPackages[]` and `paymentHash`. The raw preimage never leaves th
 
 ### Step 2 — Submit preimage shares to SOs
 
-Send the encrypted operator packages to the SOs. Each SO stores its share and will contribute to preimage reconstruction when the Lightning payment arrives.
+> **SO call:** Send the encrypted operator packages to each SO. Each SO stores its share and will contribute to preimage reconstruction when the Lightning payment arrives.
 
 ### Step 3 — Create Lightning invoice
 
@@ -369,23 +374,23 @@ Construct a BOLT11 invoice encoding `paymentHash`. Share this invoice with the p
 
 ### Step 4 — Lock leaves to the SSP
 
-Tell the Spark Service Provider (SSP): "I'll transfer X sats of my leaves to you if you pay this invoice." The SOs lock the specified leaves.
+> **SSP call:** Notify the Spark Service Provider that you will transfer X sats of your leaves in exchange for payment of the invoice. The SOs lock the specified leaves. See [Spark core concepts](https://docs.spark.money/spark/core-concepts) for the SSP role.
 
 ### Step 5 — SSP pays the Lightning invoice
 
-The SSP routes the payment across the Lightning Network.
+> **SSP call:** The SSP routes the payment across the Lightning Network.
 
 ### Step 6 — SOs reveal preimage to SSP
 
-Threshold SOs reconstruct the preimage from their Feldman shares and give it to the SSP.
+> **SO call:** Once the incoming Lightning payment is detected, threshold SOs reconstruct the preimage from their Feldman shares and reveal it to the SSP.
 
 ### Step 7 — SSP completes the Lightning payment
 
-The SSP reveals the preimage to the payer's node. The Lightning payment settles.
+> **SSP call:** The SSP reveals the preimage to the payer's node. The Lightning payment settles.
 
 ### Step 8 — SOs transfer leaves to the SSP
 
-The SOs atomically execute the leaf transfer from the receiver to the SSP.
+> **SO call:** The SOs atomically execute the leaf transfer from the receiver to the SSP.
 
 ### Timeout path
 
@@ -419,7 +424,7 @@ This is a deterministic, reusable key — call once and reuse the same address f
 
 ### Step 2 — Get SO public key shares
 
-Call the SOs: "I want to register a static deposit address at index 0." The SOs return their key share for this index.
+> **SO call:** Request SO public key shares for this static deposit index. The SOs respond with their key share, which you combine with your static deposit public key to compute the aggregate Taproot address. See [Deposits from L1](https://docs.spark.money/learn/deposits).
 
 ### Step 3 — Compute aggregate public key and Taproot deposit address
 
@@ -431,7 +436,7 @@ Client-side: build unsigned `Txn1` (branch) and `Txn2` (exit, timelocked) using 
 
 ### Step 5 — Get SO signing commitments
 
-Call the SOs: "I need to sign branch and exit transactions for static deposit index 0." The SOs return two sets of `operatorCommitments[]`.
+> **SO call:** Request FROST nonce commitments for the branch and exit transaction signing sessions at this static deposit index. The SOs return two sets of `operatorCommitments[]`. See [Deposits from L1](https://docs.spark.money/learn/deposits).
 
 ### Step 6 — FROST sign branch and exit transactions
 
@@ -483,11 +488,9 @@ The SOs register a new Spark leaf for each confirmed deposit to this address.
 
 ### Step 1 — Confirmed deposit detected
 
-After a deposit to the static address confirms on-chain, the SOs register a new leaf. Fetch an SSP quote:
+After a deposit to the static address confirms on-chain, the SOs register a new leaf.
 
-```typescript
-const quote = await wallet.getClaimStaticDepositQuote(txid, outputIndex);
-```
+> **SSP call:** Fetch a fee quote for the claim: `wallet.getClaimStaticDepositQuote(txid, outputIndex)`.
 
 ### Step 2 — Export static deposit key
 
