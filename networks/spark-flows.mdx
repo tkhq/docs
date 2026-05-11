@@ -46,7 +46,9 @@ Call [`CREATE_WALLET_ACCOUNTS`](/api-reference/activities/create-wallet-accounts
 }
 ```
 
-The response contains the compressed deposit public key. This account now exists in Turnkey and can be referenced in future signing calls.
+The response contains the compressed deposit public key. This account now exists in Turnkey and can be referenced in future signing calls. Each deposit key should only receive a single deposit — the exit transactions signed in Step 6 reference a specific UTXO, so a second deposit to the same address would arrive without pre-signed exit protection.
+
+Replace `0'/2'` with `N'/2'` where `N` is your account index. The path `m/8797555'/0'/2'` is for account 0.
 
 ### Step 2 — Get SO public key shares
 
@@ -144,7 +146,7 @@ Attach the final signature and broadcast to Bitcoin L1.
 
 ### Step 5 — Wait for confirmation
 
-BTC arrives at the user's L1 address. The SOs deactivate the leaf.
+BTC arrives at the user's L1 address. The SOs deactivate the leaf. The pre-signed exit transactions stored at deposit time are now spent and can be discarded — the UTXO no longer exists on L1.
 
 ---
 
@@ -182,7 +184,7 @@ Broadcast `Txn2`. BTC arrives at the user's L1 address.
 
 ### Step 1 — Select input leaves
 
-> **SO call:** Query the SOs for the sender's active leaf set to determine which leaves cover the transfer amount. See [Transfers](https://docs.spark.money/learn/transfers).
+> **SO call:** Query the SOs for the sender's active leaf set to determine which leaves cover the transfer amount. The SOs are the authoritative source of leaf state — unlike a standard Bitcoin wallet, the client does not maintain a local UTXO set independently. See [Transfers](https://docs.spark.money/learn/transfers).
 
 ### Step 2 — Get SO signing commitments for all new exit transactions
 
@@ -278,7 +280,7 @@ Call [`SPARK_PREPARE_TRANSFER`](/api-reference/activities/spark-prepare-transfer
 The enclave atomically:
 1. Derives old and new leaf keys from the identity key's HD wallet
 2. Computes `tweak = oldKey − newKey` per leaf
-3. Feldman-splits each tweak for the SOs
+3. Feldman VSS-splits each tweak for the SOs — each SO receives a share plus verifiable commitments, allowing them to independently verify their share is correct without seeing other shares
 4. ECIES-encrypts Bob's new leaf key to his identity public key
 5. ECIES-encrypts each SO's Shamir share to their encryption public key
 6. ECDSA-signs the per-leaf payload and the outer transfer payload with the identity key
@@ -335,13 +337,13 @@ The enclave atomically:
 
 Returns `operatorPackages[]`.
 
-### Step 3 — Submit claim packages to SOs
+### Step 3 — Store new leaf in local wallet state
+
+Record the `leafId → derivation path` mapping locally as soon as `SPARK_CLAIM_TRANSFER` returns — before submitting to the SOs. If the SO submission fails, you can retry; if local storage is deferred and something fails before it runs, the leaf becomes untracked.
+
+### Step 4 — Submit claim packages to SOs
 
 > **SO call:** Send the encrypted claim packages to each SO. Each SO applies the tweak, rotating the leaf key to Bob's HD-derived key. See [Transfers](https://docs.spark.money/learn/transfers).
-
-### Step 4 — Store new leaf in local wallet state
-
-Record the `leafId → derivation path` mapping locally. Bob's wallet now tracks this leaf.
 
 ---
 
@@ -432,6 +434,8 @@ Call [`CREATE_WALLET_ACCOUNTS`](/api-reference/activities/create-wallet-accounts
 
 This is a deterministic, reusable key — call once and reuse the same address for all future deposits at that index.
 
+Replace `0'/3'/0'` with `N'/3'/0'` where `N` is your account index, and increment the final segment for additional static addresses at the same account.
+
 ### Step 2 — Export static deposit key to SSP
 
 Call [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to retrieve the private key in a P256-encrypted bundle:
@@ -443,7 +447,7 @@ Call [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) 
 }
 ```
 
-Decrypt the export bundle locally using the ephemeral P256 private key, then send the raw key to the SSP. The SSP stores this key so it can co-sign deposit processing while you are offline.
+Decrypt the export bundle locally using the ephemeral P256 private key, then transmit the raw key to the SSP via their API. This call is made directly to the SSP — it is outside Turnkey's API surface. The SSP stores this key so it can co-sign deposit processing while your wallet is offline.
 
 > **Security note:** This is the only Spark flow that requires exporting a raw private key from the Turnkey enclave. From the moment the key is shared with the SSP until you claim any deposits, the SSP holds co-signing capability on this address. This is the intentional custodial tradeoff of static deposits — the SSP needs the key to process deposits while your wallet is offline. To minimise exposure:
 > - Use a fresh ephemeral P256 keypair for each export and zero it immediately after decrypting
@@ -520,6 +524,8 @@ After a deposit to the static address confirms on-chain, the SOs register a new 
 > **SSP call:** Fetch a fee quote for the claim: `wallet.getClaimStaticDepositQuote(txid, outputIndex)`.
 
 ### Step 2 — Claim the transfer
+
+The SSP appears as the `senderIdentityPublicKey` here because it is the SSP — not the original L1 depositor — that ECIES-encrypted the leaf key to your identity pubkey when it processed the incoming deposit. The original Bitcoin sender has no role in the Spark claim flow.
 
 Call [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/spark-claim-transfer):
 
