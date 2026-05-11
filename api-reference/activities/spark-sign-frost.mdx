@@ -40,24 +40,41 @@ Unique identifier for a given Organization.
       <p>A batch of one or more signature requests. A single call can sign multiple transactions (e.g. branch + exit at deposit time, or up to 6 refund transactions per transfer).</p>
       <Expandable title="item details">
         <NestedParam parentKey="parameters.signatures" childKey="derivation" type="object" required={true} default="">
-          The key derivation descriptor that identifies which leaf key to use for this signature.
+          A oneof descriptor — set exactly one of the following keys. The selected key tells the enclave which private key to use for this signature.
+
+          | Key | Shape | Used For |
+          | --- | --- | --- |
+          | `identity` | `{}` | Spark identity key |
+          | `signingLeaf` | `{ "leafId": "..." }` | Active leaf signing — withdrawals, transfer refunds |
+          | `deposit` | `{}` | Single-use deposit transactions |
+          | `staticDeposit` | `{ "index": N }` | Static (reusable) deposit transactions |
+          | `htlcPreimage` | `{}` | HTLC preimage key |
+
           <Expandable title="derivation details">
-            <NestedParam parentKey="parameters.signatures.derivation" childKey="type" type="enum<string>" required={true} default="">
-              Selects the key derivation strategy.
-
-              | Value | Required Field | Used For |
-              | --- | --- | --- |
-              | `SPARK_KEY_TYPE_DEPOSIT` | _(none)_ | Single-use deposit transactions |
-              | `SPARK_KEY_TYPE_STATIC_DEPOSIT_HD` | `index` | Static (reusable) deposit transactions |
-              | `SPARK_KEY_TYPE_SIGNING_HD` | `leafId` | Active leaf signing — withdrawals, transfer refunds |
-
-              Enum options: `SPARK_KEY_TYPE_DEPOSIT`, `SPARK_KEY_TYPE_STATIC_DEPOSIT_HD`, `SPARK_KEY_TYPE_SIGNING_HD`
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="identity" type="object" required={false} default="">
+              Empty object `{}`. Set this key to sign with the Spark identity key.
             </NestedParam>
-            <NestedParam parentKey="parameters.signatures.derivation" childKey="leafId" type="string" required={false} default="">
-              Required when `type` is `SPARK_KEY_TYPE_SIGNING_HD`. Identifies the specific Spark leaf whose HD-derived signing key should be used.
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="signingLeaf" type="object" required={false} default="">
+              Set this key to sign with an active leaf's HD-derived signing key.
+              <Expandable title="signingLeaf details">
+                <NestedParam parentKey="parameters.signatures.derivation.signingLeaf" childKey="leafId" type="string" required={true} default="">
+                  Unique identifier of the Spark leaf whose signing key should be used.
+                </NestedParam>
+              </Expandable>
             </NestedParam>
-            <NestedParam parentKey="parameters.signatures.derivation" childKey="index" type="number" required={false} default="">
-              Required when `type` is `SPARK_KEY_TYPE_STATIC_DEPOSIT_HD`. The integer index of the static deposit address (e.g. `0` for the first static deposit address at path `m/8797555'/{account}'/3'/0'`).
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="deposit" type="object" required={false} default="">
+              Empty object `{}`. Set this key to sign with the single-use deposit key derived at deposit time.
+            </NestedParam>
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="staticDeposit" type="object" required={false} default="">
+              Set this key to sign with the static deposit key at the given index.
+              <Expandable title="staticDeposit details">
+                <NestedParam parentKey="parameters.signatures.derivation.staticDeposit" childKey="index" type="number" required={true} default="">
+                  The integer index of the static deposit address (e.g. `0` for path `m/8797555'/{account}'/3'/0'`).
+                </NestedParam>
+              </Expandable>
+            </NestedParam>
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="htlcPreimage" type="object" required={false} default="">
+              Empty object `{}`. Set this key to sign with the HTLC preimage key.
             </NestedParam>
           </Expandable>
         </NestedParam>
@@ -189,8 +206,9 @@ curl --request POST \
         "signatures": [
             {
                 "derivation": {
-                    "type": "SPARK_KEY_TYPE_SIGNING_HD",
-                    "leafId": "<leaf-id>"
+                    "signingLeaf": {
+                        "leafId": "<leaf-id>"
+                    }
                 },
                 "message": "<sighash-hex>",
                 "verifyingKey": "<aggregate-pubkey-hex>",
@@ -221,8 +239,7 @@ const response = await turnkeyClient.apiClient().sparkSignFrost({
   signWith: "<spark-address>",
   signatures: [{
     derivation: {
-      type: "SPARK_KEY_TYPE_SIGNING_HD",
-      leafId: "<leaf-id>",
+      signingLeaf: { leafId: "<leaf-id>" },
     },
     message: "<sighash-hex>",
     verifyingKey: "<aggregate-pubkey-hex>",

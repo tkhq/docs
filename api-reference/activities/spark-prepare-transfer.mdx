@@ -66,10 +66,10 @@ Unique identifier for a given Organization.
               The identifier of the leaf being transferred.
             </NestedParam>
             <NestedParam parentKey="parameters.transfer.leaves" childKey="oldLeafDerivation" type="object" required={true} default="">
-              Derivation descriptor for the sender's current leaf key. Must use `type: SPARK_KEY_TYPE_SIGNING_HD` with the current leaf's `leafId`. The enclave derives the current leaf private key from this path to compute the tweak.
+              Derivation descriptor for the sender's current leaf key. Must use `signingLeaf` with the current leaf's `leafId` — e.g. `{ "signingLeaf": { "leafId": "<old-leaf-id>" } }`. The enclave derives the current leaf private key to compute the tweak.
             </NestedParam>
             <NestedParam parentKey="parameters.transfer.leaves" childKey="newLeafDerivation" type="object" required={true} default="">
-              Derivation descriptor for the receiver's new leaf key. Must use `type: SPARK_KEY_TYPE_SIGNING_HD` with the new leaf's `leafId`. The enclave derives this key and encrypts it to the receiver's identity public key.
+              Derivation descriptor for the receiver's new leaf key. Must use `signingLeaf` with the new leaf's `leafId` — e.g. `{ "signingLeaf": { "leafId": "<new-leaf-id>" } }`. The enclave derives this key and encrypts it to the receiver's identity public key.
             </NestedParam>
             <NestedParam parentKey="parameters.transfer.leaves" childKey="refundSignature" type="string" required={true} default="">
               The fully aggregated Schnorr signature for the new leaf's CPFP refund transaction, hex-encoded. Produced by aggregating the partial signatures from `SPARK_SIGN_FROST` with the Spark Operators' shares.
@@ -199,12 +199,14 @@ curl --request POST \
                 {
                     "leafId": "<old-leaf-id>",
                     "oldLeafDerivation": {
-                        "type": "SPARK_KEY_TYPE_SIGNING_HD",
-                        "leafId": "<old-leaf-id>"
+                        "signingLeaf": {
+                            "leafId": "<old-leaf-id>"
+                        }
                     },
                     "newLeafDerivation": {
-                        "type": "SPARK_KEY_TYPE_SIGNING_HD",
-                        "leafId": "<new-leaf-id>"
+                        "signingLeaf": {
+                            "leafId": "<new-leaf-id>"
+                        }
                     },
                     "refundSignature": "<cpfp-aggregated-schnorr-sig-hex>",
                     "directRefundSignature": "<direct-aggregated-schnorr-sig-hex>",
@@ -238,8 +240,8 @@ const response = await turnkeyClient.apiClient().sparkPrepareTransfer({
     ],
     leaves: [{
       leafId: "<old-leaf-id>",
-      oldLeafDerivation: { type: "SPARK_KEY_TYPE_SIGNING_HD", leafId: "<old-leaf-id>" },
-      newLeafDerivation: { type: "SPARK_KEY_TYPE_SIGNING_HD", leafId: "<new-leaf-id>" },
+      oldLeafDerivation: { signingLeaf: { leafId: "<old-leaf-id>" } },
+      newLeafDerivation: { signingLeaf: { leafId: "<new-leaf-id>" } },
       refundSignature: "<cpfp-aggregated-schnorr-sig-hex>",
       directRefundSignature: "<direct-aggregated-schnorr-sig-hex>",
       directFromCpfpRefundSignature: "<direct-from-cpfp-aggregated-schnorr-sig-hex>",
