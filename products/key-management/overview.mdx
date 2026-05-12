@@ -2,26 +2,73 @@
 title: "Overview"
 ---
 
-Turnkey is not just for crypto wallets. Our infrastructure also allows for more generic private key
-management: store, recover, and manage cryptographic keys with programmable access controls, and
-quorum approvals.
+## What is key management?
 
-With Key Management, you can:
+Turnkey provides infrastructure to store, recover, and operate on cryptographic keys beyond just wallet use cases. Instead of managing raw key material in your own infrastructure, your application delegates key storage to Turnkey's secure enclaves and controls access through programmable policies. **You define who can use a key and under what conditions; Turnkey ensures the key material is never exposed.**
 
-- Securely store cryptographic keys in hardware-backed
-  [secure enclave infrastructure](/security/secure-enclaves)
-- Implement disaster recovery with cryptographic guarantees
-- Protect sensitive material like API secrets, credentials, and recovery bundles
+## Why Turnkey for key management?
 
-## Solutions
+Protecting cryptographic keys means solving for secure storage, access control, disaster recovery, and auditability. Turnkey's infrastructure handles this so your keys remain protected throughout their lifecycle.
 
-| Example                                                                                        | Description                                                                                                                                 |
-| :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Enterprise Disaster Recovery](/products/key-management/examples/enterprise-disaster-recovery) | Back up wallets and private keys for disaster scenarios                                                                                     |
-| [Encryption Key Storage](/products/key-management/examples/encryption-key-storage)             | Use Turnkey private keys to encrypt sensitive data (e.g., recovery bundles, API secrets, credentials) with simple authentication & policies |
+With Turnkey, you can:
 
-## Next Steps
+- Store and [import](/security/enclave-secure-channels) cryptographic keys in hardware-backed [secure enclaves](/security/secure-enclaves) where key material never exists in plaintext outside the enclave boundary
+- Gate key access and export through a programmable [policy engine](/concepts/policies/overview), including [quorum approval](/concepts/users/root-quorum) for sensitive operations
+- Authenticate key access through multiple methods including API keys, [passkeys](/authentication/passkeys/introduction), [social logins](/authentication/social-logins), [email](/authentication/email), and [SMS OTP](/authentication/sms)
+- Maintain a cryptographic audit trail where every key operation is stamped and verifiable
+- Distribute trust between your infrastructure and Turnkey so no single party can access plaintext material
 
-Explore the [code examples](/products/key-management/examples/overview) for detailed implementation
-guides, or learn more about [secure enclaves](/security/secure-enclaves) and
-[quorum policies](/concepts/users/root-quorum).
+## How it works
+
+Your backend authenticates to Turnkey via API key. The [policy engine](/concepts/policies/overview) evaluates every request inside the secure enclave before any key operation executes. Keys are stored and operated on entirely within the enclave. Only derived outputs (public keys, encrypted export bundles, and operation results) are returned.
+
+### Access control model
+
+Key management is configured through an [organization](/concepts/organizations) with users, tags, and policies to control access:
+
+- **Users** representing human operators and automated services, each with their own credentials (API keys, passkeys)
+- **Tags** grouping users by role (e.g. `recovery-admin`, `backup-operator`)
+- **Policies** controlling who can access keys and under what conditions: by key ID, operation type, approval threshold, or any combination
+
+Turnkey is deny-by-default. If no policy explicitly allows an action, it is rejected. See [Policies](/concepts/policies/overview) and [Policy Language](/concepts/policies/language).
+
+### Security model
+
+- **Keys never leave the enclave.** Cryptographic keys live in [Trusted Execution Environments (TEEs)](/security/secure-enclaves). All key operations happen inside verifiable infrastructure; only derived outputs are returned.
+- **End-to-end encryption for import and export.** Key material in transit is encrypted directly to the enclave using [HPKE](/security/enclave-secure-channels). Plaintext never exists outside the enclave boundary.
+- **Policy-gated access.** Every key operation is evaluated against policies in the enclave. Users and services can only perform actions they have been explicitly authorized for.
+- **Trusted vs. untrusted separation.** A breach of your backend does not expose keys. The enclave enforces policies independently of your infrastructure.
+
+For a deeper look, see [Security](/security/our-approach) and [Secure Enclaves](/security/secure-enclaves).
+
+## Building with Turnkey
+
+Key management integrations are backend-driven. Use Turnkey's server SDKs to store keys, manage policies, and handle import and export operations programmatically from your infrastructure.
+
+Server SDKs are available for [TypeScript](/sdks/javascript-server), [Go](/sdks/golang), [Ruby](/sdks/ruby), [Python](/sdks/python), and [Rust](/sdks/rust). For full control, you can call the [Turnkey API](/developer-reference/api-overview/intro) directly.
+
+The [Turnkey Dashboard](https://app.turnkey.com) provides an interface for managing organizations, users, and policies.
+
+## Use cases
+
+Key management serves different needs depending on how your application uses cryptographic keys. Choose the pattern that matches your requirements.
+
+<CardGroup cols={2}>
+  <Card
+    title="Encryption Key Storage"
+    href="/products/key-management/examples/encryption-key-storage"
+  >
+    Store encryption keys in Turnkey's secure enclave and separate risk between your infrastructure and Turnkey. Build user-controlled recovery, distributed trust, and policy-gated decryption.
+  </Card>
+  <Card
+    title="Enterprise Disaster Recovery"
+    href="/products/key-management/examples/enterprise-disaster-recovery"
+  >
+    Import and recover wallets with end-to-end encryption, quorum-controlled access, and a cryptographic audit trail for treasury recovery, provider migration, and failover.
+  </Card>
+</CardGroup>
+
+## Ready to build?
+
+- [Policy Quickstart](/concepts/policies/quickstart) -- define access controls and approval requirements
+- [SDK Reference](/sdks/introduction) -- server SDKs for TypeScript, Go, Ruby, Python, and Rust
