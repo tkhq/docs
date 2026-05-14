@@ -1,0 +1,368 @@
+---
+title: 'Use Turnkey wallets with WalletConnect Pay'
+sidebarTitle: "WalletConnect Pay integration"
+---
+
+## Overview
+
+[WalletConnect Pay](https://docs.walletconnect.com/payments/wallets/standalone/react-native) is a payment protocol that enables wallet users to pay merchants with crypto by scanning a QR code. The protocol handles payment discovery, transaction construction, gas sponsorship (via [7702 paymaster](https://eips.ethereum.org/EIPS/eip-7702)), and on-chain broadcast.
+
+This cookbook shows how to integrate **Turnkey** embedded wallets with **WalletConnect Pay** using the [`with-wcpay`](https://github.com/MarkoKey/with-wcpay) example — a React Native mobile wallet that authenticates users via email OTP, signs EIP-712 payment authorizations with Turnkey, and lets WalletConnect Pay handle the rest.
+
+Each end-user's wallet is fully self-custodial: Turnkey creates a dedicated sub-organization per user with a 1-of-1 root quorum, meaning only the authenticated user can authorize signing.
+
+---
+
+## Getting started
+
+Before you begin, make sure you've followed the [Turnkey Quickstart guide](/getting-started/quickstart).
+You should have:
+
+- A Turnkey **organization** and **Auth Proxy Config ID**
+- A wallet funded with **USDC on Base**
+
+You'll also need:
+
+- A [WalletConnect Dashboard](https://cloud.walletconnect.com/) wallet project with a **WalletConnect Pay API key**
+- **Xcode** with iOS Simulator (macOS) for running the React Native app
+- **Node.js** v16+
+
+---
+
+## Install dependencies
+
+```bash
+npm install @turnkey/react-native-wallet-kit @walletconnect/pay @walletconnect/react-native-compat react-native-webview expo-camera
+```
+
+## Setting up the Turnkey wallet
+
+We'll use `@turnkey/react-native-wallet-kit` to authenticate and manage an embedded wallet. The `TurnkeyProvider` wraps the app with auth and wallet context:
+
+```tsx
+import { TurnkeyProvider } from "@turnkey/react-native-wallet-kit";
+
+const TURNKEY_CONFIG = {
+  organizationId: process.env.EXPO_PUBLIC_TURNKEY_ORGANIZATION_ID,
+  apiBaseUrl: "https://api.turnkey.com",
+  authProxyConfigId: process.env.EXPO_PUBLIC_TURNKEY_AUTH_PROXY_CONFIG_ID,
+  passkeyConfig: {
+    rpId: process.env.EXPO_PUBLIC_TURNKEY_RPID,
+  },
+  auth: {
+    otp: { email: true, sms: false },
+    passkey: true,
+    oauth: { appScheme: "wcpaydemo" },
+    autoRefreshSession: true,
+  },
+};
+
+export default function App() {
+  return (
+    <TurnkeyProvider config={TURNKEY_CONFIG}>
+      {/* Your app screens */}
+    </TurnkeyProvider>
+  );
+}
+```
+
+## Authenticating with email OTP
+
+Users authenticate via email OTP. On first login, Turnkey creates a sub-organization with an Ethereum wallet:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const customWallet = {
+  walletName: "WCPay Wallet",
+  walletAccounts: [
+    {
+      curve: "CURVE_SECP256K1",
+      pathFormat: "PATH_FORMAT_BIP32",
+      path: "m/44'/60'/0'/0/0",
+      addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+    },
+  ],
+};
+
+function LoginScreen() {
+  const { initOtp, completeOtp } = useTurnkey();
+
+  async function handleLogin(email: string, otpCode: string, otpId: string) {
+    // Step 1: Send OTP
+    const id = await initOtp({
+      otpType: "OTP_TYPE_EMAIL",
+      contact: email,
+    });
+
+    // Step 2: Verify OTP and create wallet (if new user)
+    await completeOtp({
+      otpId: id,
+      otpCode,
+      otpType: "OTP_TYPE_EMAIL",
+      contact: email,
+      createSubOrgParams: { customWallet },
+    });
+    // Auth success — user is now logged in with a wallet
+  }
+}
+```
+
+## Initializing WalletConnect Pay
+
+Configure the WalletConnect Pay client with your API key:
+
+```tsx
+import { WalletConnectPay } from "@walletconnect/pay";
+
+const client = new WalletConnectPay({
+  apiKey: process.env.EXPO_PUBLIC_WC_API_KEY,
+});
+
+// Build CAIP-10 accounts for all supported chains
+function buildAccounts(walletAddress: string): string[] {
+  return [
+    `eip155:1:${walletAddress}`,     // Ethereum
+    `eip155:8453:${walletAddress}`,  // Base
+    `eip155:10:${walletAddress}`,    // Optimism
+    `eip155:137:${walletAddress}`,   // Polygon
+    `eip155:42161:${walletAddress}`, // Arbitrum
+  ];
+}
+```
+
+## Fetching payment options
+
+When a user scans a merchant QR code or enters a payment link, fetch available payment options:
+
+```tsx
+// Normalize payment link format (dashboard URLs use ?pid= query param)
+function normalizePaymentLink(link: string): string {
+  let cleaned = link.replace(/\\/g, "");
+  const pidMatch = cleaned.match(/[?&]pid=([^&]+)/);
+  if (pidMatch) {
+    return "https://pay.walletconnect.com/" + pidMatch[1];
+  }
+  return cleaned;
+}
+
+const options = await client.getPaymentOptions({
+  paymentLink: normalizePaymentLink(paymentLink),
+  accounts: buildAccounts(walletAddress),
+  includePaymentInfo: true,
+});
+
+console.log("Merchant:", options.info?.merchant.name);
+console.log("Amount:", options.info?.amount.display.assetSymbol);
+console.log("Options:", options.options.length);
+```
+
+## Signing with Turnkey
+
+WalletConnect Pay returns RPC actions that the wallet must sign. For USDC payments, this is typically an `eth_signTypedData_v4` action containing an ERC-3009 `ReceiveWithAuthorization`.
+
+The key integration point: Turnkey's `signMessage` with `PAYLOAD_ENCODING_EIP712` handles the EIP-712 hashing server-side — you pass the raw typed data JSON string directly:
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+async function signWcPayAction(
+  action: { walletRpc: { method: string; params: string } },
+  signMessage: Function,
+  walletAccount: any
+): Promise<string> {
+  const { method, params } = action.walletRpc;
+  const parsedParams = JSON.parse(params);
+
+  if (method === "eth_signTypedData_v4") {
+    // parsedParams = [signerAddress, typedDataJSON]
+    const typedDataJson =
+      typeof parsedParams[1] === "string"
+        ? parsedParams[1]
+        : JSON.stringify(parsedParams[1]);
+
+    // Turnkey handles EIP-712 hashing server-side
+    const result = await signMessage({
+      walletAccount,
+      message: typedDataJson,
+      addEthereumPrefix: false,
+      encoding: "PAYLOAD_ENCODING_EIP712",
+      hashFunction: "HASH_FUNCTION_NO_OP",
+    });
+
+    return assembleSignature(result);
+  }
+
+  if (method === "personal_sign") {
+    const messageHex = parsedParams[0];
+    const message = messageHex.startsWith("0x")
+      ? Buffer.from(messageHex.slice(2), "hex").toString("utf8")
+      : messageHex;
+
+    const result = await signMessage({
+      walletAccount,
+      message,
+    });
+
+    return assembleSignature(result);
+  }
+
+  throw new Error(`Unsupported RPC method: ${method}`);
+}
+
+function assembleSignature(result: { r: string; s: string; v: string }): string {
+  const r = (result.r.startsWith("0x") ? result.r.slice(2) : result.r).padStart(64, "0");
+  const s = (result.s.startsWith("0x") ? result.s.slice(2) : result.s).padStart(64, "0");
+  let v = parseInt(result.v, 10);
+  if (v < 27) v += 27;
+  return `0x${r}${s}${v.toString(16).padStart(2, "0")}`;
+}
+```
+
+<Warning>
+The `signMessage` parameter names must be `encoding` and `hashFunction` — not `encodingOverride` or `hashFunctionOverride`. Using the wrong names will silently fall back to default encoding, producing a valid but incorrect signature.
+</Warning>
+
+## Handling identity verification
+
+Some payments require identity verification for Travel Rule compliance. Check for `collectData` on the selected payment option and show a WebView if present:
+
+```tsx
+import { WebView } from "react-native-webview";
+
+function IdentityVerification({ url, onComplete, onError }) {
+  const handleMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === "IC_COMPLETE") onComplete();
+      if (data.type === "IC_ERROR") onError(data.error);
+    } catch {}
+  };
+
+  return (
+    <WebView
+      source={{ uri: url }}
+      onMessage={handleMessage}
+      javaScriptEnabled
+      domStorageEnabled
+    />
+  );
+}
+
+// In your payment flow:
+if (selectedOption.collectData?.url) {
+  // Show WebView, wait for IC_COMPLETE, then proceed to signing
+}
+```
+
+## Confirming the payment
+
+After signing all actions (and completing identity verification if required), submit the signatures to WalletConnect Pay:
+
+```tsx
+// Get required signing actions
+const actions = await client.getRequiredPaymentActions({
+  paymentId: options.paymentId,
+  optionId: selectedOption.id,
+});
+
+// Sign each action with Turnkey (maintain order)
+const signatures = [];
+for (const action of actions) {
+  const sig = await signWcPayAction(action, signMessage, walletAccount);
+  signatures.push(sig);
+}
+
+// Confirm payment — WC Pay handles gas and broadcast
+const result = await client.confirmPayment({
+  paymentId: options.paymentId,
+  optionId: selectedOption.id,
+  signatures,
+});
+
+if (result.status === "succeeded") {
+  console.log("Payment confirmed on-chain!");
+}
+```
+
+## Putting it all together
+
+Here's the complete payment flow in a single component:
+
+```tsx
+import { useTurnkey, ClientState } from "@turnkey/react-native-wallet-kit";
+import { WalletConnectPay } from "@walletconnect/pay";
+
+const client = new WalletConnectPay({
+  apiKey: process.env.EXPO_PUBLIC_WC_API_KEY,
+});
+
+export default function PaymentScreen({ paymentLink }) {
+  const { wallets, signMessage, clientState } = useTurnkey();
+
+  const ethAccount = wallets
+    ?.flatMap((w) => w.accounts || [])
+    .find((a) => a.addressFormat === "ADDRESS_FORMAT_ETHEREUM");
+
+  async function handlePayment() {
+    // 1. Fetch payment options
+    const options = await client.getPaymentOptions({
+      paymentLink: normalizePaymentLink(paymentLink),
+      accounts: buildAccounts(ethAccount.address),
+      includePaymentInfo: true,
+    });
+
+    const selectedOption = options.options[0];
+
+    // 2. Handle identity verification if required
+    if (selectedOption.collectData?.url) {
+      await showIdentityWebView(selectedOption.collectData.url);
+    }
+
+    // 3. Get signing actions
+    const actions = await client.getRequiredPaymentActions({
+      paymentId: options.paymentId,
+      optionId: selectedOption.id,
+    });
+
+    // 4. Sign with Turnkey
+    const signatures = [];
+    for (const action of actions) {
+      const sig = await signWcPayAction(action, signMessage, ethAccount);
+      signatures.push(sig);
+    }
+
+    // 5. Confirm — WC Pay handles gas + broadcast
+    const result = await client.confirmPayment({
+      paymentId: options.paymentId,
+      optionId: selectedOption.id,
+      signatures,
+    });
+
+    return result;
+  }
+}
+```
+
+## Testing
+
+You can test your integration using WalletConnect Pay's built-in test flow:
+
+1. Go to the [WalletConnect Dashboard](https://cloud.walletconnect.com/) → your wallet project → **WalletConnect Pay** tab
+2. Set a **mock merchant receiving address** in the Test section
+3. Generate a test payment link from the Point-of-Sale test app
+4. Scan or paste the link in your wallet app
+
+Payments will arrive at your configured test address. No real merchant onboarding required.
+
+## Summary
+
+✅ You've now learned how to:
+
+- Authenticate users with Turnkey via email OTP and create embedded wallets
+- Initialize a WalletConnect Pay client and fetch payment options from merchant QR codes
+- Sign EIP-712 typed data (`ReceiveWithAuthorization`) with Turnkey using `PAYLOAD_ENCODING_EIP712`
+- Handle Travel Rule identity verification via WebView
+- Confirm payments through WalletConnect Pay, which handles gas sponsorship and on-chain broadcast
+
+For the full working example, see the [`with-wcpay`](https://github.com/MarkoKey/with-wcpay) repository.
