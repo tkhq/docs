@@ -11,10 +11,18 @@ dev:
 install:
 	cd scripts/openapi-gen && npm install
 
-# Default MDX generation target
+# Generate MDX for all APIs (main + auth proxy).
+# Requires both swagger files to be present in the repo root — see README for copy commands.
 gen: mintlify-check
 	npx ts-node scripts/openapi-gen/swagger-to-openapi.ts
 	cd scripts/openapi-gen && npx ts-node openapi-gen.ts --file=openapi.json --generate-mdx
+	npx ts-node scripts/openapi-gen/swagger-to-openapi.ts --service=auth-proxy
+	cd scripts/openapi-gen && npx ts-node openapi-gen.ts \
+		--file=proxy_api_openapi.json \
+		--generate-mdx \
+		--mdx-output-dir=api-reference/auth-proxy \
+		--nav-group="Auth Proxy" \
+		--auth-proxy
 
 # Run the OpenAPI generator (allows custom ARGS)
 openapi-gen: mintlify-check
