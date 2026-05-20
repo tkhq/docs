@@ -1,24 +1,19 @@
 ---
 title: "Submissions"
-description: "Submissions are requests to securely execute a workload. Submission URL paths are prefixed with `/public/v1/submit`. Submissions requests, if valid, produce an `Activity`."
+description: "Submissions are requests to securely execute a workload. Submission URL paths are prefixed with `/public/v1/submit`. Submission requests, if valid, produce an `Activity`."
 ---
 
-### Activities
+# What are activities?
 
-Activities typically create, modify, or utilize a resource within Turnkey and are subject to consensus or condition enforcement via the policy engine. Activities are executed optimistically synchronous. This means that if we can process the request synchronously, we will. Otherwise, we'll fallback to asynchronous processing. Your services or applications should account for this by checking the response for the activity state:
+Activities are requests to create, modify, or use resources within Turnkey.
+Submission endpoints are always prefixed with `/public/v1/submit`.
 
-* If `activity.status == ACTIVITY_STATUS_COMPLETED`, `activity.result` field will be populated with a successful response.
-* If `activity.status == ACTIVITY_STATUS_FAILED`, `activity.failure` field will be populated with a failure reason.
-* If `activity.status == ACTIVITY_STATUS_CONSENSUS_NEEDED`, additional signatures (votes) are required to process the request.
-* If `activity.status == ACTIVITY_STATUS_PENDING`, the request is processing asynchronously.
-
-Activities do not expire but approvals (votes) do. When an activity is submitted, the requester’s submission counts as the first approval, which starts a 24-hour window. If consensus is not reached within that window, existing approvals expire and must be re-submitted while the activity remains in `ACTIVITY_STATUS_CONSENSUS_NEEDED`.
-
-You can get activity status updates by:
-
-* Re-submitting the request. See the notes on idempotency below.
-* Polling `get_activity` with the `activity.id`
-
-### Idempotency
-
-The submission API is idempotent. For each request, the POST body is hashed into a fingerprint. Any two requests with the same fingerprint are considered the same request. If you resubmit the request, you'll get the same activity. If you want a new activity, you should modify the request timestamp `timestampMs` to produce a new fingerprint.
+- **Policy enforcement:** Activities are subject to consensus or condition enforcement via the policy engine.
+- **Optimistic execution:** Activities execute optimistically synchronous — if possible, the request completes synchronously; otherwise it falls back to asynchronous processing. Your services should account for this by checking the activity status in the response:
+  - `ACTIVITY_STATUS_COMPLETED`: The activity succeeded and the `result` field is populated.
+  - `ACTIVITY_STATUS_FAILED`: The activity failed and the `failure` field contains the reason.
+  - `ACTIVITY_STATUS_CONSENSUS_NEEDED`: More signatures (votes) are required to process the request.
+  - `ACTIVITY_STATUS_PENDING`: The request is processing asynchronously.
+- **Approval expiration:** Activities do not expire. However, when an activity is submitted, the requester's submission counts as the first approval and starts a 24-hour window. If consensus is not reached within that window, existing approvals expire and must be re-submitted while the activity remains in `ACTIVITY_STATUS_CONSENSUS_NEEDED`.
+- **Status updates:** Poll `get_activity` with the `activity.id`, or re-submit the original request (see idempotency below).
+- **Idempotency:** The submission API is idempotent. Each request's POST body is hashed into a fingerprint — any two requests with the same fingerprint return the same activity. To generate a new activity, change the `timestampMs` value in your request.

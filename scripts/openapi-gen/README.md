@@ -22,13 +22,24 @@ A utility for parsing, dereferencing, and generating content from OpenAPI specif
   npx ts-node openapi-gen.ts --file openapi.json --endpoints --generate-mdx --mdx-output-dir api-reference
   ```
 
+## Auth Proxy API Reference
+
+The auth proxy is generated as part of `make gen` — no separate command needed. Both swagger files must be present first (see the top-level README for setup).
+
+This converts `proxy_api.swagger.json` → `scripts/openapi-gen/proxy_api_openapi.json`, then generates MDX files under `api-reference/auth-proxy/` and updates the `Auth Proxy` group in `docs.json`.
+
+Key differences from the main API generation:
+- `--auth-proxy`: uses the auth-proxy generator (flat output, hardcoded base URL and auth header, v1 endpoint deduplication)
+- `--nav-group`: targets the `Auth Proxy` group in `docs.json` instead of Activities/Queries
+
 ## File Structure
 
 ```text
 scripts/openapi-gen/
 ├── openapi-gen.ts           # CLI entrypoint and core logic
-├── swagger-to-openapi.ts    # Script to convert the public_api.swagger.json to openapi v3
-├── openapi.json             # The openapi v3 result of the conversion script
+├── swagger-to-openapi.ts    # Script to convert swagger to openapi v3 (supports --service=auth-proxy)
+├── openapi.json             # OpenAPI v3 output for the main Turnkey API
+├── proxy_api_openapi.json   # OpenAPI v3 output for the Auth Proxy API (generated, not committed)
 ├── utils/
 │   ├── cli.ts               # Commander-based argument parsing
 │   ├── parser.ts            # OpenAPI spec parsing & dereferencing
