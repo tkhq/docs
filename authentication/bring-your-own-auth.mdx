@@ -1,0 +1,149 @@
+---
+title: "Bring your own auth"
+description: "Learn how to integrate Turnkey with your existing authentication system while keeping user wallets non-custodial."
+---
+
+Some teams have requirements that make it impractical to use Turnkey's built-in authentication directly — existing enterprise SSO, compliance constraints, a mature identity platform already in production, or simply a preference to keep auth centralized in one system. In these cases, you don't need to replace your auth layer: Turnkey can work alongside it.
+
+If you already have an authentication system — whether that's Auth0, Cognito, an enterprise IdP, or a homegrown JWT issuer — you can keep using it to authenticate users and only rely on Turnkey for wallet and key management. The key decision is whether you want that integration to be **custodial** or **non-custodial**.
+
+## Custodial vs. non-custodial
+
+### Custodial (API key approach)
+
+The simplest integration pattern is to use a **parent org API key** on your backend. Your server authenticates users however it normally would, and then uses the API key to operate on their Turnkey sub-organization on their behalf.
+
+This works well and is easy to implement, but it is **custodial**: your backend holds signing authority over user wallets.
+
+**Sub-org provisioning:** Your backend generates an API key pair for the user and registers it in the sub-org at creation time. This API key lives in the sub-org and is what your backend uses to stamp all subsequent requests on that user's behalf.
+
+```ts
+await client.createSubOrganization({
+  subOrganizationName: `user-${userId}`,
+  rootQuorumThreshold: 1,
+  rootUsers: [{
+    userName: userEmail,
+    userEmail: userEmail,
+    apiKeys: [{
+      apiKeyName: "backend-key",
+      publicKey: YOUR_BACKEND_PUBLIC_KEY,
+    }],
+    authenticators: [],
+    oauthProviders: [],
+  }],
+});
+```
+
+### Non-custodial (OIDC approach)
+
+If you want users to fully control their wallets, Turnkey must be able to independently verify that a user has authenticated with your system. This requires your auth system to issue **OIDC-compliant tokens**, a standard Turnkey knows how to validate. With that in place, the user's device generates a keypair, receives an OIDC token from your auth system that binds that keypair to their identity, and Turnkey registers the public key as a session credential directly in the sub-org.
+
+**Sub-org provisioning:** Your backend still creates the sub-org (using the parent org API key) on first registration, but includes the user's OIDC provider in the root user so that the user can authenticate directly with Turnkey on subsequent logins.
+
+```ts
+// Backend creates the sub-org with the OIDC provider registered
+await client.createSubOrganization({
+  subOrganizationName: `user-${userId}`,
+  rootQuorumThreshold: 1,
+  rootUsers: [{
+    userName: userEmail,
+    userEmail: userEmail,
+    apiKeys: [],
+    authenticators: [],
+    oauthProviders: [{
+      providerName: "my-auth-system",
+      oidcToken: idToken,
+    }],
+  }],
+});
+```
+
+After provisioning, each login follows these steps:
+
+1. **Client** generates a P256 keypair and computes `nonce = sha256(publicKey)`
+2. **Client** passes the nonce to your auth system when requesting a token
+3. **Auth system** issues an OIDC token with that nonce embedded
+4. **Client** sends the OIDC token and `publicKey` to your backend
+5. **Backend** calls `oauthLogin` (stamped with the parent org API key) with the OIDC token and `publicKey`
+6. **Turnkey** verifies the token signature and checks that `nonce == sha256(publicKey)`, then returns a session JWT
+7. **Client** stores the session — only the device holding the private key can use it to sign
+
+## Requirements for your OIDC issuer
+
+To use the non-custodial flow, your auth system must issue OIDC-compliant tokens with standard claims (`iss`, `sub`, `aud`, `exp`), a publicly reachable `/.well-known/openid-configuration` endpoint, and a `nonce` set to `sha256(publicKey)` to bind the token to the user's device keypair. See [OIDC token verification](/authentication/social-logins#oidc-token-verification) for the full details on how Turnkey validates tokens.
+
+## Integration flow
+
+### Step 1: Register the user
+
+When a user first authenticates, create a Turnkey sub-org for them with your OIDC provider registered. Registration requires a valid OIDC token — Turnkey verifies its signature against your JWKS and extracts the `iss`, `sub`, and `aud` claims, storing them as the user's identity fingerprint. The token itself is not retained; on each subsequent login a fresh token is verified independently and matched against that fingerprint. See [Registration vs. login tokens](/authentication/social-logins#registration-vs-login-tokens) for the full explanation.
+
+```ts
+await client.createSubOrganization({
+  subOrganizationName: `user-${userId}`,
+  rootQuorumThreshold: 1,
+  rootUsers: [{
+    userName: userEmail,
+    userEmail: userEmail,
+    apiKeys: [],
+    authenticators: [],
+    oauthProviders: [{
+      providerName: "my-auth-system",
+      oidcToken: idToken,
+    }],
+  }],
+});
+```
+
+### Step 2: Log the user in
+
+On each login, the frontend generates a keypair, requests a token with `nonce = sha256(publicKey)` from your auth server, then calls `oauthLogin`:
+
+```ts
+// --- Client ---
+// 1. Generate session keypair on the user's device
+const publicKey = await createApiKeyPair();
+
+// 2. Compute nonce and trigger auth on your auth server
+//    Your server must embed nonce = sha256(publicKey) in the issued OIDC token
+const nonce = sha256(publicKey);
+const idToken = await yourAuthServer.issueToken({ userId, nonce });
+
+// 3. Send publicKey + idToken to your backend to complete the Turnkey login
+const session = await yourBackend.login({ idToken, publicKey });
+
+// 4. Store the session — from here the device's private key is the only signer
+await storeSession({ sessionToken: session });
+```
+
+```ts
+// --- Backend (server action / API route) ---
+// Stamped with the parent org API key; calls Turnkey on behalf of the user
+export async function login({ idToken, publicKey, suborgId }) {
+  const { session } = await turnkeyClient.oauthLogin({
+    organizationId: suborgId,
+    oidcToken: idToken,
+    publicKey,
+  });
+  return session;
+}
+```
+
+Turnkey's enclave verifies the token signature against your JWKS and checks the nonce matches `sha256(publicKey)`. The resulting session JWT is scoped to that public key — only the device holding the private key can use it to sign.
+
+For a working implementation of this flow, see the [oauth example](https://github.com/tkhq/sdk/tree/main/examples/oauth) in the SDK. It uses Google as the provider, but the client/backend split and nonce binding pattern are identical for any OIDC issuer.
+
+## Adding an OIDC provider to an existing user
+
+If a user already has a Turnkey sub-org (created via email OTP, passkey, etc.) and you want to add your OIDC provider to their account, use `createOauthProviders`. This activity must be stamped with a credential that already has authority in that sub-org — for example, the user's active session, their passkey, or a backend API key registered in the sub-org. The parent org API key alone cannot stamp activities against a sub-org.
+
+```ts
+// Stamped with a credential that has authority in the sub-org
+await client.createOauthProviders({
+  userId: existingUserId,
+  oauthProviders: [{
+    providerName: "my-auth-system",
+    oidcToken: idToken,
+  }],
+});
+```

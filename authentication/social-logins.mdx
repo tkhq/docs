@@ -185,6 +185,12 @@ To verify an OIDC token, other Turnkey enclaves receive the OIDC token as well a
 
 With all of that, an enclave can independently verify an OIDC token without making outbound requests. Once the token is parsed and considered authentic, our enclaves match the `iss`, `aud` and `sub` attributes against the registered OAuth providers on the Turnkey sub-organization. We also check `exp` to make sure the OIDC token is not expired, and the `nonce` attribute (see next section).
 
+**Registration vs. login tokens**
+
+The token passed at registration (`createSubOrganization` or `createOauthProviders`) goes through the same enclave verification — signature checked against the issuer's JWKS — but its purpose is different: Turnkey extracts the `iss`, `sub`, and `aud` claims and stores them as the user's identity. The token itself is not retained.
+
+On every subsequent login, a fresh token is presented. Turnkey verifies its signature independently, then matches its `iss`, `sub`, and `aud` against the stored fingerprint to identify the user. The registration and login tokens are never compared to each other — what links them is the shared identity claims, not the tokens themselves.
+
 ## Nonce restrictions in OIDC tokens
 
 Our [`OAUTH_LOGIN`](https://docs.turnkey.com/api-reference/activities/login-with-oauth) activity requires 2 parameters minimum:
