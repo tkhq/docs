@@ -1,0 +1,243 @@
+---
+title: "Spark prepare Lightning receive"
+description: "Generate a random payment preimage inside the Turnkey enclave, Feldman-split it for Spark Operators, and return only the payment hash — the raw preimage never leaves the enclave."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="submit" path="spark_prepare_lightning_receive" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}>
+
+Enum options: `ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required={true}>
+
+Timestamp (in milliseconds) of the request, used to verify liveness of user requests.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="parameters" type="object" required={true} path="parameters">
+  <p>The parameters object containing the specific intent data for this activity.</p>
+  <Expandable title="details">
+    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
+    The Spark address of the receiving identity. Determines the enclave context in which the preimage is generated.
+    </NestedParam>
+
+    <ParamField body="lightningReceive" type="object" required={true} path="parameters.lightningReceive">
+      <p>Configuration for the Lightning receive operation: how many Spark Operators share the preimage and who they are.</p>
+      <Expandable title="lightningReceive details">
+        <NestedParam parentKey="parameters.lightningReceive" childKey="threshold" type="number" required={true} default="">
+          The Shamir secret sharing threshold — the minimum number of Spark Operators that must cooperate to reconstruct the preimage. Must be ≤ the number of `operatorRecipients`.
+        </NestedParam>
+        <ParamField body="operatorRecipients" type="array" required={true} path="parameters.lightningReceive.operatorRecipients">
+          <p>The Spark Operators that will each hold an encrypted Feldman share of the preimage. When a Lightning payment arrives, threshold operators reconstruct the preimage and reveal it to the Spark Service Provider (SSP) to settle the payment.</p>
+          <Expandable title="item details">
+            <NestedParam parentKey="parameters.lightningReceive.operatorRecipients" childKey="operatorId" type="string" required={true} default="">
+              The Spark Operator identifier (e.g. `"SO1"`).
+            </NestedParam>
+            <NestedParam parentKey="parameters.lightningReceive.operatorRecipients" childKey="encryptionPublicKey" type="string" required={true} default="">
+              The operator's ECIES encryption public key, hex-encoded. The enclave uses this key to encrypt the operator's Feldman share so only that operator can decrypt it.
+            </NestedParam>
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="generateAppProofs" type="boolean" required={false}>
+
+Enable to have your activity generate and return App Proofs, enabling verifiability.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="activity" type="object" required={true}>
+  The activity object containing type, intent, and result
+  <Expandable title="activity details">
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+The activity type
+</NestedParam>
+<NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
+      The intent of the activity
+      <Expandable title="intent details">
+        <NestedParam parentKey="activity.intent" childKey="sparkPrepareLightningReceiveIntent" type="object" required={true}>
+      The sparkPrepareLightningReceiveIntent object
+      <Expandable title="sparkPrepareLightningReceiveIntent details">
+        <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent" childKey="signWith" type="string" required={true}>
+The Spark address of the receiving identity.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent" childKey="lightningReceive" type="object" required={true}>
+The Lightning receive configuration submitted.
+</NestedParam>
+      </Expandable>
+    </NestedParam>
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="result" type="object" required={true}>
+      The result of the activity
+      <Expandable title="result details">
+        <NestedParam parentKey="activity.result" childKey="sparkPrepareLightningReceiveResult" type="object" required={true}>
+      The sparkPrepareLightningReceiveResult object
+      <Expandable title="sparkPrepareLightningReceiveResult details">
+        <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult" childKey="operatorPackages" type="array" required={true}>
+      One encrypted package per Spark Operator containing that operator's Feldman share of the preimage, ECIES-encrypted to the operator's encryption public key. Submit each package to its corresponding operator so they can reconstruct the preimage when the Lightning payment arrives.
+      <Expandable title="operatorPackages details">
+        <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult.operatorPackages" childKey="operatorId" type="string" required={true}>
+The Spark Operator identifier this package is addressed to.
+</NestedParam>
+<NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult.operatorPackages" childKey="encryptedPackage" type="string" required={true}>
+The ECIES-encrypted preimage share for this operator, hex-encoded.
+</NestedParam>
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult" childKey="paymentHash" type="string" required={true}>
+`SHA256(preimage)`, hex-encoded as a 32-byte value. Use this to construct a BOLT11 Lightning invoice. The raw preimage is never returned — it remains inside the enclave and is split across the Spark Operators.
+</NestedParam>
+      </Expandable>
+    </NestedParam>
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/spark_prepare_lightning_receive \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE",
+    "timestampMs": "<string> (e.g. 1746736509954)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "signWith": "<spark-address>",
+        "lightningReceive": {
+            "threshold": 2,
+            "operatorRecipients": [
+                { "operatorId": "SO1", "encryptionPublicKey": "<so1-pubkey-hex>" },
+                { "operatorId": "SO2", "encryptionPublicKey": "<so2-pubkey-hex>" }
+            ]
+        }
+    }
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().sparkPrepareLightningReceive({
+  signWith: "<spark-address>",
+  lightningReceive: {
+    threshold: 2,
+    operatorRecipients: [
+      { operatorId: "SO1", encryptionPublicKey: "<so1-pubkey-hex>" },
+      { operatorId: "SO2", encryptionPublicKey: "<so2-pubkey-hex>" },
+    ],
+  },
+});
+
+// Use the returned paymentHash to construct a BOLT11 invoice.
+// The raw preimage never leaves the enclave.
+console.log("Payment hash:", response.paymentHash);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g. 1746736509954)",
+    "result": {
+      "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
+        "type": "<string>",
+        "intent": {
+          "sparkPrepareLightningReceiveIntent": {
+            "signWith": "<spark-address>",
+            "lightningReceive": "<object>"
+          }
+        },
+        "result": {
+          "sparkPrepareLightningReceiveResult": {
+            "operatorPackages": [
+              { "operatorId": "SO1", "encryptedPackage": "<hex>" },
+              { "operatorId": "SO2", "encryptedPackage": "<hex>" }
+            ],
+            "paymentHash": "<32-byte-hex>"
+          }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>
