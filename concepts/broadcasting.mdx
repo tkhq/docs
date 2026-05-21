@@ -44,7 +44,7 @@ Turnkey handles all of this for you via `solSendTransaction`. Whether or not you
 
 ## Transaction status and enriched errors
 
-After you send a transaction, Turnkey monitors its status until it fails or is confirmed on-chain. You can [query the transaction status](./broadcasting#querying-via-api) or subscribe to status updates [via webhooks](./broadcasting#webhooks). 
+After you send a transaction, Turnkey monitors its status until it fails or is confirmed onchain. You can [query the transaction status](./broadcasting#querying-via-api) or subscribe to status updates [via webhooks](./broadcasting#webhooks). 
 
 ### Transaction Statuses
 
@@ -54,8 +54,8 @@ The following statuses apply to both EVM and Solana transactions:
 | ------------ | -------------------------------------------------------------------------------------------------------- |
 | INITIALIZED  | Turnkey has constructed and signed the transaction and prepared fees, but it has not yet been broadcast. |
 | BROADCASTING | Turnkey is actively broadcasting the transaction to the network and awaiting inclusion.                  |
-| INCLUDED     | The transaction has been included in a block (EVM) or confirmed on-chain (Solana).                       |
-| FAILED       | The transaction could not be included on-chain and will not be retried automatically.                    |
+| INCLUDED     | The transaction has been included in a block (EVM) or confirmed onchain (Solana).                        |
+| FAILED       | The transaction could not be included onchain and will not be retried automatically.                     |
 
 ### EVM Smart Contract Transaction Errors
 
@@ -63,12 +63,12 @@ For EVM transactions that revert, Turnkey runs a simulation to produce structure
 
 | **Error type** | **Description**                                                                                                                                         |
 | :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| UNKNOWN        | The transaction reverted during on-chain execution or simulation, but the revert reason could not be decoded (e.g. missing ABI or unverified contract). |
+| UNKNOWN        | The transaction reverted during onchain execution or simulation, but the revert reason could not be decoded (e.g. missing ABI or unverified contract).  |
 | NATIVE         | The transaction reverted due to a built-in Solidity error, such as `require()`, `assert()`, or a plain `revert()`.                                      |
 | CUSTOM         | The transaction reverted due to a contract-defined custom error declared using Solidity's `error` keyword.                                              |
 
 <Note>
-  These error types describe how an EVM smart contract reverted during on-chain execution or pre-flight simulation. Turnkey application-level errors (e.g. signing failures, policy rejections) are not classified here and are instead surfaced via `Error.Message`.
+  These error types describe how an EVM smart contract reverted during onchain execution or pre-flight simulation. Turnkey application-level errors (e.g. signing failures, policy rejections) are not classified here and are instead surfaced via `Error.Message`.
 </Note>
 
 ### Querying via API
@@ -81,32 +81,32 @@ The response includes a `txStatus` field with the current status and, when appli
 
 Turnkey Webhooks let you react to transaction status updates in real time, without polling. Instead of repeatedly calling the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status) API to check for updates, you register an endpoint and Turnkey pushes the data to you; an HTTP POST fires when a transaction status changes (e.g. from `BROADCASTING` to `INCLUDED` or `FAILED`). Webhook payloads deliver rich transaction status updates as soon as they occur, so you can keep your users informed and react to failures immediately.
 
-You subscribe to webhooks at the parent organization level. Subscriptions cover all transactions initiated across the parent organization and all of its sub-organizations. In other words, once you subscribe you'll receive webhook notifications for all transactions within your entire Turnkey instance.
+You subscribe to webhooks at the parent organization level. Subscriptions cover transactions across the parent organization and all of its sub-organizations. In other words, once you subscribe you'll receive webhook notifications for all transactions that are powered by Turnkey's transaction management suite.
 
 #### Subscribing
 
-Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the `SEND_TRANSACTION_STATUS_UPDATES` event type to register your endpoint. Create the webhook endpoint on the parent organization. Balance webhook delivery is scoped to wallet-account addresses within your parent organization and its sub-organizations. This includes both addresses generated through Turnkey and addresses imported into your Turnkey organization.
+Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the `SEND_TRANSACTION_STATUS_UPDATES` event type to register your endpoint. Create the webhook endpoint on the parent organization.
 
 #### Delivery payload
 
 Each delivery is an HTTP POST with a JSON body containing a `type` and a `msg` object. The `type` is always `"transaction:status"`. The fields present in `msg` depend on the status:
 
 - **BROADCASTING**: base fields only — no `txHash`, no `error`
-- **INCLUDED**: base fields + `txHash`. If the transaction was included but reverted on-chain, `error` is also present with full revert details.
-- **FAILED**: base fields + `error`. No `txHash` (the transaction never landed on-chain).
+- **INCLUDED**: base fields + `txHash`. If the transaction was included but reverted onchain, `error` is also present with full revert details.
+- **FAILED**: base fields + `error`. No `txHash` (the transaction never landed onchain).
 
-| **Field**                 | **Description**                                                                                     |
-| :------------------------ | :-------------------------------------------------------------------------------------------------- |
-| `type`                    | Always `"transaction:status"`.                                                                      |
-| `msg.sendTransactionStatusId` | The ID of the send transaction status record.                                                   |
-| `msg.activityId`          | The ID of the originating Turnkey activity.                                                         |
-| `msg.orgID`               | The sub-organization ID that initiated the transaction.                                             |
-| `msg.status`              | One of `BROADCASTING`, `INCLUDED`, or `FAILED`.                                                     |
-| `msg.caip2`               | The chain identifier where the transaction was sent.                                                |
-| `msg.idempotencyKey`      | A stable, unique key for this status event. Use this to safely deduplicate webhook deliveries.      |
-| `msg.timestamp`           | Unix timestamp (seconds) when the notification was generated.                                       |
-| `msg.txHash`              | _(INCLUDED only)_ The on-chain transaction hash or Solana signature.                                |
-| `msg.error`               | _(FAILED only)_ Structured error object. Contains `message`, and either `eth.revertChain` (EVM) or `solana` (Solana) details. |
+| **Field**                 | **Description**                                                                                               |
+| :------------------------ | :------------------------------------------------------------------------------------------------------------ |
+| `type`                    | Always `"transaction:status"`.                                                                                |
+| `msg.sendTransactionStatusId` | The ID of the send transaction status record.                                                             |
+| `msg.activityId`          | The ID of the originating Turnkey activity.                                                                   |
+| `msg.orgID`               | The organization ID that initiated the transaction.                                                           |
+| `msg.status`              | One of `BROADCASTING`, `INCLUDED`, or `FAILED`.                                                               |
+| `msg.caip2`               | The chain identifier where the transaction was sent.                                                          |
+| `msg.idempotencyKey`      | A stable, unique key for this status event. Use this to safely deduplicate webhook deliveries.                |
+| `msg.timestamp`           | Unix timestamp (seconds) when the notification was generated.                                                 |
+| `msg.txHash`              | _(INCLUDED only)_ The onchain transaction hash or Solana signature.                                           |
+| `msg.error`               | Structured error object. Contains `message`, and either `eth.revertChain` (EVM) or `solana` (Solana) details. |
 
 **BROADCASTING**
 
