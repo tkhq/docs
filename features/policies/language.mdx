@@ -78,7 +78,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | alias                    | string                                    | The alias of the user                                                                                                                                                                                                                                                                  |
 | **Credential**           | id                       | string                                    | The identifier of the API key or authenticator that was used to approve the request                                                                                                                                                                                                    |
 |                          | user_id                  | string                                    | The identifier of the user who owns this request and approved the request                                                                                                                                                                                                              |
-|                          | type                     | string                                    | The credential type, a full list can be found [here](/authentication/credentials#credential-types)                                                                                                                                                                                     |
+|                          | type                     | string                                    | The credential type, a full list can be found [here](/features/users/credentials#credential-types)                                                                                                                                                                                     |
 |                          | credential_id            | string                                    | The credential ID of a passkey. Note: this is only populated for passkeys (also known as Authenticators within Turnkey resources), not API keys                                                                                                                                        |
 |                          | public_key               | string                                    | The public key of the credential that approved the request                                                                                                                                                                                                                             |
 | **Activity**             | type                     | string                                    | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                                                                                                                      |
@@ -374,13 +374,13 @@ To allow a user to delete only themselves:
 
 ### Root quorum activities
 
-There are a select few activities that are not governed by policies, but rather by an organization's [root quorum](/concepts/users/root-quorum). These activities are: `ACTIVITY_TYPE_UPDATE_ROOT_QUORUM`, `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_UPDATE_ORGANIZATION_NAME`. For example, if a policy is added that allows a specific non-root user to perform `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activities, these requests will still fail as they are subject specifically to root quorum.
+There are a select few activities that are not governed by policies, but rather by an organization's [root quorum](/features/users/root-quorum). These activities are: `ACTIVITY_TYPE_UPDATE_ROOT_QUORUM`, `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_UPDATE_ORGANIZATION_NAME`. For example, if a policy is added that allows a specific non-root user to perform `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activities, these requests will still fail as they are subject specifically to root quorum.
 
 ### Ethereum
 
 Our Ethereum policy language (accessible via `eth.tx`) allows for the granular governance of signing Ethereum (EVM-compatible) transactions. Our policy engine exposes a [fairly standard set of properties](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope) belonging to a transaction.
 
-See the [Ethereum policy examples](/concepts/policies/examples/ethereum) for sample scenarios.
+See the [Ethereum policy examples](/features/policies/examples/ethereum) for sample scenarios.
 
 <Note>
   {" "}
@@ -403,19 +403,19 @@ Similarly, the policy engine exposes `solana.tx.spl_transfers`, which contains o
 
 Here are some approaches you might take to govern transfers:
 
-- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-include-a-transfer-to-only-one-specific-recipient))
-- _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/concepts/policies/examples/solana#deny-all-solana-transactions-transferring-to-an-undesired-address))
-- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/concepts/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
+- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/features/policies/examples/solana#allow-solana-transactions-that-include-a-transfer-to-only-one-specific-recipient))
+- _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/features/policies/examples/solana#deny-all-solana-transactions-transferring-to-an-undesired-address))
+- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/features/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
 
 #### Account address lookups
 
-Solana transactions can reference onchain address lookup tables for account addresses. Turnkey surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP` in Solana address fields (`account_keys`, instruction accounts, `transfers`, and `spl_transfers`). The `solana.tx.address_table_lookups` array indicates when lookups are present, but the specific addresses are not resolved. If you rely on allowlists or denylists of addresses, add a guard for this placeholder (for example, require `solana.tx.address_table_lookups.count == 0` before comparing addresses, or explicitly deny when `ADDRESS_TABLE_LOOKUP` appears with something like `solana.tx.transfers.any(t, t.to == 'ADDRESS_TABLE_LOOKUP')`) so that dynamic lookups cannot bypass or unexpectedly fail your policy. See the [address table lookup examples](/concepts/policies/examples/solana#deny-all-address-table-lookups) for examples on how to enforce this.
+Solana transactions can reference onchain address lookup tables for account addresses. Turnkey surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP` in Solana address fields (`account_keys`, instruction accounts, `transfers`, and `spl_transfers`). The `solana.tx.address_table_lookups` array indicates when lookups are present, but the specific addresses are not resolved. If you rely on allowlists or denylists of addresses, add a guard for this placeholder (for example, require `solana.tx.address_table_lookups.count == 0` before comparing addresses, or explicitly deny when `ADDRESS_TABLE_LOOKUP` appears with something like `solana.tx.transfers.any(t, t.to == 'ADDRESS_TABLE_LOOKUP')`) so that dynamic lookups cannot bypass or unexpectedly fail your policy. See the [address table lookup examples](/features/policies/examples/solana#deny-all-address-table-lookups) for examples on how to enforce this.
 
 #### Program address lookups
 
 Turnkey rejects Solana transactions where program addresses are resolved via address lookup tables. Program IDs must be statically defined in the transaction to enable static analysis of instructions without requiring onchain data lookups. If your transaction references a program via an address table lookup, the signing request will fail. Account addresses (non-program) can still be dynamically resolved via lookup tables as described above.
 
-See the [Solana policy examples](/concepts/policies/examples/solana) for sample scenarios.
+See the [Solana policy examples](/features/policies/examples/solana) for sample scenarios.
 
 ### Tron
 
@@ -429,7 +429,7 @@ Our Tron policy language (accessible via `tron.tx`) allows for policy control ov
 - UnfreezeBalanceV2Contract
 - AccountPermissionUpdateContract
 
-See the [Tron policy examples](/concepts/policies/examples/tron) for sample scenarios.
+See the [Tron policy examples](/features/policies/examples/tron) for sample scenarios.
 
 ### Bitcoin
 
@@ -437,9 +437,9 @@ Our Bitcoin policy language (accessible via `bitcoin.tx`) allows for policy cont
 
 NOTE: While our `SIGN TRANSACTION` endpoint takes in a Partially Signed Bitcoin Transaction (PSBT) as required for signing context -- our policy language supports only the standard fields inside a Bitcoin transaction: https://learnmeabitcoin.com/technical/transaction/#structure
 
-For further reference on how Turnkey handles Bitcoin transactions in our policy-enabled transaction signing flow, check out this section in our [Bitcoin Network Support](/networks/bitcoin#policy-enabled-bitcoin-transaction-signing) page.
+For further reference on how Turnkey handles Bitcoin transactions in our policy-enabled transaction signing flow, check out this section in our [Bitcoin Network Support](/features/networks/bitcoin#policy-enabled-bitcoin-transaction-signing) page.
 
-See the [Bitcoin policy examples](/concepts/policies/examples/bitcoin) for sample Bitcoin policies.
+See the [Bitcoin policy examples](/features/policies/examples/bitcoin) for sample Bitcoin policies.
 
 ### Tempo
 
@@ -449,4 +449,4 @@ The `tempo.tx` namespace exposes the following transaction-level fields: `chain_
 
 You can also govern Tempo transactions at the activity level using `activity.params.type == 'TRANSACTION_TYPE_TEMPO'`, combined with other fields such as specific wallets, private keys, or consensus rules.
 
-See the [Tempo policy examples](/concepts/policies/examples/tempo) for sample scenarios.
+See the [Tempo policy examples](/features/policies/examples/tempo) for sample scenarios.
