@@ -89,7 +89,7 @@ Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpo
 
 #### Delivery payload
 
-Each delivery is an HTTP POST with a JSON body containing a `type` and a `msg` object. The `type` is always `"transaction:status"`. The fields present in `msg` depend on the status:
+Each delivery is an HTTP POST with a JSON body containing a `type`, `organizationId`, `parentOrganizationId`, and a `msg` object. The `type` is always `"transaction:status"`. The fields present in `msg` depend on the status:
 
 - **BROADCASTING**: base fields only — no `txHash`, no `error`
 - **INCLUDED**: base fields + `txHash`. If the transaction was included but reverted onchain, `error` is also present with full revert details.
@@ -97,26 +97,28 @@ Each delivery is an HTTP POST with a JSON body containing a `type` and a `msg` o
 
 | **Field**                 | **Description**                                                                                               |
 | :------------------------ | :------------------------------------------------------------------------------------------------------------ |
-| `type`                    | Always `"transaction:status"`.                                                                                |
-| `msg.sendTransactionStatusId` | The ID of the send transaction status record.                                                             |
-| `msg.activityId`          | The ID of the originating Turnkey activity.                                                                   |
-| `msg.orgID`               | The organization ID that initiated the transaction.                                                           |
-| `msg.status`              | One of `BROADCASTING`, `INCLUDED`, or `FAILED`.                                                               |
-| `msg.caip2`               | The chain identifier where the transaction was sent.                                                          |
-| `msg.idempotencyKey`      | A stable, unique key for this status event. Use this to safely deduplicate webhook deliveries.                |
-| `msg.timestamp`           | Unix timestamp (seconds) when the notification was generated.                                                 |
-| `msg.txHash`              | _(INCLUDED only)_ The onchain transaction hash or Solana signature.                                           |
-| `msg.error`               | Structured error object. Contains `message`, and either `eth.revertChain` (EVM) or `solana` (Solana) details. |
+| `type`                        | Always `"transaction:status"`.                                                                                |
+| `organizationId`              | The organization ID that initiated the transaction.                                                           |
+| `parentOrganizationId`        | The parent organization ID.                                                                                   |
+| `msg.sendTransactionStatusId` | The ID of the send transaction status record.                                                                 |
+| `msg.activityId`              | The ID of the originating Turnkey activity.                                                                   |
+| `msg.status`                  | One of `BROADCASTING`, `INCLUDED`, or `FAILED`.                                                               |
+| `msg.caip2`                   | The chain identifier where the transaction was sent.                                                          |
+| `msg.idempotencyKey`          | A stable, unique key for this status event. Use this to safely deduplicate webhook deliveries.                |
+| `msg.timestamp`               | Unix timestamp (seconds) when the notification was generated.                                                 |
+| `msg.txHash`                  | _(INCLUDED only)_ The onchain transaction hash or Solana signature.                                           |
+| `msg.error`                   | Structured error object. Contains `message`, and either `eth.revertChain` (EVM) or `solana` (Solana) details. |
 
 **BROADCASTING**
 
 ```json
 {
   "type": "transaction:status",
+  "organizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+  "parentOrganizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
   "msg": {
     "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
     "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
-    "orgID": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
     "status": "BROADCASTING",
     "caip2": "eip155:1",
     "idempotencyKey": "3f4a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3",
@@ -130,10 +132,11 @@ Each delivery is an HTTP POST with a JSON body containing a `type` and a `msg` o
 ```json
 {
   "type": "transaction:status",
+  "organizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+  "parentOrganizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
   "msg": {
     "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
     "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
-    "orgID": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
     "status": "INCLUDED",
     "caip2": "eip155:1",
     "idempotencyKey": "7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8",
@@ -148,10 +151,11 @@ Each delivery is an HTTP POST with a JSON body containing a `type` and a `msg` o
 ```json
 {
   "type": "transaction:status",
+  "organizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+  "parentOrganizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
   "msg": {
     "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
     "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
-    "orgID": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
     "status": "FAILED",
     "caip2": "eip155:1",
     "idempotencyKey": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2",
