@@ -34,6 +34,45 @@ Turnkey reduces this to a couple of API calls. We handle fees and our battle-tes
   To access sponsored transactions, ensure that Gas Sponsorship is first enabled within your Turnkey dashboard. Then set `sponsor: true` and update the `caip2` parameter with the corresponding chain identifier.
 </Note>
 
+## Construction and Broadcast
+
+### EVM
+
+A successful EVM transaction requires:
+
+- **Transaction construction**: assembling the payload (recipient, value, calldata)
+- **Nonce**: set correctly to order transactions and prevent conflicts
+- **Gas and tip fee**: estimated to ensure inclusion even during network congestion
+- **Signature**: cryptographically signing the transaction with the sender's private key
+- **Broadcast**: submitting the signed transaction to the network and monitoring for inclusion
+
+Turnkey handles all of this for you via `ethSendTransaction`. Whether or not you use sponsorship, you pass through minimal payloads and we take care of the rest. We auto-fill any fields you omit.
+
+This endpoint supports arbitrary EVM transactions — not just simple sends. You can interact with smart contracts, deploy contracts, or execute any valid EVM operation.
+
+### Solana
+
+A successful Solana transaction requires:
+
+- **Transaction construction**: assembling the list of instructions (program, accounts, data)
+- **Recent blockhash**: fetched and attached at broadcast time to ensure the transaction is valid
+- **Compute unit limit**: estimated and set to prevent failed transactions due to insufficient compute
+- **Priority fee**: set to ensure timely inclusion under current network conditions
+- **Signature**: cryptographically signing the transaction with the sender's private key
+- **Broadcast**: submitting the signed transaction to the network and monitoring for confirmation
+
+Turnkey handles all of this for you via `solSendTransaction`. Whether or not you use sponsorship, you pass through a minimal payload and we manage the rest.
+
+<Note>
+  On Solana, fee sponsorship and rent sponsorship are separate. `Sponsor Solana Rent` is disabled by
+  default and must be enabled in the dashboard before Turnkey will pre-fund rent for account
+  creation. If created accounts are later closed, refunded rent can go back to the signer rather
+  than the sponsor. See [Solana Rent Sponsorship](/features/networks/solana-rent-refunds). For payer
+  behavior, static-key requirements, and account-creation caveats in sponsored flows, see [Solana
+  transaction construction for sponsored
+  flows](/features/networks/solana-transaction-construction).
+</Note>
+
 ## Concepts
 
 ### Gas sponsorship (aka gas abstraction, gasless transactions, fee abstraction)
