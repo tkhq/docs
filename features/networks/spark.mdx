@@ -3,93 +3,131 @@ title: "Spark support on Turnkey"
 sidebarTitle: "Spark"
 ---
 
-[Spark](https://www.spark.money/) is a Bitcoin Layer 2 network that uses an identity key system for on-chain addressing. Turnkey supports Spark address derivation and signing via plain [BIP-340 Schnorr](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) signatures.
+[Spark](https://www.spark.money/) is a Bitcoin Layer 2 that uses FROST threshold signing across a collective of operators to enable fast, low-fee transfers and Lightning payments without giving up self-custody of the underlying BTC. Turnkey provides enclave-based key management for Spark: your identity key, leaf keys, deposit keys, and Lightning preimages are generated and used entirely inside the Turnkey enclave, and never leave it during normal operation.
 
-The supported address formats are:
+If you're new to the protocol, the [Spark technical overview](https://docs.spark.money/spark/overview) and [Spark core concepts](https://docs.spark.money/spark/key-concepts) are good starting points. This page focuses on what Turnkey adds to a Spark integration.
 
-| Network  | Address Format                   | HRP       |
-| -------- | -------------------------------- | --------- |
-| Mainnet  | `ADDRESS_FORMAT_SPARK_MAINNET`   | `spark`   |
-| Regtest  | `ADDRESS_FORMAT_SPARK_REGTEST`   | `sparkrt` |
+## How Spark works (and where Turnkey fits)
 
-### BIP-32 derivation path
+Spark *leaves* — the individual units of BTC held inside the protocol — are jointly controlled by your identity key and the Spark Operators using FROST threshold signing. No single party can move a leaf: every leaf operation requires a quorum of operators to co-sign with you. The protocol is designed around a **1-of-n trust assumption**: as long as at least one operator is honest, your funds cannot be stolen. If every operator is unavailable you cannot transact, but you can still exit to Bitcoin L1 using transactions that were pre-signed at deposit time (see [Security model](#security-model)).
 
-Spark uses a unique BIP-32 purpose number (`8797555`) rather than the standard BIP-44 coin type system. The default derivation path for the identity key is:
+There are three external roles to know:
 
-```
-m/8797555'/{account}'/0'
-```
+- **Spark Operator (SO)** — a node in the operator collective that holds a threshold key share for every leaf. The current operators are Lightspark and Flashnet.
+- **Spark Entity (SE)** — the collective of all SOs acting together. A quorum of the SE is required to authorize any leaf operation.
+- **Spark Service Provider (SSP)** — an application-layer service (a wallet backend, an exchange, etc.) that coordinates flows on your behalf — routing Lightning payments, processing static deposits, and submitting transfers. The SSP has no key-share authority over leaves; it relies on the SOs for that.
 
-When creating a wallet account via the Turnkey dashboard or API, select `ADDRESS_FORMAT_SPARK_MAINNET` or `ADDRESS_FORMAT_SPARK_REGTEST` and the path will be set automatically.
+Turnkey is none of these. Turnkey runs the secure enclave that holds your identity key and derives leaf keys, deposit keys, and Lightning preimages. When a flow needs your signature, the client SDK calls a Turnkey activity (`SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER`, `SPARK_CLAIM_TRANSFER`, or `SPARK_PREPARE_LIGHTNING_RECEIVE`) and the enclave performs the cryptographic work without exposing key material. All communication with SOs and the SSP happens directly from your client — Turnkey is not in that path.
 
-<Note>
-  Only `secp256k1` keys are supported for Spark. Attempting to use an ed25519 key will result in an error.
-</Note>
+{/* Diagram placeholder — actor diagram showing client / Turnkey enclave / SOs / SSP / Bitcoin L1 with arrows labeled by what flows between them. The enclave should be visibly inside Turnkey; SOs and SSP visibly outside. The client should be the only thing that talks to the enclave, the only thing that talks to the SOs and SSP, and the only thing that broadcasts to Bitcoin L1. */}
 
-## Schnorr signing
+## Address derivation and key types
 
-Spark transactions are signed using **plain BIP-340 Schnorr** — specifically, without the Taproot key tweak described [here](/bitcoin#schnorr-signatures-and-tweaks) that Bitcoin P2TR addresses require. This is an important distinction: passing a Spark address as the `signWith` parameter to `SIGN_RAW_PAYLOAD` triggers plain Schnorr signing, while passing a Bitcoin Taproot (P2TR) address triggers tweaked Schnorr signing per [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki).
+Spark uses a unique BIP-32 purpose number (`8797555`) rather than the standard BIP-44 coin type system. Every Spark key is a hardened child of `m/8797555'/{account}'`, with the next path segment selecting the key type:
 
-Use the [`SIGN_RAW_PAYLOAD`](/api-reference/activities/sign-raw-payload) or [`SIGN_RAW_PAYLOAD_V2`](/api-reference/activities/sign-raw-payload) activity to sign Spark payloads. The `hashFunction` field should match how the payload was prepared (e.g. `HASH_FUNCTION_NO_OP` if you are passing a pre-hashed payload).
+| Type | Path segment | Per-item derivation | Purpose |
+|---|---|---|---|
+| `IDENTITY` | `/0'` | flat — used as is | Primary wallet identifier; the key behind `ADDRESS_FORMAT_SPARK_*` addresses |
+| `SIGNING_HD` | `/1'` | hardened child at `u32_be(sha256(leaf_id)[0..4]) % 2^31` | Base key for per-leaf signing keys |
+| `DEPOSIT` | `/2'` | flat — used as is | Single-use L1 deposit address |
+| `STATIC_DEPOSIT_HD` | `/3'` | hardened child at `index` | Reusable deposit addresses (SSP integration) |
+| `HTLC_PREIMAGE_HD` | `/4'` | not exposed for signing — used only for HMAC-SHA256 inside the enclave | Lightning HTLC preimage generation |
 
-The returned signature will always have `V = "00"` since Schnorr signatures do not use a recovery ID.
+The supported `IDENTITY` address formats are:
 
-### Signing scheme selection
+| Network | Address format | HRP |
+| ------- | -------------- | --- |
+| Mainnet | `ADDRESS_FORMAT_SPARK_MAINNET` | `spark` |
+| Regtest | `ADDRESS_FORMAT_SPARK_REGTEST` | `sparkrt` |
 
-Turnkey automatically selects the correct signing scheme based on the address format associated with your key:
+When creating a wallet account via the Turnkey dashboard or API, select `ADDRESS_FORMAT_SPARK_MAINNET` or `ADDRESS_FORMAT_SPARK_REGTEST` and the identity path will be set automatically. Only `secp256k1` keys are supported; ed25519 keys will be rejected.
 
-| Address type        | Signing scheme         |
-| ------------------- | ---------------------- |
-| Bitcoin P2TR        | Tweaked Schnorr (BIP-341) |
+### Schnorr signing on the identity key
+
+Spark payloads signed with the identity key use **plain BIP-340 Schnorr** — specifically, *without* the Taproot key tweak described [here](/features/networks/bitcoin#schnorr-signatures-and-tweaks) that Bitcoin P2TR addresses require. Turnkey automatically selects the correct signing scheme based on the address format associated with your key:
+
+| Address type | Signing scheme |
+| ------------ | -------------- |
+| Bitcoin P2TR | Tweaked Schnorr (BIP-341) |
 | Spark Mainnet/Regtest | Plain Schnorr (BIP-340) |
-| All others          | ECDSA                  |
+| All others | ECDSA |
 
-## Networks supported
+Use [`SIGN_RAW_PAYLOAD`](/api-reference/activities/sign-raw-payload) with the Spark address as `signWith` to produce a plain-Schnorr signature. The `hashFunction` field should match how the payload was prepared (e.g. `HASH_FUNCTION_NO_OP` for a pre-hashed payload). The returned signature always has `V = "00"` since Schnorr signatures do not carry a recovery ID.
 
-- **Spark Mainnet** — `ADDRESS_FORMAT_SPARK_MAINNET`
-- **Spark Regtest** — `ADDRESS_FORMAT_SPARK_REGTEST`
+This identity-key signing path is sufficient on its own for token operations via the Spark SDK (`@buildonspark/spark-sdk`, `@buildonspark/issuer-sdk`). The FROST-based flows below require the additional Spark-specific activities.
 
-## Key features
+## Turnkey activities for Spark
 
-- **secp256k1 signing**: Turnkey fully supports the secp256k1 curve used by Spark
-- **Plain BIP-340 Schnorr**: Distinct from the tweaked Schnorr used for Bitcoin Taproot — no key tweak is applied
-- **Bech32m addressing**: Spark identity key addresses are Bech32m-encoded canonical protobuf payloads
-- **Spark-specific BIP-32 purpose**: Derivation path uses purpose `8797555` per the Spark protocol spec
+Turnkey exposes four activities purpose-built for Spark flows. All four perform their cryptographic work inside the enclave; no key material is returned to the client.
 
-## Spark-specific API activities
+| Activity | What it does |
+| -------- | ------------ |
+| [`SPARK_SIGN_FROST`](/api-reference/activities/sign-frost-spark) | Generates the enclave's FROST signature share for one or more sighashes. Supports batched signing — multiple sighashes in a single call. Used for deposits, withdrawals, transfers, and static deposit claims. |
+| [`SPARK_PREPARE_TRANSFER`](/api-reference/activities/prepare-spark-transfer) | Atomically computes per-leaf key tweaks, Feldman-VSS-splits them for the SOs, ECIES-encrypts the recipient's new leaf key to their identity public key, and ECDSA-signs the transfer package with your identity key. Used when sending a transfer. |
+| [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer) | Decrypts an inbound transfer's ciphertext using your identity key, derives the receiver's new leaf key, computes the claim tweak, and packages the tweak for the SOs. Used when receiving a transfer. |
+| [`SPARK_PREPARE_LIGHTNING_RECEIVE`](/api-reference/activities/spark-prepare-lightning-receive) | Generates a random payment preimage, computes its payment hash, Feldman-splits the preimage across the SOs, and ECIES-encrypts each share to the SO's encryption public key. The raw preimage never leaves the enclave; only the `paymentHash` is returned to the client for BOLT11 invoice construction. |
 
-In addition to `SIGN_RAW_PAYLOAD`, Turnkey exposes four Spark-specific activities for enclave-protected FROST signing, key transfers, and Lightning receives. All private key material and secret shares remain inside the Turnkey enclave throughout.
+These are additive to Turnkey's existing primitives — Spark flows also use [`CREATE_WALLET_ACCOUNTS`](/api-reference/activities/create-wallet-accounts) to derive new deposit and signing keys, [`SIGN_RAW_PAYLOAD`](/api-reference/activities/sign-raw-payload) for Schnorr identity-key signatures, and [`SIGN_TRANSACTION`](/api-reference/activities/sign-transaction) for Bitcoin L1 transactions that fund deposits or receive cooperative withdrawals.
 
-| Activity | Description |
-| -------- | ----------- |
-| [`SPARK_SIGN_FROST`](/api-reference/activities/sign-frost-spark) | Generate a FROST partial signature for one or more Bitcoin transaction sighashes. Supports batching — branch + exit at deposit time, or up to 6 refund transactions per transfer. |
-| [`SPARK_PREPARE_TRANSFER`](/api-reference/activities/prepare-spark-transfer) | Compute key tweaks, Feldman-split them for Spark Operators, ECIES-encrypt the receiver's new leaf key, and ECDSA-sign the transfer payload. |
-| [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer) | Verify the sender's signature, ECIES-decrypt the leaf key ciphertext, derive the receiver's new HD leaf key, and produce encrypted claim packages for Spark Operators. |
-| [`SPARK_PREPARE_LIGHTNING_RECEIVE`](/api-reference/activities/spark-prepare-lightning-receive) | Generate a random payment preimage inside the enclave, Feldman-split it for Spark Operators, and return only the `paymentHash` for BOLT11 invoice construction. |
+## Supported operations
 
-Key derivation for deposit keys, signing keys, and static deposit keys uses the standard [`CREATE_WALLET_ACCOUNTS`](/api-reference/activities/create-wallet-accounts) activity with Spark-specific BIP-32 paths.
+Turnkey supports the full set of Spark wallet operations. For a runnable walkthrough of each flow — including the exact sequence of Turnkey, SO, and SSP calls — see the [SDK example](#sdk-example).
 
-## Flows
+| Operation | Direction | Turnkey activities used |
+| --------- | --------- | ----------------------- |
+| Deposit | Bitcoin L1 → Spark (single-use address) | `SIGN_TRANSACTION`, `SPARK_SIGN_FROST` |
+| Cooperative withdrawal | Spark → Bitcoin L1 (fast path; requires SO co-signing) | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER` |
+| Unilateral exit | Spark → Bitcoin L1 (emergency path; no SO cooperation needed) | none at exit time — uses pre-signed transactions from the deposit flow |
+| Transfer | Spark → Spark | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER` (sender); `SPARK_SIGN_FROST`, `SPARK_CLAIM_TRANSFER` (receiver) |
+| Lightning receive | Lightning → Spark | `SPARK_PREPARE_LIGHTNING_RECEIVE` |
+| Lightning send | Spark → Lightning | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER` |
+| Static deposit | Bitcoin L1 → Spark (reusable address) | `CREATE_WALLET_ACCOUNTS`, `EXPORT_WALLET_ACCOUNT`, `SIGN_TRANSACTION` |
+| Token transfer | Spark token operations (mint, transfer) | `SIGN_RAW_PAYLOAD` |
 
-For step-by-step details on every Turnkey-integrated Spark operation — including which activities to call, what parameters to pass, and what the enclave does at each step — see the [Spark flows](/features/networks/spark-flows) reference:
+## Security model
 
-- [Deposit: Bitcoin L1 → Spark](/features/networks/spark-flows#1-deposit-bitcoin-l1--spark)
-- [Cooperative Withdrawal: Spark → Bitcoin L1](/features/networks/spark-flows#2-cooperative-withdrawal-spark--bitcoin-l1)
-- [Unilateral Exit (Emergency)](/features/networks/spark-flows#3-unilateral-exit-spark--bitcoin-l1-emergency)
-- [Initiate Transfer: Spark → Spark](/features/networks/spark-flows#4-initiate-transfer-spark--spark-sender)
-- [Claim Transfer: Spark → Spark](/features/networks/spark-flows#5-claim-transfer-spark--spark-receiver)
-- [Lightning Receive](/features/networks/spark-flows#6-lightning-receive)
-- [Static Deposit: Bitcoin L1 → Spark](/features/networks/spark-flows#7-static-deposit-bitcoin-l1--spark-reusable-address)
-- [Static Deposit Claim](/features/networks/spark-flows#8-static-deposit-claim)
+Three things are worth understanding before you integrate.
 
-## SDK Example
+### Pre-signed exit transactions are seed-phrase-equivalent
 
-- [`examples/with-spark-schnorr`](https://github.com/tkhq/sdk/tree/main/examples/with-spark-schnorr): demonstrates wallet initialization, SO authentication and token minting + sending on Spark using Turnkey!
+When you deposit BTC into Spark, the deposit flow pre-signs two Bitcoin L1 transactions inside the Turnkey enclave: a branch transaction and a timelocked exit transaction. These are your unilateral exit path — if every Spark Operator goes offline or acts maliciously, you can broadcast them directly to Bitcoin L1 and recover your BTC without operator cooperation. The wait is approximately 100 blocks (~16 hours) due to the timelock, but the funds are recoverable.
+
+The corollary: **these transactions must be stored durably.** If they are lost and the SOs are unavailable, your recovery path is gone. Treat them with the same care as a seed phrase — durable, encrypted, off-device storage, with backups. The Turnkey enclave does not retain them; it signs them once at deposit time and returns them to your client.
+
+This is the property that makes Spark Operator unavailability a *liveness* concern rather than a *safety* concern: you may not be able to transact, but you can always exit.
+
+### Static deposits export a key from the enclave
+
+Static deposit addresses are reusable: the same address can receive multiple deposits, each creating a separate Spark leaf. To support this, the SSP must be able to process deposits while your wallet is offline — which means it needs co-signing capability on the static deposit key. This is the **only** Spark flow that uses [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to take a raw private key out of the Turnkey enclave.
+
+From the moment the static deposit key is shared with the SSP until you claim any deposits made to that address, the SSP holds co-signing capability. This is the intentional custodial tradeoff of static deposits. To minimize exposure:
+
+- Use a fresh ephemeral P-256 keypair for each export and zero it immediately after decrypting.
+- Transmit the key to the SSP only over an encrypted channel.
+- Zero the key in your local memory immediately after transmission.
+- Only use SSPs you trust — a compromised SSP holding this key could co-sign spends from the static deposit address.
+
+If you don't need a reusable receiving address, prefer single-use deposits. They keep key material inside the enclave throughout.
+
+### Communication with SOs and the SSP is outside Turnkey
+
+Every Spark flow involves direct calls from your client to the Spark Operators (for nonce commitments, partial signatures, leaf state queries, and claim submissions) and, for some flows, to the SSP. Turnkey is not on these network paths and does not see this traffic. Your client SDK is responsible for SO and SSP communication; the Turnkey enclave is responsible for the cryptographic operations on key material. The SDK example shows where each of these responsibilities sits.
+
+## SDK example
+
+The canonical reference for integrating Turnkey with Spark is [`examples/with-spark`](https://github.com/tkhq/sdk/tree/main/examples/with-spark) in the Turnkey SDK monorepo. It contains:
+
+- A Turnkey-backed Spark signer (`TurnkeySparkSigner`) that plugs into the Spark SDK.
+- End-to-end runnable flows for deposit, transfer (send + claim), withdrawal, Lightning receive and send, and static deposit.
+- Token-operation scripts (create, mint, transfer) using the issuer SDK.
+- Comments mapping each step to the actor model above.
+
+If you're integrating Spark, start with the SDK example and refer back to this page for the conceptual model and the security notes.
 
 ## Additional resources
 
 - [Spark addressing specification](https://docs.spark.money/wallets/addressing)
-- [Spark CLI reference](https://docs.spark.money/tools/cli)
+- [Spark identity-key derivation](https://docs.spark.money/wallets/identity-key-derivation)
 - [BIP-340: Schnorr Signatures for secp256k1](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
 If you're building on Spark and have questions about integrating with Turnkey, contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).
