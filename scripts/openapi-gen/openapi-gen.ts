@@ -239,6 +239,7 @@ export const tags = ${tagsStr};`;
             );
             if (activitiesGroup) {
               activitiesGroup.pages = [
+                "api-reference/activities/overview",
                 ...uniqueActivityPaths,
               ];
               console.log(`Updated Activities paths in docs.json`);
@@ -252,7 +253,10 @@ export const tags = ${tagsStr};`;
               (item: any) => typeof item === "object" && item.group === "Queries"
             );
             if (queriesGroup) {
-              queriesGroup.pages = [...uniqueQueryPaths];
+              queriesGroup.pages = [
+                "api-reference/queries/overview",
+                ...uniqueQueryPaths,
+              ];
               console.log(`Updated Queries paths in docs.json`);
             } else {
               console.warn(
