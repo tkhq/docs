@@ -46,13 +46,8 @@ const TURNKEY_CONFIG = {
   organizationId: process.env.EXPO_PUBLIC_TURNKEY_ORGANIZATION_ID,
   apiBaseUrl: "https://api.turnkey.com",
   authProxyConfigId: process.env.EXPO_PUBLIC_TURNKEY_AUTH_PROXY_CONFIG_ID,
-  passkeyConfig: {
-    rpId: process.env.EXPO_PUBLIC_TURNKEY_RPID,
-  },
   auth: {
     otp: { email: true, sms: false },
-    passkey: true,
-    oauth: { appScheme: "wcpaydemo" },
     autoRefreshSession: true,
   },
 };
@@ -71,7 +66,7 @@ export default function App() {
 Users authenticate via email OTP. On first login, Turnkey creates a sub-organization with an Ethereum wallet:
 
 ```tsx
-import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+import { useTurnkey, OtpType } from "@turnkey/react-native-wallet-kit";
 
 const customWallet = {
   walletName: "WCPay Wallet",
@@ -91,7 +86,7 @@ function LoginScreen() {
   async function handleLogin(email: string, otpCode: string, otpId: string) {
     // Step 1: Send OTP
     const id = await initOtp({
-      otpType: "OTP_TYPE_EMAIL",
+      otpType: OtpType.Email,
       contact: email,
     });
 
@@ -99,7 +94,7 @@ function LoginScreen() {
     await completeOtp({
       otpId: id,
       otpCode,
-      otpType: "OTP_TYPE_EMAIL",
+      otpType: OtpType.Email,
       contact: email,
       createSubOrgParams: { customWallet },
     });
@@ -202,6 +197,7 @@ async function signWcPayAction(
     const result = await signMessage({
       walletAccount,
       message,
+      addEthereumPrefix: true,
     });
 
     return assembleSignature(result);
@@ -213,6 +209,7 @@ async function signWcPayAction(
 function assembleSignature(result: { r: string; s: string; v: string }): string {
   const r = (result.r.startsWith("0x") ? result.r.slice(2) : result.r).padStart(64, "0");
   const s = (result.s.startsWith("0x") ? result.s.slice(2) : result.s).padStart(64, "0");
+  if (!result.v) throw new Error("Turnkey returned empty v value in signature");
   let v = parseInt(result.v, 10);
   if (v < 27) v += 27;
   return `0x${r}${s}${v.toString(16).padStart(2, "0")}`;
