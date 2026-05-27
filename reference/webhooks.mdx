@@ -121,37 +121,10 @@ The signed message follows this format:
 v1.ed25519.<signing_key_id>.<timestamp_ms>.<event_id>.<raw_body>
 ```
 
-### Verification example
-
-```ts
-import { verifyWebhookSignature } from "@turnkey/sdk-server/webhooks";
-
-app.post(
-  "/webhooks/turnkey",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    const verified = await verifyWebhookSignature({
-      headers: req.headers,
-      rawBody: req.body,
-      verificationKeys: await loadTurnkeyWebhookVerificationKeys(),
-    });
-
-    if (!verified) {
-      return res.status(401).send("invalid signature");
-    }
-
-    const event = JSON.parse(req.body.toString("utf8"));
-
-    // Process the event idempotently.
-    res.sendStatus(204);
-  },
-);
-```
-
-Use the SDK helper to verify the headers, timestamp freshness, and raw body. The default freshness window is 5 minutes, so make sure your webhook receiver's clock is synchronized.
+To verify a delivery, reconstruct the signed message from the headers and raw body, then verify the Ed25519 signature against the signing key identified by `X-Turnkey-Signature-Key-Id`. Ensure the timestamp is within an acceptable freshness window (e.g. 5 minutes) to guard against replay attacks.
 
 <Note>
-The `verifyWebhookSignature` SDK helper and the verification key discovery endpoint are releasing soon. In the meantime, you can verify signatures manually using the signed message format and headers described above.
+An SDK verification helper and a key discovery endpoint are releasing soon to simplify this process.
 </Note>
 
 ## Payloads
