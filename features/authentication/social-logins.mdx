@@ -170,7 +170,58 @@ Some OAuth providers (like Google) encourage you to register separate client IDs
 
 If a user logs in on one platform using the web client ID, and then later logs in on another platform using a different iOS client ID, the two tokens will have different `aud` values. Because of this, Turnkey will not consider them the same identity.
 
-To ensure users are recognized consistently across platforms, you must use the same OAuth client ID everywhere. In most cases, this means using your web client ID for web, iOS, and Android flows.
+To ensure users are recognized consistently across platforms, you must either use the same OAuth web client ID everywhere, or register multiple platform identities using `oidcClaims` — see [Multi-platform OAuth identities](#multi-platform-oauth-identities) below.
+
+## Multi-platform OAuth identities
+
+When a user authenticates on a different platform, their OIDC token will have a different `aud`, and Turnkey won't match it to their existing identity. `oidcClaims` lets you pre-register additional platform audiences without requiring a token for each one — you supply the `{ iss, sub, aud }` claims directly to register additional platform identities for the same user.
+
+### How it works
+
+`oidcClaims` is available when creating sub-organizations, adding OAuth providers to existing users, or creating users. Each entry in `oauthProviders` accepts either an `oidcToken` or an `oidcClaims` object:
+
+```typescript
+// Verified — requires a signed token from the provider
+{ providerName: "Google iOS", oidcToken: "eyJhbGci..." }
+
+// Verified via the accompanying oidcToken — register additional audiences directly
+{ providerName: "Google Android", oidcClaims: { iss, sub, aud } }
+```
+
+### Example
+
+A user signs up on iOS. You receive their OIDC token, decode the `sub` and `iss`, and register all three platform identities in a single `CREATE_SUB_ORGANIZATION` call:
+
+```json
+{
+  "oauthProviders": [
+    {
+      "providerName": "Google iOS",
+      "oidcToken": "eyJhbGciOiJSUzI1NiIs..."
+    },
+    {
+      "providerName": "Google Android",
+      "oidcClaims": {
+        "iss": "https://accounts.google.com",
+        "sub": "118121659617646047510",
+        "aud": "com.yourapp.android"
+      }
+    },
+    {
+      "providerName": "Google Web",
+      "oidcClaims": {
+        "iss": "https://accounts.google.com",
+        "sub": "118121659617646047510",
+        "aud": "com.yourapp.web"
+      }
+    }
+  ]
+}
+```
+
+When the user later opens your Android or Web app and authenticates with Google, the identity is found and they're logged in.
+
+The same pattern works with `CREATE_OAUTH_PROVIDERS` to add platform identities to an existing user.
 
 ## OIDC token verification
 
