@@ -1,0 +1,401 @@
+---
+title: "Sign Frost Spark"
+description: "Perform pure FROST partial signing for a Spark wallet. Produces partial signatures without constructing operator packages."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="submit" path="spark_sign_frost" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}>
+
+Enum options: `ACTIVITY_TYPE_SPARK_SIGN_FROST`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required={true}>
+
+Timestamp (in milliseconds) of the request, used to verify liveness of user requests.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="parameters" type="object" required={true} path="parameters">
+  <p>The parameters object containing the specific intent data for this activity.</p>
+  <Expandable title="details">
+    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
+    A Spark wallet account address identifying the wallet to sign with.
+    </NestedParam>
+    
+    <ParamField body="signatures" type="array" required={true} path="parameters.signatures">
+      <p>Batched sign requests. Each produces a partial signature plus Turnkey's public commitments.</p>
+      <Expandable title="item details">
+        <ParamField body="derivation" type="object" required={true} path="parameters.signatures.derivation">
+          <p>derivation field</p>
+          <Expandable title="details">
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="identity" type="object" required={false} default="">
+            identity field
+            </NestedParam>
+            
+            <ParamField body="signingLeaf" type="object" required={false} path="parameters.signatures.derivation.signingLeaf">
+              <p>signingLeaf field</p>
+              <Expandable title="details">
+                <NestedParam parentKey="parameters.signatures.derivation.signingLeaf" childKey="leafId" type="string" required={true} default="">
+                Unique identifier for the Spark signing leaf.
+                </NestedParam>
+              </Expandable>
+            </ParamField>
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="deposit" type="object" required={false} default="">
+            deposit field
+            </NestedParam>
+            
+            <ParamField body="staticDeposit" type="object" required={false} path="parameters.signatures.derivation.staticDeposit">
+              <p>staticDeposit field</p>
+              <Expandable title="details">
+                <NestedParam parentKey="parameters.signatures.derivation.staticDeposit" childKey="index" type="number" required={true} default="">
+                Index used to derive the static deposit key.
+                </NestedParam>
+              </Expandable>
+            </ParamField>
+            <NestedParam parentKey="parameters.signatures.derivation" childKey="htlcPreimage" type="object" required={false} default="">
+            htlcPreimage field
+            </NestedParam>
+          </Expandable>
+        </ParamField>
+        <NestedParam parentKey="parameters.signatures" childKey="message" type="string" required={true} default="">
+        Hex-encoded 32-byte sighash to sign.
+        </NestedParam>
+        
+        <NestedParam parentKey="parameters.signatures" childKey="verifyingKey" type="string" required={true} default="">
+        Aggregate group verifying key (hex-encoded compressed secp256k1 point), computed as P_ops + P_user. Bound into the nonce HMAC.
+        </NestedParam>
+        
+        <ParamField body="operatorCommitments" type="array" required={true} path="parameters.signatures.operatorCommitments">
+          <p>Commitments for every non-Turnkey participant. MUST NOT include an entry under Turnkey's identifier. Bound into the nonce HMAC.</p>
+          <Expandable title="item details">
+            <NestedParam parentKey="parameters.signatures.operatorCommitments" childKey="id" type="string" required={true} default="">
+            FROST participant identifier, hex-encoded (32-byte scalar).
+            </NestedParam>
+            
+            <NestedParam parentKey="parameters.signatures.operatorCommitments" childKey="hiding" type="string" required={true} default="">
+            Hiding commitment D, hex-encoded compressed secp256k1 point.
+            </NestedParam>
+            
+            <NestedParam parentKey="parameters.signatures.operatorCommitments" childKey="binding" type="string" required={true} default="">
+            Binding commitment E, hex-encoded compressed secp256k1 point.
+            </NestedParam>
+          </Expandable>
+        </ParamField>
+        <NestedParam parentKey="parameters.signatures" childKey="adaptorPublicKey" type="string" required={false} default="">
+        Optional adaptor point T (hex-encoded 33-byte compressed secp256k1 pubkey). When set, Turnkey produces a Schnorr adaptor pre-signature with the FROST challenge bound to `R+T` (where `R` is the aggregate group nonce commitment from FROST). The party holding the discrete log `t` completes the pre-sig to a valid BIP-340 signature by adding `t` (or `-t`, for parity) to the signature scalar `s`. This is primarily used by Spark leaves-swap and other adaptor-bound flows; absent or empty leads to plain FROST signing (the typical case).
+        </NestedParam>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="activity" type="object" required={true}>
+  The activity object containing type, intent, and result
+  <Expandable title="activity details">
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+The activity type
+</NestedParam>
+<NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
+      The intent of the activity
+      <Expandable title="intent details">
+        <NestedParam parentKey="activity.intent" childKey="sparkSignFrostIntent" type="object" required={true}>
+      The sparkSignFrostIntent object
+      <Expandable title="sparkSignFrostIntent details">
+        <NestedParam parentKey="activity.intent.sparkSignFrostIntent" childKey="signWith" type="string" required={true}>
+A Spark wallet account address identifying the wallet to sign with.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent" childKey="signatures" type="array" required={true}>
+      Batched sign requests. Each produces a partial signature plus Turnkey's public commitments.
+      <Expandable title="signatures details">
+        <NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures" childKey="derivation" type="object" required={true}>
+      derivation field
+      <Expandable title="derivation details">
+        <NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation" childKey="identity" type="object" required={false}>
+identity field
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation" childKey="signingLeaf" type="object" required={false}>
+      signingLeaf field
+      <Expandable title="signingLeaf details">
+        <NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation.signingLeaf" childKey="leafId" type="string" required={true}>
+Unique identifier for the Spark signing leaf.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation" childKey="deposit" type="object" required={false}>
+deposit field
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation" childKey="staticDeposit" type="object" required={false}>
+      staticDeposit field
+      <Expandable title="staticDeposit details">
+        <NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation.staticDeposit" childKey="index" type="number" required={true}>
+Index used to derive the static deposit key.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.derivation" childKey="htlcPreimage" type="object" required={false}>
+htlcPreimage field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures" childKey="message" type="string" required={true}>
+Hex-encoded 32-byte sighash to sign.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures" childKey="verifyingKey" type="string" required={true}>
+Aggregate group verifying key (hex-encoded compressed secp256k1 point), computed as P_ops + P_user. Bound into the nonce HMAC.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures" childKey="operatorCommitments" type="array" required={true}>
+      Commitments for every non-Turnkey participant. MUST NOT include an entry under Turnkey's identifier. Bound into the nonce HMAC.
+      <Expandable title="operatorCommitments details">
+        <NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.operatorCommitments" childKey="id" type="string" required={true}>
+FROST participant identifier, hex-encoded (32-byte scalar).
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.operatorCommitments" childKey="hiding" type="string" required={true}>
+Hiding commitment D, hex-encoded compressed secp256k1 point.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures.operatorCommitments" childKey="binding" type="string" required={true}>
+Binding commitment E, hex-encoded compressed secp256k1 point.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.sparkSignFrostIntent.signatures" childKey="adaptorPublicKey" type="string" required={false}>
+Optional adaptor point T (hex-encoded 33-byte compressed secp256k1 pubkey). When set, Turnkey produces a Schnorr adaptor pre-signature with the FROST challenge bound to `R+T` (where `R` is the aggregate group nonce commitment from FROST). The party holding the discrete log `t` completes the pre-sig to a valid BIP-340 signature by adding `t` (or `-t`, for parity) to the signature scalar `s`. This is primarily used by Spark leaves-swap and other adaptor-bound flows; absent or empty leads to plain FROST signing (the typical case).
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="result" type="object" required={true}>
+      The result of the activity
+      <Expandable title="result details">
+        <NestedParam parentKey="activity.result" childKey="sparkSignFrostResult" type="object" required={true}>
+      The sparkSignFrostResult object
+      <Expandable title="sparkSignFrostResult details">
+        <NestedParam parentKey="activity.result.sparkSignFrostResult" childKey="signatures" type="array" required={true}>
+      Partial signatures plus Turnkey commitments, one per request, in order.
+      <Expandable title="signatures details">
+        <NestedParam parentKey="activity.result.sparkSignFrostResult.signatures" childKey="signatureShare" type="string" required={true}>
+Hex-encoded FROST partial signature.
+</NestedParam>
+<NestedParam parentKey="activity.result.sparkSignFrostResult.signatures" childKey="hiding" type="string" required={true}>
+Turnkey's hiding commitment D (hex-encoded compressed secp256k1 point). Forward to the Spark Operator.
+</NestedParam>
+<NestedParam parentKey="activity.result.sparkSignFrostResult.signatures" childKey="binding" type="string" required={true}>
+Turnkey's binding commitment E (hex-encoded compressed secp256k1 point). Forward to the Spark Operator.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/spark_sign_frost \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_SPARK_SIGN_FROST",
+    "timestampMs": "<string> (e.g. 1746736509954)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "signWith": "<string>",
+        "signatures": [
+            {
+                "derivation": {
+                    "identity": "<object>",
+                    "signingLeaf": {
+                        "leafId": "<string>"
+                    },
+                    "deposit": "<object>",
+                    "staticDeposit": {
+                        "index": "<number>"
+                    },
+                    "htlcPreimage": "<object>"
+                },
+                "message": "<string>",
+                "verifyingKey": "<string>",
+                "operatorCommitments": [
+                    {
+                        "id": "<string>",
+                        "hiding": "<string>",
+                        "binding": "<string>"
+                    }
+                ],
+                "adaptorPublicKey": "<string>"
+            }
+        ]
+    }
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().sparkSignFrost({
+  signWith: "<string> (A Spark wallet account address identifying the wallet to sign with.)",
+  signatures: [{ // Batched sign requests. Each produces a partial signature plus Turnkey's public commitments.,
+    derivation: { // derivation field,
+      identity: { /* object */ } // identity field,
+      signingLeaf: { // signingLeaf field,
+        leafId: "<string> (Unique identifier for the Spark signing leaf.)",
+      },
+      deposit: { /* object */ } // deposit field,
+      staticDeposit: { // staticDeposit field,
+        index: 0 // Index used to derive the static deposit key.,
+      },
+      htlcPreimage: { /* object */ } // htlcPreimage field,
+    },
+    message: "<string> (Hex-encoded 32-byte sighash to sign.)",
+    verifyingKey: "<string> (Aggregate group verifying key (hex-encoded compressed secp256k1 point), computed as P_ops + P_user. Bound into the nonce HMAC.)",
+    operatorCommitments: [{ // Commitments for every non-Turnkey participant. MUST NOT include an entry under Turnkey's identifier. Bound into the nonce HMAC.,
+      id: "<string> (FROST participant identifier, hex-encoded (32-byte scalar).)",
+      hiding: "<string> (Hiding commitment D, hex-encoded compressed secp256k1 point.)",
+      binding: "<string> (Binding commitment E, hex-encoded compressed secp256k1 point.)",
+    }],
+    adaptorPublicKey: "<string> (Optional adaptor point T (hex-encoded 33-byte compressed secp256k1 pubkey). When set, Turnkey produces a Schnorr adaptor pre-signature with the FROST challenge bound to `R+T` (where `R` is the aggregate group nonce commitment from FROST). The party holding the discrete log `t` completes the pre-sig to a valid BIP-340 signature by adding `t` (or `-t`, for parity) to the signature scalar `s`. This is primarily used by Spark leaves-swap and other adaptor-bound flows; absent or empty leads to plain FROST signing (the typical case).)",
+  }]
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_SPARK_SIGN_FROST",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g. 1746736509954)",
+    "result": {
+      "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
+        "type": "<string>",
+        "intent": {
+          "sparkSignFrostIntent": {
+            "signWith": "<string>",
+            "signatures": [
+              {
+                "derivation": {
+                  "identity": "<object>",
+                  "signingLeaf": {
+                    "leafId": "<string>"
+                  },
+                  "deposit": "<object>",
+                  "staticDeposit": {
+                    "index": "<number>"
+                  },
+                  "htlcPreimage": "<object>"
+                },
+                "message": "<string>",
+                "verifyingKey": "<string>",
+                "operatorCommitments": [
+                  {
+                    "id": "<string>",
+                    "hiding": "<string>",
+                    "binding": "<string>"
+                  }
+                ],
+                "adaptorPublicKey": "<string>"
+              }
+            ]
+          }
+        },
+        "result": {
+          "sparkSignFrostResult": {
+            "signatures": [
+              {
+                "signatureShare": "<string>",
+                "hiding": "<string>",
+                "binding": "<string>"
+              }
+            ]
+          }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>

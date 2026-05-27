@@ -1,6 +1,6 @@
 ---
 title: "Spark prepare Lightning receive"
-description: "Generate a random payment preimage inside the Turnkey enclave, Feldman-split it for Spark Operators, and return only the payment hash — the raw preimage never leaves the enclave."
+description: "Generate a Lightning preimage and distribute Feldman shares to operators for a Spark Lightning receive. Does not perform FROST signing."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -33,23 +33,25 @@ Unique identifier for a given Organization.
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
-    The Spark address of the receiving identity. Determines the enclave context in which the preimage is generated.
+    A Spark wallet account address identifying the wallet.
     </NestedParam>
-
+    
     <ParamField body="lightningReceive" type="object" required={true} path="parameters.lightningReceive">
-      <p>Configuration for the Lightning receive operation: how many Spark Operators share the preimage and who they are.</p>
-      <Expandable title="lightningReceive details">
+      <p>lightningReceive field</p>
+      <Expandable title="details">
         <NestedParam parentKey="parameters.lightningReceive" childKey="threshold" type="number" required={true} default="">
-          The Shamir secret sharing threshold — the minimum number of Spark Operators that must cooperate to reconstruct the preimage. Must be ≤ the number of `operatorRecipients`.
+        Feldman VSS threshold for reconstructing the preimage.
         </NestedParam>
+        
         <ParamField body="operatorRecipients" type="array" required={true} path="parameters.lightningReceive.operatorRecipients">
-          <p>The Spark Operators that will each hold an encrypted Feldman share of the preimage. When a Lightning payment arrives, threshold operators reconstruct the preimage and reveal it to the Spark Service Provider (SSP) to settle the payment.</p>
+          <p>Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list.</p>
           <Expandable title="item details">
             <NestedParam parentKey="parameters.lightningReceive.operatorRecipients" childKey="operatorId" type="string" required={true} default="">
-              The Spark Operator identifier (e.g. `"SO1"`).
+            Spark operator identifier (UUID).
             </NestedParam>
+            
             <NestedParam parentKey="parameters.lightningReceive.operatorRecipients" childKey="encryptionPublicKey" type="string" required={true} default="">
-              The operator's ECIES encryption public key, hex-encoded. The enclave uses this key to encrypt the operator's Feldman share so only that operator can decrypt it.
+            Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point).
             </NestedParam>
           </Expandable>
         </ParamField>
@@ -57,12 +59,6 @@ Unique identifier for a given Organization.
     </ParamField>
   </Expandable>
 </ParamField>
-
-<ParamField body="generateAppProofs" type="boolean" required={false}>
-
-Enable to have your activity generate and return App Proofs, enabling verifiability.
-</ParamField>
-
 
 <H3Bordered text="Response" />
 A successful response returns the following fields:
@@ -89,13 +85,33 @@ The activity type
       The sparkPrepareLightningReceiveIntent object
       <Expandable title="sparkPrepareLightningReceiveIntent details">
         <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent" childKey="signWith" type="string" required={true}>
-The Spark address of the receiving identity.
+A Spark wallet account address identifying the wallet.
 </NestedParam>
 <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent" childKey="lightningReceive" type="object" required={true}>
-The Lightning receive configuration submitted.
+      lightningReceive field
+      <Expandable title="lightningReceive details">
+        <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive" childKey="threshold" type="number" required={true}>
+Feldman VSS threshold for reconstructing the preimage.
 </NestedParam>
+<NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive" childKey="operatorRecipients" type="array" required={true}>
+      Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list.
+      <Expandable title="operatorRecipients details">
+        <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive.operatorRecipients" childKey="operatorId" type="string" required={true}>
+Spark operator identifier (UUID).
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive.operatorRecipients" childKey="encryptionPublicKey" type="string" required={true}>
+Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point).
+</NestedParam>
+
       </Expandable>
     </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
       </Expandable>
     </NestedParam>
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
@@ -105,21 +121,24 @@ The Lightning receive configuration submitted.
       The sparkPrepareLightningReceiveResult object
       <Expandable title="sparkPrepareLightningReceiveResult details">
         <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult" childKey="operatorPackages" type="array" required={true}>
-      One encrypted package per Spark Operator containing that operator's Feldman share of the preimage, ECIES-encrypted to the operator's encryption public key. Submit each package to its corresponding operator so they can reconstruct the preimage when the Lightning payment arrives.
+      Per-operator ECIES-encrypted Feldman share packages.
       <Expandable title="operatorPackages details">
         <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult.operatorPackages" childKey="operatorId" type="string" required={true}>
-The Spark Operator identifier this package is addressed to.
+Spark operator identifier (UUID).
 </NestedParam>
 <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult.operatorPackages" childKey="encryptedPackage" type="string" required={true}>
-The ECIES-encrypted preimage share for this operator, hex-encoded.
+ECIES ciphertext (hex-encoded) opaque to Turnkey after emission.
 </NestedParam>
+
       </Expandable>
     </NestedParam>
 <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult" childKey="paymentHash" type="string" required={true}>
-`SHA256(preimage)`, hex-encoded as a 32-byte value. Use this to construct a BOLT11 Lightning invoice. The raw preimage is never returned — it remains inside the enclave and is split across the Spark Operators.
+Hex-encoded SHA256(preimage). Forward to the Lightning node.
 </NestedParam>
+
       </Expandable>
     </NestedParam>
+
       </Expandable>
     </NestedParam>
 <NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
@@ -157,12 +176,14 @@ curl --request POST \
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "signWith": "<spark-address>",
+        "signWith": "<string>",
         "lightningReceive": {
-            "threshold": 2,
+            "threshold": "<number>",
             "operatorRecipients": [
-                { "operatorId": "SO1", "encryptionPublicKey": "<so1-pubkey-hex>" },
-                { "operatorId": "SO2", "encryptionPublicKey": "<so2-pubkey-hex>" }
+                {
+                    "operatorId": "<string>",
+                    "encryptionPublicKey": "<string>"
+                }
             ]
         }
     }
@@ -180,19 +201,15 @@ const turnkeyClient = new Turnkey({
 });
 
 const response = await turnkeyClient.apiClient().sparkPrepareLightningReceive({
-  signWith: "<spark-address>",
-  lightningReceive: {
-    threshold: 2,
-    operatorRecipients: [
-      { operatorId: "SO1", encryptionPublicKey: "<so1-pubkey-hex>" },
-      { operatorId: "SO2", encryptionPublicKey: "<so2-pubkey-hex>" },
-    ],
-  },
+  signWith: "<string> (A Spark wallet account address identifying the wallet.)",
+  lightningReceive: { // lightningReceive field,
+    threshold: 0 // Feldman VSS threshold for reconstructing the preimage.,
+    operatorRecipients: [{ // Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list.,
+      operatorId: "<string> (Spark operator identifier (UUID).)",
+      encryptionPublicKey: "<string> (Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point).)",
+    }],
+  }
 });
-
-// Use the returned paymentHash to construct a BOLT11 invoice.
-// The raw preimage never leaves the enclave.
-console.log("Payment hash:", response.paymentHash);
 ```
 
 </RequestExample>
@@ -215,17 +232,27 @@ console.log("Payment hash:", response.paymentHash);
         "type": "<string>",
         "intent": {
           "sparkPrepareLightningReceiveIntent": {
-            "signWith": "<spark-address>",
-            "lightningReceive": "<object>"
+            "signWith": "<string>",
+            "lightningReceive": {
+              "threshold": "<number>",
+              "operatorRecipients": [
+                {
+                  "operatorId": "<string>",
+                  "encryptionPublicKey": "<string>"
+                }
+              ]
+            }
           }
         },
         "result": {
           "sparkPrepareLightningReceiveResult": {
             "operatorPackages": [
-              { "operatorId": "SO1", "encryptedPackage": "<hex>" },
-              { "operatorId": "SO2", "encryptedPackage": "<hex>" }
+              {
+                "operatorId": "<string>",
+                "encryptedPackage": "<string>"
+              }
             ],
-            "paymentHash": "<32-byte-hex>"
+            "paymentHash": "<string>"
           }
         },
         "votes": "<array>",

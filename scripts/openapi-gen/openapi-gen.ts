@@ -16,7 +16,7 @@ import {
   formatApiEndpoints,
   ApiEndpointParserResult,
 } from "./utils/endpoint-parser";
-import { generateMdxFile } from "./utils/mdx-generator";
+import { generateMdxFile, generateAuthProxyMdxFile } from "./utils/mdx-generator";
 import path from "path";
 import fs from "fs";
 
@@ -139,23 +139,40 @@ export const tags = ${tagsStr};`;
       fs.mkdirSync(absoluteMdxOutputDir, { recursive: true });
       console.log(`Endpoint count: ${endpointResult.endpoints.length}`);
 
+      // In auth-proxy mode, build a set of endpoint paths to skip — those for which
+      // a higher-versioned sibling exists (e.g. skip /v1/otp_init when /v1/otp_init_v2 is present).
+      const skipEndpointPaths = new Set<string>();
+      if (options.authProxy) {
+        const versionSuffix = /_v(\d+)$/;
+        const allPaths = endpointResult.endpoints.map((e) => e.path);
+        for (const p of allPaths) {
+          const base = p.replace(versionSuffix, "");
+          if (base !== p) {
+            // This is a versioned path — mark the unversioned base (v1) for skipping
+            skipEndpointPaths.add(base);
+          }
+        }
+      }
+
       // Collect generated MDX paths for docs.json update
       const activityPaths: string[] = [];
       const queryPaths: string[] = [];
+      const authProxyPaths: string[] = [];
 
       for (const endpoint of endpointResult.endpoints) {
-        // Pass the mdxAddOnly flag and capture the generated path
-        const generatedPath = generateMdxFile(
-          endpoint,
-          absoluteMdxOutputDir,
-          options.mdxAddOnly
-        );
+        if (skipEndpointPaths.has(endpoint.path)) continue;
+        // Use the auth-proxy generator when --auth-proxy is set, main generator otherwise
+        const generatedPath = options.authProxy
+          ? generateAuthProxyMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly)
+          : generateMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly);
 
         if (generatedPath) {
           // Construct the full path needed for docs.json
-          const fullDocsPath = path.join("api-reference", generatedPath);
+          const fullDocsPath = path.join(relativeMdxBaseDir, generatedPath);
 
-          if (endpoint.type === "activity") {
+          if (options.authProxy) {
+            authProxyPaths.push(fullDocsPath);
+          } else if (endpoint.type === "activity") {
             activityPaths.push(fullDocsPath);
           } else if (endpoint.type === "query") {
             queryPaths.push(fullDocsPath);
@@ -171,26 +188,16 @@ export const tags = ${tagsStr};`;
         const docsJsonContent = fs.readFileSync(docsJsonPath, "utf-8");
 
         const docsConfig = JSON.parse(docsJsonContent);
-        // console.log("docsConfig", docsConfig.navigation);
-        // Define overview paths
-        const activityOverviewPath = path.join(
-          relativeMdxBaseDir,
-          "activities",
-          "overview"
-        );
-        const queryOverviewPath = path.join(
-          relativeMdxBaseDir,
-          "queries",
-          "overview"
-        );
 
         // Remove duplicates before sorting
         const uniqueActivityPaths = [...new Set(activityPaths)];
         const uniqueQueryPaths = [...new Set(queryPaths)];
+        const uniqueAuthProxyPaths = [...new Set(authProxyPaths)];
 
         // Sort generated paths alphabetically
         uniqueActivityPaths.sort();
         uniqueQueryPaths.sort();
+        uniqueAuthProxyPaths.sort();
 
         // --- Find and Update Navigation ---
         // Check if docsConfig.navigation is an array before proceeding
@@ -198,47 +205,68 @@ export const tags = ${tagsStr};`;
           console.error(
             `Error: Expected 'docs.json' to have a top-level 'navigation' array.`
           );
-          throw new Error("'docs.json' structure is not as expected."); // Or handle more gracefully
+          throw new Error("'docs.json' structure is not as expected.");
         }
 
-        // Find the API Reference tab
+        // Find the API & SDK reference tab
         const apiRefTab = docsConfig.navigation.tabs.find(
-          (item: any) => item.tab === "API reference"
+          (item: any) => item.tab === "API & SDK reference"
         );
 
-        if (apiRefTab && Array.isArray(apiRefTab.pages)) {
-          // Find and update Activities group
-          const activitiesGroup = apiRefTab.pages.find(
-            (item: any) =>
-              typeof item === "object" && item.group === "Activities"
-          );
-          if (activitiesGroup) {
-            activitiesGroup.pages = [
-              activityOverviewPath,
-              ...uniqueActivityPaths,
-            ];
-            console.log(`Updated Activities paths in docs.json`);
-          } else {
-            console.warn(
-              `Could not find 'Activities' group in docs.json under 'API Reference'`
-            );
-          }
+        // Activities and Queries live inside the "REST API" group within the tab
+        const restApiGroup = apiRefTab?.pages?.find(
+          (item: any) => typeof item === "object" && item.group === "REST API"
+        );
 
-          // Find and update Queries group
-          const queriesGroup = apiRefTab.pages.find(
-            (item: any) => typeof item === "object" && item.group === "Queries"
-          );
-          if (queriesGroup) {
-            queriesGroup.pages = [queryOverviewPath, ...uniqueQueryPaths];
-            console.log(`Updated Queries paths in docs.json`);
-          } else {
-            console.warn(
-              `Could not find 'Queries' group in docs.json under 'API Reference - V2'`
+        if (restApiGroup && Array.isArray(restApiGroup.pages)) {
+          if (options.authProxy && options.navGroup) {
+            // Auth-proxy mode: find or create the named nav group and set its pages
+            let navGroup = restApiGroup.pages.find(
+              (item: any) => typeof item === "object" && item.group === options.navGroup
             );
+            if (!navGroup) {
+              navGroup = { group: options.navGroup, pages: [] };
+              restApiGroup.pages.push(navGroup);
+              console.log(`Created new nav group '${options.navGroup}' in docs.json`);
+            }
+            navGroup.pages = uniqueAuthProxyPaths;
+            console.log(`Updated '${options.navGroup}' paths in docs.json`);
+          } else {
+            // Standard mode: update Activities and Queries groups
+            const activitiesGroup = restApiGroup.pages.find(
+              (item: any) =>
+                typeof item === "object" && item.group === "Activities"
+            );
+            if (activitiesGroup) {
+              activitiesGroup.pages = [
+                "api-reference/activities/overview",
+                ...uniqueActivityPaths,
+              ];
+              console.log(`Updated Activities paths in docs.json`);
+            } else {
+              console.warn(
+                `Could not find 'Activities' group in docs.json under 'REST API'`
+              );
+            }
+
+            const queriesGroup = restApiGroup.pages.find(
+              (item: any) => typeof item === "object" && item.group === "Queries"
+            );
+            if (queriesGroup) {
+              queriesGroup.pages = [
+                "api-reference/queries/overview",
+                ...uniqueQueryPaths,
+              ];
+              console.log(`Updated Queries paths in docs.json`);
+            } else {
+              console.warn(
+                `Could not find 'Queries' group in docs.json under 'REST API'`
+              );
+            }
           }
         } else {
           console.warn(
-            `Could not find 'API Reference - V2' tab in docs.json navigation`
+            `Could not find 'REST API' group in 'API & SDK reference' tab in docs.json navigation`
           );
         }
 

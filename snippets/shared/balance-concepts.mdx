@@ -6,23 +6,32 @@
 
 Turnkey provides two complementary tools for tracking onchain balances:
 
-- **Balances API**: query the current balances for a given address on a specific chain, across all supported assets for that chain.
-- **Balance webhooks**: receive notifications whenever a transaction that includes a balance change is first seen in a block onchain.
+- **Balances API**: query the current balances for a given address on a specific chain, across all
+  supported assets for that chain.
+- **Balance webhooks**: receive notifications when a transaction that includes a balance change is
+  first seen in a block onchain (`"balances:confirmed"`), or when the containing block has reached
+  the finalization threshold (`"balances:finalized"`).
 
 ## Concepts
 
 ### Balances API
 
-The [Get Balances](/api-reference/queries/get-balances) endpoint returns all non-zero balances for a given address on a specified chain. You can also call [List Supported Assets](/api-reference/queries/list-supported-assets) to retrieve the full catalog of assets available for querying on a given chain, including a logo URL for each asset.
+The [Get Balances](/api-reference/queries/get-balances) endpoint returns all non-zero balances for a
+given address on a specified chain. You can also call
+[List Supported Assets](/api-reference/queries/list-supported-assets) to retrieve the full catalog
+of assets available for querying on a given chain, including a logo URL for each asset.
 
-Each balance entry includes the asset metadata (symbol, name, decimals, and CAIP-19 identifier) and the current amount held at the address.
+Each balance entry includes the asset metadata (symbol, name, decimals, and CAIP-19 identifier) and
+the current amount held at the address.
 
 <Tip>
-  See the [with-balances](https://github.com/tkhq/sdk/tree/main/examples/with-balances) SDK example for a working integration.
+  See the [with-balances](https://github.com/tkhq/sdk/tree/main/examples/with-balances) SDK example
+  for a working integration.
 </Tip>
 
 <Note>
-  The address must belong to a wallet account in your organization. Private key addresses are not supported.
+  The address must belong to a wallet account in your organization. Private key addresses are not
+  supported.
 </Note>
 
 #### Supported chains
@@ -48,22 +57,36 @@ Each balance entry includes the asset metadata (symbol, name, decimals, and CAIP
 
 ### Webhooks
 
-Turnkey Webhooks let you react to balance changes in real time, without polling. Instead of repeatedly calling the Get Balances API to check for updates, you register an endpoint and Turnkey pushes the data to you; an HTTP POST fires when a supported asset transfer is first confirmed in a block onchain. Webhook payloads deliver balance diffs as soon as a transaction is confirmed in a block. Combined with the Balance APIs, you have everything you need to keep your application's balances up to date without building your own indexing/polling infrastructure or relying on another third party.
+Turnkey Webhooks let you react to balance changes in real time, without polling. Instead of
+repeatedly calling the [Get Balances](/api-reference/queries/get-balances) API to check for updates,
+you register an endpoint and Turnkey pushes the data to you; an HTTP POST fires when a supported
+asset transfer is first confirmed in a block onchain. Webhook payloads deliver balance diffs as soon
+as a transaction is confirmed in a block. Combined with the Balance APIs, you have everything you
+need to keep your application's balances up to date without building your own indexing/polling
+infrastructure or relying on another third party.
 
-You subscribe to webhooks at the parent organization level. Subscriptions cover wallet-account addresses across the parent organization and all of its sub-organizations. In other words, once you subscribe you'll receive webhook notifications for all the addresses within your entire Turnkey instance.
+You subscribe to webhooks at the parent organization level. Subscriptions cover wallet-account
+addresses across the parent organization and all of its sub-organizations. In other words, once you
+subscribe you'll receive webhook notifications for all the addresses within your entire Turnkey
+instance.
 
 <Note>
-  Webhook delivery does **not** mean the transaction is finalized. A chain reorganization could still occur and the transaction may be removed from the canonical chain. Support for finalized webhook events will be added before this feature exits closed beta.
+  Webhook delivery does **not** mean the transaction is finalized. A chain reorganization could
+  still occur and the transaction may be removed from the canonical chain. Support for finalized
+  webhook events will be added before this feature exits closed beta.
 </Note>
 
 #### Subscribing
 
-Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the `BALANCE_CONFIRMED_UPDATES` event type to register your endpoint. Create the webhook endpoint on the parent organization. Balance webhook delivery is scoped to wallet-account addresses within your parent organization and its sub-organizations. This includes both addresses generated through Turnkey and addresses imported into your Turnkey organization.
+Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the
+`BALANCE_CONFIRMED_UPDATES` event type to register your endpoint. Create the webhook endpoint on the
+parent organization. Balance webhook delivery is scoped to wallet-account addresses within your
+parent organization and its sub-organizations. This includes both addresses generated through
+Turnkey and addresses imported into your Turnkey organization.
 
 #### Supported chains
 
 Balance webhooks are currently supported on:
-
 
 **EVM:**
 
@@ -86,60 +109,63 @@ Balance webhooks are currently supported on:
 
 #### Delivery payload
 
-Each delivery corresponds to a single balance-change event: one address, one operation (`deposit` or `withdraw`), and one asset. Because a single transaction can affect multiple addresses or assets, it may produce multiple webhook deliveries — each with its own `idempotencyKey`.
+Each delivery corresponds to a single balance-change event: one address, one operation (`deposit` or
+`withdraw`), and one asset. Because a single transaction can affect multiple addresses or assets, it
+may produce multiple webhook deliveries — each with its own `idempotencyKey`.
 
 Example:
 
 ```json
 {
   "type": "balances:confirmed",
+  "organizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
+  "parentOrganizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
   "msg": {
     "operation": "deposit",
-    "caip2": "eip155:1",
-    "txHash": "0x1e126f617337ba40dd3f5f3f98047077364f489711bf6c954ebe86e38d89ffff",
-    "address": "0x51e217d00473aaf5bcd7f741ee3c88c865fdffff",
-    "orgID": "7298cfe0-4dab-40a2-afeb-4a4c2eaaffff",
-    "parentOrgID": "7298cfe0-4dab-40a2-afeb-4a4c2eaaffff",
-    "idempotencyKey": "e3ab173e2cce8ef889eb8aba5828815b863c104b696ceac42935faebf8da01a0",
+    "caip2": "eip155:8453",
+    "txHash": "0x5b6901be92e69781a7ce401dd9a2910e1f49aa77a5bdedcd2a23c8d563d88b24",
+    "address": "0x3400e577153101863f39ba41f7fd49bbea011628",
+    "idempotencyKey": "d3b8cef0ad7479433783c5707da9ded4fee9b254b4638f44758a2141c49416b7:balances:confirmed",
     "asset": {
-      "symbol": "USDC",
-      "name": "USDC",
-      "decimals": 6,
-      "caip19": "eip155:1/erc20:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-      "amount": "10000"
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "decimals": 18,
+      "caip19": "eip155:8453/slip44:60",
+      "amount": "4793760441409"
     },
     "block": {
-      "number": 24800082,
-      "hash": "0xcd1bc886a98854b46c4bf0e8c56797eae26d4f1eb43c314998b270eb317b3ba7",
-      "timestamp": "2026-04-03T15:44:11Z"
+      "number": 46343814,
+      "hash": "0x41a4e8d444e5410f83c1ac35c838c7d8be1e3d6f32a35a04c72096adae74d095",
+      "timestamp": "2026-05-22T19:09:35Z"
     }
   }
 }
 ```
 
-| **Field**        | **Description**                                                                                                                                                   |
-| :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`           | Always `"balances:confirmed"` for balance change events.                                                                                                          |
-| `operation`      | Either `"deposit"` (incoming) or `"withdraw"` (outgoing).                                                                                                         |
-| `caip2`          | The chain identifier where the event occurred.                                                                                                                    |
-| `txHash`         | The transaction hash that triggered the balance change.                                                                                                           |
-| `address`        | The address whose balance changed.                                                                                                                                |
-| `orgID`          | The organization ID that owns the address.                                                                                                                        |
-| `parentOrgID`    | The parent organization ID.                                                                                                                                       |
-| `idempotencyKey` | A stable, unique key for this event. Use this to safely deduplicate webhook deliveries.                                                                           |
-| `asset`          | Asset metadata: symbol, name, decimals, CAIP-19 identifier, and the amount transferred (in the asset's decimals). Webhooks are emitted only for supported assets. |
-| `block`          | Block number, hash, and timestamp of the block in which the transaction was first seen.                                                                           |
+| **Field**              | **Description**                                                                                                                                                   |
+| :--------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`                 | `"balances:confirmed"` for when a balance change is first seen on-chain, or `"balances:finalized"` when the associated block has the finalization threshold.      |
+| `organizationId`       | The organization ID that owns the address.                                                                                                                        |
+| `parentOrganizationId` | The parent organization ID.                                                                                                                                       |
+| `msg`                  | Object containing the balance change details.                                                                                                                     |
+| `msg.operation`        | Either `"deposit"` (incoming) or `"withdraw"` (outgoing).                                                                                                         |
+| `msg.caip2`            | The chain identifier where the event occurred.                                                                                                                    |
+| `msg.txHash`           | The transaction hash that triggered the balance change.                                                                                                           |
+| `msg.address`          | The address whose balance changed.                                                                                                                                |
+| `msg.idempotencyKey`   | A stable, unique key for this event. Use this to safely deduplicate webhook deliveries.                                                                           |
+| `msg.asset`            | Asset metadata: symbol, name, decimals, CAIP-19 identifier, and the amount transferred (in the asset's decimals). Webhooks are emitted only for supported assets. |
+| `msg.block`            | Block number, hash, and timestamp of the block in which the transaction was first seen.                                                                           |
 
 <Tip>
-  See the [with-balance-confirmed-webhooks](https://github.com/tkhq/sdk/tree/main/examples/with-balance-confirmed-webhooks) SDK example for a working integration.
+  See the [with-tx-webhooks](https://github.com/tkhq/sdk/tree/main/examples/with-tx-webhooks) SDK
+  example for a working integration.
 </Tip>
 
 #### Limitations
 
 <Note>
-  Balance webhooks fire only for assets in the [supported asset list](/api-reference/queries/list-supported-assets).
+  Balance webhooks fire only for assets in the [supported asset
+  list](/api-reference/queries/list-supported-assets).
 </Note>
 
-<Note>
-  Balance webhooks are not supported for private keys.
-</Note>
+<Note>Balance webhooks are not supported for private keys.</Note>

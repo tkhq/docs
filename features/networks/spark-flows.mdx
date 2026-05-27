@@ -1,0 +1,567 @@
+---
+title: "Spark flows"
+sidebarTitle: "Flows"
+description: "Step-by-step reference for every Turnkey-integrated Spark operation: deposits, withdrawals, transfers, Lightning receives, and exits."
+---
+
+This page documents each Spark flow in detail, showing exactly which Turnkey API activities are called at each step and what happens inside the enclave. In almost all flows, private key material and secret shares remain inside the Turnkey enclave and never reach client code.
+
+> **Exception — Static Deposits:** The [Static Deposit Setup flow](#7-static-deposit-bitcoin-l1--spark-reusable-address) requires exporting the static deposit private key from the enclave so the SSP can co-sign deposits while your wallet is offline. This is the only Spark flow that uses `EXPORT_WALLET_ACCOUNT`. See [Step 2 of Flow 7](#step-2--export-static-deposit-key-to-ssp) for the full security note.
+
+For quick-reference code examples, see the [Spark network overview](/features/networks/spark).
+
+---
+
+## Spark Context: Understanding SOs, SSPs, and the SE
+
+Spark leaves are jointly controlled by your identity key and the Spark Operator collective (the SE), using [FROST threshold signing](https://docs.spark.money/learn/frost-signing). SOs never hold your complete key — they hold threshold shares — and the protocol is designed around a [1-of-n trust assumption](https://docs.spark.money/learn/trust-model): as long as one operator is honest, funds cannot be stolen. The worst case if all operators are unavailable is that you cannot transact, not that funds are lost.
+
+- **SO (Spark Operator):** One node in the operator collective that holds a threshold key share for every leaf. The current operators are **Lightspark** and **Flashnet**.
+- **SE (Spark Entity):** The collective of all SOs acting together. FROST threshold signing requires a quorum of the SE to authorise any leaf operation.
+- **SSP (Spark Service Provider):** An application-layer service (e.g. a wallet backend or exchange) that coordinates flows on your behalf — routing Lightning payments, processing static deposits, and submitting transfers. The SSP has no key-share authority over leaves; it relies on the SOs for that.
+
+For full definitions see [Spark core concepts](https://docs.spark.money/spark/core-concepts). For a deeper protocol walkthrough, see the [Spark technical overview](https://www.spark.money/technical-overview).
+
+**SO communication happens outside Turnkey.** Steps labeled **SO call** or **SSP call** throughout this page are direct client-to-operator API calls — Turnkey is not involved in those steps. Turnkey only handles the enclave key operations (`SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER`, etc.). For a working example of how to wire the Turnkey signer into the Spark SDK, refer to the JS code example provided with your Spark integration.
+
+---
+
+## 1. Deposit: Bitcoin L1 → Spark
+
+**Turnkey activities:** `CREATE_WALLET_ACCOUNTS` ×1, `SPARK_SIGN_FROST` ×1 (batch of 2)
+
+### Step 1 — Derive deposit key
+
+Call [`CREATE_WALLET_ACCOUNTS`](/api-reference/activities/create-wallet-accounts) to derive and register a single-use deposit key in the enclave:
+
+```json
+{
+  "walletId": "<spark-wallet-id>",
+  "accounts": [{
+    "curve": "CURVE_SECP256K1",
+    "pathFormat": "PATH_FORMAT_BIP32",
+    "path": "m/8797555'/0'/2'",
+    "addressFormat": "ADDRESS_FORMAT_COMPRESSED"
+  }]
+}
+```
+
+The response contains the compressed deposit public key. This account now exists in Turnkey and can be referenced in future signing calls. Each deposit key should only receive a single deposit — the exit transactions signed in Step 6 reference a specific UTXO, so a second deposit to the same address would arrive without pre-signed exit protection.
+
+Replace `0'/2'` with `N'/2'` where `N` is your account index. The path `m/8797555'/0'/2'` is for account 0.
+
+### Step 2 — Get SO public key shares
+
+> **SO call:** Request SO public key shares for this deposit leaf. The SOs respond with their key share, which you combine with your deposit public key to compute the aggregate Taproot address. See [Deposits from L1](https://docs.spark.money/learn/deposits).
+
+### Step 3 — Compute aggregate public key and Taproot deposit address
+
+Client-side: `P_aggregate = P_user_deposit + P_so`. Derive the `bc1p...` Taproot address.
+
+### Step 4 — Construct branch and exit transactions
+
+Client-side: build unsigned `Txn1` (branch) and `Txn2` (exit, timelocked) using the aggregate public key.
+
+### Step 5 — Get SO signing commitments
+
+> **SO call:** Request FROST nonce commitments for the branch and exit transaction signing sessions. The SOs return two sets of `operatorCommitments[]`. See [Deposits from L1](https://docs.spark.money/learn/deposits).
+
+### Step 6 — FROST sign branch and exit transactions
+
+Call [`SPARK_SIGN_FROST`](/api-reference/activities/sign-frost-spark) with a batch of 2 signatures:
+
+```json
+{
+  "signWith": "spark1pgss...",
+  "signatures": [
+    {
+      "derivation": { "deposit": {} },
+      "message": "<branch-tx-sighash>",
+      "operatorCommitments": [{ "id": "SO1", "hiding": "<hex>", "binding": "<hex>" }],
+      "verifyingKey": "<P_aggregate_hex>"
+    },
+    {
+      "derivation": { "deposit": {} },
+      "message": "<exit-tx-sighash>",
+      "operatorCommitments": [{ "id": "SO1", "hiding": "<hex>", "binding": "<hex>" }],
+      "verifyingKey": "<P_aggregate_hex>"
+    }
+  ]
+}
+```
+
+The enclave generates fresh nonces and returns 2 `(signatureShare, hiding, binding)` tuples. The client aggregates each with the SOs' partial signatures to produce 2 final Schnorr signatures. Both transactions are now fully signed.
+
+### Step 7 — Store signed exit transactions
+
+Store `Txn1` and `Txn2` securely. These are the permanent unilateral exit path — see [Unilateral Exit](#3-unilateral-exit-spark--bitcoin-l1-emergency).
+
+> **Security note:** These two transactions are your primary protection against Spark Operator misbehaviour or prolonged downtime. They were signed inside the Turnkey enclave at deposit time and require no SO cooperation to broadcast — if the entire operator set goes offline or acts maliciously, you can still recover your BTC by broadcasting them directly to Bitcoin L1. Treat them with the same care as a seed phrase: store them in durable, encrypted, off-device storage and back them up. If they are lost and the SOs are unavailable, your only recovery path is gone.
+
+### Step 8 — Broadcast deposit transaction
+
+Broadcast a standard Bitcoin transaction sending BTC to the `bc1p...` Taproot address.
+
+### Step 9 — Wait for L1 confirmation
+
+The SOs register the new Spark leaf once the transaction confirms.
+
+---
+
+## 2. Cooperative Withdrawal: Spark → Bitcoin L1
+
+**Turnkey activities:** `SPARK_SIGN_FROST` ×1
+
+A cooperative withdrawal is the normal, fast path for moving BTC from a Spark leaf back to a Bitcoin L1 address. It requires the SOs to co-sign a single withdrawal transaction and settles in one on-chain confirmation. If the SOs are unavailable, use the [Unilateral Exit](#3-unilateral-exit-spark--bitcoin-l1-emergency) path instead — it is slower (~16 hours timelock) but requires no operator cooperation.
+
+### Step 1 — Construct withdrawal transaction
+
+Client-side: build an unsigned Bitcoin L1 transaction spending from the leaf's Taproot address to the user's personal Bitcoin address.
+
+### Step 2 — Get SO signing commitments
+
+> **SO call:** Request FROST nonce commitments for the cooperative withdrawal signing session. The SOs return `operatorCommitments[]`. See [Withdrawals](https://docs.spark.money/learn/withdrawals).
+
+### Step 3 — FROST sign withdrawal transaction
+
+Call [`SPARK_SIGN_FROST`](/api-reference/activities/sign-frost-spark):
+
+```json
+{
+  "signWith": "spark1pgss...",
+  "signatures": [{
+    "derivation": { "signingLeaf": { "leafId": "leaf-abc-123" } },
+    "message": "<withdrawal-tx-sighash>",
+    "operatorCommitments": [{ "id": "SO1", "hiding": "<hex>", "binding": "<hex>" }],
+    "verifyingKey": "<aggregate-pubkey-for-this-leaf>"
+  }]
+}
+```
+
+The enclave returns `(signatureShare, hiding, binding)`. The client forwards the nonces to the SOs and aggregates all partial signatures into the final Schnorr signature.
+
+### Step 4 — Broadcast withdrawal transaction
+
+Attach the final signature and broadcast to Bitcoin L1.
+
+### Step 5 — Wait for confirmation
+
+BTC arrives at the user's L1 address. The SOs deactivate the leaf. The pre-signed exit transactions stored at deposit time are now spent and can be discarded — the UTXO no longer exists on L1.
+
+---
+
+## 3. Unilateral Exit: Spark → Bitcoin L1 (Emergency)
+
+**Turnkey activities:** None
+
+Use this path when cooperative withdrawal is not possible — for example, if the Spark Operators are offline, unresponsive, or you have reason to believe they are acting maliciously. It requires no SO cooperation and no Turnkey API calls, but it is subject to an approximately 100-block (~16 hour) relative timelock before funds are spendable. This path relies entirely on the exit transactions that were pre-signed at deposit time (Flow 1 Step 7 / Flow 7 Step 8); if those transactions were not stored, this recovery path is unavailable.
+
+### Step 1 — Retrieve pre-signed exit transactions
+
+Retrieve the stored `Txn1` (branch) and `Txn2` (exit) from deposit time.
+
+### Step 2 — Broadcast branch transaction
+
+Broadcast `Txn1` to Bitcoin L1. Once mined, the relative timelock countdown begins.
+
+### Step 3 — Wait for timelock
+
+Wait approximately 100 blocks (~16 hours).
+
+### Step 4 — Broadcast exit transaction
+
+Broadcast `Txn2`. BTC arrives at the user's L1 address.
+
+<Note>
+  The unilateral exit path requires no Turnkey API calls and no SO cooperation — exit transactions were fully signed at deposit time using `SPARK_SIGN_FROST` and can be broadcast directly to Bitcoin L1. This is the property that makes SO unavailability a liveness concern rather than a safety concern. See [Trust model](https://docs.spark.money/learn/trust-model).
+</Note>
+
+---
+
+## 4. Initiate Transfer: Spark → Spark (Sender)
+
+**Turnkey activities:** `SPARK_SIGN_FROST` ×1 (batch of up to 6), `SPARK_PREPARE_TRANSFER` ×1
+
+### Step 1 — Select input leaves
+
+> **SO call:** Query the SOs for the sender's active leaf set to determine which leaves cover the transfer amount. The SOs are the authoritative source of leaf state — unlike a standard Bitcoin wallet, the client does not maintain a local UTXO set independently. See [Transfers](https://docs.spark.money/learn/transfers).
+
+### Step 2 — Get SO signing commitments for all new exit transactions
+
+> **SO call:** Request FROST nonce commitments for refund transactions across all new leaves. The SOs return `operatorCommitments[]` for each of 3 refund transaction types per new leaf (CPFP, direct, direct-from-CPFP). For 2 new leaves (recipient leaf + change leaf) this yields 6 sets of commitments. See [FROST signing](https://docs.spark.money/learn/frost-signing).
+
+### Step 3 — FROST sign all refund transactions
+
+Call [`SPARK_SIGN_FROST`](/api-reference/activities/sign-frost-spark) with a batch of up to 6 signatures (3 types × up to 2 leaves):
+
+```json
+{
+  "signWith": "spark1pgss...",
+  "signatures": [
+    {
+      "derivation": { "signingLeaf": { "leafId": "bob-new-leaf-id" } },
+      "message": "<bob-leaf-cpfp-refund-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<bob-leaf-aggregate-pubkey>"
+    },
+    {
+      "derivation": { "signingLeaf": { "leafId": "bob-new-leaf-id" } },
+      "message": "<bob-leaf-direct-refund-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<bob-leaf-aggregate-pubkey>"
+    },
+    {
+      "derivation": { "signingLeaf": { "leafId": "bob-new-leaf-id" } },
+      "message": "<bob-leaf-direct-from-cpfp-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<bob-leaf-aggregate-pubkey>"
+    },
+    {
+      "derivation": { "signingLeaf": { "leafId": "alice-change-leaf-id" } },
+      "message": "<change-leaf-cpfp-refund-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<change-leaf-aggregate-pubkey>"
+    },
+    {
+      "derivation": { "signingLeaf": { "leafId": "alice-change-leaf-id" } },
+      "message": "<change-leaf-direct-refund-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<change-leaf-aggregate-pubkey>"
+    },
+    {
+      "derivation": { "signingLeaf": { "leafId": "alice-change-leaf-id" } },
+      "message": "<change-leaf-direct-from-cpfp-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<change-leaf-aggregate-pubkey>"
+    }
+  ]
+}
+```
+
+The enclave returns 6 `(signatureShare, hiding, binding)` tuples. The client aggregates each with the SOs' partial signatures to produce 6 final Schnorr signatures. All new leaf exit transactions are now pre-signed.
+
+### Step 4 — Build the transfer package
+
+Call [`SPARK_PREPARE_TRANSFER`](/api-reference/activities/prepare-spark-transfer) with the aggregated refund signatures from Step 3:
+
+```json
+{
+  "signWith": "spark1pgss...",
+  "transfer": {
+    "transferId": "aaaaa-bbbb-...",
+    "threshold": 2,
+    "receiverPublicKey": "<bob-identity-pubkey-hex>",
+    "operatorRecipients": [
+      { "operatorId": "SO1", "encryptionPublicKey": "02abc..." },
+      { "operatorId": "SO2", "encryptionPublicKey": "02def..." }
+    ],
+    "leaves": [
+      {
+        "leafId": "old-leaf-id",
+        "oldLeafDerivation": { "signingLeaf": { "leafId": "old-leaf-id" } },
+        "newLeafDerivation": { "signingLeaf": { "leafId": "bob-new-leaf-id" } },
+        "refundSignature": "<aggregated-sig-from-signatures[0]>",
+        "directRefundSignature": "<aggregated-sig-from-signatures[1]>",
+        "directFromCpfpRefundSignature": "<aggregated-sig-from-signatures[2]>"
+      },
+      {
+        "leafId": "old-leaf-id",
+        "oldLeafDerivation": { "signingLeaf": { "leafId": "old-leaf-id" } },
+        "newLeafDerivation": { "signingLeaf": { "leafId": "alice-change-leaf-id" } },
+        "refundSignature": "<aggregated-sig-from-signatures[3]>",
+        "directRefundSignature": "<aggregated-sig-from-signatures[4]>",
+        "directFromCpfpRefundSignature": "<aggregated-sig-from-signatures[5]>"
+      }
+    ]
+  }
+}
+```
+
+The enclave atomically:
+1. Derives old and new leaf keys from the identity key's HD wallet
+2. Computes `tweak = oldKey − newKey` per leaf
+3. Feldman VSS-splits each tweak for the SOs — each SO receives a share plus verifiable commitments, allowing them to independently verify their share is correct without seeing other shares
+4. ECIES-encrypts Bob's new leaf key to his identity public key
+5. ECIES-encrypts each SO's Shamir share to their encryption public key
+6. ECDSA-signs the per-leaf payload and the outer transfer payload with the identity key
+
+Returns `operatorPackages[]` and `transferUserSignature`.
+
+### Step 5 — Submit to Spark Operators
+
+> **SO call:** Send the aggregated refund signatures from Step 3, the encrypted operator packages from Step 4, and the `transferUserSignature` from Step 4 to each SO. The SOs verify, rotate key shares, delete old shares, store the ECIES blob for Bob, register new leaves, and activate watchtowers. See [Transfers](https://docs.spark.money/learn/transfers) and [Trust model](https://docs.spark.money/learn/trust-model).
+
+---
+
+## 5. Claim Transfer: Spark → Spark (Receiver)
+
+**Turnkey activities:** `SPARK_CLAIM_TRANSFER` ×1
+
+### Step 1 — Poll SOs for pending transfers
+
+> **SO call:** Query the SOs for pending inbound transfers. The SOs return the encrypted blob, leaf ID, transfer ID, and sender identity public key for each pending transfer. See [Transfers](https://docs.spark.money/learn/transfers).
+
+### Step 2 — Claim the transfer
+
+Call [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer):
+
+```json
+{
+  "signWith": "spark1pbob...",
+  "claim": {
+    "transferId": "aaaaa-bbbb-...",
+    "senderIdentityPublicKey": "<alice-identity-pubkey-hex>",
+    "threshold": 2,
+    "operatorRecipients": [
+      { "operatorId": "SO1", "encryptionPublicKey": "02abc..." },
+      { "operatorId": "SO2", "encryptionPublicKey": "02def..." }
+    ],
+    "leaves": [{
+      "leafId": "bob-new-leaf-id",
+      "ciphertext": "<ecies-blob-from-alice-stored-by-sos>",
+      "senderSignature": "<alice-per-leaf-ecdsa-signature>"
+    }]
+    }
+  }
+}
+```
+
+The enclave atomically:
+1. Verifies Alice's ECDSA signature over `SHA256(leafId || transferId || ciphertext)`
+2. ECIES-decrypts the ciphertext using Bob's identity private key to recover `current_leaf_priv`
+3. Derives Bob's new leaf key from his HD wallet
+4. Computes `claim_tweak = current_leaf_priv − new_leaf_priv`
+5. Feldman-splits the claim tweak for the SOs
+6. ECIES-encrypts each SO's claim share to their encryption public key
+
+Returns `operatorPackages[]`.
+
+### Step 3 — Store new leaf in local wallet state
+
+Record the `leafId → derivation path` mapping locally as soon as `SPARK_CLAIM_TRANSFER` returns — before submitting to the SOs. If the SO submission fails, you can retry; if local storage is deferred and something fails before it runs, the leaf becomes untracked.
+
+### Step 4 — Submit claim packages to SOs
+
+> **SO call:** Send the encrypted claim packages to each SO. Each SO applies the tweak, rotating the leaf key to Bob's HD-derived key. See [Transfers](https://docs.spark.money/learn/transfers).
+
+---
+
+## 6. Lightning Receive
+
+**Turnkey activities:** `SPARK_PREPARE_LIGHTNING_RECEIVE` ×1
+
+### Step 1 — Generate preimage and distribute shares to SOs
+
+Call [`SPARK_PREPARE_LIGHTNING_RECEIVE`](/api-reference/activities/spark-prepare-lightning-receive):
+
+```json
+{
+  "signWith": "spark1pgss...",
+  "lightningReceive": {
+    "threshold": 2,
+    "operatorRecipients": [
+      { "operatorId": "SO1", "encryptionPublicKey": "02abc..." },
+      { "operatorId": "SO2", "encryptionPublicKey": "02def..." }
+    ]
+  }
+}
+```
+
+The enclave:
+1. Generates a random 32-byte preimage using a secure RNG
+2. Computes `paymentHash = SHA256(preimage)`
+3. Feldman-splits the preimage across the SOs
+4. ECIES-encrypts each SO's share to their encryption public key
+
+Returns `operatorPackages[]` and `paymentHash`. The raw preimage never leaves the enclave.
+
+### Step 2 — Submit preimage shares to SOs
+
+> **SO call:** Send the encrypted operator packages to each SO. Each SO stores its share and will contribute to preimage reconstruction when the Lightning payment arrives.
+
+### Step 3 — Create Lightning invoice
+
+Construct a BOLT11 invoice encoding `paymentHash`. Share this invoice with the payer.
+
+### Step 4 — Lock leaves to the SSP
+
+> **SSP call:** Notify the Spark Service Provider that you will transfer X sats of your leaves in exchange for payment of the invoice. The SOs lock the specified leaves. See [Spark core concepts](https://docs.spark.money/spark/core-concepts) for the SSP role.
+
+### Step 5 — SSP pays the Lightning invoice
+
+> **SSP call:** The SSP routes the payment across the Lightning Network.
+
+### Step 6 — SOs reveal preimage to SSP
+
+> **SO call:** Once the incoming Lightning payment is detected, threshold SOs reconstruct the preimage from their Feldman shares and reveal it to the SSP.
+
+### Step 7 — SSP completes the Lightning payment
+
+> **SSP call:** The SSP reveals the preimage to the payer's node. The Lightning payment settles.
+
+### Step 8 — SOs transfer leaves to the SSP
+
+> **SO call:** The SOs atomically execute the leaf transfer from the receiver to the SSP.
+
+### Timeout path
+
+If the SSP doesn't pay within the time limit, the SOs unlock the receiver's leaves. No funds are lost.
+
+---
+
+## 7. Static Deposit: Bitcoin L1 → Spark (Reusable Address)
+
+**Turnkey activities:** `CREATE_WALLET_ACCOUNTS` ×1, `EXPORT_WALLET_ACCOUNT` ×1, `SPARK_SIGN_FROST` ×1 (batch of 2)
+
+A static deposit address is deterministic and permanent — the same path at index N always produces the same Taproot address and can receive multiple deposits, each creating a separate Spark leaf.
+
+### Step 1 — Derive static deposit key
+
+Call [`CREATE_WALLET_ACCOUNTS`](/api-reference/activities/create-wallet-accounts) once per index. Increment the final path segment for additional static addresses:
+
+```json
+{
+  "walletId": "<spark-wallet-id>",
+  "accounts": [{
+    "curve": "CURVE_SECP256K1",
+    "pathFormat": "PATH_FORMAT_BIP32",
+    "path": "m/8797555'/0'/3'/0'",
+    "addressFormat": "ADDRESS_FORMAT_COMPRESSED"
+  }]
+}
+```
+
+This is a deterministic, reusable key — call once and reuse the same address for all future deposits at that index.
+
+Replace `0'/3'/0'` with `N'/3'/0'` where `N` is your account index, and increment the final segment for additional static addresses at the same account.
+
+### Step 2 — Export static deposit key to SSP
+
+Call [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to retrieve the private key in a P256-encrypted bundle:
+
+```json
+{
+  "address": "<static-deposit-account-address>",
+  "targetPublicKey": "<ephemeral-p256-pubkey>"
+}
+```
+
+Decrypt the export bundle locally using the ephemeral P256 private key, then transmit the raw key to the SSP via their API. This call is made directly to the SSP — it is outside Turnkey's API surface. The SSP stores this key so it can co-sign deposit processing while your wallet is offline.
+
+> **Security note:** This is the only Spark flow that requires exporting a raw private key from the Turnkey enclave. From the moment the key is shared with the SSP until you claim any deposits, the SSP holds co-signing capability on this address. This is the intentional custodial tradeoff of static deposits — the SSP needs the key to process deposits while your wallet is offline. To minimise exposure:
+> - Use a fresh ephemeral P256 keypair for each export and zero it immediately after decrypting
+> - Send the key to the SSP over an encrypted channel
+> - Zero the key in your local memory immediately after it has been transmitted
+> - Only use SSPs you trust; a compromised SSP with this key could co-sign spends from your static deposit address
+
+### Step 3 — Get SO public key shares
+
+> **SO call:** Request SO public key shares for this static deposit index. The SOs respond with their key share, which you combine with your static deposit public key to compute the aggregate Taproot address. See [Deposits from L1](https://docs.spark.money/learn/deposits).
+
+### Step 4 — Compute aggregate public key and Taproot deposit address
+
+Client-side: `P_aggregate = P_static_deposit_user + P_so`. Derive the permanent `bc1p...` Taproot address for this index.
+
+### Step 5 — Construct branch and exit transactions
+
+Client-side: build unsigned `Txn1` (branch) and `Txn2` (exit, timelocked) using the aggregate public key.
+
+### Step 6 — Get SO signing commitments
+
+> **SO call:** Request FROST nonce commitments for the branch and exit transaction signing sessions at this static deposit index. The SOs return two sets of `operatorCommitments[]`. See [Deposits from L1](https://docs.spark.money/learn/deposits).
+
+### Step 7 — FROST sign branch and exit transactions
+
+Call [`SPARK_SIGN_FROST`](/api-reference/activities/sign-frost-spark) using the `staticDeposit` derivation key and the index:
+
+```json
+{
+  "signWith": "spark1pgss...",
+  "signatures": [
+    {
+      "derivation": { "staticDeposit": { "index": 0 } },
+      "message": "<branch-tx-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<P_aggregate_hex>"
+    },
+    {
+      "derivation": { "staticDeposit": { "index": 0 } },
+      "message": "<exit-tx-sighash>",
+      "operatorCommitments": [...],
+      "verifyingKey": "<P_aggregate_hex>"
+    }
+  ]
+}
+```
+
+Returns 2 `(signatureShare, hiding, binding)` tuples. The client aggregates with SO partial signatures to produce 2 final Schnorr signatures.
+
+### Step 8 — Store signed exit transactions
+
+Store `Txn1` and `Txn2`. Each individual deposit to this address generates a separate leaf with its own exit transactions.
+
+### Step 9 — Broadcast deposit transaction
+
+Broadcast a standard Bitcoin transaction sending BTC to the static `bc1p...` Taproot address.
+
+### Step 10 — Wait for L1 confirmation
+
+The SOs register a new Spark leaf for each confirmed deposit to this address.
+
+---
+
+## 8. Static Deposit Claim
+
+**Turnkey activities:** `SPARK_CLAIM_TRANSFER` ×1
+
+Once a deposit is confirmed, the SSP packages the leaf key (encrypted to your identity public key) as a standard transfer claim. The claim goes through the same `SPARK_CLAIM_TRANSFER` path as any other incoming Spark transfer — no key export required.
+
+### Step 1 — Confirmed deposit detected
+
+After a deposit to the static address confirms on-chain, the SOs register a new leaf.
+
+> **SSP call:** Fetch a fee quote for the claim: `wallet.getClaimStaticDepositQuote(txid, outputIndex)`.
+
+### Step 2 — Claim the transfer
+
+The SSP appears as the `senderIdentityPublicKey` here because it is the SSP — not the original L1 depositor — that ECIES-encrypted the leaf key to your identity pubkey when it processed the incoming deposit. The original Bitcoin sender has no role in the Spark claim flow.
+
+Call [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer):
+
+```json
+{
+  "signWith": "spark1p...",
+  "claim": {
+    "transferId": "<transfer-id>",
+    "senderIdentityPublicKey": "<ssp-identity-pubkey-hex>",
+    "threshold": 2,
+    "operatorRecipients": [
+      { "operatorId": "SO1", "encryptionPublicKey": "02abc..." },
+      { "operatorId": "SO2", "encryptionPublicKey": "02def..." }
+    ],
+    "leaves": [{
+      "leafId": "<new-leaf-id>",
+      "ciphertext": "<ecies-blob-from-ssp>",
+      "senderSignature": "<ssp-per-leaf-ecdsa-signature>"
+    }]
+  }
+}
+```
+
+The enclave atomically:
+- Verifies the SSP's per-leaf ECDSA signature
+- ECIES-decrypts the ciphertext using your identity private key to recover the current leaf private key
+- Derives your new leaf key from your HD wallet at `m/8797555'/n'/1'/{leafIndex}'`
+- Computes `claim_tweak = current_leaf_priv − new_leaf_priv`
+- Feldman-splits the claim tweak for the SOs
+- ECIES-encrypts each SO's claim share to their encryption public key
+
+Returns `operatorPackages[]`.
+
+### Step 3 — Submit claim packages to SOs
+
+> **SO call:** Send the encrypted packages to the SOs. Each SO applies the tweak, rotating the leaf key to your HD-derived key. After this step, the leaf is fully under your control — the SSP no longer has co-signing capability on this leaf.
+
+### Step 4 — Wait for balance availability
+
+Poll `wallet.getBalance()` until the credited sats appear as available.
