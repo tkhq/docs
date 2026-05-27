@@ -113,7 +113,7 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 
 Turnkey treats `2xx` responses as successful. Turnkey automatically retries retryable delivery failures. Retry schedules and attempt counts are subject to change.
 
-Signed retries receive a fresh timestamp and signature. For balance and transaction status webhooks, deduplicate by `msg.idempotencyKey`. For activity update webhooks, deduplicate by the activity `id` together with `X-Turnkey-Event-Id`.
+Signed retries receive a fresh timestamp and signature. For activity deliveries, use the activity `id` and/or `X-Turnkey-Event-Id`. For balance and transaction status deliveries, use `msg.idempotencyKey`.
 
 ## Verify signatures
 
@@ -127,17 +127,40 @@ v1.ed25519.<signing_key_id>.<timestamp_ms>.<event_id>.<raw_body>
 
 The `event_id` segment in the signed message is the value of the `X-Turnkey-Event-Id` header.
 
-To verify a delivery, reconstruct the signed message from the headers and raw body, then verify the Ed25519 signature against the signing key identified by `X-Turnkey-Signature-Key-Id`. Ensure the timestamp is within an acceptable freshness window (e.g. 5 minutes) to guard against replay attacks.
+Signature verification signs only the signature contract fields shown above plus the raw body. Other delivery headers are useful for routing and observability but are not part of the signed message.
 
-<Note>
-An SDK verification helper and a key discovery endpoint are releasing soon to simplify this process.
-</Note>
+Use `verifyTurnkeyWebhookSignature` from `@turnkey/crypto` to verify Turnkey webhook signatures when you manage verification-key fetching and caching yourself. A key discovery endpoint and higher-level server helper are planned separately.
+
+Each verification key should include the `keyId` from `X-Turnkey-Signature-Key-Id`, a hex-encoded 32-byte Ed25519 public key, and `algorithm: "ed25519"`.
+
+The helper accepts the raw body as a UTF-8 string, `Uint8Array` or Node `Buffer`, or `ArrayBuffer`. Prefer the raw bytes captured by your framework.
+
+```ts
+import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
+
+const result = verifyTurnkeyWebhookSignature({
+  headers: req.headers,
+  body: req.body, // raw bytes from express.raw(), not parsed JSON
+  verificationKeys: [
+    {
+      keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
+      publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
+      algorithm: "ed25519",
+    },
+  ],
+  maxTimestampAgeMs: 5 * 60 * 1000,
+});
+
+if (!result.ok) {
+  throw new Error(`Invalid Turnkey webhook: ${result.reason}`);
+}
+```
 
 ## Payloads
 
 ### Activity updates
 
-`ACTIVITY_UPDATES` deliveries contain the full activity object for the triggering event. Use the activity `id` and the webhook `X-Turnkey-Event-Id` header to process deliveries idempotently.
+`ACTIVITY_UPDATES` deliveries contain the full activity object for the triggering event. Use the activity `id` and/or the webhook `X-Turnkey-Event-Id` header to process deliveries idempotently.
 
 ### Balance updates
 
