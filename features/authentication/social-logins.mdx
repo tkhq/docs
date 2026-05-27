@@ -170,7 +170,74 @@ Some OAuth providers (like Google) encourage you to register separate client IDs
 
 If a user logs in on one platform using the web client ID, and then later logs in on another platform using a different iOS client ID, the two tokens will have different `aud` values. Because of this, Turnkey will not consider them the same identity.
 
-To ensure users are recognized consistently across platforms, you must use the same OAuth client ID everywhere. In most cases, this means using your web client ID for web, iOS, and Android flows.
+To ensure users are recognized consistently across platforms, you must either use the same OAuth client ID everywhere, or register multiple platform identities using `oidcClaims` — see [Multi-platform OAuth identities](#multi-platform-oauth-identities) below.
+
+## Multi-platform OAuth identities
+
+`oidcClaims` solves this. Instead of requiring a full OIDC token (which always requires user action and can only be obtained for one `aud` at a time), you can directly supply the `{ iss, sub, aud }` claims to register additional platform identities for the same user at sub-org creation time.
+
+### How it works
+
+`oidcClaims` is supported in the following activities:
+
+- `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8`
+- `ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS_V2`
+- `ACTIVITY_TYPE_CREATE_USERS_V4`
+
+`OauthProviderParamsV2` (used by all three) accepts either an `oidcToken` or an `oidcClaims` object:
+
+```typescript
+// Verified — requires a signed token from the provider
+{ providerName: "Google iOS", oidcToken: "eyJhbGci..." }
+
+// Unverified — register additional audiences directly
+{ providerName: "Google Android", oidcClaims: { iss, sub, aud } }
+```
+
+At least one `oidcToken` must be present when using `oidcClaims`. Each `oidcClaims` entry must have a matching `oidcToken` with the same `iss` and `sub`.
+
+### Example
+
+A user signs up on iOS. You receive their OIDC token, decode the `sub` and `iss`, and register all three platform identities in a single `CREATE_SUB_ORGANIZATION` call:
+
+```json
+{
+  "oauthProviders": [
+    {
+      "providerName": "Google iOS",
+      "oidcToken": "eyJhbGciOiJSUzI1NiIs..."
+    },
+    {
+      "providerName": "Google Android",
+      "oidcClaims": {
+        "iss": "https://accounts.google.com",
+        "sub": "118121659617646047510",
+        "aud": "com.yourapp.android"
+      }
+    },
+    {
+      "providerName": "Google Web",
+      "oidcClaims": {
+        "iss": "https://accounts.google.com",
+        "sub": "118121659617646047510",
+        "aud": "com.yourapp.web"
+      }
+    }
+  ]
+}
+```
+
+When the user later opens your Android or Web app and authenticates with Google, the identity is found and they're logged in.
+
+The same pattern works with `CREATE_OAUTH_PROVIDERS` to add platform identities to an existing user.
+
+### Verified vs. unverified identities
+
+| Method | Verified by provider |
+|--------|---------------------|
+| `oidcToken` | ✅ Yes — Turnkey validates the token signature against the issuer's JWKS |
+| `oidcClaims` | ❌ No — claims are registered as-is, trusted by your backend. The identity becomes verified the first time the user actually logs in with a valid OIDC token matching those claims. |
+
 
 ## OIDC token verification
 
