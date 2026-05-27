@@ -18,11 +18,13 @@ Webhooks deliver real-time notifications as signed HTTPS POST requests. Register
 |---|---|---|
 | `ACTIVITY_UPDATES` | Sends activity status updates. Parent-owned endpoints receive events for the parent and all sub-organizations; sub-organization-owned endpoints receive only their own events. | Organization-scoped |
 | `BALANCE_CONFIRMED_UPDATES` | Sends confirmed balance update events when a transaction containing a balance change is first seen in a block onchain. | Billing organization scoped |
-| `BALANCE_FINALIZED_UPDATES` | Sends finalized balance update events when the containing block has reached the finalization threshold. | Billing organization scoped |
+| `BALANCE_FINALIZED_UPDATES` | Sends finalized balance update events when the containing block has reached the finalization threshold. Add this alongside `BALANCE_CONFIRMED_UPDATES` if you need finalization signals. | Billing organization scoped |
 | `SEND_TRANSACTION_STATUS_UPDATES` | Sends transaction status updates when a transaction changes state (e.g. from `BROADCASTING` to `INCLUDED` or `FAILED`). | Billing organization scoped |
 
 <Note>
 Balance and transaction status webhook endpoints must be managed from the billing organization. Sub-organization attempts to create, update, or delete these endpoints return `PermissionDenied`.
+
+Only documented event types produce deliveries. Unknown event types should not be used and may be rejected in the future.
 
 For further information on balances, including supported chains and assets, see [Balances](/features/transaction-management/balances).
 </Note>
@@ -57,6 +59,8 @@ const activityWebhook = await turnkey.apiClient().createWebhookEndpoint({
 
 ### Balance updates
 
+For balance webhooks, subscribe to `BALANCE_CONFIRMED_UPDATES` when enabling balance notifications. Add `BALANCE_FINALIZED_UPDATES` alongside confirmed updates if you also need finalization signals.
+
 ```ts
 const balanceWebhook = await turnkey.apiClient().createWebhookEndpoint({
   type: "ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT",
@@ -71,7 +75,7 @@ const balanceWebhook = await turnkey.apiClient().createWebhookEndpoint({
 ```
 
 <Warning>
-The `name` field is required. Event types must be passed in `subscriptions[]`; do not pass a top-level `eventTypes` field.
+The `name` field is a human-readable endpoint name and should be non-empty. Event types must be passed in `subscriptions[]`; do not pass a top-level `eventTypes` field.
 </Warning>
 
 ## Manage endpoints
@@ -80,7 +84,7 @@ Use the webhook endpoint APIs or the Dashboard UI to manage existing endpoints:
 
 | Operation | Path | Notes |
 |---|---|---|
-| [Create endpoint](/api-reference/activities/create-webhook-endpoint) | `/public/v1/submit/create_webhook_endpoint` | Requires `url`, `name`, and `subscriptions[]`. |
+| [Create endpoint](/api-reference/activities/create-webhook-endpoint) | `/public/v1/submit/create_webhook_endpoint` | Requires `url` and `subscriptions[]`; `name` should be non-empty. |
 | [Update endpoint](/api-reference/activities/update-webhook-endpoint) | `/public/v1/submit/update_webhook_endpoint` | Updates `url`, `name`, or `isActive`. |
 | [Delete endpoint](/api-reference/activities/delete-webhook-endpoint) | `/public/v1/submit/delete_webhook_endpoint` | Deletes an endpoint and its subscriptions. |
 | [List endpoints](/api-reference/queries/list-webhook-endpoints) | `/public/v1/query/list_webhook_endpoints` | Returns endpoints and their subscriptions for an organization. |
@@ -95,7 +99,7 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 
 | Header | Description |
 |---|---|
-| `X-Turnkey-Organization-Id` | Organization associated with the delivered event. |
+| `X-Turnkey-Organization-Id` | Organization used for webhook routing and delivery. For billing-scoped events such as balance and transaction status updates, this is the billing/parent organization. The event owner is available in the payload `organizationId`. |
 | `X-Turnkey-Event-Type` | Event type, such as `ACTIVITY_UPDATES` or `BALANCE_CONFIRMED_UPDATES`. |
 | `X-Turnkey-Timestamp` | Unix timestamp in milliseconds for the delivery attempt. |
 | `X-Turnkey-Webhook-Version` | Webhook delivery contract version. The current value is `1`. |
@@ -107,9 +111,9 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 
 ### Retry behavior
 
-Turnkey treats `2xx` responses as successful. Network errors and `5xx` responses are retried automatically. `3xx`, `4xx`, and `429` responses are terminal failures and are not retried. Redirects are not followed.
+Turnkey treats `2xx` responses as successful. Turnkey automatically retries retryable delivery failures. Retry schedules and attempt counts are subject to change.
 
-Signed retries receive a fresh timestamp and signature, so deduplicate by `idempotencyKey` or event `id` rather than by signature value.
+Signed retries receive a fresh timestamp and signature. For balance and transaction status webhooks, deduplicate by `msg.idempotencyKey`. For activity update webhooks, deduplicate by the activity `id` together with `X-Turnkey-Event-Id`.
 
 ## Verify signatures
 
@@ -120,6 +124,8 @@ The signed message follows this format:
 ```text
 v1.ed25519.<signing_key_id>.<timestamp_ms>.<event_id>.<raw_body>
 ```
+
+The `event_id` segment in the signed message is the value of the `X-Turnkey-Event-Id` header.
 
 To verify a delivery, reconstruct the signed message from the headers and raw body, then verify the Ed25519 signature against the signing key identified by `X-Turnkey-Signature-Key-Id`. Ensure the timestamp is within an acceptable freshness window (e.g. 5 minutes) to guard against replay attacks.
 
@@ -169,8 +175,8 @@ The `type` field is `"balances:confirmed"` when a balance change is first seen o
 | Field | Description |
 |---|---|
 | `type` | `"balances:confirmed"` when first seen onchain, or `"balances:finalized"` when the block has reached the finalization threshold. |
-| `organizationId` | The organization ID that owns the address. |
-| `parentOrganizationId` | The parent organization ID. |
+| `organizationId` | Organization that owns the address. |
+| `parentOrganizationId` | Billing/parent organization that owns webhook configuration and delivery. |
 | `msg.operation` | Either `"deposit"` (incoming) or `"withdraw"` (outgoing). |
 | `msg.caip2` | The chain identifier where the event occurred. |
 | `msg.txHash` | The transaction hash that triggered the balance change. |
@@ -211,8 +217,8 @@ Each delivery fires when a transaction changes state. The `type` is always `"tra
 | Field | Description |
 |---|---|
 | `type` | Always `"transaction:status"`. |
-| `organizationId` | The organization ID that initiated the transaction. |
-| `parentOrganizationId` | The parent organization ID. |
+| `organizationId` | Organization that initiated the transaction. |
+| `parentOrganizationId` | Billing/parent organization that owns webhook configuration and delivery. |
 | `msg.sendTransactionStatusId` | The ID of the send transaction status record. |
 | `msg.activityId` | The ID of the originating Turnkey activity. |
 | `msg.status` | One of `BROADCASTING`, `INCLUDED`, or `FAILED`. |
@@ -242,7 +248,7 @@ Read operations, such as listing webhook endpoints, use standard authenticated q
 |---|---|
 | `createWebhookEndpoint` is unavailable in your SDK | Upgrade to a webhooks-capable SDK release. The minimum SDK version will be listed in the SDK changelog once published. |
 | `PermissionDenied` on create/update/delete | Confirm the user has an allow policy for the webhook activity type, and confirm balance webhooks are being managed from the billing organization. |
-| Missing required field errors | Confirm `parameters.name` is set. |
+| Empty or unclear endpoint names | Set `parameters.name` to a non-empty, human-readable name. |
 | Subscription shape errors | Pass event types inside `parameters.subscriptions[]`, not as top-level `eventTypes`. |
 | Invalid webhook URL errors | Use an HTTPS URL that resolves to a public destination. Localhost, private IPs, link-local addresses, metadata endpoints, and URLs with user info are rejected. |
 | Signature verification fails | Verify against the exact raw request body bytes, use the millisecond timestamp and event id from the headers, check clock skew, and select the public key matching the signature key id. |
