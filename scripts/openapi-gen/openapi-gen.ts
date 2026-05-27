@@ -188,18 +188,6 @@ export const tags = ${tagsStr};`;
         const docsJsonContent = fs.readFileSync(docsJsonPath, "utf-8");
 
         const docsConfig = JSON.parse(docsJsonContent);
-        // console.log("docsConfig", docsConfig.navigation);
-        // Define overview paths
-        const activityOverviewPath = path.join(
-          relativeMdxBaseDir,
-          "activities",
-          "overview"
-        );
-        const queryOverviewPath = path.join(
-          relativeMdxBaseDir,
-          "queries",
-          "overview"
-        );
 
         // Remove duplicates before sorting
         const uniqueActivityPaths = [...new Set(activityPaths)];
@@ -220,57 +208,61 @@ export const tags = ${tagsStr};`;
           throw new Error("'docs.json' structure is not as expected.");
         }
 
-        // Find the API Reference tab
+        // Find the API & SDK reference tab
         const apiRefTab = docsConfig.navigation.tabs.find(
-          (item: any) => item.tab === "API reference"
+          (item: any) => item.tab === "API & SDK reference"
         );
 
-        if (apiRefTab && Array.isArray(apiRefTab.pages)) {
+        // Activities and Queries live inside the "REST API" group within the tab
+        const restApiGroup = apiRefTab?.pages?.find(
+          (item: any) => typeof item === "object" && item.group === "REST API"
+        );
+
+        if (restApiGroup && Array.isArray(restApiGroup.pages)) {
           if (options.authProxy && options.navGroup) {
             // Auth-proxy mode: find or create the named nav group and set its pages
-            let navGroup = apiRefTab.pages.find(
+            let navGroup = restApiGroup.pages.find(
               (item: any) => typeof item === "object" && item.group === options.navGroup
             );
             if (!navGroup) {
               navGroup = { group: options.navGroup, pages: [] };
-              apiRefTab.pages.push(navGroup);
+              restApiGroup.pages.push(navGroup);
               console.log(`Created new nav group '${options.navGroup}' in docs.json`);
             }
             navGroup.pages = uniqueAuthProxyPaths;
             console.log(`Updated '${options.navGroup}' paths in docs.json`);
           } else {
             // Standard mode: update Activities and Queries groups
-            const activitiesGroup = apiRefTab.pages.find(
+            const activitiesGroup = restApiGroup.pages.find(
               (item: any) =>
                 typeof item === "object" && item.group === "Activities"
             );
             if (activitiesGroup) {
               activitiesGroup.pages = [
-                activityOverviewPath,
                 ...uniqueActivityPaths,
               ];
               console.log(`Updated Activities paths in docs.json`);
             } else {
               console.warn(
-                `Could not find 'Activities' group in docs.json under 'API Reference'`
+                `Could not find 'Activities' group in docs.json under 'REST API'`
               );
             }
 
-            const queriesGroup = apiRefTab.pages.find(
+            const queriesGroup = restApiGroup.pages.find(
               (item: any) => typeof item === "object" && item.group === "Queries"
             );
             if (queriesGroup) {
-              queriesGroup.pages = [queryOverviewPath, ...uniqueQueryPaths];
+              queriesGroup.pages = [...uniqueQueryPaths];
               console.log(`Updated Queries paths in docs.json`);
             } else {
               console.warn(
-                `Could not find 'Queries' group in docs.json under 'API Reference'`
+                `Could not find 'Queries' group in docs.json under 'REST API'`
               );
             }
           }
         } else {
           console.warn(
-            `Could not find 'API reference' tab in docs.json navigation`
+            `Could not find 'REST API' group in 'API & SDK reference' tab in docs.json navigation`
           );
         }
 

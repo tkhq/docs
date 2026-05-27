@@ -1,0 +1,312 @@
+---
+title: "@turnkey/sdk-browser (legacy)"
+sidebarTitle: "Legacy (@turnkey/sdk-browser)"
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+
+`@turnkey/sdk-browser` is our legacy TypeScript SDK for building embedded wallet experiences in browser applications.
+
+This package will soon be discontinued, if you're starting a new project, we recommend using [`@turnkey/core`](/solutions/embedded-wallets/integration-guide/typescript/index) instead. If you're using React, please consider using the [`@turnkey/react-wallet-kit`](/solutions/embedded-wallets/integration-guide/react/getting-started) for a more tailored experience.
+
+## Overview
+
+The [`@turnkey/sdk-browser`](https://www.npmjs.com/package/@turnkey/sdk-browser) package enables developers to build browser-based applications that interact with the Turnkey API using multiple authentication methods.
+
+It includes:
+
+- `indexedDbClient`: The recommended client for authentication and session creation using secure, unextractable P-256 keys stored in the browser’s IndexedDB.
+- `passkeyClient`: For passkey registration and signing flows.
+- `iframeClient`: Used for secure credential injection and import/export operations.
+- `walletClient`: For signing with external wallets like MetaMask.
+
+If you're building with React, check out our [`@turnkey/sdk-react`](https://www.npmjs.com/package/@turnkey/sdk-react) package.
+
+## Installation
+
+<CodeGroup>
+
+```bash NPM
+npm install @turnkey/sdk-browser
+```
+
+```bash Yarn
+yarn add @turnkey/sdk-browser
+```
+
+</CodeGroup>
+
+## Initialization
+
+```ts
+import { Turnkey } from "@turnkey/sdk-browser";
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
+});
+```
+
+## Authentication
+
+### `loginWithPasskey`
+
+Creates a session for a user authenticated with a passkey. The session is stored in `localStorage`, and signing operations are done with an unextractable keypair stored in IndexedDB.
+
+```ts
+const passkeyClient = turnkey.passkeyClient();
+const indexedDbClient = await turnkey.indexedDbClient();
+await indexedDbClient.init();
+
+const publicKey = await indexedDbClient.getPublicKey();
+
+await passkeyClient.loginWithPasskey({
+  sessionType: "SESSION_TYPE_READ_WRITE",
+  publicKey,
+  expirationSeconds: 900,
+});
+```
+
+### `loginWithBundle`
+
+Used to authenticate a user with a credential bundle (e.g. from Email Auth). Must be used from an `iframeClient`.
+
+```ts
+const iframeClient = await turnkey.iframeClient({
+  iframeUrl: "https://auth.turnkey.com",
+  iframeContainer: document.getElementById("iframe-container"),
+});
+
+await iframeClient.loginWithBundle({
+  bundle: "credential-bundle",
+  expirationSeconds: 900,
+});
+```
+
+### `loginWithSession`
+
+Logs in using a session string (JWT) that was created elsewhere (e.g. server action). Only valid on `indexedDbClient`.
+
+```ts
+await indexedDbClient.loginWithSession("jwt-session-string");
+```
+
+### `loginWithWallet`
+
+Uses a Web3 wallet to authenticate the user and store a read-write session.
+
+```ts
+const walletClient = turnkey.walletClient(new EthereumWallet());
+
+await walletClient.loginWithWallet({
+  sessionType: "SESSION_TYPE_READ_WRITE",
+  publicKey: await walletClient.getPublicKey(),
+  expirationSeconds: 900,
+});
+```
+
+### `refreshSession`
+
+Refreshes the current session and extends its expiration time. The correct `publicKey` must be provided for read-write sessions.
+
+```ts
+await indexedDbClient.refreshSession({
+  sessionType: "SESSION_TYPE_READ_WRITE",
+  publicKey: await indexedDbClient.getPublicKey(),
+  expirationSeconds: 900,
+});
+```
+
+## IndexedDbClient
+
+The `indexedDbClient` is the recommended way to manage secure keys for session-based authentication.
+
+### `init`
+
+Initializes and stores an unextractable P-256 keypair in the browser.
+
+```ts
+await indexedDbClient.init();
+```
+
+### `getPublicKey`
+
+Returns the base64url-encoded public key of the stored keypair.
+
+```ts
+const publicKey = await indexedDbClient.getPublicKey();
+```
+
+### `clear`
+
+Removes all key material from IndexedDB.
+
+```ts
+await indexedDbClient.clear();
+```
+
+### `resetKeyPair`
+
+Deletes and regenerates the stored keypair.
+
+```ts
+await indexedDbClient.resetKeyPair();
+```
+
+## IframeClient
+
+Primarily used for secure credential injection and key export/import.
+
+### `injectCredentialBundle`
+
+Injects a read-write session credential bundle into the iframe.
+
+```ts
+await iframeClient.injectCredentialBundle("bundle");
+```
+
+### `injectWalletExportBundle`
+
+```ts
+await iframeClient.injectWalletExportBundle("bundle", "org-id");
+```
+
+### `injectKeyExportBundle`
+
+```ts
+await iframeClient.injectKeyExportBundle("bundle", "org-id", "PEM");
+```
+
+### `injectImportBundle`
+
+```ts
+await iframeClient.injectImportBundle("bundle", "org-id", "user-id");
+```
+
+### `extractWalletEncryptedBundle`
+
+```ts
+const walletBundle = await iframeClient.extractWalletEncryptedBundle();
+```
+
+### `extractKeyEncryptedBundle`
+
+```ts
+const keyBundle = await iframeClient.extractKeyEncryptedBundle();
+```
+
+### `getEmbeddedPublicKey`
+
+```ts
+const pubkey = await iframeClient.getEmbeddedPublicKey();
+```
+
+### `initEmbeddedKey`
+
+```ts
+const pubkey = await iframeClient.initEmbeddedKey();
+```
+
+### `clearEmbeddedKey`
+
+```ts
+await iframeClient.clearEmbeddedKey();
+```
+
+## PasskeyClient
+
+### `createUserPasskey`
+
+Registers a new passkey using WebAuthn.
+
+```ts
+const passkey = await passkeyClient.createUserPasskey({
+  publicKey: {
+    rp: { name: "My App" },
+    user: { name: "user@example.com", displayName: "User" },
+  },
+});
+```
+
+## WalletClient
+
+### `getPublicKey`
+
+```ts
+const publicKey = await walletClient.getPublicKey();
+```
+
+### `getWalletInterface`
+
+```ts
+const wallet = walletClient.getWalletInterface();
+```
+
+## Session management
+
+### `getSession`
+
+Returns the active session if it exists and hasn’t expired.
+
+```ts
+const session = await turnkey.getSession();
+```
+
+### `getRawSession`
+
+Returns the raw JWT string if a valid session exists.
+
+```ts
+const jwt = await turnkey.getRawSession();
+```
+
+### `logout`
+
+Clears all stored session and client data.
+
+```ts
+await turnkey.logout();
+```
+
+## Top-level SDK methods
+
+### `passkeyClient()`
+
+```ts
+const passkeyClient = turnkey.passkeyClient();
+```
+
+### `indexedDbClient()`
+
+```ts
+const indexedDbClient = await turnkey.indexedDbClient();
+```
+
+### `iframeClient()`
+
+```ts
+const iframeClient = await turnkey.iframeClient({
+  iframeUrl: "https://auth.turnkey.com",
+  iframeContainer: document.getElementById("iframe-container"),
+});
+```
+
+### `walletClient(wallet)`
+
+```ts
+const walletClient = turnkey.walletClient(new EthereumWallet());
+```
+
+### `serverSign(methodName, params, [serverSignUrl])`
+
+```ts
+const result = await turnkey.serverSign("method", [param1, param2]);
+```
+
+## Examples
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <FeatureCard title="Auth flow with Passkeys" icon="lock-01" href="/solutions/embedded-wallets/integration-guide/react/sub-organization-customization" description="Implement an embedded wallet authentication flow with Passkeys." />
+  <FeatureCard title="Auth flow with email" icon="lock-01" href="/solutions/embedded-wallets/integration-guide/react/auth" description="Implement an embedded wallet authentication flow with email." />
+  <FeatureCard title="Signing Transactions" icon="file-code-01" href="/solutions/embedded-wallets/integration-guide/react/signing" description="Sign transactions using Turnkey's embedded wallets." />
+</div>

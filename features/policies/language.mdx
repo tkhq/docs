@@ -1,0 +1,452 @@
+---
+title: "Policy language"
+description: "This page provides an overview of how to author policies using our policy language. To begin, we'll need to get familiar with the language's grammar, keywords, and types."
+sidebarTitle: "Language"
+---
+
+## Grammar
+
+The grammar has been designed for flexibility and expressiveness. We currently support the following operations:
+
+| Operation  | Operators                    | Example                      | Types                    |
+| ---------- | ---------------------------- | ---------------------------- | ------------------------ |
+| logical    | &&, \|\|                     | "true && false"              | (bool, bool) -> bool     |
+| comparison | ==, !=, \<, >, \<=, >=       | "1 \< 2"                     | (int, int) -> bool       |
+| comparison | ==, !=                       | "'a' != 'b'"                 | (string, string) -> bool |
+| comparison | in                           | "1 in \[1, 2, 3]"            | (T, list\<T>) -> bool    |
+| access     | x\[\<index>]                 | \[1,2,3]\[0]                 | (list\<T>) -> T          |
+| access     | x\[\<index>]                 | "'abc'\[0]"                  | (string) -> string       |
+| access     | x\[\<start>..\<end>]         | \[1,2,3]\[0..2]              | (list\<T>) -> (list\<T>) |
+| access     | x\[\<start>..\<end>]         | "'abc'\[0..2]"               | (string) -> string       |
+| access     | x.\<field>                   | "user.tags"                  | (struct) -> T            |
+| function   | x.all(item, \<predicate>)    | "\[1,1,1].all(x, x == 1)"    | (list\<T>) -> bool       |
+| function   | x.any(item, \<predicate>)    | "\[1,2,3].any(x, x == 1)"    | (list\<T>) -> bool       |
+| function   | x.contains(\<value>)         | "\[1,2,3].contains(1)"       | (list\<T>) -> bool       |
+| function   | x.count()                    | "\[1,2,3].count()"           | (list\<T>) -> int        |
+| function   | x.filter(item, \<predicate>) | "\[1,2,3].filter(x, x == 1)" | (list\<T>) -> (list\<T>) |
+
+## Keywords
+
+Keywords are reserved words that are dynamically interchanged for real values at evaluation time. Each field supports a different set of keywords.
+
+### Consensus
+
+| Keyword         | Type               | Description                                           |
+| --------------- | ------------------ | ----------------------------------------------------- |
+| **approvers**   | list\<User\>       | The users that have approved an activity              |
+| **credentials** | list\<Credential\> | The credentials that were used to approve an activity |
+
+### Condition
+
+| Keyword                        | Type                 | Description                                                                 |
+| ------------------------------ | -------------------- | --------------------------------------------------------------------------- |
+| **activity**                   | Activity             | The activity metadata of the request                                        |
+| **eth.tx**                     | EthereumTransaction  | The parsed Ethereum transaction payload (see Appendix below)                |
+| **eth.eip_712**                | Eip712TypedData      | EIP-712 Typed Data (see Appendix below)                                     |
+| **eth.eip_7702_authorization** | Eip7702Authorization | EIP-7702 Authorization (see Appendix below)                                 |
+| **solana.tx**                  | SolanaTransaction    | The parsed Solana transaction payload (see Appendix below)                  |
+| **tron.tx**                    | TronTransaction      | The parsed Tron transaction payload (see Appendix below)                    |
+| **bitcoin.tx**                 | BitcoinTransaction   | The parsed Bitcoin transaction payload (see Appendix below)                 |
+| **tempo.tx**                   | TempoTransaction     | The parsed Tempo transaction payload (see Appendix below)                   |
+| **wallet**                     | Wallet               | The target wallet used in sign + export requests                            |
+| **wallets**                    | list\<Wallet\>       | The target wallets associated with requests involving with multiple wallets |
+| **private_key**                | PrivateKey           | The target private key used in sign + export requests                       |
+| **wallet_account**             | WalletAccount        | The target wallet account used in sign + export requests                    |
+
+## Types
+
+The language is strongly typed which makes policies easy to author and maintain.
+
+### Primitive
+
+| Type          | Example                                 | Notes                                             |
+| ------------- | --------------------------------------- | ------------------------------------------------- |
+| **bool**      | true                                    |                                                   |
+| **int**       | 256                                     | i128                                              |
+| **uint**      | 170141183460469231731687303715884105728 | u256                                              |
+| **string**    | 'a'                                     | only single quotes are supported                  |
+| **list\<T\>** | [1, 2, 3]                               | a list of type T                                  |
+| **struct**    | \{ id: 'abc' \}                         | a key-value map of \{ field: T \} (defined below) |
+
+### Struct
+
+| Struct                   | Field                    | Type                                      | Description                                                                                                                                                                                                                                                                            |
+| ------------------------ | ------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User**                 | id                       | string                                    | The identifier of the user                                                                                                                                                                                                                                                             |
+|                          | tags                     | list\<string\>                            | The collection of tags for the user                                                                                                                                                                                                                                                    |
+|                          | email                    | string                                    | The email address of the user                                                                                                                                                                                                                                                          |
+|                          | alias                    | string                                    | The alias of the user                                                                                                                                                                                                                                                                  |
+| **Credential**           | id                       | string                                    | The identifier of the API key or authenticator that was used to approve the request                                                                                                                                                                                                    |
+|                          | user_id                  | string                                    | The identifier of the user who owns this request and approved the request                                                                                                                                                                                                              |
+|                          | type                     | string                                    | The credential type, a full list can be found [here](/features/users/credentials#credential-types)                                                                                                                                                                                     |
+|                          | credential_id            | string                                    | The credential ID of a passkey. Note: this is only populated for passkeys (also known as Authenticators within Turnkey resources), not API keys                                                                                                                                        |
+|                          | public_key               | string                                    | The public key of the credential that approved the request                                                                                                                                                                                                                             |
+| **Activity**             | type                     | string                                    | The type of the activity (e.g. ACTIVITY_TYPE_SIGN_TRANSACTION_V2)                                                                                                                                                                                                                      |
+|                          | resource                 | string                                    | The resource type the activity targets: `USER`, `PRIVATE_KEY`, `POLICY`, `WALLET`, `ORGANIZATION`, `INVITATION`, `CREDENTIAL`, `CONFIG`, `**RECOVERY`, `AUTH`, `OTP`, `PAYMENT_METHOD`, `SUBSCRIPTION`                                                                                 |
+|                          | action                   | string                                    | The action of the activity: `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT`, `IMPORT`                                                                                                                                                                                                   |
+|                          | params                   | struct                                    | The parameters of the activity. See [here](#activity-parameters) for more details.                                                                                                                                                                                                     |
+| **Wallet**               | id                       | string                                    | The identifier of the wallet                                                                                                                                                                                                                                                           |
+|                          | imported                 | bool                                      | Boolean indicating whether or not this wallet has been imported                                                                                                                                                                                                                        |
+|                          | exported                 | bool                                      | Boolean indicating whether or not this wallet has been exported                                                                                                                                                                                                                        |
+|                          | label                    | string                                    | The label of this wallet                                                                                                                                                                                                                                                               |
+| **Wallet Account**       | address                  | string                                    | The wallet account address                                                                                                                                                                                                                                                             |
+| **PrivateKey**           | id                       | string                                    | The identifier of the private key                                                                                                                                                                                                                                                      |
+|                          | tags                     | list\<string\>                            | The collection of tags for the private key                                                                                                                                                                                                                                             |
+|                          | imported                 | bool                                      | Boolean indicating whether or not this private key has been imported                                                                                                                                                                                                                   |
+|                          | exported                 | bool                                      | Boolean indicating whether or not this private key has been exported                                                                                                                                                                                                                   |
+|                          | label                    | string                                    | The label of this private key                                                                                                                                                                                                                                                          |
+| **EthereumTransaction**  | from                     | string                                    | The sender address of the transaction                                                                                                                                                                                                                                                  |
+|                          | to                       | string                                    | The receiver address of the transaction (can be an EOA or smart contract)                                                                                                                                                                                                              |
+|                          | data                     | string                                    | The arbitrary calldata of the transaction (hex-encoded)                                                                                                                                                                                                                                |
+|                          | value                    | int                                       | The amount being sent (in wei)                                                                                                                                                                                                                                                         |
+|                          | gas                      | int                                       | The maximum allowed gas for the transaction                                                                                                                                                                                                                                            |
+|                          | gas_price                | int                                       | The price of gas for the transaction (Note: this field was used in legacy transactions and was replaced with max_fee_per_gas in EIP 1559 transactions, however when evaluating policies on EIP 1559 transactions, this field will be populated with the same value as max_fee_per_gas) |
+|                          | chain_id                 | int                                       | The chain identifier for the transaction                                                                                                                                                                                                                                               |
+|                          | nonce                    | int                                       | The nonce for the transaction                                                                                                                                                                                                                                                          |
+|                          | max_fee_per_gas          | int                                       | EIP 1559 field specifying the max amount to pay per unit of gas for the transaction (Note: This is the sum of the gas for the transaction and the priority fee described below)                                                                                                        |
+|                          | max_priority_fee_per_gas | int                                       | EIP 1559 field specifying the max amount of the tip to be paid to miners for the transaction                                                                                                                                                                                           |
+|                          | max_fee_per_blob_gas     | int                                       | EIP 4844 field specifying the maximum fee users are willing to pay per unit of blob gas, akin to the tip in EIP 1559                                                                                                                                                                   |
+|                          | type                     | string                                    | The EVM transaction type. This should be one of the following: "LEGACY", "TYPE_1" (EIP 2930), "TYPE_2" (EIP 1559), "TYPE_3" (EIP 4844), "TYPE_4" (EIP 7702)                                                                                                                            |
+|                          | function_name            | string                                    | ABI field specifying the function name that the transaction call data is calling                                                                                                                                                                                                       |
+|                          | function_signature       | string                                    | ABI field specifying the leading bytes which denote the function being called in the call data                                                                                                                                                                                         |
+|                          | contract_call_args       | Option\<Map\<String, ContractArgument\>\> | ABI field specifying all contract arguments parsed from the contract call data. It is a mapping of the string representations of the arg name to the argument itself                                                                                                                   |
+| **Eip712TypedData**      | primary_type             | string                                    | The type of the primary (i.e. outermost) structure in the `message` JSON                                                                                                                                                                                                               |
+|                          | domain                   | Eip712Domain                              | The `Domain` of the payload                                                                                                                                                                                                                                                            |
+|                          | message                  | Map\<string, Value\>                      | JSON serializaiton of the message payload                                                                                                                                                                                                                                              |
+| **Eip7702Authorization** | address                  | string                                    | The address you would like to authorize                                                                                                                                                                                                                                                |
+|                          | chain_id                 | number                                    | The EVM chain ID                                                                                                                                                                                                                                                                       |
+|                          | nonce                    | number                                    | The nonce of the authority                                                                                                                                                                                                                                                             |
+| **SolanaTransaction**    | account_keys             | list\<string\>                            | The accounts (public keys) involved in the transaction                                                                                                                                                                                                                                 |
+|                          | program_keys             | list\<string\>                            | The programs (public keys) involved in the transaction                                                                                                                                                                                                                                 |
+|                          | instructions             | list\<Instruction\>                       | A list of Instructions (see below)                                                                                                                                                                                                                                                     |
+|                          | transfers                | list\<Transfer\>                          | A list of Transfers (see below)                                                                                                                                                                                                                                                        |
+|                          | recent_blockhash         | string                                    | The recent blockhash specified in a transaction                                                                                                                                                                                                                                        |
+|                          | spl_transfers            | list\<SPLTransfer\>                       | A list of SPLTransfers (see below)                                                                                                                                                                                                                                                     |
+|                          | address_table_lookups    | list\<AddressTableLookup\>                | A list of AddressTableLookups (see below)                                                                                                                                                                                                                                              |
+| **TronTransaction**      | ref_block_bytes          | string                                    | The height of the transaction reference block                                                                                                                                                                                                                                          |
+|                          | ref_block_hash           | string                                    | The hash of the transaction reference block                                                                                                                                                                                                                                            |
+|                          | expiration               | int                                       | Transaction expiration time in milliseconds                                                                                                                                                                                                                                            |
+|                          | timestamp                | int                                       | Transaction timestamp in milliseconds                                                                                                                                                                                                                                                  |
+|                          | data                     | string                                    | Transaction memo (not the call data!)                                                                                                                                                                                                                                                  |
+|                          | fee_limit                | int                                       | The maximum energy cost allowed for the execution of smart contract transactions                                                                                                                                                                                                       |
+|                          | contract                 | list\<TronContract\>                      | A list of TronContract. This is the main content of a Tron transaction. This determines the type of transaction being executed and its parameters (see below)                                                                                                                          |
+| **BitcoinTransaction**   | version                  | string                                    | The version of the Bitcoin transaction                                                                                                                                                                                                                                                 |
+|                          | inputs                   | list\<BitcoinTxInput\>                    | All inputs to this Bitcoin transaction                                                                                                                                                                                                                                                 |
+|                          | outputs                  | list\<BitcoinTxOutput\>                   | All outputs created by this Bitcoin transaction                                                                                                                                                                                                                                        |
+|                          | locktime                 | BitcoinTxLocktime                         | The locktime of this bitcoin transaction                                                                                                                                                                                                                                               |
+|                          | fee                      | int                                       | The total fee for this Bitcoin transaction in satoshis (computed as sum of input values minus sum of output values)                                                                                                                                                                    |
+| **TempoTransaction**     | chain_id                 | int                                       | The chain identifier for the transaction                                                                                                                                                                                                                                               |
+|                          | from                     | string                                    | The signer address of the transaction                                                                                                                                                                                                                                                  |
+|                          | nonce                    | int                                       | The nonce for the transaction                                                                                                                                                                                                                                                          |
+|                          | gas_limit                | int                                       | The maximum allowed gas for the transaction                                                                                                                                                                                                                                            |
+|                          | max_fee_per_gas          | int                                       | The maximum fee per unit of gas for the transaction                                                                                                                                                                                                                                    |
+|                          | max_priority_fee_per_gas | int                                       | The maximum priority fee (tip) per unit of gas                                                                                                                                                                                                                                         |
+|                          | fee_token                | string                                    | The token address used to pay transaction fees                                                                                                                                                                                                                                         |
+|                          | valid_before             | int                                       | Upper validity bound (timestamp). Defaults to 0 when not set                                                                                                                                                                                                                           |
+|                          | valid_after              | int                                       | Lower validity bound (timestamp). Defaults to 0 when not set                                                                                                                                                                                                                           |
+|                          | calls                    | list\<TempoCall\>                         | The list of calls in the transaction. Tempo transactions natively support batched calls — a single transaction can contain multiple calls that execute atomically                                                                                                                      |
+
+<Note>
+  {" "}
+  The `ContractArgument` type, used in documentation for ABI and IDL arguments
+  represents an enum indicating this type could be any one of the string,
+  number, array or struct types listed in our Primitives section.{" "}
+</Note>
+
+#### Nested structs
+
+| Struct                          | Field                   | Type                                  | Description                                                                                                                                                                                                                                                |
+| ------------------------------- | ----------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Eip712Domain**                | name                    | string                                | The name                                                                                                                                                                                                                                                   |
+|                                 | version                 | string                                | The version                                                                                                                                                                                                                                                |
+|                                 | chain_id                | uint                                  | The chain ID                                                                                                                                                                                                                                               |
+|                                 | verifying_contract      | string                                | The address of the verifying contract                                                                                                                                                                                                                      |
+| **Instruction**                 | program_key             | string                                | The program (public key) involved in the instruction                                                                                                                                                                                                       |
+|                                 | accounts                | list\<Account\>                       | A list of Accounts involved in the instruction                                                                                                                                                                                                             |
+|                                 | instruction_data_hex    | string                                | Raw hex bytes corresponding to instruction data                                                                                                                                                                                                            |
+|                                 | address_table_lookups   | list\<AddressTableLookup\>            | A list of AddressTableLookups used in the instruction.                                                                                                                                                                                                     |
+|                                 | parsed_instruction_data | Option\<SolanaParsedInstructionData\> | IDL related field specifying all additional information for an instruction calling a program for which an IDL has been uploaded                                                                                                                            |
+| **Transfer**                    | from                    | string                                | A Solana account (public key) representing the sender of the transfer                                                                                                                                                                                      |
+|                                 | to                      | string                                | A Solana account (public key) representing the recipient of the transfer                                                                                                                                                                                   |
+|                                 | amount                  | int                                   | The native SOL amount for the transfer (lamports). Only transfers executed by direct calls to system programs are recognized, transfers performed indirectly inside other programs or via unsupported System Program instructions are not included.        |
+| **SPLTransfer**                 | from                    | string                                | A Solana account (public key) representing the token account that is sending tokens in this SPL transfer                                                                                                                                                   |
+|                                 | to                      | string                                | A Solana account (public key) representing the token account that is receiving tokens in this SPL transfer                                                                                                                                                 |
+|                                 | amount                  | int                                   | The amount (noted in raw atomic units) of this SPL transfer. Only parsed for top-level SPL transfers using `Transfer`, `TransferChecked`, or `TransferCheckedWithFee`. Transfers performed through other Token / Token-2022 instructions are not included. |
+|                                 | owner                   | string                                | A Solana account (public key) representing the owner of the sending token account for this SPL transfer                                                                                                                                                    |
+|                                 | signers                 | list\<string\>                        | A list of Solana accounts (public keys) representing the multisig signers (if they exist) for this SPL transfer                                                                                                                                            |
+|                                 | token_mint              | string                                | A Solana account (public key) representing the token mint of the token being transferred in this SPL transfer                                                                                                                                              |
+| **Account**                     | account_key             | string                                | A Solana account (public key)                                                                                                                                                                                                                              |
+|                                 | signer                  | boolean                               | An indicator of whether or not the account is a signer                                                                                                                                                                                                     |
+|                                 | writable                | boolean                               | An indicator of whether or not the account can perform a write operation                                                                                                                                                                                   |
+| **AddressTableLookup**          | address_table_key       | string                                | A Solana address (public key) corresponding to the address table                                                                                                                                                                                           |
+|                                 | writable_indexes        | list\<int\>                           | Indexes corresponding to accounts that can perform writes                                                                                                                                                                                                  |
+|                                 | readonly_indexes        | list\<int\>                           | Indexes corresponding to accounts that can only perform reads                                                                                                                                                                                              |
+| **SolanaParsedInstructionData** | instruction_name        | string                                | IDL related field specifying the name of the instruction being called                                                                                                                                                                                      |
+|                                 | discriminator           | string                                | IDL related field specifying the byte discriminator denoting which instruction is being called by the instruction call data                                                                                                                                |
+|                                 | named_account           | map\<string, string\>                 | IDL related field specifying a mapping of account names to the account string, with the names as defined by the program IDL                                                                                                                                |
+|                                 | program_call_args       | map\<string, ContractArgument\>       | IDL related field specifying a mapping of account names to the account string, with the names as defined by the program IDL                                                                                                                                |
+| **TronContract**                | type                    | string                                | The contract type, a complete list can be found in the Tron Protocol Documentation                                                                                                                                                                         |
+|                                 | permission_id           | int                                   | The transaction permission type                                                                                                                                                                                                                            |
+|                                 | owner_address           | string                                | The address of the caller of the transaction                                                                                                                                                                                                               |
+|                                 | to_address              | string                                | The address of the recipient (Only available for TransferContract's)                                                                                                                                                                                       |
+|                                 | amount                  | int                                   | The amount of TRX to send (Only available for TransferContract's)                                                                                                                                                                                          |
+|                                 | contract_address        | string                                | The address of the contract being called (Only available for TriggerSmartContract's)                                                                                                                                                                       |
+|                                 | call_value              | int                                   | The amount of TRX passed to the contract (Only available for TriggerSmartContract's)                                                                                                                                                                       |
+|                                 | data                    | string                                | The function selector, and the functions parameters of the contract (Only available for TriggerSmartContract's)                                                                                                                                            |
+|                                 | call_token_value        | int                                   | The amount of a TRC-10 token passed to the contract (Only available for TriggerSmartContract's)                                                                                                                                                            |
+|                                 | token_id                | int                                   | The TRC-10 token id (Only available for TriggerSmartContract's)                                                                                                                                                                                            |
+|                                 | resource                | string                                | The resource to delegate/undelegate will be "ENERGY" or "BANDWIDTH" (Only available for Delegate, UnDelegate, FreezeBalanceV2, UnfreezeBalanceV2 contract's)                                                                                               |
+|                                 | balance                 | int                                   | The amount of sun (1,000,000 sun = 1 TRX) staked for resources to be delegated (Only available for DelegateContract and UnDelegateContract)                                                                                                                |
+|                                 | receiver_address        | string                                | The resource receiver address (Only available for DelegateContract and UnDelegateContract)                                                                                                                                                                 |
+|                                 | lock                    | bool                                  | Indicates if the delegated resources are locked or not. If true resources cannot be undelegated within the lock_period (Only available for DelegateContract's)                                                                                             |
+|                                 | lock_period             | int                                   | The time, in blocks, of how long the delegation is locked, only valid when lock is true (Only available for DelegateContract's)                                                                                                                            |
+|                                 | frozen_balance          | int                                   | The amount of sun (1,000,000 sun = 1 TRX) to be frozen (Only available for FreezeBalanceV2Contract's)                                                                                                                                                      |
+|                                 | unfreeze_balance        | int                                   | The amount of sun (1,000,000 sun = 1 TRX) to unfreeze (Only available for UnfreezeBalanceV2Contract's)                                                                                                                                                     |
+|                                 | owner                   | TronPermission                        | The owner permission of the account (Only available for AccountPermissionUpdateContract's)                                                                                                                                                                 |
+|                                 | witness                 | TronPermission                        | The witness permission of the account (Only available for AccountPermissionUpdateContract's)                                                                                                                                                               |
+|                                 | actives                 | list\<TronPermission\>                | A list of active permissions for the account (Only available for AccountPermissionUpdateContract's)                                                                                                                                                        |
+| **TronPermission**              | type                    | string                                | The permission type either "Owner", "Witness", or "Active"                                                                                                                                                                                                 |
+|                                 | id                      | int                                   | The permission id Owner = 0, Witness = 1, Active = 2+n where n is the 0 indexed active permission number                                                                                                                                                   |
+|                                 | permission_name         | string                                | The name of the permission                                                                                                                                                                                                                                 |
+|                                 | threshold               | int                                   | The operation is allowed only when the sum of the weights of the participating signatures exceeds the domain value. Requires a maximum value less than the Long type (int64).                                                                              |
+|                                 | parent_id               | int                                   | The parent id, currently always 0                                                                                                                                                                                                                          |
+|                                 | operations              | String                                | Hex encoded 32 bytes (256 bits), each bit represents the authority of a contract, a 1 means the authority to own the contract                                                                                                                              |
+|                                 | keys                    | TronKey                               | A list of address's and weight's that jointly own the permission can be up to 5 keys.                                                                                                                                                                      |
+| **TronKey**                     | address                 | string                                | The address authorized for a specific TronPermission                                                                                                                                                                                                       |
+|                                 | weight                  | int                                   | The weight of this address's signature for this permission, used to reach "threshold" in a TronPermission                                                                                                                                                  |
+| **BitcoinTxInput**              | tx_id                   | string                                | The transaction id of the Bitcoin transaction that created the output that is being spent by this input                                                                                                                                                    |
+|                                 | vout                    | int                                   | The index in the output array on the Bitcoin transaction that created the output being spent by this input                                                                                                                                                 |
+|                                 | sequence                | int                                   | The sequence field on this input which is set whether the transaction can be replaced or when it can be mined                                                                                                                                              |
+| **BitcoinTxOutput**             | value                   | int                                   | The value of this output in Satoshis                                                                                                                                                                                                                       |
+|                                 | script_pubkey           | string                                | The locking code for this transaction output                                                                                                                                                                                                               |
+|                                 | address                 | string                                | The onchain address representation for this transaction output                                                                                                                                                                                            |
+|                                 | address_type            | string                                | The address derivation type of the address for this transaction output                                                                                                                                                                                     |
+| **BitcoinTxLocktime**           | amount                  | int                                   | The amount represented in this transaction's locktime                                                                                                                                                                                                      |
+|                                 | type                    | string                                | The type of locktime represented (either 'Seconds' or 'Blocks')                                                                                                                                                                                            |
+| **TempoCall**                   | to                      | string                                | The destination address of the call (empty string for contract creation)                                                                                                                                                                                   |
+|                                 | input                   | string                                | The raw call data as a hex string (supports slicing, e.g. `tempo.tx.calls[0].input[34..74]`)                                                                                                                                                               |
+|                                 | function_signature      | string                                | The 4-byte function selector derived from the call input (e.g. `0xa9059cbb` for ERC-20 `transfer`). Empty string when input is absent or too short                                                                                                         |
+
+## Activity breakdown
+
+| Resource Type                | Action |                                 Activity Type |
+| ---------------------------- | ------ | --------------------------------------------: |
+| **ORGANIZATION**             | CREATE |      ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8 |
+|                              | DELETE |             ACTIVITY_TYPE_DELETE_ORGANIZATION |
+|                              | DELETE |         ACTIVITY_TYPE_DELETE_SUB_ORGANIZATION |
+| **INVITATION**               | CREATE |              ACTIVITY_TYPE_CREATE_INVITATIONS |
+|                              | DELETE |               ACTIVITY_TYPE_DELETE_INVITATION |
+| **POLICY**                   | CREATE |                ACTIVITY_TYPE_CREATE_POLICY_V3 |
+|                              | CREATE |                 ACTIVITY_TYPE_CREATE_POLICIES |
+|                              | UPDATE |                ACTIVITY_TYPE_UPDATE_POLICY_V2 |
+|                              | DELETE |                   ACTIVITY_TYPE_DELETE_POLICY |
+|                              | DELETE |                 ACTIVITY_TYPE_DELETE_POLICIES |
+| **SMART_CONTRACT_INTERFACE** | CREATE | ACTIVITY_TYPE_CREATE_SMART_CONTRACT_INTERFACE |
+|                              | DELETE | ACTIVITY_TYPE_DELETE_SMART_CONTRACT_INTERFACE |
+| **WALLET**                   | CREATE |                   ACTIVITY_TYPE_CREATE_WALLET |
+|                              | CREATE |          ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS |
+|                              | EXPORT |                   ACTIVITY_TYPE_EXPORT_WALLET |
+|                              | EXPORT |           ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT |
+|                              | IMPORT |              ACTIVITY_TYPE_INIT_IMPORT_WALLET |
+|                              | IMPORT |                   ACTIVITY_TYPE_IMPORT_WALLET |
+|                              | DELETE |                  ACTIVITY_TYPE_DELETE_WALLETS |
+|                              | UPDATE |                   ACTIVITY_TYPE_UPDATE_WALLET |
+|                              | DELETE |          ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS |
+| **PRIVATE_KEY**              | CREATE |          ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2 |
+|                              | CREATE |          ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG |
+|                              | UPDATE |          ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG |
+|                              | DELETE |             ACTIVITY_TYPE_DISABLE_PRIVATE_KEY |
+|                              | DELETE |         ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS |
+|                              | DELETE |             ACTIVITY_TYPE_DELETE_PRIVATE_KEYS |
+|                              | EXPORT |              ACTIVITY_TYPE_EXPORT_PRIVATE_KEY |
+|                              | IMPORT |         ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY |
+|                              | IMPORT |              ACTIVITY_TYPE_IMPORT_PRIVATE_KEY |
+|                              | SIGN   |             ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2 |
+|                              | SIGN   |               ACTIVITY_TYPE_SIGN_RAW_PAYLOADS |
+|                              | SIGN   |             ACTIVITY_TYPE_SIGN_TRANSACTION_V2 |
+|                              | SIGN   |            ACTIVITY_TYPE_ETH_SEND_TRANSACTION |
+|                              | SIGN   |            ACTIVITY_TYPE_SOL_SEND_TRANSACTION |
+| **USER**                     | CREATE |                 ACTIVITY_TYPE_CREATE_USERS_V4 |
+|                              | CREATE |                 ACTIVITY_TYPE_CREATE_USER_TAG |
+|                              | CREATE |           ACTIVITY_TYPE_CREATE_API_ONLY_USERS |
+|                              | UPDATE |                     ACTIVITY_TYPE_UPDATE_USER |
+|                              | UPDATE |                ACTIVITY_TYPE_UPDATE_USER_NAME |
+|                              | UPDATE |               ACTIVITY_TYPE_UPDATE_USER_EMAIL |
+|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_USER_PHONE_NUMBER |
+|                              | UPDATE |                 ACTIVITY_TYPE_UPDATE_USER_TAG |
+|                              | DELETE |                    ACTIVITY_TYPE_DELETE_USERS |
+|                              | DELETE |                ACTIVITY_TYPE_DELETE_USER_TAGS |
+| **CREDENTIAL**               | CREATE |              ACTIVITY_TYPE_CREATE_API_KEYS_V2 |
+|                              | CREATE |        ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2 |
+|                              | DELETE |                 ACTIVITY_TYPE_DELETE_API_KEYS |
+|                              | DELETE |           ACTIVITY_TYPE_DELETE_AUTHENTICATORS |
+|                              | CREATE |       ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS_V2 |
+|                              | DELETE |          ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS |
+| **PAYMENT_METHOD**           | UPDATE |           ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2 |
+|                              | DELETE |           ACTIVITY_TYPE_DELETE_PAYMENT_METHOD |
+| **SUBSCRIPTION**             | CREATE |           ACTIVITY_TYPE_ACTIVATE_BILLING_TIER |
+| **CONFIG**                   | UPDATE |          ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS |
+| \***\*RECOVERY**             | CREATE |     ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2 |
+| **AUTH**                     | CREATE |                   ACTIVITY_TYPE_EMAIL_AUTH_V3 |
+|                              | CREATE |                ACTIVITY_TYPE_INIT_OTP_AUTH_V3 |
+|                              | CREATE |                        ACTIVITY_TYPE_OTP_AUTH |
+|                              | CREATE |                           ACTIVITY_TYPE_OAUTH |
+|                              | CREATE |                     ACTIVITY_TYPE_OAUTH_LOGIN |
+|                              | CREATE |                    ACTIVITY_TYPE_OTP_LOGIN_V2 |
+|                              | CREATE |                     ACTIVITY_TYPE_STAMP_LOGIN |
+|                              | CREATE |    ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2 |
+|                              | CREATE |        ACTIVITY_TYPE_CREATE_OAUTH2_CREDENTIAL |
+|                              | DELETE |        ACTIVITY_TYPE_DELETE_OAUTH2_CREDENTIAL |
+|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL |
+|                              | CREATE |             ACTIVITY_TYPE_OAUTH2_AUTHENTICATE |
+| **OTP**                      | CREATE |                     ACTIVITY_TYPE_INIT_OTP_V3 |
+|                              | VERIFY |                   ACTIVITY_TYPE_VERIFY_OTP_V2 |
+| **AUTH_PROXY**               | CREATE |               ACTIVITY_TYPE_ENABLE_AUTH_PROXY |
+|                              | DELETE |              ACTIVITY_TYPE_DISABLE_AUTH_PROXY |
+|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_AUTH_PROXY_CONFIG |
+| **WEBHOOK_ENDPOINT**         | CREATE |          ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT |
+|                              | UPDATE |          ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT |
+|                              | DELETE |          ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT |
+
+<Note> ** Legacy features, deprecated in the latest SDKs. </Note>
+
+## Appendix
+
+### Policy evaluation
+
+Note that our policy engine does not short circuit during evaluation. In practice, this means that if any clause within the `condition` field of a policy results in an error, the evaluated `outcome` for that policy will be an error. In such cases, consider breaking up complex policies into separate policies.
+
+For example, suppose you're looking to construct a policy with the condition `wallet.id == '\<wallet UUID\>' || private_key.id == '\<private key UUID\>'. This condition will _always_ error out during evaluation, because only one of the two clauses can ever be valid: an activity cannot target both a wallet and private key. That means if you're trying to, say, sign with a private key, then the wallet clause will fail (because a wallet isn't being passed into the policy evaluation). Conversely, if you're trying to sign with a wallet, the private key clause will fail for the same reason.
+
+### Activity parameters
+
+The `activity.params` field exposes specific parameters based on the activity type. Most activities do not expose any parameters, but certain activities expose fields that can be used in policy conditions.
+
+| Category          | Activity Type                       | Field           | Type           | Description                                                                                                                                                   |
+| ----------------- | ----------------------------------- | --------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Signing           | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD`    | `hash_function` | string         | The hash function used (e.g., `HASH_FUNCTION_NO_OP`, `HASH_FUNCTION_KECCAK256`)                                                                               |
+|                   |                                     | `encoding`      | string         | The payload encoding (e.g., `PAYLOAD_ENCODING_HEXADECIMAL`, `PAYLOAD_ENCODING_EIP712`)                                                                        |
+|                   | `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2` | `hash_function` | string         | The hash function used                                                                                                                                        |
+|                   |                                     | `encoding`      | string         | The payload encoding                                                                                                                                          |
+|                   | `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS`   | `hash_function` | string         | The hash function used                                                                                                                                        |
+|                   |                                     | `encoding`      | string         | The payload encoding                                                                                                                                          |
+|                   | `ACTIVITY_TYPE_SIGN_TRANSACTION_V2` | `type`          | string         | The transaction type (one of `[TRANSACTION_TYPE_ETHEREUM, TRANSACTION_TYPE_SOLANA, TRANSACTION_TYPE_BITCOIN, TRANSACTION_TYPE_TRON, TRANSACTION_TYPE_TEMPO`]) |
+| User Management   | `ACTIVITY_TYPE_DELETE_USERS`        | `user_ids`      | list\<string\> | The list of user IDs being deleted                                                                                                                            |
+| Wallet Management | `ACTIVITY_TYPE_UPDATE_WALLET`       | `wallet_id`     | string         | The ID of the wallet being updated                                                                                                                            |
+| Authentication    | `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`    | `otp_length`    | int            | The length of the OTP code                                                                                                                                    |
+|                   | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`    | `otp_length`    | int            | The length of the OTP code                                                                                                                                    |
+| Policy Management | `ACTIVITY_TYPE_DELETE_POLICY`       | `policy_id`     | string         | The ID of the policy being deleted                                                                                                                            |
+|                   | `ACTIVITY_TYPE_DELETE_POLICIES`     | `policy_ids`    | list\<string\> | The list of policy IDs being deleted                                                                                                                          |
+| Webhook Endpoint  | `ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT` | `url`       | string         | The URL of the webhook endpoint                                                                                                                               |
+|                   |                                     | `name`          | string         | The display name of the webhook endpoint                                                                                                                      |
+|                   |                                     | `subscriptions` | list\<struct\> | The list of event subscriptions for this endpoint                                                                                                             |
+|                   |                                     | `subscriptions.event_type` | string | The event type to subscribe to (e.g., `ACTIVITY_UPDATES`, `BALANCE_CONFIRMED_UPDATES`)                                                     |
+|                   |                                     | `subscriptions.filters_json` | string | JSON-encoded filter criteria for the subscription                                                                                                   |
+|                   |                                     | `subscriptions.is_active` | bool | Whether this subscription is active                                                                                                                      |
+|                   | `ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT` | `endpoint_id` | string       | The ID of the webhook endpoint being updated                                                                                                                  |
+|                   |                                     | `url`           | string         | The updated URL of the webhook endpoint                                                                                                                       |
+|                   |                                     | `name`          | string         | The updated display name of the webhook endpoint                                                                                                              |
+|                   |                                     | `is_active`     | bool           | Whether the webhook endpoint is active                                                                                                                        |
+|                   | `ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT` | `endpoint_id` | string       | The ID of the webhook endpoint being deleted                                                                                                                  |
+
+#### Examples
+
+To deny signing raw payloads with the NO_OP hash function (except for EIP-712):
+
+```json
+{
+  "policyName": "Deny NO_OP hash signing",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
+}
+```
+
+To allow a user to delete only themselves:
+
+```json
+{
+  "policyName": "Allow self-deletion",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_DELETE_USERS' && activity.params.user_ids.count() == 1 && '<USER_ID>' in activity.params.user_ids"
+}
+```
+
+### Root quorum activities
+
+There are a select few activities that are not governed by policies, but rather by an organization's [root quorum](/features/users/root-quorum). These activities are: `ACTIVITY_TYPE_UPDATE_ROOT_QUORUM`, `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE`, `ACTIVITY_TYPE_UPDATE_ORGANIZATION_NAME`. For example, if a policy is added that allows a specific non-root user to perform `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activities, these requests will still fail as they are subject specifically to root quorum.
+
+### Ethereum
+
+Our Ethereum policy language (accessible via `eth.tx`) allows for the granular governance of signing Ethereum (EVM-compatible) transactions. Our policy engine exposes a [fairly standard set of properties](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope) belonging to a transaction.
+
+See the [Ethereum policy examples](/features/policies/examples/ethereum) for sample scenarios.
+
+<Note>
+  {" "}
+  The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart
+  contracts support signed integers up to 256 bits (`int256`), but values
+  exceeding the 128-bit signed range cannot be used in policy conditions.{" "}
+</Note>
+
+#### EIP-712
+
+Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When defining policies for EIP-712 messages, please ensure that all hex-encoded strings (e.g. addresses, function selectors, bytes) are **lowercase**. The policy engine expects lowercase hex strings to conform to Ethereum's standard convention. Using uppercase hex strings may result in errors or policy rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
+
+### Solana
+
+Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing Solana transactions. Note that there are some fundamental differences between the architecture of the two types of transactions, hence the resulting differences in policy structure.
+
+Notably, within our policy engine, a Solana transaction contains a list of Transfers, currently corresponding to native SOL transfers. Each transfer within a transaction is considered a separate entity. Each entity represents only top-level transfers that directly invoke supported System Program transfer instructions and do not include transfers performed indirectly inside other programs, or via unsupported System Program instructions.
+
+Similarly, the policy engine exposes `solana.tx.spl_transfers`, which contains only top-level SPL transfers using the supported Token and Token-2022 instructions `Transfer`, `TransferChecked`, and `TransferCheckedWithFee`. SPL transfers performed indirectly inside other programs or via unsupported Token and Token-2022 instructions are not detected and do not appear in this list.
+
+Here are some approaches you might take to govern transfers:
+
+- _All_ transfers need to match the policy condition. Useful for allowlists ([example](/features/policies/examples/solana#allow-solana-transactions-that-include-a-transfer-to-only-one-specific-recipient))
+- _Just one_ transfer needs to match the policy condition. Useful for blocklists ([example](/features/policies/examples/solana#deny-all-solana-transactions-transferring-to-an-undesired-address))
+- Only match if there is a _single_ transfer in the transaction, _and_ that transfer meets the criteria ([example](/features/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)). This is the most secure approach, and thus most restrictive.
+
+#### Account address lookups
+
+Solana transactions can reference onchain address lookup tables for account addresses. Turnkey surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP` in Solana address fields (`account_keys`, instruction accounts, `transfers`, and `spl_transfers`). The `solana.tx.address_table_lookups` array indicates when lookups are present, but the specific addresses are not resolved. If you rely on allowlists or denylists of addresses, add a guard for this placeholder (for example, require `solana.tx.address_table_lookups.count == 0` before comparing addresses, or explicitly deny when `ADDRESS_TABLE_LOOKUP` appears with something like `solana.tx.transfers.any(t, t.to == 'ADDRESS_TABLE_LOOKUP')`) so that dynamic lookups cannot bypass or unexpectedly fail your policy. See the [address table lookup examples](/features/policies/examples/solana#deny-all-address-table-lookups) for examples on how to enforce this.
+
+#### Program address lookups
+
+Turnkey rejects Solana transactions where program addresses are resolved via address lookup tables. Program IDs must be statically defined in the transaction to enable static analysis of instructions without requiring onchain data lookups. If your transaction references a program via an address table lookup, the signing request will fail. Account addresses (non-program) can still be dynamically resolved via lookup tables as described above.
+
+See the [Solana policy examples](/features/policies/examples/solana) for sample scenarios.
+
+### Tron
+
+Our Tron policy language (accessible via `tron.tx`) allows for policy control over signing Tron transactions. Our policy language supports the standard fields in a Tron transaction: https://developers.tron.network/docs/tron-protocol-transaction. To reference a Contract within a Transaction you should use `tron.tx.contract[0].field_name` in your policy where field_name is some field of the contract used in your transaction. While Tron only currently supports 1 contract per transaction this could change in the future, and we're ready for it if it does! The policy engine currently supports the following Tron contract types:
+
+- TransferContract (TRX transfers)
+- TriggerSmartContract (Smart contract, including, but not limited to TRC-20, invocations)
+- DelegateResourceContract
+- UnDelegateResourceContract
+- FreezeBalanceV2Contract
+- UnfreezeBalanceV2Contract
+- AccountPermissionUpdateContract
+
+See the [Tron policy examples](/features/policies/examples/tron) for sample scenarios.
+
+### Bitcoin
+
+Our Bitcoin policy language (accessible via `bitcoin.tx`) allows for policy control over signing Bitcoin transactions.
+
+NOTE: While our `SIGN TRANSACTION` endpoint takes in a Partially Signed Bitcoin Transaction (PSBT) as required for signing context -- our policy language supports only the standard fields inside a Bitcoin transaction: https://learnmeabitcoin.com/technical/transaction/#structure
+
+For further reference on how Turnkey handles Bitcoin transactions in our policy-enabled transaction signing flow, check out this section in our [Bitcoin Network Support](/features/networks/bitcoin#policy-enabled-bitcoin-transaction-signing) page.
+
+See the [Bitcoin policy examples](/features/policies/examples/bitcoin) for sample Bitcoin policies.
+
+### Tempo
+
+Our Tempo policy language (accessible via `tempo.tx`) allows for policy control over signing Tempo transactions. Tempo transactions natively support batched calls — a single transaction can contain one or more calls that execute atomically. The `tempo.tx.calls` list gives you access to each individual call, including its destination and raw input data.
+
+The `tempo.tx` namespace exposes the following transaction-level fields: `chain_id`, `from`, `nonce`, `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas`, `fee_token`, `valid_before`, and `valid_after`. Each call in `tempo.tx.calls` exposes: `to`, `input`, and `function_signature`.
+
+You can also govern Tempo transactions at the activity level using `activity.params.type == 'TRANSACTION_TYPE_TEMPO'`, combined with other fields such as specific wallets, private keys, or consensus rules.
+
+See the [Tempo policy examples](/features/policies/examples/tempo) for sample scenarios.
