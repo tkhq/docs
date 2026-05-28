@@ -91,6 +91,14 @@ Use the webhook endpoint APIs or the Dashboard UI to manage existing endpoints:
 
 Set `isActive` to `false` to pause delivery without deleting the endpoint.
 
+## Endpoint validation and reachability
+
+Webhook endpoint URLs are validated when endpoints are created or updated, and delivery also uses dial-time protections. URLs must use `https`, include a valid host, and resolve to a public destination. Turnkey rejects URLs that point to localhost, private IP ranges, link-local addresses, metadata endpoints, or URLs that include user info.
+
+Redirects are not followed. If your endpoint hostname later resolves to a disallowed destination, delivery will fail even if the endpoint was valid when it was created.
+
+Keep your endpoint publicly reachable and return a `2xx` response after accepting the webhook. Avoid long-running request handling in the delivery path; enqueue work internally and respond quickly. `3xx`, `4xx`, and `429` responses are treated as terminal delivery failures, while network errors and `5xx` responses may be retried.
+
 ## Delivery contract
 
 Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON and the `Content-Type` header is `application/json`. Your endpoint should return a `2xx` status code after accepting the delivery. Only active endpoints and active subscriptions receive deliveries.
