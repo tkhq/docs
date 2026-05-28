@@ -1,6 +1,5 @@
 # Overview
 
-
 Turnkey provides two complementary tools for tracking onchain balances:
 
 - **Balances API**: query the current balances for a given address on a specific chain, across all
@@ -38,12 +37,14 @@ the current amount held at the address.
 - **Base** - eip155:8453
 - **Polygon** - eip155:137
 - **Ethereum** - eip155:1
+- **Arbitrum** - eip155:42161
 
 **EVM testnets:**
 
 - **Base (Sepolia)** - eip155:84532
 - **Polygon (Amoy)** - eip155:80002
 - **Ethereum (Sepolia)** - eip155:11155111
+- **Arbitrum (Sepolia)** - eip155:421614
 
 **Solana:**
 
@@ -54,34 +55,37 @@ the current amount held at the address.
 
 ### Webhooks
 
-Turnkey Webhooks let you react to balance changes in real time, without polling. Instead of
-repeatedly calling the [Get Balances](/api-reference/queries/get-balances) API to check for updates,
-you register an endpoint and Turnkey pushes the data to you; an HTTP POST fires when a supported
-asset transfer is first confirmed in a block onchain. Webhook payloads deliver balance diffs as soon
-as a transaction is confirmed in a block. Combined with the Balance APIs, you have everything you
-need to keep your application's balances up to date without building your own indexing/polling
-infrastructure or relying on another third party.
+Turnkey Webhooks let you react to balance changes in real time, without polling. Instead of repeatedly calling the Get Balances API to check for updates, you register an endpoint and Turnkey pushes the data to you. Each payload carries the balance diff for that event (asset, address, and amount transferred), so your application can update state immediately without an additional API call. Combined with the Balance APIs, you have everything you need to keep your application's balances up to date without building your own indexing/polling infrastructure or relying on another third party.
 
-You subscribe to webhooks at the parent organization level. Subscriptions cover wallet-account
-addresses across the parent organization and all of its sub-organizations. In other words, once you
-subscribe you'll receive webhook notifications for all the addresses within your entire Turnkey
-instance.
+You subscribe to webhooks at the parent organization level. Subscriptions cover wallet-account addresses across the parent organization and all of its sub-organizations. In other words, once you subscribe you'll receive webhook notifications for all the addresses within your entire Turnkey instance.
 
-<Note>
-  Webhook delivery does **not** mean the transaction is finalized. A chain reorganization could
-  still occur and the transaction may be removed from the canonical chain. Add
-  `BALANCE_FINALIZED_UPDATES` alongside `BALANCE_CONFIRMED_UPDATES` if you also need events after
-  the block has reached the finalization threshold.
-</Note>
+#### The two-webhook model
+
+Turnkey emits two event types for every balance change:
+
+- `"balances:confirmed"` fires when a supported asset transfer is first included in a block onchain. The transfer has happened, but a chain reorganization could still remove it from the canonical chain.
+- `"balances:finalized"` fires once the containing block has reached the finalization threshold for that chain. At this point the chance of the transfer being removed by a reorg is negligible.
+
+You can subscribe to one or both. For example, a consumer app that wants its UI to react immediately can listen on `"balances:confirmed"`, render the deposit as pending, and clear that state when the matching `"balances:finalized"` arrives. An application moving high-value transfers that needs certainty before crediting funds can ignore `"balances:confirmed"` entirely and act only on `"balances:finalized"`.
 
 #### Subscribing
 
-Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the
-`BALANCE_CONFIRMED_UPDATES` event type to register your endpoint. Add
-`BALANCE_FINALIZED_UPDATES` alongside confirmed updates if you also need finalization signals.
-Create the webhook endpoint on the parent organization. Balance webhook delivery is scoped to
-wallet-account addresses within your parent organization and its sub-organizations. This includes
-both addresses generated through Turnkey and addresses imported into your Turnkey organization.
+Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the `BALANCE_CONFIRMED_UPDATES` or `BALANCE_FINALIZED_UPDATES` event type. You can subscribe to one or both by registering a subscription per event type. The endpoint itself is created on the parent organization. Once active, the subscription delivers events for wallet-account addresses across the parent organization and all of its sub-organizations. This covers both addresses Turnkey generated and addresses imported into your Turnkey organization.
+
+#### Reorg handling
+
+The two-webhook model handles chain reorganizations without any rollback logic on your side. If a confirmed transaction is reorged out of the canonical chain before finality:
+
+1. The original `"balances:confirmed"` fires when the transaction is first included.
+2. The reorg occurs and the transaction is removed from the canonical chain.
+3. A new `"balances:confirmed"` fires when the transaction is included again in the new canonical chain.
+4. A `"balances:finalized"` fires for the canonical inclusion once it reaches finality.
+
+If the transaction never re-enters the canonical chain, no `"balances:finalized"` event fires for it. Either way, `"balances:finalized"` is the source of truth for what actually landed onchain. You don't need to track and roll back state from earlier confirmed events.
+
+#### Delivery
+
+Balance webhooks use at-least-once processing. If your endpoint is unreachable or a delivery fails on our side, Turnkey will retry. Each payload includes a per-event `idempotencyKey`, so you can safely deduplicate any duplicate deliveries on your end.
 
 #### Supported chains
 
@@ -92,12 +96,14 @@ Balance webhooks are currently supported on:
 - **Base** - eip155:8453
 - **Polygon** - eip155:137
 - **Ethereum** - eip155:1
+- **Arbitrum** - eip155:42161
 
 **EVM testnets:**
 
 - **Base (Sepolia)** - eip155:84532
 - **Polygon (Amoy)** - eip155:80002
 - **Ethereum (Sepolia)** - eip155:11155111
+- **Arbitrum (Sepolia)** - eip155:421614
 
 **Solana:**
 
