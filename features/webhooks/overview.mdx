@@ -137,41 +137,11 @@ The `event_id` segment in the signed message is the value of the `X-Turnkey-Even
 
 Signature verification signs only the signature contract fields shown above plus the raw body. Other delivery headers are useful for routing and observability but are not part of the signed message.
 
-Webhook signatures can be verified with `verifyTurnkeyWebhookSignature` from `@turnkey/crypto`.
+To verify a delivery, reconstruct the signed message from the headers and raw body, then verify the Ed25519 signature against the signing key identified by `X-Turnkey-Signature-Key-Id`. Ensure the timestamp is within an acceptable freshness window (e.g. 5 minutes) to guard against replay attacks.
 
-Automatic key discovery is not available yet. For now, configure Turnkey's webhook verification key statically. A discovery endpoint will be added later for automatic key rotation.
-
-```bash
-TURNKEY_WEBHOOK_KEY_ID=turnkey_webhook_signing_key_001
-TURNKEY_WEBHOOK_PUBLIC_KEY=5ebf48061c8e5ca73f30381fbde77c47940bc2149c8ef37eff4faf36c5ba8f9a
-```
-
-Each verification key should include the `keyId` from `X-Turnkey-Signature-Key-Id`, a hex-encoded 32-byte Ed25519 public key, and `algorithm: "ed25519"`.
-
-The helper accepts the raw body as a UTF-8 string, `Uint8Array` or Node `Buffer`, or `ArrayBuffer`. Prefer the raw bytes captured by your framework.
-
-```ts
-import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
-
-const result = verifyTurnkeyWebhookSignature({
-  headers: request.headers,
-  body: rawBody,
-  verificationKeys: [
-    {
-      keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
-      publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
-      algorithm: "ed25519",
-    },
-  ],
-  maxTimestampAgeMs: 5 * 60 * 1000,
-});
-
-if (!result.ok) {
-  throw new Error(`Invalid Turnkey webhook: ${result.reason}`);
-}
-```
-
-The verifier accepts a list of keys so the same integration can support key rotation. Today, configure the current Turnkey webhook signing key statically. When key discovery ships, prefer fetching and caching verification keys from the discovery endpoint.
+<Note>
+An SDK verification helper and a key discovery endpoint are releasing soon to simplify this process.
+</Note>
 
 ## Payloads
 
@@ -188,14 +158,14 @@ The `type` field is `"balances:confirmed"` when a balance change is first seen o
 ```json
 {
   "type": "balances:confirmed",
-  "organizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
-  "parentOrganizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
+  "organizationId": "<organization-id>",
+  "parentOrganizationId": "<parent-organization-id>",
   "msg": {
     "operation": "deposit",
     "caip2": "eip155:8453",
-    "txHash": "0x5b6901be92e69781a7ce401dd9a2910e1f49aa77a5bdedcd2a23c8d563d88b24",
-    "address": "0x3400e577153101863f39ba41f7fd49bbea011628",
-    "idempotencyKey": "d3b8cef0ad7479433783c5707da9ded4fee9b254b4638f44758a2141c49416b7:balances:confirmed",
+    "txHash": "<transaction-hash>",
+    "address": "<wallet-address>",
+    "idempotencyKey": "<idempotency-key>",
     "asset": {
       "symbol": "ETH",
       "name": "Ethereum",
@@ -205,7 +175,7 @@ The `type` field is `"balances:confirmed"` when a balance change is first seen o
     },
     "block": {
       "number": 46343814,
-      "hash": "0x41a4e8d444e5410f83c1ac35c838c7d8be1e3d6f32a35a04c72096adae74d095",
+      "hash": "<block-hash>",
       "timestamp": "2026-05-22T19:09:35Z"
     }
   }
@@ -240,16 +210,16 @@ Each delivery fires when a transaction changes state. The `type` is always `"tra
 ```json
 {
   "type": "transaction:status",
-  "organizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
-  "parentOrganizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+  "organizationId": "<organization-id>",
+  "parentOrganizationId": "<parent-organization-id>",
   "msg": {
-    "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
-    "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
+    "sendTransactionStatusId": "<send-transaction-status-id>",
+    "activityId": "<activity-id>",
     "status": "INCLUDED",
     "caip2": "eip155:1",
-    "idempotencyKey": "7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8",
+    "idempotencyKey": "<idempotency-key>",
     "timestamp": 1746000042,
-    "txHash": "0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+    "txHash": "<transaction-hash>"
   }
 }
 ```
