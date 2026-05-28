@@ -21,26 +21,26 @@ Turnkey is none of these. It runs the secure enclave that holds your identity ke
 
 ```mermaid
 graph LR
-    Client["Your client SDK"]
-
-    subgraph TK["Turnkey"]
-      Enclave["Secure enclave<br/>holds identity, leaf,<br/>deposit, and preimage keys"]
+    subgraph TK["Inside Turnkey"]
+      E["Secure enclave<br/>• holds your keys<br/>• signs (FROST, Schnorr, ECDSA)<br/>• encrypts operator packages<br/>• derives HD subkeys"]
     end
 
-    subgraph SE["Spark Entity (SE)"]
-      SOs["Spark Operators<br/>(threshold key shares)"]
+    C["Client SDK<br/>(orchestrator)"]
+
+    subgraph SP["External Spark + L1"]
+      direction TB
+      SO["Spark Operators (SE)"]
+      SSP["Spark Service Provider"]
+      L1["Bitcoin L1"]
     end
 
-    SSP["Spark Service Provider"]
-    L1["Bitcoin L1"]
-
-    Client <-->|"SPARK_* activities,<br/>CREATE_WALLET_ACCOUNTS,<br/>SIGN_RAW_PAYLOAD,<br/>SIGN_TRANSACTION"| Enclave
-    Client <-->|"FROST nonces & partial sigs,<br/>leaf state, claim submissions"| SOs
-    Client <-->|"transfer routing,<br/>Lightning, static deposits"| SSP
-    Client -->|"L1 broadcasts<br/>(deposit, withdrawal, unilateral exit)"| L1
+    E <-->|"signature shares,<br/>encrypted packages"| C
+    C <-->|"FROST + leaf state"| SO
+    C <-->|"Lightning, transfers,<br/>static deposits"| SSP
+    C -->|"signed Bitcoin txs"| L1
 ```
 
-Turnkey only connects to the client. SO, SSP, and L1 communication happens directly from your client; Turnkey is not on those paths.
+Turnkey only connects to the client. SO, SSP, and L1 communication happens directly from the client; Turnkey is not on those paths.
 
 ## Address derivation and key types
 
