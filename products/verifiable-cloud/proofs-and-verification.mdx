@@ -7,7 +7,7 @@ Turnkey Verifiable Cloud (TVC) uses two related proofs to let a verifier answer 
 - A **Boot Proof** is produced by the TVC platform. It answers: what enclave booted, and what code and configuration was it approved to run?
 - An **App Proof** is produced by application logic. It answers: what application-level output did that enclave sign?
 
-The trust chain starts with AWS. The AWS Nitro Secure Module (NSM) signs an attestation document with a certificate chain rooted in the [AWS root certificate](https://docs.aws.amazon.com/enclaves/latest/user/verify-root.html); that document binds an enclave's **Ephemeral Key** to PCR measurements and Turnkey's QOS manifest digest. The QOS manifest then identifies the application binary and deployment configuration. Finally, an App Proof signature links an application-level payload back to the same Ephemeral Key.
+The trust chain starts with AWS. The AWS Nitro Secure Module (NSM) signs an attestation document with a certificate chain rooted in the [AWS root certificate](https://docs.aws.amazon.com/enclaves/latest/user/verify-root.html); that document binds an enclave's **Ephemeral Key** to PCR measurements and Turnkey's [QOS](https://github.com/tkhq/qos) manifest digest. The QOS manifest then identifies the application binary and deployment configuration. Finally, an App Proof signature links an application-level payload back to the same Ephemeral Key.
 
 This page is written for TVC builders who want to design and verify their own App Proofs. It also uses Turnkey's own App Proofs as examples throughout. For the customer-facing dashboard and Embedded Wallet Kit feature built on Turnkey's proofs, see [Turnkey Verified](https://docs.turnkey.com/security/turnkey-verified).
 
@@ -53,7 +53,7 @@ For example, Turnkey's address derivation App Proof signs a payload committing t
 }
 ```
 
-On its own, this payload does not that a particular enclave signed it; but when a verifier can match `publicKey` to a valid Boot Proof, the claim is tied back to an enclave instance and the code identified by its manifest. Your own TVC App Proofs follow the same chain even if the payload schema is specific to your application.
+On its own, this payload does not prove that a particular enclave signed it; but when a verifier can match `publicKey` to a valid Boot Proof, the claim is tied back to an enclave instance and the code identified by its manifest. Your own TVC App Proofs follow the same chain even if the payload schema is specific to your application.
 
 ## Why the Ephemeral Key and not the Quorum Key
 
@@ -61,7 +61,7 @@ QuorumOS enclaves already have a Quorum Key, which is the long-lived key associa
 
 The answer is a trust boundary distinction.
 
-The quorum key is designed to live across many different versions of an enclave app and can not be provably exclusive to a specific enclave instance, app binary, or configuration. The Quorum Key is provisioned via the [QuorumOS quorum provisioning protocol](https://github.com/tkhq/qos/blob/main/docs/boot_standard.md): share holders verify a node's attestation document, encrypt quorum key shares to the node's Ephemeral Key, and the node reconstructs the Quorum Key once the configured threshold is met. Because the Quorum Key can be provisioned into any enclave that satisfies the provisioning protocol, a Quorum Key signature can be linked with arbitrary code that has received that key. Turnkey customers have no way to attest "this private key only exists inside this enclave" for the Quorum Key, because that statement is not true at the cryptographic layer.
+The quorum key is designed to live across many different versions of an enclave app and can not be provably exclusive to a specific enclave instance, app binary, or configuration. The Quorum Key is provisioned via the [QuorumOS quorum provisioning protocol](https://github.com/tkhq/qos/blob/main/docs/boot_standard.md): share holders verify a node's attestation document, encrypt quorum key shares to the node's Ephemeral Key, and the node reconstructs the Quorum Key once the configured threshold is met. Because the Quorum Key can be provisioned into any enclave that satisfies the provisioning protocol, a Quorum Key signature cannot cryptographically prove the app proof payload came from the _inside_ of a _specific_ enclave.
 
 The Ephemeral Key can be cryptographically proven to be generated inside the enclave at boot and never exist outside of the enclave. The Nitro attestation document signs over the QOS measurement (`PCR0`/`PCR1`/`PCR2`), the AWS account/role measurement (`PCR3`), the QOS manifest digest (`user_data`), and the Ephemeral public key (`public_key`) all in a single signed document produced by the NSM. That binding is what gives the Ephemeral Key its property: it is unique to this specific enclave instance running this specific code. No quorum provisioning flow can recreate that Ephemeral private key elsewhere.
 
