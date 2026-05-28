@@ -111,7 +111,7 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 | `X-Turnkey-Event-Type` | Event type, such as `ACTIVITY_UPDATES` or `BALANCE_CONFIRMED_UPDATES`. |
 | `X-Turnkey-Timestamp` | Unix timestamp in milliseconds for the delivery attempt. |
 | `X-Turnkey-Webhook-Version` | Webhook delivery contract version. The current value is `1`. |
-| `X-Turnkey-Event-Id` | Stable event identifier for this webhook event. |
+| `X-Turnkey-Event-Id` | Signed delivery metadata. This value is stable across retry attempts for the same webhook event. |
 | `X-Turnkey-Signature-Key-Id` | Identifier for the Turnkey signing key. |
 | `X-Turnkey-Signature-Algorithm` | Signature algorithm. The current value is `ed25519`. |
 | `X-Turnkey-Signature-Version` | Signature contract version. The current value is `v1`. |
@@ -121,7 +121,7 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 
 Turnkey treats `2xx` responses as successful. Turnkey automatically retries retryable delivery failures. Retry schedules and attempt counts are subject to change.
 
-Signed retries receive a fresh timestamp and signature. For activity deliveries, use the activity `id` and/or `X-Turnkey-Event-Id`. For balance and transaction status deliveries, use `msg.idempotencyKey`.
+Signed retries receive a fresh timestamp and signature. `X-Turnkey-Event-Id` is signed delivery metadata and is stable across retry attempts for the same webhook event. Payload fields such as `msg.idempotencyKey` are event-specific business identifiers. Either may be useful for deduplication depending on the use case, but they are not the same field.
 
 ## Verify signatures
 
@@ -137,7 +137,14 @@ The `event_id` segment in the signed message is the value of the `X-Turnkey-Even
 
 Signature verification signs only the signature contract fields shown above plus the raw body. Other delivery headers are useful for routing and observability but are not part of the signed message.
 
-Use `verifyTurnkeyWebhookSignature` from `@turnkey/crypto` to verify Turnkey webhook signatures when you manage verification-key fetching and caching yourself. A key discovery endpoint and higher-level server helper are planned separately.
+Webhook signatures can be verified with `verifyTurnkeyWebhookSignature` from `@turnkey/crypto`.
+
+Automatic key discovery is not available yet. For now, configure Turnkey's webhook verification key statically. A discovery endpoint will be added later for automatic key rotation.
+
+```bash
+TURNKEY_WEBHOOK_KEY_ID=turnkey_webhook_signing_key_001
+TURNKEY_WEBHOOK_PUBLIC_KEY=5ebf48061c8e5ca73f30381fbde77c47940bc2149c8ef37eff4faf36c5ba8f9a
+```
 
 Each verification key should include the `keyId` from `X-Turnkey-Signature-Key-Id`, a hex-encoded 32-byte Ed25519 public key, and `algorithm: "ed25519"`.
 
@@ -147,8 +154,8 @@ The helper accepts the raw body as a UTF-8 string, `Uint8Array` or Node `Buffer`
 import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
 
 const result = verifyTurnkeyWebhookSignature({
-  headers: req.headers,
-  body: req.body, // raw bytes from express.raw(), not parsed JSON
+  headers: request.headers,
+  body: rawBody,
   verificationKeys: [
     {
       keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
@@ -163,6 +170,8 @@ if (!result.ok) {
   throw new Error(`Invalid Turnkey webhook: ${result.reason}`);
 }
 ```
+
+The verifier accepts a list of keys so the same integration can support key rotation. Today, configure the current Turnkey webhook signing key statically. When key discovery ships, prefer fetching and caching verification keys from the discovery endpoint.
 
 ## Payloads
 
