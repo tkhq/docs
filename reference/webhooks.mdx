@@ -33,27 +33,28 @@ For further information on balances, including supported chains and assets, see 
 
 Create webhook endpoints from a server-side client using an API key, or from any Turnkey client that can submit signed activities for your organization. The endpoint URL must be HTTPS and must resolve to a public destination.
 
+SDK methods accept the intent parameters directly. The SDK adds the activity envelope fields (`type`, `timestampMs`, `organizationId`, and `parameters`) before signing and submitting the request. Use the raw envelope shape only when calling the HTTP API directly.
+
 ### Activity updates
 
 ```ts
 import { Turnkey } from "@turnkey/sdk-server";
 
+const organizationId = process.env.ORGANIZATION_ID!;
+const webhookUrl = "https://example.com/webhooks/turnkey";
+
 const turnkey = new Turnkey({
   apiBaseUrl: "https://api.turnkey.com",
   apiPublicKey: process.env.API_PUBLIC_KEY!,
   apiPrivateKey: process.env.API_PRIVATE_KEY!,
-  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+  defaultOrganizationId: organizationId,
 });
 
 const activityWebhook = await turnkey.apiClient().createWebhookEndpoint({
-  type: "ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT",
-  timestampMs: Date.now().toString(),
-  organizationId: process.env.ORGANIZATION_ID!,
-  parameters: {
-    url: "https://example.com/webhooks/turnkey",
-    name: "Activity updates",
-    subscriptions: [{ eventType: "ACTIVITY_UPDATES" }],
-  },
+  organizationId, // optional if defaultOrganizationId is configured
+  name: "Activity updates",
+  url: webhookUrl,
+  subscriptions: [{ eventType: "ACTIVITY_UPDATES" }],
 });
 ```
 
@@ -62,15 +63,14 @@ const activityWebhook = await turnkey.apiClient().createWebhookEndpoint({
 For balance webhooks, subscribe to `BALANCE_CONFIRMED_UPDATES` when enabling balance notifications. Add `BALANCE_FINALIZED_UPDATES` alongside confirmed updates if you also need finalization signals.
 
 ```ts
+const organizationId = process.env.ORGANIZATION_ID!;
+const webhookUrl = "https://example.com/webhooks/balances";
+
 const balanceWebhook = await turnkey.apiClient().createWebhookEndpoint({
-  type: "ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT",
-  timestampMs: Date.now().toString(),
-  organizationId: process.env.ORGANIZATION_ID!,
-  parameters: {
-    url: "https://example.com/webhooks/balances",
-    name: "Balance confirmations",
-    subscriptions: [{ eventType: "BALANCE_CONFIRMED_UPDATES" }],
-  },
+  organizationId,
+  name: "Balance confirmed updates",
+  url: webhookUrl,
+  subscriptions: [{ eventType: "BALANCE_CONFIRMED_UPDATES" }],
 });
 ```
 
