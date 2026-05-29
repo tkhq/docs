@@ -35,16 +35,22 @@ The authentication process happens in two steps:
 
 <Steps>
   <Step>
-    A 6-9 digit or alphanumeric OTP code is sent to the user's verified email address
+    A 6-9 digit or alphanumeric OTP code is sent to the user's verified email
+    address
   </Step>
   <Step>
-    Upon verification of the correct code, an API key credential is generated and encrypted for the client
+    Upon verification of the correct code, an API key credential is generated
+    and encrypted for the client
   </Step>
 </Steps>
 
 ### Credential bundle method
 
-<Note> This method is only supported by **legacy iframe-based flows** and is not available in the current Turnkey SDKs. </Note>
+<Note>
+  {" "}
+  This method is only supported by **legacy iframe-based flows** and is not
+  available in the current Turnkey SDKs.{" "}
+</Note>
 
 The API key credential is encrypted and delivered directly through email to the user. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](/security/enclave-secure-channels) for more info on how we achieve secure delivery.
 
@@ -80,7 +86,13 @@ For OTP Auth signup and login flows you will need a user with the following poli
 }
 ```
 
-<Note>Avoid using an API key that is also present in the sub-organization that you're targeting within the email activities. Turnkey identifies the user from the request signature and in case of an identical API key it will always prioritize the sub-organization user matching. As a result, it will try to evaluate the sub-organization policies instead of the parent ones.</Note>
+<Note>
+  Avoid using an API key that is also present in the sub-organization that
+  you're targeting within the email activities. Turnkey identifies the user from
+  the request signature and in case of an identical API key it will always
+  prioritize the sub-organization user matching. As a result, it will try to
+  evaluate the sub-organization policies instead of the parent ones.
+</Note>
 
 ## User experience
 
@@ -109,13 +121,11 @@ After receiving the verification token, users complete OTP authentication flow w
 
 - `publicKey`: public key to add to organization data associated with the signing key in IndexedDB or SecureStorage.
 - `verificationToken`: JWT returned from successful `VERIFY_OTP` activity
-- `clientSignature`: This proves authorization for the verification token being used, and is generated using the keypair whose public key was provided in the `encryptedOtpBundle` during verification. 
+- `clientSignature`: This proves authorization for the verification token being used, and is generated using the keypair whose public key was provided in the `encryptedOtpBundle` during verification.
 - `expirationSeconds`: optional validity window (defaults to 15 minutes)
 - `invalidateExisting`: optional boolean to invalidate previous login sessions
 
-<Frame>
-  ![auth otp email](/images/authentication/img/auth_otp_email.png)
-</Frame>
+<Frame>![auth otp email](/images/authentication/img/auth_otp_email.png)</Frame>
 
 ### Sub-organization initiated OTP
 
@@ -139,6 +149,7 @@ All activities are stamped using valid sub-organization credentials, with `organ
     <Note>
       The `verificationToken` is scoped to the issuing organization. Parent-issued tokens can be used by any sub-organization; sub-org-issued tokens are limited to that sub-org only.
     </Note>
+
   </Step>
 </Steps>
 
@@ -161,9 +172,7 @@ This alternative method uses `ACTIVITY_TYPE_EMAIL_AUTH` with these parameters:
 - `emailCustomization`: optional parameters for customizing emails
 - `invalidateExisting`: optional boolean to invalidate previous Email Auth API keys
 
-<Frame>
-  ![auth email](/images/authentication/img/auth_email.png)
-</Frame>
+<Frame>![auth email](/images/authentication/img/auth_email.png)</Frame>
 
 ## Email customization
 
@@ -198,14 +207,15 @@ const response = await client.emailAuth({
 <Warning>
   **Effective December 16, 2025**
 
-  Beginning December 16, 2025, all email-based OTP and recovery activities will require the `appName` parameter. Existing SDK versions will continue working, but upgrading without setting an `appName` will break email-based flows.
+Beginning December 16, 2025, all email-based OTP and recovery activities will require the `appName` parameter. Existing SDK versions will continue working, but upgrading without setting an `appName` will break email-based flows.
 
-  **Auth Proxy users** — Set `appName` under [email configuration](https://app.turnkey.com/dashboard/walletKit) in the dashboard.
+**Auth Proxy users** — Set `appName` under [email configuration](https://app.turnkey.com/dashboard/walletKit) in the dashboard.
 
-  **Server SDK users** — If you call `init_otp_auth`, `init_otp`, `email_recovery`, or `email_auth` without `appName`:
-  - For `email_recovery` or `email_auth`: include `appName` in your request
-  - For `init_otp` or `init_otp_auth`: update your API call to match the new input structure when upgrading to the latest server SDK
-</Warning>
+**Server SDK users** — If you call `init_otp_auth`, `init_otp`, `email_recovery`, or `email_auth` without `appName`:
+
+- For `email_recovery` or `email_auth`: include `appName` in your request
+- For `init_otp` or `init_otp_auth`: update your API call to match the new input structure when upgrading to the latest server SDK
+  </Warning>
 
 <Accordion title="Server SDK code examples">
 
@@ -217,9 +227,9 @@ await client.emailAuth({
     email: "user@example.com",
     targetPublicKey: "<client-public-key>",
     emailCustomization: {
-      appName: "Your App Name" // this is now required
-    }
-  }
+      appName: "Your App Name", // this is now required
+    },
+  },
 });
 ```
 
@@ -233,8 +243,8 @@ await client.initOtp({
     appName: "Your App Name", // this is now required
     emailCustomization: {
       // other optional customization
-    }
-  }
+    },
+  },
 });
 ```
 
@@ -244,17 +254,16 @@ await client.initOtp({
 
 If you manage email flows with policies, update to the new activity types:
 
-| **Flow** | **Old activity type** | **New activity type** |
-| :--- | :--- | :--- |
-| Email auth | `ACTIVITY_TYPE_EMAIL_AUTH`, `ACTIVITY_TYPE_EMAIL_AUTH_V2` | `ACTIVITY_TYPE_EMAIL_AUTH_V3` |
-| Init OTP auth | `ACTIVITY_TYPE_INIT_OTP_AUTH`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V2` | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3` |
-| Init OTP (signup) | `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_INIT_OTP_V2` | `ACTIVITY_TYPE_INIT_OTP_V3` |
-| Verify OTP | `ACTIVITY_TYPE_VERIFY_OTP` | `ACTIVITY_TYPE_VERIFY_OTP_V2` |
-| OTP login | `ACTIVITY_TYPE_OTP_LOGIN` | `ACTIVITY_TYPE_OTP_LOGIN_V2` |
-| Email recovery | `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY` | `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2` |
+| **Flow**          | **Old activity type**                                           | **New activity type**                       |
+| :---------------- | :-------------------------------------------------------------- | :------------------------------------------ |
+| Email auth        | `ACTIVITY_TYPE_EMAIL_AUTH`, `ACTIVITY_TYPE_EMAIL_AUTH_V2`       | `ACTIVITY_TYPE_EMAIL_AUTH_V3`               |
+| Init OTP auth     | `ACTIVITY_TYPE_INIT_OTP_AUTH`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V2` | `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`            |
+| Init OTP (signup) | `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_INIT_OTP_V2`           | `ACTIVITY_TYPE_INIT_OTP_V3`                 |
+| Verify OTP        | `ACTIVITY_TYPE_VERIFY_OTP`                                      | `ACTIVITY_TYPE_VERIFY_OTP_V2`               |
+| OTP login         | `ACTIVITY_TYPE_OTP_LOGIN`                                       | `ACTIVITY_TYPE_OTP_LOGIN_V2`                |
+| Email recovery    | `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY`                        | `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2` |
 
 </Accordion>
-
 
 ### Email templates
 
@@ -282,14 +291,16 @@ For best compatibility across email providers, make sure to use PNG images withi
 </Frame>
 
 <Warning>
-  **Bespoke HTML templates** and **custom email sender domains** are available to [**Enterprise clients**](https://www.turnkey.com/pricing) on the **Scale tier** or higher.
+  **Bespoke HTML templates** and **custom email sender domains** are available
+  to [**Enterprise clients**](https://www.turnkey.com/pricing) on the **Scale
+  tier** or higher.
 </Warning>
 
 If you are interested in implementing bespoke, fully-customized email templates, please reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
 
 ### Custom email sender domain
 
-[Enterprise](https://www.turnkey.com/pricing) clients  can also customize the email sender domain. To get set up, please reach out to your Turnkey rep to get started but here is what you'll be able to configure:
+[Enterprise](https://www.turnkey.com/pricing) clients can also customize the email sender domain. To get set up, please reach out to your Turnkey rep to get started but here is what you'll be able to configure:
 
 ```js
 // Optional custom email address from which to send the OTP email
@@ -330,7 +341,8 @@ Specifically:
 - For credential bundle auth: `ACTIVITY_TYPE_EMAIL_AUTH`
 
 <Frame>
-  ![email auth authorization](/images/authentication/img/diagrams/email_auth_authorization.png)
+  ![email auth
+  authorization](/images/authentication/img/diagrams/email_auth_authorization.png)
 </Frame>
 
 ### Example implementations

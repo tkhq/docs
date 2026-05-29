@@ -40,7 +40,7 @@ class TurnkeyAptosSigner {
     apiPublicKey: string,
     organizationId: string,
     address: string,
-    nodeUrl: string = "https://fullnode.mainnet.aptoslabs.com/v1"
+    nodeUrl: string = "https://fullnode.mainnet.aptoslabs.com/v1",
   ) {
     this.turnkeyClient = new Turnkey({
       apiBaseUrl: "https://api.turnkey.com",
@@ -61,7 +61,7 @@ class TurnkeyAptosSigner {
 
   // Sign a transaction using Turnkey
   async signTransaction(
-    rawTxn: TxnBuilderTypes.RawTransaction
+    rawTxn: TxnBuilderTypes.RawTransaction,
   ): Promise<Uint8Array> {
     // Serialize the raw transaction to BCS
     const serializer = new BCS.Serializer();
@@ -93,20 +93,20 @@ class TurnkeyAptosSigner {
       const authenticator = new TxnBuilderTypes.TransactionAuthenticatorEd25519(
         new TxnBuilderTypes.Ed25519PublicKey(
           // Note: In a real implementation, you would need to get the actual public key
-          new Uint8Array(32) // Placeholder - replace with actual public key
+          new Uint8Array(32), // Placeholder - replace with actual public key
         ),
-        new TxnBuilderTypes.Ed25519Signature(signature)
+        new TxnBuilderTypes.Ed25519Signature(signature),
       );
 
       // Create a signed transaction
       const signedTxn = new TxnBuilderTypes.SignedTransaction(
         rawTxn,
-        authenticator
+        authenticator,
       );
 
       // Submit the transaction
       const pendingTxn = await this.aptosClient.submitSignedBCSTransaction(
-        BCS.bcsToBytes(signedTxn)
+        BCS.bcsToBytes(signedTxn),
       );
 
       return pendingTxn.hash;
@@ -118,7 +118,7 @@ class TurnkeyAptosSigner {
 
   // Helper method to create a raw transaction
   private async createRawTransaction(
-    payload: any
+    payload: any,
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const account = await this.aptosClient.getAccount(this.address);
     const chainId = await this.aptosClient.getChainId();
@@ -131,7 +131,7 @@ class TurnkeyAptosSigner {
       BigInt(2000), // Max gas amount
       BigInt(100), // Gas unit price
       BigInt(Math.floor(Date.now() / 1000) + 30), // Expiration timestamp (30 seconds from now)
-      new TxnBuilderTypes.ChainId(chainId)
+      new TxnBuilderTypes.ChainId(chainId),
     );
   }
 }
@@ -143,7 +143,7 @@ async function transferCoins() {
     process.env.API_PUBLIC_KEY!,
     process.env.ORGANIZATION_ID!,
     process.env.APTOS_ADDRESS!, // Your Aptos address in Turnkey
-    "https://fullnode.testnet.aptoslabs.com/v1" // Testnet URL
+    "https://fullnode.testnet.aptoslabs.com/v1", // Testnet URL
   );
 
   const recipientAddress = "0x..."; // Recipient address
@@ -156,16 +156,16 @@ async function transferCoins() {
       "transfer",
       [
         new TxnBuilderTypes.TypeTagStruct(
-          TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin")
+          TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"),
         ),
       ],
       [
         BCS.bcsToBytes(
-          TxnBuilderTypes.AccountAddress.fromHex(recipientAddress)
+          TxnBuilderTypes.AccountAddress.fromHex(recipientAddress),
         ),
         BCS.bcsSerializeUint64(amount),
-      ]
-    )
+      ],
+    ),
   );
 
   try {

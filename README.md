@@ -84,10 +84,10 @@ The docs in this repository utilize shared MDX snippets to ensure consistency an
 
 **Important:** Always update the shared MDX file rather than modifying individual duplicate pages. This guarantees that any change propagates throughout all references.
 
-| Duplicate Page Path                                           | Shared MDX File                       |
-| ------------------------------------------------------------- | ------------------------------------- |
-| `concepts/policies/overview.mdx`                              | `/snippets/shared/policy-engine.mdx`  |
-| `products/embedded-wallets/features/policy-engine.mdx`        | `/snippets/shared/policy-engine.mdx`  |
+| Duplicate Page Path                                    | Shared MDX File                       |
+| ------------------------------------------------------ | ------------------------------------- |
+| `concepts/policies/overview.mdx`                       | `/snippets/shared/policy-engine.mdx`  |
+| `products/embedded-wallets/features/policy-engine.mdx` | `/snippets/shared/policy-engine.mdx`  |
 | `products/company-wallets/features/export-wallets.mdx` | `/snippets/shared/export-wallets.mdx` |
 | `products/company-wallets/features/import-wallets.mdx` | `/snippets/shared/import-wallets.mdx` |
 

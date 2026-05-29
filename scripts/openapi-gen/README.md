@@ -29,6 +29,7 @@ The auth proxy is generated as part of `make gen` — no separate command needed
 This converts `proxy_api.swagger.json` → `scripts/openapi-gen/proxy_api_openapi.json`, then generates MDX files under `api-reference/auth-proxy/` and updates the `Auth Proxy` group in `docs.json`.
 
 Key differences from the main API generation:
+
 - `--auth-proxy`: uses the auth-proxy generator (flat output, hardcoded base URL and auth header, v1 endpoint deduplication)
 - `--nav-group`: targets the `Auth Proxy` group in `docs.json` instead of Activities/Queries
 
@@ -51,7 +52,7 @@ scripts/openapi-gen/
 │       └── generator.ts     # Generates MDX files per endpoint
 ├── package.json             # Dependencies for CLI (commander, ts-node)
 └── tsconfig.json             # TypeScript configuration
-``` 
+```
 
 ## Generated Outputs
 

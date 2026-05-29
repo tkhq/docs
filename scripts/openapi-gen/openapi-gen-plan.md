@@ -60,7 +60,7 @@ program
   .option("--path <jsonPath>", "JSON path to specific element to output")
   .option(
     "-o, --output <filepath>",
-    "Output file path (stdout if not specified)"
+    "Output file path (stdout if not specified)",
   )
   .parse(process.argv);
 ```
@@ -76,7 +76,7 @@ program
 ```typescript
 function outputResults(
   data: any,
-  options: { outputFile?: string; jsonPath?: string }
+  options: { outputFile?: string; jsonPath?: string },
 ) {
   // Get the data to output (full spec or filtered by JSON path)
   const outputData = options.jsonPath

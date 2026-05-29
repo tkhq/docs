@@ -19,12 +19,12 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const dataPayloadString = JSON.stringify(
     dataPayloadObject,
     (_key, value) => (typeof value === "bigint" ? value.toString() : value),
-    4
+    4,
   );
   const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''");
 
   const curlCommand =
-    "```bash title=\"cURL\"\n" +
+    '```bash title="cURL"\n' +
     "curl --request POST \\\n" +
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
@@ -39,14 +39,14 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
 // --- Helper: Generate response example ---
 function generateResponseExample(endpoint: ApiEndpoint): string {
   const successResponse = endpoint.responses?.find(
-    (res) => res.statusCode === 200
+    (res) => res.statusCode === 200,
   );
 
   let resultPayload: Record<string, any>;
   if (successResponse?.fields) {
     resultPayload = generateJsonPayloadRecursive(
       successResponse.fields,
-      endpoint.path
+      endpoint.path,
     );
   } else {
     resultPayload = { "<result_key>": "<result_value>" };
@@ -55,7 +55,7 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
   const responseJsonString = JSON.stringify(
     resultPayload,
     (_key, value) => (typeof value === "bigint" ? value.toString() : value),
-    2
+    2,
   );
 
   return `<ResponseExample>\n\n\`\`\`json 200\n${responseJsonString}\n\`\`\`\n\n</ResponseExample>`;
@@ -98,7 +98,7 @@ import { NestedParam } from "/snippets/nested-param.mdx";
 
   // Response fields
   const successResponse = endpoint.responses?.find(
-    (res) => res.statusCode === 200
+    (res) => res.statusCode === 200,
   );
   if (successResponse?.fields && successResponse.fields.length > 0) {
     mdxContent += `\n<H3Bordered text="Response" />\n`;
@@ -123,17 +123,18 @@ import { NestedParam } from "/snippets/nested-param.mdx";
 export function generateAuthProxyMdxFile(
   endpoint: ApiEndpoint,
   baseOutputDir: string,
-  addOnly: boolean = false
+  addOnly: boolean = false,
 ): string | null {
   if (!endpoint.title || !endpoint.path) {
     console.warn(
-      `Skipping MDX generation for endpoint (Title: ${endpoint.title}, Path: ${endpoint.path}) due to missing title or path.`
+      `Skipping MDX generation for endpoint (Title: ${endpoint.title}, Path: ${endpoint.path}) due to missing title or path.`,
     );
     return null;
   }
 
-  const slug = (endpoint.path.split("/").filter(Boolean).pop() || endpoint.title)
-    .replace(/_v\d+$/, ""); // strip version suffix
+  const slug = (
+    endpoint.path.split("/").filter(Boolean).pop() || endpoint.title
+  ).replace(/_v\d+$/, ""); // strip version suffix
 
   const kebabCaseSlug = slug
     .toLowerCase()
@@ -161,7 +162,7 @@ export function generateAuthProxyMdxFile(
     return kebabCaseSlug;
   } catch (error: any) {
     console.error(
-      `Error generating auth proxy MDX file for endpoint "${endpoint.title}": ${error.message}`
+      `Error generating auth proxy MDX file for endpoint "${endpoint.title}": ${error.message}`,
     );
     if (error.stack) console.error(error.stack);
     return null;

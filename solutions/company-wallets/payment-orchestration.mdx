@@ -4,8 +4,8 @@ description: "Build automated sweep, deposit, and treasury flows with policy-enf
 mode: wide
 ---
 
-import { FeatureCard } from '/snippets/feature-card.mdx'
-import { SolutionCard } from '/snippets/solution-card.mdx'
+import { FeatureCard } from "/snippets/feature-card.mdx";
+import { SolutionCard } from "/snippets/solution-card.mdx";
 
 Move funds programmatically across deposit, omnibus, and cold wallets with sub-100ms signing and policy-enforced access control at every transaction. For a basic signing walkthrough, start with the [Quickstart](/solutions/company-wallets/quickstart).
 
@@ -20,15 +20,15 @@ Leading platforms use Turnkey to deliver onchain payment rails at scale:
 
 ## Key implementation decisions
 
-| Decision | What to consider |
-| :--- | :--- |
-| Wallet architecture | Single HD wallet with many accounts (cost-efficient, shared seed) vs separate wallets per function (deposits, omnibus, cold) |
-| Deposit addressing | Per-user deposit addresses via `createWalletAccounts` at no extra cost |
-| Sweep strategy | Policy-enforced sweeps restricting deposit addresses to a single omnibus destination |
-| Gas management | [Sponsored transactions](/features/transaction-management/broadcasting) (`sponsor: true`) eliminate the need to fund each deposit address for gas |
-| Chain coverage | EVM and SVM require separate policies due to different transaction models |
-| Hot wallet controls | Automated API key user with policies scoping exactly which transfers are allowed |
-| Treasury controls | Multi-party approval via [consensus expressions](/features/policies/quickstart) (e.g., 2-of-N ops team) |
+| Decision               | What to consider                                                                                                                                   |
+| :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wallet architecture    | Single HD wallet with many accounts (cost-efficient, shared seed) vs separate wallets per function (deposits, omnibus, cold)                       |
+| Deposit addressing     | Per-user deposit addresses via `createWalletAccounts` at no extra cost                                                                             |
+| Sweep strategy         | Policy-enforced sweeps restricting deposit addresses to a single omnibus destination                                                               |
+| Gas management         | [Sponsored transactions](/features/transaction-management/broadcasting) (`sponsor: true`) eliminate the need to fund each deposit address for gas  |
+| Chain coverage         | EVM and SVM require separate policies due to different transaction models                                                                          |
+| Hot wallet controls    | Automated API key user with policies scoping exactly which transfers are allowed                                                                   |
+| Treasury controls      | Multi-party approval via [consensus expressions](/features/policies/quickstart) (e.g., 2-of-N ops team)                                            |
 | Cold storage transfers | Policy-gated with parsed calldata for token transfers, or [upload the contract ABI](/features/policies/smart-contract-interfaces) for full parsing |
 
 ## Example: custodial payment processing
@@ -37,18 +37,20 @@ Exchanges and custodial payment processors are common examples requiring highly 
 
 ![payment-flow](/assets/files/payment-flow.png)
 
-| Need | How Turnkey solves it |
-| :--- | :--- |
-| All users have a unique deposit address | Wallet accounts are efficiently created and controlled within a Turnkey organization |
-| Access to all wallets must be strictly permissioned | Policies enforce RBAC and least-privilege for all signing actions |
-| Keys must never be exposed | Keys remain in the [secure enclave](/security/secure-enclaves); only signatures are returned |
-| Must support automation and human review | Policies allow automation for routine tasks and require multi-party consensus for sensitive ones |
-| Must move funds efficiently | [Transaction sponsorship](/features/transaction-management/broadcasting) eliminates the cost of funding thousands of deposit addresses for gas |
+| Need                                                | How Turnkey solves it                                                                                                                          |
+| :-------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| All users have a unique deposit address             | Wallet accounts are efficiently created and controlled within a Turnkey organization                                                           |
+| Access to all wallets must be strictly permissioned | Policies enforce RBAC and least-privilege for all signing actions                                                                              |
+| Keys must never be exposed                          | Keys remain in the [secure enclave](/security/secure-enclaves); only signatures are returned                                                   |
+| Must support automation and human review            | Policies allow automation for routine tasks and require multi-party consensus for sensitive ones                                               |
+| Must move funds efficiently                         | [Transaction sponsorship](/features/transaction-management/broadcasting) eliminates the cost of funding thousands of deposit addresses for gas |
 
 ### Implementation steps
 
 <Note>
-  This guide assumes you've completed the [Quickstart](/solutions/company-wallets/quickstart) and have a Turnkey client initialized. If not, start there first.
+  This guide assumes you've completed the
+  [Quickstart](/solutions/company-wallets/quickstart) and have a Turnkey client
+  initialized. If not, start there first.
 </Note>
 
 <Steps>
@@ -81,7 +83,7 @@ Then generate fresh deposit addresses on demand:
 ```ts
 async function createDepositAddresses(
   turnkeyClient: Turnkey,
-  walletId: string
+  walletId: string,
 ): Promise<string[]> {
   const addresses = await turnkeyClient.apiClient().createWalletAccounts({
     walletId,
@@ -126,17 +128,19 @@ Turnkey's Policy Engine is default-deny: you only specify the exact conditions t
 Normally you'd need to fund every deposit address with gas before sweeping. Sponsored transactions bypass this entirely:
 
 ```ts
-const sendTransactionStatusId = await turnkeyClient.apiClient().ethSendTransaction({
-  transaction: {
-    from: depositAddress,
-    to: "OMNIBUS_ADDRESS",
-    caip2: "eip155:8453",
-    sponsor: true,
-    value: "0",
-    data: "0x",
-    nonce: "0",
-  },
-});
+const sendTransactionStatusId = await turnkeyClient
+  .apiClient()
+  .ethSendTransaction({
+    transaction: {
+      from: depositAddress,
+      to: "OMNIBUS_ADDRESS",
+      caip2: "eip155:8453",
+      sponsor: true,
+      value: "0",
+      data: "0x",
+      nonce: "0",
+    },
+  });
 ```
 
 See the [gas sponsorship guide](/features/transaction-management/broadcasting) for more details.
@@ -165,8 +169,29 @@ For token transfers, the policy above parses the ERC-20 `transfer` function sign
 
 ## Next steps
 
-<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
-  <FeatureCard title="Gas Sponsorship" icon="bank-note-01" href="/features/transaction-management/broadcasting" description="Eliminate gas costs across thousands of deposit wallets with sponsored transactions." />
-  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/quickstart" description="Define granular access controls for every signing action in your organization." />
-  <SolutionCard title="Smart Contract Management" icon="smart-contract-management" href="/solutions/company-wallets/smart-contract-management" description="Secure contract deployment, interactions, and upgrades with the same RBAC model." />
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "12px",
+  }}
+>
+  <FeatureCard
+    title="Gas Sponsorship"
+    icon="bank-note-01"
+    href="/features/transaction-management/broadcasting"
+    description="Eliminate gas costs across thousands of deposit wallets with sponsored transactions."
+  />
+  <FeatureCard
+    title="Policy Engine"
+    icon="file-shield-02"
+    href="/features/policies/quickstart"
+    description="Define granular access controls for every signing action in your organization."
+  />
+  <SolutionCard
+    title="Smart Contract Management"
+    icon="smart-contract-management"
+    href="/solutions/company-wallets/smart-contract-management"
+    description="Secure contract deployment, interactions, and upgrades with the same RBAC model."
+  />
 </div>

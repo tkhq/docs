@@ -17,13 +17,13 @@ Production deploys from **`main`** (see README).
 
 ## Files to edit
 
-| Change | Files |
-|--------|--------|
-| Welcome / landing layout | `welcome.mdx` |
-| Welcome / shared UI styles | `styles.css` (`.tk-*` classes) |
-| Site-wide color, nav, fonts | `docs.json` |
-| Illustrations, icons | `images/` (use `/images/...` paths) |
-| Logos / favicon | `logo/`, `favicon.svg` |
+| Change                      | Files                               |
+| --------------------------- | ----------------------------------- |
+| Welcome / landing layout    | `welcome.mdx`                       |
+| Welcome / shared UI styles  | `styles.css` (`.tk-*` classes)      |
+| Site-wide color, nav, fonts | `docs.json`                         |
+| Illustrations, icons        | `images/` (use `/images/...` paths) |
+| Logos / favicon             | `logo/`, `favicon.svg`              |
 
 Avoid unless intentional:
 

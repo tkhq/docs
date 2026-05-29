@@ -24,7 +24,7 @@ export function validateFile(filePath: string): string {
  * Parse and dereference an OpenAPI specification
  */
 export async function parseOpenAPI(
-  options: OpenAPIParserOptions
+  options: OpenAPIParserOptions,
 ): Promise<any> {
   try {
     // Validate file exists before attempting to parse
@@ -39,7 +39,7 @@ export async function parseOpenAPI(
     // Dereference the parsed JSON
     const api = await OpenAPIParser.default.dereference(jsonContent);
 
-    console.log('api', api);
+    console.log("api", api);
 
     return api;
   } catch (error: any) {
