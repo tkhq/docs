@@ -19,7 +19,7 @@ This works whether you use the [Auth Proxy](https://docs.turnkey.com/reference/a
 
 Both approaches follow the same principle — using an authenticated session to add a Delegated Access (DA) user and defining policies for that user within the sub-organization.
 
-### Step 1: create an embedded wallet 
+### Step 1: create an embedded wallet
 
 In this guide we'll be using [@turnkey/react-wallet-kit](https://www.npmjs.com/package/@turnkey/react-wallet-kit) together with [Auth Proxy](https://docs.turnkey.com/sdks/react/getting-started).
 
@@ -67,19 +67,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
 - Handle authentication is using the `handleLogin` function from the useTurnkey hook. It’s idempotent — existing users simply log in to their sub-org.
 
-
 ```tsx page.tsx
 "use client";
 import { useTurnkey } from "@turnkey/react-wallet-kit";
 
 function LoginButton() {
-    const { handleLogin } = useTurnkey();
-    return <button onClick={handleLogin}>Login / Sign Up</button>;
+  const { handleLogin } = useTurnkey();
+  return <button onClick={handleLogin}>Login / Sign Up</button>;
 }
 export default function Home() {
-    return (
-        <LoginButton /> 
-  );
+  return <LoginButton />;
 }
 ```
 
@@ -94,31 +91,32 @@ You can create this user at any point, either immediately after login or on-dema
 
 ```tsx src/dashboard/page.tsx
 const handleDaSetup = async () => {
-    if (!isHexCompressedPubKey(daPublicKey)) {
-      setPublicKeyErr(
-        "Public key must be a 66-hex-character compressed key (no 0x prefix).",
-      );
-      return;
-    }
-    setPublicKeyErr(null);
+  if (!isHexCompressedPubKey(daPublicKey)) {
+    setPublicKeyErr(
+      "Public key must be a 66-hex-character compressed key (no 0x prefix).",
+    );
+    return;
+  }
+  setPublicKeyErr(null);
 
-    try {
-      const res = await fetchOrCreateP256ApiKeyUser({
-        publicKey: daPublicKey,
-        createParams: {
-          userName: "Delegated Access",
-          apiKeyName: "Delegated User API Key",
-        },
-      });
-      setDaUser(res);
-    } catch (err) {
-      console.error("Error setting up DA user:", err);
-      setDaUser({ error: "Failed to set up DA user." });
-    }
+  try {
+    const res = await fetchOrCreateP256ApiKeyUser({
+      publicKey: daPublicKey,
+      createParams: {
+        userName: "Delegated Access",
+        apiKeyName: "Delegated User API Key",
+      },
+    });
+    setDaUser(res);
+  } catch (err) {
+    console.error("Error setting up DA user:", err);
+    setDaUser({ error: "Failed to set up DA user." });
+  }
 };
 ```
 
 **Note:** At this stage, the DA user is non-root, so any signing attempts will be denied by the policy engine because:
+
 - the user is not part of the root quorum, and
 - no policy has been added yet to allow that action.
 
@@ -129,56 +127,58 @@ In this example, we’ll allow the DA user to sign Ethereum transactions **only*
 
 ```tsx src/dashboard/page.tsx
 const handleBuildPolicyTemplate = () => {
-    if (!daUser?.userId) {
-      setPolicyError("Set up the Delegated Access user first.");
-      return;
-    }
-    if (!isEthAddress(recipientAddress)) {
-      setRecipientErr("Enter a valid 0x-prefixed, 40-hex Ethereum address.");
-      return;
-    }
-    setRecipientErr(null);
-    setPolicyError(null);
+  if (!daUser?.userId) {
+    setPolicyError("Set up the Delegated Access user first.");
+    return;
+  }
+  if (!isEthAddress(recipientAddress)) {
+    setRecipientErr("Enter a valid 0x-prefixed, 40-hex Ethereum address.");
+    return;
+  }
+  setRecipientErr(null);
+  setPolicyError(null);
 
-    const template = [
-      {
-        policyName: `Allow user ${daUser.userId} to sign only to ${recipientAddress}`,
-        effect: "EFFECT_ALLOW",
-        consensus: `approvers.any(user, user.id == '${daUser.userId}')`,
-        condition: `eth.tx.to == '${recipientAddress}'`,
-        notes:
-          "Allow Delegated Access user to sign Ethereum transactions only to the specified recipient",
-      },
-    ];
-    setPolicyJson(JSON.stringify(template, null, 2));
-  };
+  const template = [
+    {
+      policyName: `Allow user ${daUser.userId} to sign only to ${recipientAddress}`,
+      effect: "EFFECT_ALLOW",
+      consensus: `approvers.any(user, user.id == '${daUser.userId}')`,
+      condition: `eth.tx.to == '${recipientAddress}'`,
+      notes:
+        "Allow Delegated Access user to sign Ethereum transactions only to the specified recipient",
+    },
+  ];
+  setPolicyJson(JSON.stringify(template, null, 2));
+};
 
-  // Keep in sync setToAllowed if recipientAddress changes manually
-  useEffect(() => {
-    if (recipientAddress) {
-      setToAllowed(recipientAddress);
-    }
-  }, [recipientAddress]);
+// Keep in sync setToAllowed if recipientAddress changes manually
+useEffect(() => {
+  if (recipientAddress) {
+    setToAllowed(recipientAddress);
+  }
+}, [recipientAddress]);
 
-  const handleSubmitPolicies = async () => {
-    setPolicyError(null);
-    setPolicyResult(null);
-    setSubmittingPolicy(true);
-    try {
-      const parsed = JSON.parse(policyJson);
-      if (!Array.isArray(parsed)) {
-        throw new Error("JSON must be an array of policy objects.");
-      }
-      const res = await fetchOrCreatePolicies({ policies: parsed });
-      setPolicyResult(res);
-    } catch (e: any) {
-      setPolicyError(e?.message || "Failed to submit policies.");
-    } finally {
-      setSubmittingPolicy(false);
+const handleSubmitPolicies = async () => {
+  setPolicyError(null);
+  setPolicyResult(null);
+  setSubmittingPolicy(true);
+  try {
+    const parsed = JSON.parse(policyJson);
+    if (!Array.isArray(parsed)) {
+      throw new Error("JSON must be an array of policy objects.");
     }
-  };
+    const res = await fetchOrCreatePolicies({ policies: parsed });
+    setPolicyResult(res);
+  } catch (e: any) {
+    setPolicyError(e?.message || "Failed to submit policies.");
+  } finally {
+    setSubmittingPolicy(false);
+  }
+};
 ```
-**Note:** 
+
+**Note:**
+
 - Reminder, until this policy is added, the DA user cannot sign any transactions — it’s a non-root user with no permissions by default.
 - The `fetchOrCreatePolicies` method compares the full intent signature of each policy you pass in:
   - If a policy already exists with the **exact same fields**, it will be reused.

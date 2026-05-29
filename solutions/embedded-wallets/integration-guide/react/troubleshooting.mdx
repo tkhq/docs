@@ -86,7 +86,7 @@ If you are using environment variables, ensure they are correctly set up in your
 ```tsx
 console.log(
   "Auth Proxy Config ID:",
-  process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID
+  process.env.NEXT_PUBLIC_AUTH_PROXY_CONFIG_ID,
 );
 console.log("Organization ID:", process.env.NEXT_PUBLIC_ORGANIZATION_ID);
 ```
@@ -412,11 +412,13 @@ function RadixDialog() {
 />
 
 #### Problem
+
 This error occurs when using Create React App (CRA) and trying to import `@turnkey/react-wallet-kit`. CRA requires that all imports include the file extension to be fully specified. Note that this can also occur in strict ESM build environments (e.g., Next.js builds in CI) where fully specified imports are required. In those cases you may see errors like: `Cannot find module '@turnkey/core/dist/__types__/enums'` and a suggestion to import `@turnkey/core/dist/__types__/enums.js`. The fix is to ensure the import is resolved with the `.js` extension (e.g., `@turnkey/core/dist/__types__/enums.js`). If you can't edit the package source directly, apply a small build-time patch that rewrites the import.
 
 #### Solution
 
 Follow these steps to resolve the issue:
+
 <Steps>
   <Step title="Eject from Create React App (CRA)">
   Ejecting from CRA will give you full control over the Webpack configuration, allowing you to modify it to remove the need for fully specified imports.
@@ -427,27 +429,29 @@ Follow these steps to resolve the issue:
   </Step>
   <Step title="Modify the Webpack configuration">
 
-  After ejecting, open the `config/webpack.config.js` file and locate the `resolve` section. Add the following line to the `resolve` object under the rules for `/\.(js|mjs)$/` files:
-  ```js
-  // config/webpack.config.js
+After ejecting, open the `config/webpack.config.js` file and locate the `resolve` section. Add the following line to the `resolve` object under the rules for `/\.(js|mjs)$/` files:
 
-  // ... other configurations
-  {
-    test: /\.(js|mjs)$/,  // Search for this line
-    exclude: /@babel(?:\/|\\{1,2})runtime/,
-    loader: require.resolve('babel-loader'),
+```js
+// config/webpack.config.js
 
-    resolve: {
-      fullySpecified: false,  // Add this line
-    },
+// ... other configurations
+{
+  test: /\.(js|mjs)$/,  // Search for this line
+  exclude: /@babel(?:\/|\\{1,2})runtime/,
+  loader: require.resolve('babel-loader'),
+
+  resolve: {
+    fullySpecified: false,  // Add this line
+  },
 
 
 
-  // ... other configurations
-  }
-  ```
+// ... other configurations
+}
+```
 
-  This will disable the requirement for fully specified imports in your project. 
+This will disable the requirement for fully specified imports in your project.
+
   </Step>
 </Steps>
 
@@ -461,13 +465,14 @@ Read more about fully specified imports in the [Webpack documentation](https://w
 />
 
 #### Problem
+
 This error occurs when you try to use Turnkey client functions before the SDK has finished initializing said client. The Turnkey SDK performs several asynchronous operations during initialization, and if you attempt to call client functions before this process is complete, you'll encounter this error.
 
 #### Solution
 
 To resolve this issue, ensure that you only call Turnkey client functions after the SDK has fully initialized. You can do this by checking the `clientState` state variable from the `useTurnkey` hook. The `clientState` variable indicates the current state of the Turnkey client. You can read up more about how to use the `clientState` variable and why its important in the [Getting Started](/solutions/embedded-wallets/integration-guide/react/getting-started#client-readiness) guide.
 
-Example solutions to potential issues: 
+Example solutions to potential issues:
 
 **Calling client functions in `useEffects` or event handlers without checking client readiness:**
 
@@ -500,4 +505,3 @@ useEffect(() => {
   }
 }, [clientState]);
 ```
-

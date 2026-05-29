@@ -3,8 +3,8 @@ title: "Agentic Wallets"
 description: "Give AI agents scoped signing authority over company wallets with policy-enforced access control, spending caps, and multi-party consensus for high-value actions."
 ---
 
-import { FeatureCard } from '/snippets/feature-card.mdx'
-import { SolutionCard } from '/snippets/solution-card.mdx'
+import { FeatureCard } from "/snippets/feature-card.mdx";
+import { SolutionCard } from "/snippets/solution-card.mdx";
 
 This guide covers the key implementation decisions for giving AI agents secure access to company wallets, then walks through provisioning an agent end-to-end: creating a scoped wallet, assigning a non-root agent user, and defining policies that constrain exactly what the agent can sign. For basic signing, start with the [Quickstart](/solutions/company-wallets/quickstart).
 
@@ -16,46 +16,51 @@ This guide covers the key implementation decisions for giving AI agents secure a
 
 Turnkey supports different agent roles through policy composition:
 
-| Persona | What it can do | Policy approach |
-| :--- | :--- | :--- |
-| **Worker** | Signs transactions on a designated wallet | ALLOW with wallet scope + destination/function/value constraints |
-| **Observer** | Read-only access (balance checks, activity monitoring) | No policies needed; default-deny prevents signing. Add explicit DENY if org has shared ALLOWs. |
-| **Approver** | Reviews and approves other agents' transactions | Narrow ALLOW for `APPROVE_ACTIVITY` and `REJECT_ACTIVITY` only. Must NOT have signing permissions. |
+| Persona      | What it can do                                         | Policy approach                                                                                    |
+| :----------- | :----------------------------------------------------- | :------------------------------------------------------------------------------------------------- |
+| **Worker**   | Signs transactions on a designated wallet              | ALLOW with wallet scope + destination/function/value constraints                                   |
+| **Observer** | Read-only access (balance checks, activity monitoring) | No policies needed; default-deny prevents signing. Add explicit DENY if org has shared ALLOWs.     |
+| **Approver** | Reviews and approves other agents' transactions        | Narrow ALLOW for `APPROVE_ACTIVITY` and `REJECT_ACTIVITY` only. Must NOT have signing permissions. |
 
 These personas can be composed for multi-agent systems. For example, a worker agent proposes trades, an approver agent validates them against risk models, and a human admin retains override authority for high-value actions.
 
 ## Key implementation decisions
 
-| Decision | What to consider |
-| :--- | :--- |
-| Wallet scope | Dedicate a wallet (or specific accounts) to the agent. Never share wallets between agents with different trust levels. |
-| Destination allowlist | Restrict which addresses the agent can send to (e.g., only a treasury address, only a specific DEX router) |
-| Spending caps | Bound transaction values per-signing to limit blast radius if the agent misbehaves |
-| Function restrictions | For smart contract interactions, restrict to specific function selectors or [upload the ABI](/features/policies/smart-contract-interfaces) for argument-level control |
-| Consensus requirements | For high-value actions, require both the agent and a human (or another agent) to approve before the enclave signs |
-| Key management | Store agent API keys in a secrets manager. Plan for rotation without downtime. Use short-lived keys where viable. |
+| Decision               | What to consider                                                                                                                                                                                                |
+| :--------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wallet scope           | Dedicate a wallet (or specific accounts) to the agent. Never share wallets between agents with different trust levels.                                                                                          |
+| Destination allowlist  | Restrict which addresses the agent can send to (e.g., only a treasury address, only a specific DEX router)                                                                                                      |
+| Spending caps          | Bound transaction values per-signing to limit blast radius if the agent misbehaves                                                                                                                              |
+| Function restrictions  | For smart contract interactions, restrict to specific function selectors or [upload the ABI](/features/policies/smart-contract-interfaces) for argument-level control                                           |
+| Consensus requirements | For high-value actions, require both the agent and a human (or another agent) to approve before the enclave signs                                                                                               |
+| Key management         | Store agent API keys in a secrets manager. Plan for rotation without downtime. Use short-lived keys where viable.                                                                                               |
 | Transaction management | Enterprise customers can use Turnkey's [transaction management](/features/transaction-management) to offload gas sponsorship, nonce management, and broadcasting — so agents only need to handle signing logic. |
 
 ## Example: autonomous trading agent
 
 An AI agent that analyzes market data and executes trades on a DEX needs scoped signing authority: it should only be able to call specific router functions on approved contracts, with spending limits and human oversight for large trades.
 
-| Need | How Turnkey solves it |
-| :--- | :--- |
-| Agent must never access the private key | Keys stay in the [secure enclave](/security/secure-enclaves); the agent authenticates via API key and receives signatures only |
-| Signing must be restricted to approved contracts | Policies target specific contract addresses and function selectors |
-| Large trades need human approval | Consensus expressions require both the agent and a human approver for transactions above a threshold |
-| Must support multiple chains | One agent user with chain-specific policies (EVM, SVM, etc.) covering each network |
-| Must be revocable instantly | Delete the agent user to permanently and immediately revoke all access |
+| Need                                             | How Turnkey solves it                                                                                                          |
+| :----------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
+| Agent must never access the private key          | Keys stay in the [secure enclave](/security/secure-enclaves); the agent authenticates via API key and receives signatures only |
+| Signing must be restricted to approved contracts | Policies target specific contract addresses and function selectors                                                             |
+| Large trades need human approval                 | Consensus expressions require both the agent and a human approver for transactions above a threshold                           |
+| Must support multiple chains                     | One agent user with chain-specific policies (EVM, SVM, etc.) covering each network                                             |
+| Must be revocable instantly                      | Delete the agent user to permanently and immediately revoke all access                                                         |
 
 ### Implementation steps
 
 <Tip>
-  The [agent provisioning skill](/get-started/ai-skills) can run this entire workflow for you through an AI assistant. Use the steps below if you prefer to implement it manually.
+  The [agent provisioning skill](/get-started/ai-skills) can run this entire
+  workflow for you through an AI assistant. Use the steps below if you prefer to
+  implement it manually.
 </Tip>
 
 <Note>
-  This guide assumes you've completed the [Quickstart](/solutions/company-wallets/quickstart) and have a Turnkey client initialized with your root credentials. The agent will get its own separate credentials.
+  This guide assumes you've completed the
+  [Quickstart](/solutions/company-wallets/quickstart) and have a Turnkey client
+  initialized with your root credentials. The agent will get its own separate
+  credentials.
 </Note>
 
 <Steps>
@@ -65,7 +70,10 @@ Create a dedicated wallet scoped to the agent's needs. Always check for existing
 
 ```ts
 const { wallets } = await turnkeyClient.apiClient().getWallets();
-console.log("Existing wallets:", wallets.map((w) => `${w.walletName} (${w.walletId})`));
+console.log(
+  "Existing wallets:",
+  wallets.map((w) => `${w.walletName} (${w.walletId})`),
+);
 
 const { walletId, addresses } = await turnkeyClient.apiClient().createWallet({
   walletName: "Trading Agent Wallet",
@@ -98,23 +106,29 @@ const pubJwk = keyPair.publicKey.export({ format: "jwk" });
 const privJwk = keyPair.privateKey.export({ format: "jwk" });
 
 // SEC1-compressed P-256 public key (33 bytes, 66 hex chars)
-const xHex = Buffer.from(pubJwk.x!, "base64url").toString("hex").padStart(64, "0");
+const xHex = Buffer.from(pubJwk.x!, "base64url")
+  .toString("hex")
+  .padStart(64, "0");
 const yBuf = Buffer.from(
   Buffer.from(pubJwk.y!, "base64url").toString("hex").padStart(64, "0"),
-  "hex"
+  "hex",
 );
 const prefix = (yBuf[yBuf.length - 1] & 1) === 0 ? "02" : "03";
 const agentPublicKey = prefix + xHex;
-const agentPrivateKey = Buffer.from(privJwk.d!, "base64url").toString("hex").padStart(64, "0");
+const agentPrivateKey = Buffer.from(privJwk.d!, "base64url")
+  .toString("hex")
+  .padStart(64, "0");
 ```
 
 Then create a user tag and the agent user. `userTags` takes tag IDs (UUIDs), not string labels, so create the tag first:
 
 ```ts
-const { userTagId: agentTagId } = await turnkeyClient.apiClient().createUserTag({
-  userTagName: "agent",
-  userIds: [],
-});
+const { userTagId: agentTagId } = await turnkeyClient
+  .apiClient()
+  .createUserTag({
+    userTagName: "agent",
+    userIds: [],
+  });
 
 const { userIds } = await turnkeyClient.apiClient().createUsers({
   users: [
@@ -138,7 +152,8 @@ const agentUserId = userIds[0];
 ```
 
 <Warning>
-  Never create agents as root users. Root users bypass the policy engine entirely. Always use non-root users with explicit ALLOW policies.
+  Never create agents as root users. Root users bypass the policy engine
+  entirely. Always use non-root users with explicit ALLOW policies.
 </Warning>
 
 </Step>
@@ -220,7 +235,8 @@ SIGN_WITH=<agent-wallet-address>
 ```
 
 <Warning>
-  Never output or log root credentials alongside agent credentials. The agent should only ever have its own key pair.
+  Never output or log root credentials alongside agent credentials. The agent
+  should only ever have its own key pair.
 </Warning>
 
 </Step>
@@ -228,9 +244,35 @@ SIGN_WITH=<agent-wallet-address>
 
 ## Next steps
 
-<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
-  <FeatureCard title="Turnkey Agent Skills" icon="cpu-chip-01" href="/get-started/ai-skills" description="Embeddable guides for provisioning, managing, and monitoring agents with Turnkey." />
-  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/quickstart" description="Define granular access controls for every signing action in your organization." />
-  <FeatureCard title="Smart Contract Interfaces" icon="file-code-02" href="/features/policies/smart-contract-interfaces" description="Upload ABIs for function-level policy control over agent contract interactions." />
-  <SolutionCard title="Payment Orchestration" icon="payment-orchestration" href="/solutions/company-wallets/payment-orchestration" description="Agents can automate sweep, deposit, and treasury flows with the same RBAC model." />
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "12px",
+  }}
+>
+  <FeatureCard
+    title="Turnkey Agent Skills"
+    icon="cpu-chip-01"
+    href="/get-started/ai-skills"
+    description="Embeddable guides for provisioning, managing, and monitoring agents with Turnkey."
+  />
+  <FeatureCard
+    title="Policy Engine"
+    icon="file-shield-02"
+    href="/features/policies/quickstart"
+    description="Define granular access controls for every signing action in your organization."
+  />
+  <FeatureCard
+    title="Smart Contract Interfaces"
+    icon="file-code-02"
+    href="/features/policies/smart-contract-interfaces"
+    description="Upload ABIs for function-level policy control over agent contract interactions."
+  />
+  <SolutionCard
+    title="Payment Orchestration"
+    icon="payment-orchestration"
+    href="/solutions/company-wallets/payment-orchestration"
+    description="Agents can automate sweep, deposit, and treasury flows with the same RBAC model."
+  />
 </div>

@@ -41,7 +41,7 @@ const DEFAULT_OPTIONS: ApiEndpointParserOptions = {
  */
 export function parseApiEndpoints(
   openApiSpec: any,
-  options: ApiEndpointParserOptions = DEFAULT_OPTIONS
+  options: ApiEndpointParserOptions = DEFAULT_OPTIONS,
 ): ApiEndpointParserResult {
   const endpoints: ApiEndpoint[] = [];
 
@@ -53,7 +53,7 @@ export function parseApiEndpoints(
     for (const [path, pathItem] of Object.entries(paths)) {
       // Process each HTTP method for this path
       for (const [method, operationObj] of Object.entries(
-        pathItem as Record<string, any>
+        pathItem as Record<string, any>,
       )) {
         // Skip if not a valid HTTP method
         if (!isHttpMethod(method)) continue;
@@ -120,17 +120,17 @@ export function parseApiEndpoints(
           const intents = findVersionedComponents(
             openApiSpec,
             "intent",
-            intentBaseName
+            intentBaseName,
           );
           const results = findVersionedComponents(
             openApiSpec,
             "result",
-            resultBaseName
+            resultBaseName,
           );
           const versionedComponents = matchVersionedComponents(
             typeEnum,
             intents,
-            results
+            results,
           );
 
           // Create ApiEndpoint for each matched version
@@ -138,12 +138,12 @@ export function parseApiEndpoints(
             const intentSchema = getComponentSchema(
               openApiSpec,
               "Intent",
-              component.intentName
+              component.intentName,
             );
             const resultSchema = getComponentSchema(
               openApiSpec,
               "Result",
-              component.resultName
+              component.resultName,
             );
 
             // Create basic endpoint structure for this version
@@ -172,20 +172,24 @@ export function parseApiEndpoints(
                           name: "id",
                           type: "string",
                           required: true,
-                          description: "Unique identifier for a given Activity object.",
+                          description:
+                            "Unique identifier for a given Activity object.",
                         },
                         {
                           name: "organizationId",
                           type: "string",
                           required: true,
-                          description: "Unique identifier for a given Organization.",
+                          description:
+                            "Unique identifier for a given Organization.",
                         },
                         {
                           name: "status",
                           type: "string",
                           required: true,
-                          description: baseEndpointInfo.path.includes("reject_activity") 
-                            ? "ACTIVITY_STATUS_REJECTED" 
+                          description: baseEndpointInfo.path.includes(
+                            "reject_activity",
+                          )
+                            ? "ACTIVITY_STATUS_REJECTED"
                             : "The activity status",
                         },
                         {
@@ -217,22 +221,24 @@ export function parseApiEndpoints(
                           required: true,
                           description: "The result of the activity",
                           childFields: resultSchema
-                              ? [
-                                  {
-                                    name: component.resultName,
-                                    type: "object",
-                                    required: true,
-                                    description: `The ${component.resultName} object`,
-                                    childFields: parseSchemaProperties(resultSchema),
-                                  },
-                                ]
-                              : [],
+                            ? [
+                                {
+                                  name: component.resultName,
+                                  type: "object",
+                                  required: true,
+                                  description: `The ${component.resultName} object`,
+                                  childFields:
+                                    parseSchemaProperties(resultSchema),
+                                },
+                              ]
+                            : [],
                         },
                         {
                           name: "votes",
                           type: "array",
                           required: true,
-                          description: "A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.",
+                          description:
+                            "A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.",
                         },
                         {
                           name: "fingerprint",
@@ -305,7 +311,7 @@ function parameterToApiParameter(param: any): any {
 function getComponentSchema(
   openApiSpec: any,
   componentType: string,
-  componentName: string
+  componentName: string,
 ): any | null {
   try {
     const schema = openApiSpec.components?.schemas?.[componentType];
@@ -385,16 +391,18 @@ function createEnumOptions(enumValues: string[]): EnumOption[] {
 function schemaToApiField(
   name: string,
   schema: any,
-  required: boolean
+  required: boolean,
 ): ApiField {
   const dataType = mapOpenApiTypeToDataType(schema.type);
 
   // Provide better default descriptions for common fields
   let defaultDescription: string;
   if (name === "parameters") {
-    defaultDescription = "The parameters object containing the specific intent data for this activity.";
+    defaultDescription =
+      "The parameters object containing the specific intent data for this activity.";
   } else if (name === "generateAppProofs") {
-    defaultDescription = "Enable to have your activity generate and return App Proofs, enabling verifiability.";
+    defaultDescription =
+      "Enable to have your activity generate and return App Proofs, enabling verifiability.";
   } else {
     defaultDescription = `${name} field`;
   }
@@ -471,7 +479,7 @@ function mapOpenApiTypeToDataType(openApiType: string): DataType {
  */
 function isHttpMethod(method: string): method is HttpMethod {
   return ["get", "post", "put", "patch", "delete"].includes(
-    method.toLowerCase()
+    method.toLowerCase(),
   );
 }
 
@@ -480,7 +488,7 @@ function isHttpMethod(method: string): method is HttpMethod {
  */
 function findActivityTypeEnum(
   openApiSpec: any,
-  activityTypeBase: string
+  activityTypeBase: string,
 ): string[] {
   const activityTypes: string[] = [];
 
@@ -492,8 +500,8 @@ function findActivityTypeEnum(
       // Filter enum values that start with the activity type base
       activityTypes.push(
         ...activityTypeSchema.enum.filter((type: string) =>
-          startsWith(type, activityTypeBase)
-        )
+          startsWith(type, activityTypeBase),
+        ),
       );
     }
   } catch (error) {
@@ -510,7 +518,7 @@ function findActivityTypeEnum(
 function findVersionedComponents(
   openApiSpec: any,
   componentType: "intent" | "result",
-  baseName: string
+  baseName: string,
 ): string[] {
   const components: string[] = [];
 
@@ -523,8 +531,8 @@ function findVersionedComponents(
       // Filter properties that start with the base name
       components.push(
         ...Object.keys(schema.properties).filter((property) =>
-          startsWith(property, baseName)
-        )
+          startsWith(property, baseName),
+        ),
       );
     }
   } catch (error) {
@@ -551,7 +559,7 @@ interface VersionedComponent {
 function matchVersionedComponents(
   activityTypes: string[],
   intents: string[],
-  results: string[]
+  results: string[],
 ): VersionedComponent[] {
   const components: VersionedComponent[] = [];
 
@@ -564,18 +572,18 @@ function matchVersionedComponents(
   if (latestActivityType && latestIntent) {
     const activityTypeVersion = extractVersionFromComponent(latestActivityType);
     const intentVersion = extractVersionFromComponent(latestIntent);
-    
+
     // Use the higher version number for the component version
     const componentVersion = Math.max(
       parseInt(activityTypeVersion || "1"),
-      parseInt(intentVersion || "1")
+      parseInt(intentVersion || "1"),
     ).toString();
 
     components.push({
       version: componentVersion,
       activityType: latestActivityType,
       intentName: latestIntent,
-      resultName: latestResult || latestIntent.replace('Intent', 'Result'), // Use latest result or fallback
+      resultName: latestResult || latestIntent.replace("Intent", "Result"), // Use latest result or fallback
     });
   }
 
@@ -590,7 +598,7 @@ function matchVersionedComponents(
  */
 function findLatestVersion(components: string[]): string | null {
   if (components.length === 0) return null;
-  
+
   let latest = components[0];
   let latestVersion = parseInt(extractVersionFromComponent(latest) || "1");
 
@@ -615,7 +623,7 @@ function parseResponsesFromOperation(operationResponses: any): ApiResponse[] {
   }
 
   for (const [statusCodeStr, responseObj] of Object.entries(
-    operationResponses
+    operationResponses,
   )) {
     const statusCode = parseInt(statusCodeStr, 10);
     if (isNaN(statusCode)) continue; // Skip if status code is not a number (like 'default')

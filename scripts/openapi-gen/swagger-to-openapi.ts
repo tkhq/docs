@@ -9,23 +9,37 @@ const isAuthProxy = service === "auth-proxy";
 
 const SWAGGER_PATH = path.resolve(
   __dirname,
-  isAuthProxy ? "../../proxy_api.swagger.json" : "../../public_api.swagger.json"
+  isAuthProxy
+    ? "../../proxy_api.swagger.json"
+    : "../../public_api.swagger.json",
 );
 const OUTPUT_PATH = path.resolve(
   __dirname,
-  isAuthProxy ? "proxy_api_openapi.json" : "openapi.json"
+  isAuthProxy ? "proxy_api_openapi.json" : "openapi.json",
 );
 
 // Doing some custom key ordering to match the old openapi.json and minimize diffs in initial change
 const KEY_ORDERS: Record<string, string[]> = {
   root: [
-    "openapi", "info", "servers", "security", "tags",
-    "paths", "components", "x-tagGroups", "x-original-swagger-version",
+    "openapi",
+    "info",
+    "servers",
+    "security",
+    "tags",
+    "paths",
+    "components",
+    "x-tagGroups",
+    "x-original-swagger-version",
   ],
   info: ["title", "description", "contact", "version"],
   operation: [
-    "tags", "summary", "description", "operationId",
-    "requestBody", "responses", "x-codegen-request-body-name",
+    "tags",
+    "summary",
+    "description",
+    "operationId",
+    "requestBody",
+    "responses",
+    "x-codegen-request-body-name",
   ],
 };
 
@@ -84,7 +98,9 @@ async function main() {
   );
 
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(ordered, null, 2));
-  console.log(`Converted Swagger 2.0 → OpenAPI 3.0.1 and wrote to ${OUTPUT_PATH}`);
+  console.log(
+    `Converted Swagger 2.0 → OpenAPI 3.0.1 and wrote to ${OUTPUT_PATH}`,
+  );
 }
 
 main().catch((err) => {

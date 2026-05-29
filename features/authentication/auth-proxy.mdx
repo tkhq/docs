@@ -20,13 +20,14 @@ Enable and configure the Auth Proxy from the **Dashboard** → AUTH section (all
 
 ## How it works
 
-1. Enable in Dashboard. Toggle **Auth Proxy** ON. Turnkey creates a Proxy User and proxy API key, stored encrypted in the auth proxy config for your org.  
-2. Configure Allowed Origins. Only requests from these origins may call the proxy (CORS + origin validation). Each entry must be an exact URL (e.g. `https://myapp.com`). By default all origins are allowed (*). Note: partial wildcard patterns like `https://*.myapp.com` are not currently supported.  
+1. Enable in Dashboard. Toggle **Auth Proxy** ON. Turnkey creates a Proxy User and proxy API key, stored encrypted in the auth proxy config for your org.
+2. Configure Allowed Origins. Only requests from these origins may call the proxy (CORS + origin validation). Each entry must be an exact URL (e.g. `https://myapp.com`). By default all origins are allowed (_). Note: partial wildcard patterns like `https://_.myapp.com` are not currently supported.
 3. Your App Calls Auth Proxy. Your frontend hits `https://authproxy.turnkey.com/v1/...` with your auth proxy config id and the flow parameters. This should be passed to the X-Auth-Proxy-Config-Id header in your request
-4. Proxy Signs & Forwards. Auth Proxy decrypts your proxy key in-memory, signs the activity, and forwards to Turnkey Coordinator.  
-5. Coordinator Responds. Proxy returns success / error, plus any response payload (e.g., organizationId, session).  
+4. Proxy Signs & Forwards. Auth Proxy decrypts your proxy key in-memory, signs the activity, and forwards to Turnkey Coordinator.
+5. Coordinator Responds. Proxy returns success / error, plus any response payload (e.g., organizationId, session).
 
 **Security notes:**
+
 - Proxy keys are HPKE encrypted inside our enclave; decrypted per request only in memory.
 - Strict separation from Turnkey’s core backend; communicates via public API only.
 - The Auth Proxy does not verify App Proofs produced by Turnkey's secure enclaves, it simply passes them on to its caller. End-users (SDKs) are expected to perform this verification procedure, not the Auth Proxy. Refer to [Turnkey Verified](/security/turnkey-verified) for more information on how App Proof verification works.
@@ -37,10 +38,11 @@ All endpoints are under https://authproxy.turnkey.com
 
 ## Authentication & headers
 
-- **Auth Proxy Config Id** (required): identifies your parent org’s proxy config.  
-  - Send as header:  
+- **Auth Proxy Config Id** (required): identifies your parent org’s proxy config.
+  - Send as header:
     ```
     X-Auth-Proxy-Config-Id: <auth-proxy-config-token>
+    ```
 - **CORS & Origin:** Requests must originate from a whitelisted origin set in the dashboard.
 
 ## Endpoints
@@ -52,6 +54,7 @@ All endpoints are under https://authproxy.turnkey.com
 Onboard a new user by creating a sub-organization. Optionally creates a wallet.
 
 **Request Body**
+
 ```json
 {
   "userName": "newuser@example.com",
@@ -68,6 +71,7 @@ Onboard a new user by creating a sub-organization. Optionally creates a wallet.
 ```
 
 **Response**
+
 ```json
 {
   "organizationId": "suborg-abc123"
@@ -81,13 +85,16 @@ POST /v1/otp_init
 Initialize an OTP (SMS or email) for a user.
 
 **Request Body**
+
 ```json
 {
   "otpType": "OTP_TYPE_SMS",
   "contact": "+12265550123"
 }
 ```
+
 **Response**
+
 ```json
 {
   "otpId": "otp-xyz789"
@@ -106,7 +113,7 @@ Verify the OTP code previously sent to the user’s contact.
 {
   "otpId": "otp-xyz789",
   "otpCode": "123456",
-  "public_key": "02ab...compressedP256",
+  "public_key": "02ab...compressedP256"
 }
 ```
 
@@ -130,7 +137,7 @@ Login using a verification token and public key.
 {
   "verificationToken": "verify-token-abc",
   "publicKey": "02ab...compressedP256",
-  "client_signature": "30453...hexEncodedSignatureOverVerificationToken",
+  "client_signature": "30453...hexEncodedSignatureOverVerificationToken"
 }
 ```
 
@@ -156,8 +163,8 @@ Authenticate with an OAuth 2.0 provider and receive an OIDC token issued by Turn
   "authCode": "your_oauth2_auth_code",
   "redirectUri": "https://yourapp.com/callback",
   "codeVerifier": "string-used-for-pkce",
-  "nonce":"sha256(publicKey)",
-  "clientId":"your-oauth2-client-id",
+  "nonce": "sha256(publicKey)",
+  "clientId": "your-oauth2-client-id"
 }
 ```
 
@@ -232,7 +239,15 @@ Return Wallet Kit feature toggles for the calling organization.
 
 ```json
 {
-  "enabledProviders": ["google", "facebook", "apple", "email", "sms", "passkey", "wallet"],
+  "enabledProviders": [
+    "google",
+    "facebook",
+    "apple",
+    "email",
+    "sms",
+    "passkey",
+    "wallet"
+  ],
   "sessionExpirationSeconds": "1800",
   "organizationId": "org-abc123"
 }
@@ -240,7 +255,7 @@ Return Wallet Kit feature toggles for the calling organization.
 
 ## Configuration (Dashboard → AUTH)
 
-- Enable/Disable the Auth Proxy for your org  
-- Allowed Frontend Origins (CORS enforcement)  
-- Email/SMS Customization  
+- Enable/Disable the Auth Proxy for your org
+- Allowed Frontend Origins (CORS enforcement)
+- Email/SMS Customization
 - Session Expiration

@@ -16,7 +16,10 @@ import {
   formatApiEndpoints,
   ApiEndpointParserResult,
 } from "./utils/endpoint-parser";
-import { generateMdxFile, generateAuthProxyMdxFile } from "./utils/mdx-generator";
+import {
+  generateMdxFile,
+  generateAuthProxyMdxFile,
+} from "./utils/mdx-generator";
 import path from "path";
 import fs from "fs";
 
@@ -48,15 +51,19 @@ async function main() {
 
       // Helper to kebab-case strings and remove '?'
       const kebabCase = (str: string) =>
-        str.replace(/\?/g, '').trim().toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        str
+          .replace(/\?/g, "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
 
       // Build raw list with name, id, type, tags
-      const rawList = endpointResult.endpoints.map(ep => {
-        const name = ep.title.replace(/\?/g, '').trim();
+      const rawList = endpointResult.endpoints.map((ep) => {
+        const name = ep.title.replace(/\?/g, "").trim();
         const id = kebabCase(name);
         const type = ep.type;
-        const tags = (ep.tags || []).map(t => ({
+        const tags = (ep.tags || []).map((t) => ({
           id: kebabCase(t),
           label: t,
         }));
@@ -64,10 +71,15 @@ async function main() {
       });
 
       // Deduplicate by id + tag ids
-      const uniqueList: { name: string; id: string; type: string; tags: { id: string; label: string }[] }[] = [];
+      const uniqueList: {
+        name: string;
+        id: string;
+        type: string;
+        tags: { id: string; label: string }[];
+      }[] = [];
       const seen = new Set<string>();
       for (const item of rawList) {
-        const key = `${item.id}|${item.tags.map(t => t.id).join(',')}`;
+        const key = `${item.id}|${item.tags.map((t) => t.id).join(",")}`;
         if (!seen.has(key)) {
           seen.add(key);
           uniqueList.push(item);
@@ -79,7 +91,7 @@ async function main() {
         // First sort by type: activities before queries
         if (a.type === "activity" && b.type === "query") return -1;
         if (a.type === "query" && b.type === "activity") return 1;
-        
+
         // If same type, sort alphabetically by name
         return a.name.localeCompare(b.name);
       });
@@ -93,11 +105,11 @@ async function main() {
         const endpointsStr = JSON.stringify(uniqueList, null, 2);
         // Collect unique tags
         const tagMap = new Map<string, string>();
-        uniqueList.forEach(item =>
-          item.tags.forEach(tag => tagMap.set(tag.id, tag.label))
+        uniqueList.forEach((item) =>
+          item.tags.forEach((tag) => tagMap.set(tag.id, tag.label)),
         );
         const uniqueTagsArray = Array.from(tagMap.entries()).map(
-          ([id, label]) => ({ id, label })
+          ([id, label]) => ({ id, label }),
         );
         const tagsStr = JSON.stringify(uniqueTagsArray, null, 2);
         // Construct MDX content with endpoints and tags
@@ -119,7 +131,7 @@ export const tags = ${tagsStr};`;
       // --- MDX Generation Mode ---
       if (!endpointResult) {
         throw new Error(
-          "Endpoint data is required for MDX generation (--endpoints flag might be needed)."
+          "Endpoint data is required for MDX generation (--endpoints flag might be needed).",
         );
       }
       console.log(`--- Starting MDX Generation ---`);
@@ -132,7 +144,7 @@ export const tags = ${tagsStr};`;
       const absoluteMdxOutputDir = path.resolve(projectRoot, mdxOutputDirName);
       const relativeMdxBaseDir = path.relative(
         projectRoot,
-        absoluteMdxOutputDir
+        absoluteMdxOutputDir,
       );
 
       console.log(`Output directory: ${absoluteMdxOutputDir}`);
@@ -163,7 +175,11 @@ export const tags = ${tagsStr};`;
         if (skipEndpointPaths.has(endpoint.path)) continue;
         // Use the auth-proxy generator when --auth-proxy is set, main generator otherwise
         const generatedPath = options.authProxy
-          ? generateAuthProxyMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly)
+          ? generateAuthProxyMdxFile(
+              endpoint,
+              absoluteMdxOutputDir,
+              options.mdxAddOnly,
+            )
           : generateMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly);
 
         if (generatedPath) {
@@ -203,31 +219,34 @@ export const tags = ${tagsStr};`;
         // Check if docsConfig.navigation is an array before proceeding
         if (!docsConfig || !docsConfig.navigation) {
           console.error(
-            `Error: Expected 'docs.json' to have a top-level 'navigation' array.`
+            `Error: Expected 'docs.json' to have a top-level 'navigation' array.`,
           );
           throw new Error("'docs.json' structure is not as expected.");
         }
 
         // Find the API & SDK reference tab
         const apiRefTab = docsConfig.navigation.tabs.find(
-          (item: any) => item.tab === "API & SDK reference"
+          (item: any) => item.tab === "API & SDK reference",
         );
 
         // Activities and Queries live inside the "REST API" group within the tab
         const restApiGroup = apiRefTab?.pages?.find(
-          (item: any) => typeof item === "object" && item.group === "REST API"
+          (item: any) => typeof item === "object" && item.group === "REST API",
         );
 
         if (restApiGroup && Array.isArray(restApiGroup.pages)) {
           if (options.authProxy && options.navGroup) {
             // Auth-proxy mode: find or create the named nav group and set its pages
             let navGroup = restApiGroup.pages.find(
-              (item: any) => typeof item === "object" && item.group === options.navGroup
+              (item: any) =>
+                typeof item === "object" && item.group === options.navGroup,
             );
             if (!navGroup) {
               navGroup = { group: options.navGroup, pages: [] };
               restApiGroup.pages.push(navGroup);
-              console.log(`Created new nav group '${options.navGroup}' in docs.json`);
+              console.log(
+                `Created new nav group '${options.navGroup}' in docs.json`,
+              );
             }
             navGroup.pages = uniqueAuthProxyPaths;
             console.log(`Updated '${options.navGroup}' paths in docs.json`);
@@ -235,7 +254,7 @@ export const tags = ${tagsStr};`;
             // Standard mode: update Activities and Queries groups
             const activitiesGroup = restApiGroup.pages.find(
               (item: any) =>
-                typeof item === "object" && item.group === "Activities"
+                typeof item === "object" && item.group === "Activities",
             );
             if (activitiesGroup) {
               activitiesGroup.pages = [
@@ -245,12 +264,13 @@ export const tags = ${tagsStr};`;
               console.log(`Updated Activities paths in docs.json`);
             } else {
               console.warn(
-                `Could not find 'Activities' group in docs.json under 'REST API'`
+                `Could not find 'Activities' group in docs.json under 'REST API'`,
               );
             }
 
             const queriesGroup = restApiGroup.pages.find(
-              (item: any) => typeof item === "object" && item.group === "Queries"
+              (item: any) =>
+                typeof item === "object" && item.group === "Queries",
             );
             if (queriesGroup) {
               queriesGroup.pages = [
@@ -260,25 +280,25 @@ export const tags = ${tagsStr};`;
               console.log(`Updated Queries paths in docs.json`);
             } else {
               console.warn(
-                `Could not find 'Queries' group in docs.json under 'REST API'`
+                `Could not find 'Queries' group in docs.json under 'REST API'`,
               );
             }
           }
         } else {
           console.warn(
-            `Could not find 'REST API' group in 'API & SDK reference' tab in docs.json navigation`
+            `Could not find 'REST API' group in 'API & SDK reference' tab in docs.json navigation`,
           );
         }
 
         // Write updated config back to docs.json
         fs.writeFileSync(
           docsJsonPath,
-          JSON.stringify(docsConfig, null, 2) + "\n"
+          JSON.stringify(docsConfig, null, 2) + "\n",
         );
         console.log(`Successfully updated ${docsJsonPath}`);
       } catch (error: any) {
         console.error(
-          `Error processing or updating docs.json: ${error.message}`
+          `Error processing or updating docs.json: ${error.message}`,
         );
       }
       console.log(`--- Finished updating docs.json ---`);
@@ -288,10 +308,10 @@ export const tags = ${tagsStr};`;
       if (options.output) {
         const absoluteFormattedOutputPath = path.resolve(
           projectRoot,
-          options.output
+          options.output,
         );
         console.log(
-          `Additionally writing formatted endpoints to ${absoluteFormattedOutputPath}`
+          `Additionally writing formatted endpoints to ${absoluteFormattedOutputPath}`,
         );
         const endpointFormat =
           options.format === "yaml" ? "json" : options.format; // Default to json if yaml requested
@@ -332,7 +352,7 @@ export const tags = ${tagsStr};`;
       // --- Raw OpenAPI Spec Mode (JSON/YAML) ---
       if (options.format === "typescript") {
         throw new Error(
-          "TypeScript format is only supported when using the --endpoints or --generate-mdx flags."
+          "TypeScript format is only supported when using the --endpoints or --generate-mdx flags.",
         );
       }
       // Resolve output path relative to project root if specified
