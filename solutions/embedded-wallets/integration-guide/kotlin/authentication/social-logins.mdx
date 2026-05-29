@@ -10,7 +10,7 @@ Using OAuth requires a bit of configuration in the Turnkey Dashboard and your ap
 
 ### Enabling OAuth
 
-Navigate to the **Wallet Kit** section in the [Turnkey Dashboard](https://app.turnkey.com/dashboard/walletKit) and enable the
+Navigate to the **Embedded Wallets → Configuration** section in the [Turnkey Dashboard](https://app.turnkey.com/dashboard/walletKit) and enable the
 **OAuth**. Note if you have not enabled the Auth Proxy, you will need to do so first. Check out the [Getting Started](/solutions/embedded-wallets/integration-guide/kotlin/getting-started) guide for more details.
 
 <img
@@ -41,7 +41,7 @@ You can choose to enter your client IDs for each OAuth provider and the redirect
   alt="OAuth redirect URL configuration"
 />
 
-Or, you can provide the client IDs and redirect URI through environment variables and pass them in the `TurnkeyConfig` used to initialize the SDK.
+Or, you can provide the client IDs and redirect URI through environment variables and pass them into the `TurnkeyConfig` used to initialize the SDK.
 This is useful if you want to use different OAuth client IDs or a different redirect URL for different environments (e.g., development, staging, production).
 
 You can retrieve the client IDs from the OAuth provider's dashboard. Note that the redirect URI must match the one you configured in the dashboard or in the TurnkeyConfig.
@@ -110,6 +110,15 @@ class App : Application() {
     }
 }
 ```
+
+<Note>
+  By default, Turnkey hosts the OAuth redirect and origin pages at
+  `https://oauth-redirect.turnkey.com` and `https://oauth-origin.turnkey.com`,
+  which forward back into your app via the `appScheme` you configured. If
+  you'd rather host these yourself, you can set an `oauthRedirectUri` in your
+  `TurnkeyConfig`. Whatever URL you set must match the one registered in the
+  provider's developer dashboard.
+</Note>
 
 ## Usage
 
@@ -183,24 +192,25 @@ class MainActivity : AppCompatActivity() {
 
 #### Google
 
-Requirements: 
+Requirements:
 
-- Dashboard: Enable Google OAuth and provide client ID and secret.
-- Client ID: use a Web client ID in the Google developer console and set it in the Dashboard or in the `TurnkeyContext.init`'s config.
+- Client ID: use a Web client ID from the Google developer console and set it in the Dashboard or in the `TurnkeyContext.init`'s config.
+- In the **Google developer console**, set the authorized redirect URL to `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and the authorized JavaScript origin to `https://oauth-origin.turnkey.com/`. Replace `YOURAPPSCHEME` with the `appScheme` you set in `TurnkeyConfig`.
 
 #### Apple
 
+`handleAppleOAuth` on Android uses a **web-based** Apple OAuth flow that authenticates against the Apple **Services ID**.
+
 Requirements:
 
-- Turnkey Dashboard: Enable Apple OAuth
-- Client ID: set Apple Services ID in the Dashboard or in the `TurnkeyContext.init`'s config.
-- Provider Dashboard: Set the Redirect URI to `myapp://`
+- Client ID: set the Apple **Services ID** in the Dashboard or in the `TurnkeyContext.init`'s config.
+- In the **Apple Developer** dashboard, set the Services ID's return URL to `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and its domain/origin to `https://oauth-origin.turnkey.com/`. Replace `YOURAPPSCHEME` with the `appScheme` you set in `TurnkeyConfig`.
 
 ### OAuth2.0 providers
 
 For OAuth providers that exclusively use OAuth2.0 (e.g., X, Discord), you will need to configure a few additional settings in your Turnkey Dashboard.
 
-In the **Wallet Kit** section of the dashboard, head to the **Socials** tab and click **Add provider**.
+In the **Embedded Wallets → Configuration** section of the dashboard, head to the **OAuth 2.0** tab and click **Add Credential**.
 
 <img
   src="/images/sdks/img/socials-page.png"
@@ -229,14 +239,12 @@ Click **Select** to choose your newly added client ID, then click **Save Setting
 
 Requirements:
 
-- Turnkey Dashboard: enable Discord (OAuth 2.0 provider).
 - Client ID: set in Dashboard or in the `TurnkeyContext.init`'s config.
-- Provider Dashboard: Set the Redirect URI to `myapp://`
+- In the **Discord Developer Portal**, set the redirect URI to `YOUR_APP_SCHEME://`.
 
 #### X (Twitter)
 
 Requirements:
 
-- Turnkey Dashboard: enable X (OAuth 2.0 provider).
 - Client ID: set in Dashboard or in the `TurnkeyContext.init`'s config.
-- Provider Dashboard: Set the Redirect URI to `myapp://`
+- In the **Twitter Developer Portal**, set the redirect URI to `YOUR_APP_SCHEME://`.
