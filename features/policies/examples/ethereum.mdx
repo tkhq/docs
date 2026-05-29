@@ -8,9 +8,40 @@ Note: see the [language section](/features/policies/language#ethereum) for more 
 
 #### Allow ABI-specific contract call parameters
 
-See [here](../../../concepts/policies/smart-contract-interfaces) for more information and examples.
+For contract interactions, use
+[Smart Contract Interfaces](/features/policies/smart-contract-interfaces) (ABI upload) rather than
+raw calldata slicing. ABI-based policies use named arguments
+(`eth.tx.contract_call_args['arg_name']`) instead of byte offsets — they're more readable, less
+error-prone, and won't silently break if the contract encoding changes. Raw `eth.tx.data[...]`
+slicing is a fallback for contracts where no ABI is available.
 
-#### Allow ERC-20 transfers for a specific token smart contract
+**Restrict a `transfer` call to a maximum amount and a specific recipient:**
+
+```json
+{
+  "policyName": "Limit WETH transfers",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.contract_call_args['wad'] < 1000000000000000000 && eth.tx.contract_call_args['dst'] == '0x08d2b0a37F869FF76BACB5Bab3278E26ab7067B7'"
+}
+```
+
+**Restrict by function name or selector (also requires an ABI upload):**
+
+```json
+{
+  "policyName": "Allow only transfer calls to a contract",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.to == '<CONTRACT_ADDRESS>' && eth.tx.function_name == 'transfer'"
+}
+```
+
+See [Smart Contract Interfaces](/features/policies/smart-contract-interfaces) for the full upload
+walkthrough and Solana IDL support.
+
+#### Allow ERC-20 transfers for a specific token smart contract (raw calldata fallback)
+
+Use this pattern only when an ABI is unavailable. The selector `0xa9059cbb` is the 4-byte keccak256
+hash of `transfer(address,uint256)`.
 
 ```json
 {
@@ -52,15 +83,19 @@ See [here](../../../concepts/policies/smart-contract-interfaces) for more inform
 
 #### Inspect nested fields in EIP-712 message payloads
 
-The `eth.eip_712.message` map supports nested field access using bracket notation, allowing policies to inspect typed data contents beyond just the domain and primary type.
+The `eth.eip_712.message` map supports nested field access using bracket notation, allowing policies
+to inspect typed data contents beyond just the domain and primary type.
 
 **Syntax:**
+
 - Nested struct fields: `eth.eip_712.message['outerField']['innerField']`
 - Array element fields: `eth.eip_712.message['arrayField'][0]['innerField']`
 
 **Example: Restrict Hyperliquid orders to a specific asset**
 
-Hyperliquid's `HyperliquidTransaction:Order` message contains an `orders` array of `Order` structs. Each `Order` uses short field names: `a` (asset index), `b` (isBuy), `p` (price), `s` (size), `r` (reduceOnly).
+Hyperliquid's `HyperliquidTransaction:Order` message contains an `orders` array of `Order` structs.
+Each `Order` uses short field names: `a` (asset index), `b` (isBuy), `p` (price), `s` (size), `r`
+(reduceOnly).
 
 ```json
 {
@@ -86,7 +121,10 @@ To allow only orders for a specific asset (e.g. ETH = asset index `3`):
 ```
 
 <Note>
-Array access is index-based (`[0]`, `[1]`, etc.). The condition `message['orders'][0]['a'] == '3'` only checks the first order — any additional orders in the array are not evaluated. To restrict all orders in a known-size batch, add a condition for each index: `message['orders'][0]['a'] == '3' && message['orders'][1]['a'] == '3'`.
+  Array access is index-based (`[0]`, `[1]`, etc.). The condition `message['orders'][0]['a'] == '3'`
+  only checks the first order — any additional orders in the array are not evaluated. To restrict
+  all orders in a known-size batch, add a condition for each index: `message['orders'][0]['a'] ==
+  '3' && message['orders'][1]['a'] == '3'`.
 </Note>
 
 ### Deny signing of `NO_OP` keccak256 payloads
