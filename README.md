@@ -25,6 +25,21 @@ mintlify dev
 
 This will start a local development server where you can preview your changes in real-time.
 
+### Formatting
+
+This repo uses [Prettier](https://prettier.io) to format all hand-written content (`.mdx`, `.md`, `.css`, `.json`, `.ts`, `.js`, ...). Generated artifacts (swagger files, `generated-docs/`) are excluded via `.prettierignore`.
+
+```sh
+# Install dev dependencies (one time)
+npm install
+
+# Format everything in place
+npm run format   # or: make format
+
+# Check formatting without writing (useful in CI)
+npm run format:check   # or: make format-check
+```
+
 If you encounter any issues with the development server:
 
 - Run `mintlify install` to reinstall dependencies

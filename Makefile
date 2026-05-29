@@ -1,11 +1,19 @@
 ROOT := $(shell git rev-parse --show-toplevel)
 JS_SDK_ROOT := $(ROOT)/../sdk
 
-.PHONY: openapi-gen gen tags mintlify-check
+.PHONY: openapi-gen gen tags mintlify-check format format-check
 
 # Convenience method to start dev server
 dev:
 	mintlify dev
+
+# Format all hand-written content with Prettier (mdx, md, css, json, ts, js, ...)
+format:
+	npm run format
+
+# Check formatting without writing changes (use in CI)
+format-check:
+	npm run format:check
 
 # Install deps for OpenAPI
 install:
