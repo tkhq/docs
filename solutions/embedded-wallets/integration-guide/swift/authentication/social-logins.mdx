@@ -22,7 +22,13 @@ Before you begin:
 
 ## Configure providers
 
-Define your app scheme and provider client IDs directly in `TurnkeyConfig`:
+Define your app scheme and provider client IDs directly in `TurnkeyConfig`.
+
+Each provider takes a `primaryClientId` and an optional `secondaryClientIds` array. Any `secondaryClientIds` you pass are registered as additional OIDC audiences on the sub-organization at creation time, which lets a single Turnkey user be authenticated by multiple client IDs (typically used by apps that have both web and mobile versions sharing one identity).
+
+<Note>
+  Apple Sign-In on iOS uses the **native** Apple Sign-In flow. The `serviceId` on `AppleOAuthPrimaryClientId` is only needed if you want to use the legacy web-based Apple Sign-In flow (`handleAppleWebOAuth`).
+</Note>
 
 ```swift DemoWalletApp.swift
 import SwiftUI
@@ -43,10 +49,16 @@ struct DemoWalletApp: App {
                 oauth: .init(
                     appScheme: "<your-app-scheme>",
                     providers: .init(
-                        google: .init(clientId: "<your_google_client_id>"),
-                        apple: .init(clientId: "<your_apple_client_id>"),
-                        x: .init(clientId: "<your_x_client_id>"),
-                        discord: .init(clientId: "<your_discord_client_id>")
+                        google: .init(
+                            primaryClientId: .init(webClientId: "<your_google_web_client_id>")
+                            // secondaryClientIds: ["<another_google_client_id>"]
+                        ),
+                        apple: .init(
+                            // primaryClientId: .init(serviceId: "<your_apple_services_id>") - this is only needed if you're using handleAppleWebOauth.
+                            // secondaryClientIds: ["<another_apple_client_id>"]
+                        ),
+                        x: .init(primaryClientId: "<your_x_client_id>"),
+                        discord: .init(primaryClientId: "<your_discord_client_id>")
                     )
                 )
             )
@@ -60,6 +72,15 @@ struct DemoWalletApp: App {
     }
 }
 ```
+
+<Note>
+  By default, Turnkey hosts the OAuth redirect and origin pages at
+  `https://oauth-redirect.turnkey.com` and `https://oauth-origin.turnkey.com`,
+  which forward back into your app via the `appScheme` you configured. If
+  you'd rather host these yourself, you can set a `redirectUri` in your
+  `TurnkeyConfig`. Whatever URL you set must match the one registered in the
+  provider's developer dashboard.
+</Note>
 
 ## Helper: presentation anchor
 
@@ -82,6 +103,31 @@ func defaultAnchor() -> ASPresentationAnchor? {
 ## OIDC: Google and Apple
 
 Use `handleGoogleOAuth` or `handleAppleOAuth`.
+
+### Google
+
+In the **Google developer console**, set the authorized redirect URL to `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and the authorized JavaScript origin to `https://oauth-origin.turnkey.com/`. Replace `YOURAPPSCHEME` with the `appScheme` you set in `OAuthConfig`.
+
+### Apple
+
+`handleAppleOAuth` uses the **native** Sign in with Apple flow on iOS. For this to work you must:
+
+- Enable the **Sign in with Apple** capability for your app in **Xcode** (Signing & Capabilities).
+- Enable **Sign in with Apple** for the app identifier in the **Apple Developer** dashboard.
+
+The native flow authenticates against the Apple **Services ID** configured in `AppleOAuthPrimaryClientId.serviceId`; no redirect URL setup is required for it.
+
+<Note>
+  `handleAppleWebOauth` is also exposed but **deprecated**. It's kept for
+  backwards compatibility with older SDK versions and forces the web-based
+  Apple OAuth flow on iOS using `serviceId` as the audience. Only use it if
+  you specifically need to force the web flow. The web flow uses
+  Turnkey's redirect and origin by default. Set the Services ID's return URL to
+  `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and its
+  domain/origin to `https://oauth-origin.turnkey.com/` in the Apple Developer
+  dashboard.
+</Note>
+
 
 ```swift LoginView.swift
 import SwiftUI
@@ -119,7 +165,7 @@ Optional parameters:
 
 ## OAuth2 PKCE: Discord and X
 
-Use `handleDiscordOAuth` or `handleXOauth`.
+Use `handleDiscordOAuth` or `handleXOauth`. In the **Discord** and **X (Twitter) developer portals**, set the redirect URI to `YOUR_APP_SCHEME://` (matching the `appScheme` you set in `OAuthConfig`).
 
 ```swift LoginView.swift
 import SwiftUI

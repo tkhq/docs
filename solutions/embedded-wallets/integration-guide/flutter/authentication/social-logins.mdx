@@ -7,37 +7,44 @@ sidebarTitle: "Social logins"
 
 ## Configuring OAuth
 
-Using OAuth requires configuration in the Turnkey Dashboard and in your app.
+Using OAuth requires a bit of configuration in the Turnkey Dashboard and your app configuration.
 
 ### Enabling OAuth
 
-Navigate to the **Wallet Kit** section in the [Turnkey Dashboard](https://app.turnkey.com/dashboard/walletKit) and enable **OAuth**. If you have not enabled the Auth Proxy, enable it first. See [Getting Started](/solutions/embedded-wallets/integration-guide/flutter/getting-started) for details.
+Navigate to the **Embedded Wallets → Configuration** section in the [Turnkey Dashboard](https://app.turnkey.com/dashboard/walletKit) and enable the
+**OAuth**. Note if you have not enabled the Auth Proxy, you will need to do so first. Check out the [Getting Started](/solutions/embedded-wallets/integration-guide/react-native/getting-started) guide for more details.
 
-<img src="/images/sdks/img/enable-oauth.png" alt="OAuth providers configuration" />
-
-### Configuring OAuth providers
-
-Enable the providers you want to use under **Social logins**.
-
-<img src="/images/sdks/img/social-logins.png" alt="OAuth client IDs configuration" />
+<img
+  src="/images/sdks/img/enable-oauth.png"
+  alt="OAuth providers configuration"
+/>
 
 #### Client IDs
 
-You can enter client IDs for each provider and the redirect URL directly in the dashboard:
+You can choose to enter your primary client IDs for each OAuth provider in the dashboard
 
-<img src="/images/sdks/img/google-client-id.png" alt="OAuth client IDs configuration" />
+<img
+  src="/images/sdks/img/google-client-id.png"
+  alt="OAuth client IDs configuration"
+/>
 
-<img src="/images/sdks/img/oauth-redirect-url.png" alt="OAuth redirect URL configuration" />
-
-Or provide client IDs and the redirect URI through your app configuration and pass them to the `TurnkeyProvider`.
+Or provide client IDs through your app configuration and pass them into the `TurnkeyProvider`'s config.
+Client IDs typically come from the OAuth provider's developer console. For example, Google client IDs can be found in the [Google developer console](https://console.developers.google.com/).
 
 <Note>
-  For OAuth 2.0 providers, you will need to upload the client ID and secret in the dashboard. See the **OAuth 2.0 providers** section below for details.
+  For OAuth2.0 providers, you will need to upload the client ID and secret in
+  the dashboard. Check out the [OAuth2.0 providers](/solutions/embedded-wallets/integration-guide/react-native/authentication/social-logins#oauth2-0-providers) section for more details.
 </Note>
 
 #### Client configuration
 
-If you prefer configuring via code, provide your client IDs and optional redirect URI through `TurnkeyConfig.authConfig.oAuthConfig`, and set an `appScheme` to complete deep links.
+If you prefer configuring via code, provide your client IDs through `TurnkeyConfig.authConfig.oAuthConfig`, and set an `appScheme` to complete deep links.
+
+Each provider takes a `primaryClientId` and an optional `secondaryClientIds` array. Any `secondaryClientIds` you pass are registered as additional OIDC audiences on the sub-organization at creation time, which lets a single Turnkey user be authenticated by multiple client IDs (typically used by apps that have both web and mobile versions sharing one identity). You can learn more about Multi-platform OAuth Identities [here](/features/authentication/social-logins#multi-platform-oauth-identities).
+
+<Note>
+  Apple Sign-In on iOS uses the **native** Apple Sign-In flow, which authenticates against the iOS app's bundle identifier. On Android, Apple Sign-In uses a **web-based** OAuth flow that authenticates against the Apple **Services ID**. To keep iOS and Android signups for the same user compatible, when you set `iosBundleId`, it is automatically added as a secondary client ID on the sub-org during Android signups (and vice-versa), so a user who signs up on one platform can still sign in on the other.
+</Note>
 
 ```dart title=lib/main.dart (excerpt)
 final turnkeyProvider = TurnkeyProvider(
@@ -46,20 +53,44 @@ final turnkeyProvider = TurnkeyProvider(
     appScheme: 'myapp', // Required for OAuth deep link completion
     authConfig: AuthConfig(
       oAuthConfig: OAuthConfig(
-        // Note: If no redirect URI is provided, the default redirect URI will be used: https://oauth-redirect.turnkey.com. This url must be configured to redirect back to your app!
-        oauthRedirectUri: '<YOUR_REDIRECT_URI>', // Optional: e.g., "https://your-app.com/oauth-callback"
+        oauthRedirectUri: '<YOUR_REDIRECT_URI>',  // Optional if you want to force the redirect URI instead of the default `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/`
 
         // Client IDs from your provider dashboards
-        googleClientId: '<YOUR_GOOGLE_CLIENT_ID>',
-        appleClientId: '<YOUR_APPLE_CLIENT_ID>',
-        facebookClientId: '<YOUR_FACEBOOK_CLIENT_ID>',
-        xClientId: '<YOUR_X_CLIENT_ID>',
-        discordClientId: '<YOUR_DISCORD_CLIENT_ID>',
+        providers: OAuthProviders(
+          google: GoogleOAuthProviderParams(
+            primaryClientId: GoogleOAuthPrimaryClientId(
+              webClientId: '<YOUR_GOOGLE_WEB_CLIENT_ID>',
+            ),
+            // secondaryClientIds: ['<ANOTHER_GOOGLE_CLIENT_ID>'],
+          ),
+          apple: AppleOAuthProviderParams(
+            primaryClientId: AppleOAuthPrimaryClientId(
+              // Services ID - used on Android for the web-based OAuth flow.
+              serviceId: '<YOUR_APPLE_SERVICES_ID>',
+              // iOS bundle ID - used as the audience for the native iOS Sign-In flow.
+              iosBundleId: '<YOUR_IOS_BUNDLE_ID>',
+            ),
+          ),
+          x: XOAuthProviderParams(
+            primaryClientId: '<YOUR_X_CLIENT_ID>',
+          ),
+          discord: DiscordOAuthProviderParams(
+            primaryClientId: '<YOUR_DISCORD_CLIENT_ID>',
+          ),
+        ),
       ),
     ),
   ),
 );
 ```
+
+<Note>
+  By default, Turnkey hosts the OAuth redirect and origin pages at
+  `https://oauth-redirect.turnkey.com` and `https://oauth-origin.turnkey.com`,
+  which forward back into your app via the `appScheme` you configured. If
+  you'd rather host these yourself, override `oauthRedirectUri` in your `TurnkeyProvider`'s config. Whatever URL you set
+  must match the one registered in the provider's developer dashboard.
+</Note>
 
 ### App scheme configuration (deep links)
 
@@ -158,8 +189,8 @@ class SocialLoginButtons extends StatelessWidget {
 
 Requirements:
 
-* Dashboard: enable Google in Wallet Kit → Authentication.
 * Client ID: Web client ID from the Google developer console, set in the Dashboard or via `OAuthConfig`.
+* In the **Google developer console**, set the authorized redirect URL to `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and the authorized JavaScript origin to `https://oauth-origin.turnkey.com/`. Replace `YOURAPPSCHEME` with the `appScheme` you set in `TurnkeyConfig`.
 
 Usage:
 
@@ -169,11 +200,17 @@ await context.read<TurnkeyProvider>().handleGoogleOauth();
 
 #### Apple
 
+`handleAppleOauth` uses the **native** Sign in with Apple flow on iOS devices. For this to work you must:
+
+* Enable the **Sign in with Apple** capability for your iOS app in **Xcode** (Signing & Capabilities).
+* Enable **Sign in with Apple** for the app identifier in the **Apple Developer** dashboard.
+
+On Android, `handleAppleOauth` falls back to a **web-based** Apple OAuth flow that authenticates against the Apple **Services ID**. To keep iOS and Android sign-ins linked to the same Turnkey user, configure both `serviceId` and `iosBundleId` on `AppleOAuthPrimaryClientId`. The `iosBundleId` is automatically registered as a secondary client ID on the sub-org during Android signups (and vice-versa).
+
 Requirements:
 
-* Dashboard: enable Apple.
-* Client ID: Apple Services ID, set in the Dashboard or via `OAuthConfig`.
-* Redirect URI must match your configured value (e.g., `myapp://`).
+* Client IDs: Apple **Services ID** (Android web flow) and iOS **bundle ID** (native iOS flow), set via the `OAuthConfig`.
+* In the **Apple Developer** dashboard, set the Services ID's return URL to `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and its domain/origin to `https://oauth-origin.turnkey.com/`. Replace `YOURAPPSCHEME` with the `appScheme` you set in `TurnkeyConfig`. This is only required for the Android web-based flow; the native iOS flow doesn't need it.
 
 Usage:
 
@@ -181,13 +218,19 @@ Usage:
 await context.read<TurnkeyProvider>().handleAppleOauth();
 ```
 
+<Note>
+  `handleAppleWebOauth` is also exposed but **deprecated**. It's kept for
+  backwards compatibility with older SDK versions and forces the web-based
+  Apple OAuth flow on all platforms (including iOS), using `serviceId` as the
+  audience. Only use it if you specifically need to force the web flow on iOS.
+</Note>
+
 #### Facebook
 
 Requirements:
 
-* Dashboard: enable Facebook.
 * Client ID: set in the Dashboard or via `OAuthConfig`.
-* Redirect URI must match your configured value (e.g., `myapp://`).
+* In the **Facebook for Developers** dashboard, set the valid OAuth redirect URI to `https://oauth-redirect.turnkey.com/?scheme=YOURAPPSCHEME/` and the app domain to `https://oauth-origin.turnkey.com/`. Replace `YOURAPPSCHEME` with the `appScheme` you set in `TurnkeyConfig`.
 
 Usage:
 
@@ -195,31 +238,41 @@ Usage:
 await context.read<TurnkeyProvider>().handleFacebookOauth();
 ```
 
-### OAuth 2.0 providers
+### OAuth2.0 providers
 
-For providers that use OAuth 2.0 (e.g., X, Discord), configure additional settings in the Turnkey Dashboard.
+For OAuth providers that exclusively use OAuth2.0 (e.g., X, Discord), you will need to configure a few additional settings in your Turnkey Dashboard.
 
-In **Wallet Kit → Socials**, click **Add provider**.
+In the **Embedded Wallets → Configuration** section of the dashboard, head to the **OAuth 2.0** tab and click **Add Credential**.
 
-<img src="/images/sdks/img/socials-page.png" alt="OAuth2.0 providers configuration" />
+<img
+  src="/images/sdks/img/socials-page.png"
+  alt="OAuth2.0 providers configuration"
+/>
 
-Select the provider and fill in the required fields from the provider console. Secrets are encrypted on upload.
+Select the provider you want to add from the dropdown, and fill in the required fields.
+You can find these values in the provider's developer console.
+Any secrets will automatically be encrypted before uploading to Turnkey.
 
-<img src="/images/sdks/img/add-provider-modal.png" alt="Adding an OAuth2.0 provider" />
+<img
+  src="/images/sdks/img/add-provider-modal.png"
+  alt="Adding an OAuth2.0 provider"
+/>
 
-Then go to **Authentication** and enable the provider under **SDK Configuration**.
+Once you've added the provider, head back to the **Authentication** tab, and enable the provider you just added under the **SDK Configuration** section.
 
-<img src="/images/sdks/img/twitter-toggled.png" alt="Enabling an OAuth2.0 provider" />
+Click **Select** to choose your newly added client ID, then click **Save Settings**. You can also simply enter the client ID in the `OAuthConfig` as shown above.
 
-Click **Select** to choose your newly added client ID, then **Save Settings**. Alternatively, enter the client ID through `OAuthConfig`.
+<img
+  src="/images/sdks/img/twitter-client-id.png"
+  alt="Selecting an OAuth2.0 provider"
+/>
 
 #### Discord
 
 Requirements:
 
-* Dashboard: enable Discord (OAuth 2.0).
 * Client ID: set in Dashboard or via `OAuthConfig`.
-* Redirect URI must match your configured value (e.g., `myapp://`).
+* In the **Discord Developer Portal**, set the redirect URI to `YOUR_APP_SCHEME://`.
 
 Usage:
 
@@ -231,9 +284,8 @@ await context.read<TurnkeyProvider>().handleDiscordOauth();
 
 Requirements:
 
-* Dashboard: enable X (OAuth 2.0).
 * Client ID: set in Dashboard or via `OAuthConfig`.
-* Redirect URI must match your configured value (e.g., `myapp://`).
+* In the **Twitter Developer Portal**, set the redirect URI to `YOUR_APP_SCHEME://`.
 
 Usage:
 
