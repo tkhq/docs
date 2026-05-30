@@ -280,6 +280,7 @@ export const tags = ${tagsStr};`;
         console.error(
           `Error processing or updating docs.json: ${error.message}`
         );
+        process.exit(1);
       }
       console.log(`--- Finished updating docs.json ---`);
 
