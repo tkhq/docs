@@ -1,0 +1,280 @@
+---
+title: "Verify webhook signatures"
+description: "Verify Turnkey Webhooks V2 signatures with caller-provided verification keys."
+sidebarTitle: "Verify signatures"
+---
+
+Turnkey signs Webhooks V2 deliveries with Ed25519. Verify the signature before parsing or trusting the JSON payload.
+
+The signature covers the signature contract fields and the exact raw request body:
+
+```text
+v1.ed25519.<key_id>.<timestamp_ms>.<event_id>.<raw_body>
+```
+
+<Warning>
+Verification must use the raw request body that Turnkey sent. Re-serializing parsed JSON, changing whitespace, or changing key order changes the signed input.
+</Warning>
+
+## Verification keys
+
+`@turnkey/crypto` verifies against caller-provided verification keys:
+
+```ts
+const verificationKeys = [
+  {
+    keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
+    publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
+    algorithm: "ed25519" as const,
+  },
+];
+```
+
+Use the webhook signing key ID and public key provided by Turnkey for your environment. The public acquisition path for these values should be confirmed with product before publishing this page broadly.
+
+The helper does not discover keys automatically and does not implement JWKS, refresh behavior, discovery endpoints, or server-side key management.
+
+## Minimal example
+
+```ts
+import {
+  TurnkeyWebhookVerificationFailureReasons,
+  verifyTurnkeyWebhookSignature,
+} from "@turnkey/crypto";
+
+const rawBody = await request.text();
+
+const result = verifyTurnkeyWebhookSignature({
+  headers: request.headers,
+  body: rawBody,
+  verificationKeys: [
+    {
+      keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
+      publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
+      algorithm: "ed25519",
+    },
+  ],
+  maxTimestampAgeMs: 5 * 60 * 1000,
+});
+
+if (!result.ok) {
+  if (result.reason === TurnkeyWebhookVerificationFailureReasons.StaleTimestamp) {
+    console.warn("Rejected stale Turnkey webhook");
+  }
+
+  return new Response("Invalid signature", { status: 401 });
+}
+
+const payload = JSON.parse(rawBody);
+```
+
+`verifyTurnkeyWebhookSignature` accepts:
+
+| Parameter | Type |
+| --- | --- |
+| `headers` | `Headers` or `Record&lt;string, string | string[] | undefined&gt;` |
+| `body` | `string`, `Uint8Array`, or `ArrayBuffer` |
+| `verificationKeys` | `{ keyId, publicKey, algorithm: "ed25519" }[]` |
+| `maxTimestampAgeMs` | Replay window in milliseconds. Use `5 * 60 * 1000`. |
+| `nowMs` | Optional current time override in milliseconds. |
+
+Successful verification returns:
+
+```ts
+{ ok: true; eventId: string; keyId: string; timestampMs: number }
+```
+
+Failed verification returns:
+
+```ts
+{
+  ok: false;
+  reason: TurnkeyWebhookVerificationFailureReason;
+  headerName?: string;
+}
+```
+
+Compare `reason` against the `TurnkeyWebhookVerificationFailureReasons` constants instead of hardcoding strings.
+
+## Runtime examples
+
+<AccordionGroup>
+  <Accordion title="Next.js App Router">
+    ```ts
+    import {
+      verifyTurnkeyWebhookSignature,
+    } from "@turnkey/crypto";
+    import { NextResponse } from "next/server";
+
+    export const runtime = "nodejs";
+
+    export async function POST(request: Request) {
+      const rawBody = await request.text();
+
+      const result = verifyTurnkeyWebhookSignature({
+        headers: request.headers,
+        body: rawBody,
+        verificationKeys: [
+          {
+            keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
+            publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
+            algorithm: "ed25519",
+          },
+        ],
+        maxTimestampAgeMs: 5 * 60 * 1000,
+      });
+
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: "Invalid Turnkey webhook", reason: result.reason },
+          { status: 401 }
+        );
+      }
+
+      const payload = JSON.parse(rawBody);
+
+      return NextResponse.json({ ok: true, eventId: result.eventId });
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Fetch / Workers">
+    ```ts
+    import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
+
+    export default {
+      async fetch(request: Request, env: Env): Promise<Response> {
+        const rawBody = await request.arrayBuffer();
+
+        const result = verifyTurnkeyWebhookSignature({
+          headers: request.headers,
+          body: rawBody,
+          verificationKeys: [
+            {
+              keyId: env.TURNKEY_WEBHOOK_KEY_ID,
+              publicKey: env.TURNKEY_WEBHOOK_PUBLIC_KEY,
+              algorithm: "ed25519",
+            },
+          ],
+          maxTimestampAgeMs: 5 * 60 * 1000,
+        });
+
+        if (!result.ok) {
+          return new Response("Invalid Turnkey webhook", { status: 401 });
+        }
+
+        const payload = JSON.parse(new TextDecoder().decode(rawBody));
+
+        return Response.json({ ok: true, eventId: result.eventId });
+      },
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Express">
+    ```ts
+    import express from "express";
+    import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
+
+    const app = express();
+
+    app.post(
+      "/webhooks/turnkey",
+      express.raw({ type: "application/json" }),
+      (req, res) => {
+        const rawBody = req.body as Uint8Array;
+
+        const result = verifyTurnkeyWebhookSignature({
+          headers: req.headers,
+          body: rawBody,
+          verificationKeys: [
+            {
+              keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
+              publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
+              algorithm: "ed25519",
+            },
+          ],
+          maxTimestampAgeMs: 5 * 60 * 1000,
+        });
+
+        if (!result.ok) {
+          return res.status(401).json({
+            error: "Invalid Turnkey webhook",
+            reason: result.reason,
+          });
+        }
+
+        const payload = JSON.parse(Buffer.from(rawBody).toString("utf8"));
+
+        return res.status(200).json({ ok: true, eventId: result.eventId });
+      }
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="Fastify">
+    ```ts
+    import Fastify from "fastify";
+    import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
+
+    const fastify = Fastify();
+
+    fastify.addContentTypeParser(
+      "application/json",
+      { parseAs: "buffer" },
+      (_request, body, done) => done(null, body)
+    );
+
+    fastify.post("/webhooks/turnkey", async (request, reply) => {
+      const rawBody = request.body as Uint8Array;
+
+      const result = verifyTurnkeyWebhookSignature({
+        headers: request.headers,
+        body: rawBody,
+        verificationKeys: [
+          {
+            keyId: process.env.TURNKEY_WEBHOOK_KEY_ID!,
+            publicKey: process.env.TURNKEY_WEBHOOK_PUBLIC_KEY!,
+            algorithm: "ed25519",
+          },
+        ],
+        maxTimestampAgeMs: 5 * 60 * 1000,
+      });
+
+      if (!result.ok) {
+        return reply.code(401).send({
+          error: "Invalid Turnkey webhook",
+          reason: result.reason,
+        });
+      }
+
+      const payload = JSON.parse(Buffer.from(rawBody).toString("utf8"));
+
+      return reply.send({ ok: true, eventId: result.eventId });
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Verification failures
+
+Return a non-`2xx` response when verification fails. Log the failure reason, but avoid logging the raw body unless your logging pipeline is approved for webhook payloads.
+
+Common failure reasons include:
+
+| Reason | What to check |
+| --- | --- |
+| `InvalidMaxTimestampAge` | `maxTimestampAgeMs` must be a finite, non-negative number. |
+| `InvalidNow` | `nowMs`, when provided, must be finite. |
+| `MissingHeader` | One of the required signature headers was not present. Check `headerName`. |
+| `InvalidTimestamp` or `StaleTimestamp` | The timestamp header was malformed or outside your replay window. Check clock skew. |
+| `MissingKey` | No caller-provided verification key matched the `X-Turnkey-Signature-Key-Id` header. |
+| `InvalidVerificationKeyAlgorithm` | A verification key declared an unsupported algorithm. Use `ed25519`. |
+| `InvalidVerificationKey` | The configured public key is not a valid hex-encoded 32-byte Ed25519 public key. |
+| `UnsupportedSignatureAlgorithm` | The algorithm header was not `ed25519`. |
+| `UnsupportedSignatureVersion` | The signature version header was not `v1`. |
+| `InvalidSignature` | The signature was malformed or did not verify over the exact raw body. |
+
+Signature verification proves the delivery came from a holder of the Turnkey webhook signing key and that the raw body was not modified within your replay window. It does not validate business payload fields such as `organizationId`, event type, wallet account ownership, or whether the event should affect your internal state.
+
+The helper checks required signature headers, timestamp freshness, key matching, signature format, verification-key shape, supported algorithm/version, and the Ed25519 signature itself.

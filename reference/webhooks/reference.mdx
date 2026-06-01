@@ -1,0 +1,205 @@
+---
+title: "Webhooks reference"
+description: "Technical contract for Turnkey Webhooks V2 delivery, signatures, payloads, retries, and endpoint management."
+sidebarTitle: "Reference"
+---
+
+## Event types
+
+| Event type | Public payload `type` | Scope | Notes |
+| --- | --- | --- | --- |
+| `ACTIVITY_UPDATES` | Activity object `type`, such as `ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT` | Organization-scoped | Configure on the organization where activities occur. |
+| `BALANCE_CONFIRMED_UPDATES` | `balances:confirmed` | Billing organization-scoped | Emitted when a supported balance change is first seen in a block. |
+| `BALANCE_FINALIZED_UPDATES` | `balances:finalized` | Billing organization-scoped | Emitted when the block reaches finalization. |
+| `SEND_TRANSACTION_STATUS_UPDATES` | `transaction:status` | Billing organization-scoped | Emitted when send transaction status changes. |
+
+Balance and send-transaction-status webhook endpoints must be managed from the billing organization. Sub-organizations cannot manage billing-scoped endpoints.
+
+## Endpoint operations
+
+| Operation | API reference | Path | Notes |
+| --- | --- | --- | --- |
+| Create | [Create webhook endpoint](/api-reference/activities/create-webhook-endpoint) | `/public/v1/submit/create_webhook_endpoint` | Requires `url`, `name`, and at least one subscription. |
+| List | [List webhook endpoints](/api-reference/queries/list-webhook-endpoints) | `/public/v1/query/list_webhook_endpoints` | Returns endpoints and their subscriptions. |
+| Update | [Update webhook endpoint](/api-reference/activities/update-webhook-endpoint) | `/public/v1/submit/update_webhook_endpoint` | Updates `url`, `name`, or `isActive`. |
+| Delete | [Delete webhook endpoint](/api-reference/activities/delete-webhook-endpoint) | `/public/v1/submit/delete_webhook_endpoint` | Deletes an endpoint and its subscriptions. |
+
+Create, update, and delete are signed write activities:
+
+```text
+ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT
+ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT
+ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT
+```
+
+Root users can approve these by default. Use [policies](/features/policies/overview) to delegate webhook management to non-root users.
+
+## Endpoint URL validation
+
+Turnkey validates endpoint URLs when webhook endpoints are created or updated.
+
+| Rule | Behavior |
+| --- | --- |
+| Scheme | HTTPS is required. |
+| Host | A host is required. |
+| User info | URLs with user info are rejected. |
+| DNS | Hostnames must resolve to public destination IPs. |
+| Blocked destinations | Localhost, private ranges, link-local addresses, metadata endpoints, multicast, and unspecified addresses are rejected. |
+| Redirects | Redirects are not followed during delivery. |
+
+## Delivery
+
+Turnkey sends each delivery as an HTTPS `POST` request. The body is JSON and `Content-Type` defaults to `application/json`.
+
+Receivers should:
+
+- Verify the signature over the raw request body.
+- Persist or enqueue the event.
+- Return `2xx` quickly after accepting the event.
+- Process slow work asynchronously.
+
+## Delivery headers
+
+| Header | Description |
+| --- | --- |
+| `X-Turnkey-Organization-Id` | Organization used for webhook routing and delivery. For billing-scoped events, this is the billing organization. |
+| `X-Turnkey-Event-Type` | Subscription event type, such as `ACTIVITY_UPDATES` or `BALANCE_CONFIRMED_UPDATES`. |
+| `X-Turnkey-Timestamp` | Unix timestamp in milliseconds for the delivery attempt. |
+| `X-Turnkey-Webhook-Version` | Webhook delivery contract version. Current value: `1`. |
+| `X-Turnkey-Event-Id` | Stable event identifier for the webhook event. |
+| `X-Turnkey-Signature-Key-Id` | Turnkey webhook signing key ID. |
+| `X-Turnkey-Signature-Algorithm` | Signature algorithm. Current value: `ed25519`. |
+| `X-Turnkey-Signature-Version` | Signature contract version. Current value: `v1`. |
+| `X-Turnkey-Signature` | Hex-encoded Ed25519 signature. |
+
+## Signed input
+
+The signed input is:
+
+```text
+v1.ed25519.<key_id>.<timestamp_ms>.<event_id>.<raw_body>
+```
+
+`<timestamp_ms>` is `X-Turnkey-Timestamp`, `<event_id>` is `X-Turnkey-Event-Id`, and `<raw_body>` is the exact request body bytes Turnkey sent.
+
+## Retry behavior
+
+| Outcome | Delivery result |
+| --- | --- |
+| `2xx` | Success. |
+| Network error | Retryable. |
+| Timeout | Retryable while retry budget remains. |
+| `5xx` | Retryable. |
+| `3xx` | Terminal failure. Redirects are not followed. |
+| `4xx` | Terminal failure. |
+| `429` | Terminal failure. |
+
+Retry schedules and attempt counts are implementation details and may change. Signed retries receive a fresh delivery timestamp and signature.
+
+## Ordering and idempotency
+
+Webhooks V2 ordering is scoped to a single `billing_org_id:endpoint_id` delivery lane. There is no ordering guarantee across endpoints, even within the same billing organization.
+
+Use idempotent processing downstream. Balance and transaction-status payloads expose `msg.idempotencyKey`; activity update receivers should deduplicate on the activity ID plus the webhook event ID or activity update timestamp.
+
+## Payload examples
+
+### Activity update
+
+`ACTIVITY_UPDATES` deliveries contain the external activity object for the activity that changed.
+
+```json
+{
+  "id": "018f2f0f-0000-7000-9000-000000000000",
+  "organizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
+  "status": "ACTIVITY_STATUS_COMPLETED",
+  "type": "ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT",
+  "intent": {
+    "updateWebhookEndpointIntent": {
+      "endpointId": "018f2f0f-1111-7000-9000-000000000000",
+      "name": "Webhook.site test 2"
+    }
+  },
+  "result": {
+    "updateWebhookEndpointResult": {
+      "endpointId": "018f2f0f-1111-7000-9000-000000000000"
+    }
+  },
+  "votes": [],
+  "fingerprint": "activity-fingerprint",
+  "canApprove": false,
+  "canReject": false,
+  "createdAt": "2026-05-22T19:09:31.000Z",
+  "updatedAt": "2026-05-22T19:09:35.000Z"
+}
+```
+
+### Balance update
+
+```json
+{
+  "type": "balances:confirmed",
+  "organizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
+  "parentOrganizationId": "95dfcd47-99bb-4433-9126-1524110d68e6",
+  "msg": {
+    "operation": "deposit",
+    "caip2": "eip155:8453",
+    "txHash": "0x5b6901be92e69781a7ce401dd9a2910e1f49aa77a5bdedcd2a23c8d563d88b24",
+    "address": "0x3400e577153101863F39ba41f7Fd49Bbea011628",
+    "idempotencyKey": "d3b8cef0ad7479433783c5707da9ded4fee9b254b4638f44758a2141c49416b7:balances:confirmed",
+    "asset": {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "decimals": 18,
+      "caip19": "eip155:8453/slip44:60",
+      "amount": "4793760441409"
+    },
+    "block": {
+      "number": 46343814,
+      "hash": "0x41a4e8d444e5410f83c1ac35c838c7d8be1e3d6f32a35a04c72096adae74d095",
+      "timestamp": "2026-05-22T19:09:35Z"
+    }
+  }
+}
+```
+
+`operation` is `deposit` or `withdraw`. A single transaction can produce multiple balance webhook deliveries if it changes multiple tracked addresses or assets. Balance webhooks are emitted only for supported assets.
+
+### Send transaction status update
+
+```json
+{
+  "type": "transaction:status",
+  "organizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+  "parentOrganizationId": "9e8d7c6b-aaaa-bbbb-cccc-ddddeeee0000",
+  "msg": {
+    "sendTransactionStatusId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
+    "activityId": "a1b2c3d4-0000-1111-2222-333344445555",
+    "status": "INCLUDED",
+    "caip2": "eip155:1",
+    "idempotencyKey": "7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8",
+    "timestamp": 1746000042,
+    "txHash": "0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+  }
+}
+```
+
+Fields present in `msg` depend on status:
+
+| Status | Additional fields |
+| --- | --- |
+| `BROADCASTING` | No `txHash` or `error`. |
+| `INCLUDED` | Includes `txHash`. If the transaction reverted onchain, `error` may also be present. |
+| `FAILED` | Includes `error`; no `txHash` because the transaction did not land onchain. |
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Non-HTTPS URL rejected | Use an `https://` URL. |
+| Private, local, or metadata destination rejected | Use a public receiver. Localhost, private IPs, link-local addresses, and metadata endpoints are blocked. |
+| Receiver returns non-`2xx` | Return `2xx` only after accepting the event. `3xx`, `4xx`, and `429` are terminal failures; `5xx` may be retried. |
+| Receiver times out | Verify quickly, enqueue work, and respond before your handler exceeds the delivery timeout. |
+| Signature verification fails | Verify the exact raw request body before JSON parsing. Do not re-stringify parsed JSON. |
+| Balance or transaction-status events do not arrive | Confirm the endpoint was created from the billing organization and subscribed to the correct event type. |
+| Duplicate downstream work | Use idempotent processing keyed by `msg.idempotencyKey` where present, or the activity ID and webhook event ID for activity updates. |

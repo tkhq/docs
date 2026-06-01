@@ -1,0 +1,179 @@
+export const WebhookSiteUrlGenerator = () => {
+  const STORAGE_KEY = "turnkey.webhooks.quickstart.webhookSiteUrl";
+  const OUTPUT_ID = "tk-webhook-url-helper-output-value";
+  const MESSAGE_ID = "tk-webhook-url-helper-message";
+  const GENERATE_ID = "tk-webhook-url-helper-generate";
+  const COPY_ID = "tk-webhook-url-helper-copy";
+
+  const setHelperState = (nextState) => {
+    const webhookUrl = nextState.webhookUrl || "";
+    const status = nextState.status || "idle";
+    const message = nextState.message || "";
+
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const outputElement = document.getElementById(OUTPUT_ID);
+    const messageElement = document.getElementById(MESSAGE_ID);
+    const generateButton = document.getElementById(GENERATE_ID);
+    const copyButton = document.getElementById(COPY_ID);
+
+    if (outputElement) {
+      outputElement.textContent = webhookUrl
+        ? `WEBHOOK_URL="${webhookUrl}"`
+        : 'WEBHOOK_URL="https://webhook.site/..."';
+      outputElement.setAttribute("data-webhook-url", webhookUrl);
+    }
+
+    if (messageElement) {
+      messageElement.textContent = message;
+      messageElement.className = `tk-webhook-url-helper-message tk-webhook-url-helper-message-${status}`;
+    }
+
+    if (generateButton) {
+      generateButton.textContent = webhookUrl ? "Regenerate" : "Generate URL";
+      generateButton.disabled = status === "loading";
+    }
+
+    if (copyButton) {
+      copyButton.disabled = !webhookUrl;
+    }
+  };
+
+  const initialize = (element) => {
+    if (!element || element.getAttribute("data-initialized") === "true") {
+      return;
+    }
+
+    element.setAttribute("data-initialized", "true");
+
+    try {
+      const savedUrl = window.localStorage.getItem(STORAGE_KEY);
+      if (savedUrl) {
+        setHelperState({
+          webhookUrl: savedUrl,
+          status: "ready",
+          message: "Saved in this browser. Regenerate when you want a fresh test receiver.",
+        });
+      }
+    } catch (error) {
+      setHelperState({
+        status: "idle",
+        message: "Browser storage is unavailable, so generated URLs will not be saved.",
+      });
+    }
+  };
+
+  const copyValue = async () => {
+    const outputElement = document.getElementById(OUTPUT_ID);
+    const webhookUrl = outputElement?.getAttribute("data-webhook-url");
+
+    if (!webhookUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(`WEBHOOK_URL="${webhookUrl}"`);
+      setHelperState({
+        webhookUrl,
+        status: "copied",
+        message: "Copied WEBHOOK_URL to your clipboard.",
+      });
+    } catch (error) {
+      setHelperState({
+        webhookUrl,
+        status: "error",
+        message: "Copy failed. Select the WEBHOOK_URL value and copy it manually.",
+      });
+    }
+  };
+
+  const generateUrl = async () => {
+    setHelperState({
+      status: "loading",
+      message: "Creating a temporary Webhook.site URL...",
+    });
+
+    try {
+      const response = await fetch("https://webhook.site/token", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook.site returned ${response.status}`);
+      }
+
+      const token = await response.json();
+
+      if (!token.uuid) {
+        throw new Error("Webhook.site did not return a token UUID.");
+      }
+
+      const nextUrl = `https://webhook.site/${token.uuid}`;
+
+      try {
+        window.localStorage.setItem(STORAGE_KEY, nextUrl);
+        setHelperState({
+          webhookUrl: nextUrl,
+          status: "ready",
+          message: "Generated and saved in this browser.",
+        });
+      } catch (error) {
+        setHelperState({
+          webhookUrl: nextUrl,
+          status: "ready",
+          message: "Generated, but browser storage is unavailable. Copy it before refreshing.",
+        });
+      }
+    } catch (error) {
+      setHelperState({
+        status: "error",
+        message:
+          "Could not create a URL from this browser. If this is a CORS error, use the existing URL tab or add a docs-side proxy before publishing this helper.",
+      });
+    }
+  };
+
+  return (
+    <div className="tk-webhook-url-helper not-prose">
+      <span ref={initialize} className="tk-webhook-url-helper-init" />
+      <div className="tk-webhook-url-helper-header">
+        <div>
+          <div className="tk-webhook-url-helper-title">Temporary Webhook.site receiver</div>
+          <div className="tk-webhook-url-helper-description">
+            Generate a test URL and reuse it in the Dashboard, SDK, and CLI examples below.
+          </div>
+        </div>
+        <button
+          id={GENERATE_ID}
+          type="button"
+          onClick={generateUrl}
+          className="tk-webhook-url-helper-button"
+        >
+          Generate URL
+        </button>
+      </div>
+
+      <div className="tk-webhook-url-helper-output" aria-live="polite">
+        <code id={OUTPUT_ID} data-webhook-url="">
+          WEBHOOK_URL="https://webhook.site/..."
+        </code>
+        <button
+          id={COPY_ID}
+          type="button"
+          onClick={copyValue}
+          disabled
+          className="tk-webhook-url-helper-copy"
+        >
+          Copy
+        </button>
+      </div>
+
+      <div id={MESSAGE_ID} className="tk-webhook-url-helper-message" />
+    </div>
+  );
+};

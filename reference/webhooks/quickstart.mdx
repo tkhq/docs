@@ -1,0 +1,199 @@
+---
+title: "Webhooks quickstart"
+description: "Create a Turnkey webhook endpoint with webhook.site and inspect your first delivery."
+sidebarTitle: "Quickstart"
+---
+
+import { WebhookSiteUrlGenerator } from '/snippets/webhook-site-url-generator.mdx'
+
+This walkthrough uses [webhook.site](https://webhook.site) as a temporary receiver so you can see the exact headers and JSON body Turnkey sends.
+
+<Warning>
+Use webhook.site only for testing. Production webhook endpoints should be owned by your application, verify Turnkey signatures, and avoid logging sensitive payloads.
+</Warning>
+
+## 1. Create a test receiver
+
+Use a temporary receiver for this quickstart, then replace it with your own HTTPS endpoint before sending production traffic.
+
+<Tabs>
+  <Tab title="Generate URL">
+    Click **Generate URL** to create a temporary Webhook.site URL for this browser. The docs save it locally so you can refresh the page or return to this quickstart without losing the value.
+
+    <WebhookSiteUrlGenerator />
+
+    <Warning>
+    Use this URL only for local testing. Webhook.site stores captured requests so you can inspect them. Do not send production webhook traffic or sensitive payloads to a shared test receiver.
+    </Warning>
+  </Tab>
+
+  <Tab title="Use Existing URL">
+    Go to [https://webhook.site](https://webhook.site). Webhook.site creates a unique URL for your browser session.
+
+    Copy the value labeled **Your unique URL**. It should look like:
+
+    ```text
+    https://webhook.site/00000000-0000-0000-0000-000000000000
+    ```
+
+    Set it as an environment variable for the examples below:
+
+    ```bash
+    export WEBHOOK_URL="https://webhook.site/00000000-0000-0000-0000-000000000000"
+    ```
+
+    Keep the webhook.site tab open. New deliveries will appear in the request list on the left.
+  </Tab>
+</Tabs>
+
+If the generated URL button fails in your browser, use the existing URL tab. Browser-based token creation depends on Webhook.site allowing docs-origin requests.
+
+## 2. Create a Turnkey webhook endpoint
+
+Choose one creation method.
+
+<Tabs>
+  <Tab title="Dashboard">
+    In the Turnkey Dashboard, open **Webhooks**.
+
+    1. In **Webhook Endpoints**, select **New webhook**.
+    2. In **Create Webhook**, enter a **Name**, such as `Webhook.site test`.
+    3. Paste your webhook.site URL into **Destination URL**.
+    4. Under **Subscriptions**, choose one or more event types:
+       - **Activities** for `ACTIVITY_UPDATES`
+       - **Confirmed Balances** for `BALANCE_CONFIRMED_UPDATES`
+       - **Finalized Balances** for `BALANCE_FINALIZED_UPDATES`
+       - **Transactions** for `SEND_TRANSACTION_STATUS_UPDATES`
+    5. Select **Create Webhook**.
+
+    Creating a webhook endpoint is a signed write activity. Depending on your organization's policy, the Dashboard may prompt you to approve **Webhook Creation** before the endpoint is created.
+  </Tab>
+
+  <Tab title="SDK">
+    Install `@turnkey/sdk-server` and create the endpoint from a server-side environment.
+
+    ```ts
+    import { Turnkey } from "@turnkey/sdk-server";
+
+    const turnkey = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPublicKey: process.env.API_PUBLIC_KEY!,
+      apiPrivateKey: process.env.API_PRIVATE_KEY!,
+      defaultOrganizationId: process.env.ORGANIZATION_ID!,
+    });
+
+    const response = await turnkey.apiClient().createWebhookEndpoint({
+      organizationId: process.env.ORGANIZATION_ID!,
+      name: "Webhook.site test",
+      url: process.env.WEBHOOK_URL!,
+      subscriptions: [{ eventType: "ACTIVITY_UPDATES" }],
+    });
+
+    console.log(response.endpointId);
+    ```
+
+    For balance or transaction status webhooks, run this from the billing organization and change the subscription:
+
+    ```ts
+    subscriptions: [{ eventType: "BALANCE_CONFIRMED_UPDATES" }];
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    The Turnkey CLI is implemented in [`tkhq/tkcli`](https://github.com/tkhq/tkcli). It does not have dedicated webhook subcommands today, but `turnkey request` can call the public API directly.
+
+    Create an endpoint:
+
+    ```bash
+    export ORGANIZATION_ID="<your-organization-id>"
+    export WEBHOOK_URL="https://webhook.site/<your-id>"
+
+    turnkey request \
+      --path /public/v1/submit/create_webhook_endpoint \
+      --body '{
+        "type": "ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT",
+        "timestampMs": "'"$(date +%s)"'000",
+        "organizationId": "'"$ORGANIZATION_ID"'",
+        "parameters": {
+          "name": "Webhook.site test",
+          "url": "'"$WEBHOOK_URL"'",
+          "subscriptions": [
+            { "eventType": "ACTIVITY_UPDATES" }
+          ]
+        }
+      }'
+    ```
+
+    List endpoints:
+
+    ```bash
+    turnkey request \
+      --path /public/v1/query/list_webhook_endpoints \
+      --body '{
+        "organizationId": "'"$ORGANIZATION_ID"'"
+      }'
+    ```
+
+    Create, update, and delete are signed write activities and may require approval depending on your organization's policy.
+  </Tab>
+</Tabs>
+
+## 3. Trigger a harmless event
+
+For an activity webhook, update the endpoint name you just created. This avoids creating a duplicate endpoint with the same URL.
+
+<Tabs>
+  <Tab title="Dashboard">
+    In **Webhooks**, edit the endpoint and change the **Name**, for example from `Webhook.site test` to `Webhook.site test 2`. Save the webhook.
+  </Tab>
+
+  <Tab title="SDK">
+    ```ts
+    await turnkey.apiClient().updateWebhookEndpoint({
+      organizationId: process.env.ORGANIZATION_ID!,
+      endpointId: "<endpoint-id>",
+      name: `Webhook.site test ${Date.now()}`,
+    });
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    export ENDPOINT_ID="<endpoint-id>"
+
+    turnkey request \
+      --path /public/v1/submit/update_webhook_endpoint \
+      --body '{
+        "type": "ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT",
+        "timestampMs": "'"$(date +%s)"'000",
+        "organizationId": "'"$ORGANIZATION_ID"'",
+        "parameters": {
+          "endpointId": "'"$ENDPOINT_ID"'",
+          "name": "Webhook.site test '"$(date +%s)"'"
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## 4. Inspect the delivery
+
+Return to webhook.site. You should see a new `POST` request.
+
+Open it and inspect:
+
+- Headers such as `X-Turnkey-Organization-Id`, `X-Turnkey-Event-Type`, `X-Turnkey-Timestamp`, `X-Turnkey-Webhook-Version`, and the signature headers.
+- The JSON body. For `ACTIVITY_UPDATES`, the body contains the activity object that changed.
+- The response status webhook.site returned to Turnkey.
+
+## 5. Move to production
+
+When you replace webhook.site with your production endpoint:
+
+- Verify signatures using the exact raw request body before parsing JSON.
+- Return `2xx` only after accepting the event.
+- Queue slow work and respond quickly.
+- Deduplicate downstream work. For balance and transaction status events, use `msg.idempotencyKey`; for activity events, use the activity ID and webhook event ID.
+- Monitor non-`2xx` responses and receiver timeouts.
+
+Continue with [Verify signatures](/reference/webhooks/verify-signatures) before sending production traffic to your receiver.

@@ -1,0 +1,55 @@
+---
+title: "Webhooks"
+description: "Receive signed, real-time notifications for events in your Turnkey organization."
+sidebarTitle: "Overview"
+---
+
+Webhooks let your application react to Turnkey events without polling. You register an HTTPS endpoint, choose the event types you want, and Turnkey sends signed `POST` requests when matching events occur.
+
+Use webhooks to update an internal activity feed, start downstream reconciliation when balances change, or track transaction status as submitted transactions move through broadcast and confirmation.
+
+## Event types
+
+| Event type | Description | Scope |
+| --- | --- | --- |
+| `ACTIVITY_UPDATES` | Activity status updates for activities in the configured organization. | Organization-scoped |
+| `BALANCE_CONFIRMED_UPDATES` | Balance changes when a transaction is first seen in a block onchain. | Billing organization-scoped |
+| `BALANCE_FINALIZED_UPDATES` | Balance changes after the containing block reaches the finalization threshold. | Billing organization-scoped |
+| `SEND_TRANSACTION_STATUS_UPDATES` | Status changes for submitted transactions, such as broadcasting, included, or failed. | Billing organization-scoped |
+
+## Organization scope
+
+Activity webhooks are configured on the organization where activities occur.
+
+Balance and send-transaction-status webhooks must be configured from the billing organization. In a parent/sub-organization setup, create these endpoints from the parent billing organization so the endpoint can receive events for wallet accounts and transaction activity under that billing org.
+
+## Delivery model
+
+Turnkey sends each delivery as an HTTPS `POST` request with an `application/json` body. Your receiver should verify the signature, accept the event, enqueue any slow work, and return a `2xx` response quickly.
+
+Network errors and `5xx` responses may be retried. Redirects, `4xx` responses, and `429` responses are treated as terminal delivery failures.
+
+## Security model
+
+Turnkey validates webhook endpoint URLs when endpoints are created or updated:
+
+- URLs must use HTTPS.
+- Hosts must resolve to public destinations.
+- Localhost, private ranges, link-local addresses, metadata endpoints, multicast, and unspecified addresses are rejected.
+- Redirects are not followed during delivery.
+
+Turnkey also signs Webhooks V2 deliveries with Ed25519. Receivers should verify the signature over the exact raw request body before parsing JSON.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/reference/webhooks/quickstart" icon="rocket">
+    Create an endpoint with webhook.site, trigger a harmless event, and inspect the delivery.
+  </Card>
+  <Card title="Verify signatures" href="/reference/webhooks/verify-signatures" icon="shield-check">
+    Verify raw webhook requests with `@turnkey/crypto`.
+  </Card>
+  <Card title="Reference" href="/reference/webhooks/reference" icon="book-open">
+    Review headers, payloads, retries, URL validation, and endpoint operations.
+  </Card>
+</CardGroup>
