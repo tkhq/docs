@@ -34,6 +34,45 @@ Turnkey reduces this to a couple of API calls. We handle fees and our battle-tes
   To access sponsored transactions, ensure that Gas Sponsorship is first enabled within your Turnkey dashboard. Then set `sponsor: true` and update the `caip2` parameter with the corresponding chain identifier.
 </Note>
 
+## Construction and Broadcast
+
+### EVM
+
+A successful EVM transaction requires:
+
+- **Transaction construction**: assembling the payload (recipient, value, calldata)
+- **Nonce**: set correctly to order transactions and prevent conflicts
+- **Gas and tip fee**: estimated to ensure inclusion even during network congestion
+- **Signature**: cryptographically signing the transaction with the sender's private key
+- **Broadcast**: submitting the signed transaction to the network and monitoring for inclusion
+
+Turnkey handles all of this for you via `ethSendTransaction`. Whether or not you use sponsorship, you pass through minimal payloads and we take care of the rest. We auto-fill any fields you omit.
+
+This endpoint supports arbitrary EVM transactions — not just simple sends. You can interact with smart contracts, deploy contracts, or execute any valid EVM operation.
+
+### Solana
+
+A successful Solana transaction requires:
+
+- **Transaction construction**: assembling the list of instructions (program, accounts, data)
+- **Recent blockhash**: fetched and attached at broadcast time to ensure the transaction is valid
+- **Compute unit limit**: estimated and set to prevent failed transactions due to insufficient compute
+- **Priority fee**: set to ensure timely inclusion under current network conditions
+- **Signature**: cryptographically signing the transaction with the sender's private key
+- **Broadcast**: submitting the signed transaction to the network and monitoring for confirmation
+
+Turnkey handles all of this for you via `solSendTransaction`. Whether or not you use sponsorship, you pass through a minimal payload and we manage the rest.
+
+<Note>
+  On Solana, fee sponsorship and rent sponsorship are separate. `Sponsor Solana Rent` is disabled by
+  default and must be enabled in the dashboard before Turnkey will pre-fund rent for account
+  creation. If created accounts are later closed, refunded rent can go back to the signer rather
+  than the sponsor. See [Solana Rent Sponsorship](/features/networks/solana-rent-refunds). For payer
+  behavior, static-key requirements, and account-creation caveats in sponsored flows, see [Solana
+  transaction construction for sponsored
+  flows](/features/networks/solana-transaction-construction).
+</Note>
+
 ## Concepts
 
 ### Gas sponsorship (aka gas abstraction, gasless transactions, fee abstraction)
@@ -43,14 +82,30 @@ A single endpoint lets you toggle between standard and sponsored transactions. W
 Either way, Turnkey handles construction, signing, broadcast, and status monitoring. The `sponsor` flag only controls who pays the fee.
 
 <Note>
-  Gas Sponsorship is available to **<u>Enterprise clients only</u>**<u>.</u> Pay-as-you-go and Pro customers can access transaction construction, signing, and broadcast. If you'd like to leverage gas sponsorship, please reach out!
+  Gas Sponsorship is available on **Pro** and **Enterprise** plans.
+
+  - **Pro:** Up to \$50/day across your organization. Sub-organization spending limits can be configured freely up to the \$50/day ceiling.
+  - **Enterprise:** Unlimited spend, with configurable time windows
+
+  Pay-as-you-go customers can still access transaction construction, signing, and broadcast. If you'd like to leverage gas sponsorship, please reach out!
 </Note>
 
 ### Spend limits
 
-Turnkey provides tools to manage your gas sponsorship budget. You configure USD fee limits at two levels: across all orgs and per sub-org. This gives you control over both total spend and per-user spend. You can set limit values and time windows through the dashboard.
+Turnkey gives you USD-denominated controls over gas sponsorship spend at two levels:
 
-You can query current gas usage and limits through our endpoints.
+- **Organization-wide limit** — the cap on total sponsored spend across your parent organization and all of its sub-organizations.
+- **Sub-organization limit** — the cap that applies to each of your sub-organizations
+
+What you can configure depends on your plan:
+
+| | Pro | Enterprise |
+|---|---|---|
+| Organization-wide limit | Up to \$50/day | Fully configurable, no limits |
+| Interval | Daily only | Minutes, hours, daily, weekly, or monthly |
+| Sub-organization limits | Configurable up to the \$50/day org limit | Fully configurable, no limits |
+
+You can set limit values and time intervals through the dashboard. You can also query current usage against the active limit via the [`get_gas_usage`](https://docs.turnkey.com/api-reference/queries/get-gas-usage) endpoint.
 
 <Tip>
   Turnkey provides fee sponsorship and transaction broadcasting services only. In high-fee or congested network conditions, delays or non-inclusion may occur. It is the developer's responsibility to ensure appropriate spend limits are in place.

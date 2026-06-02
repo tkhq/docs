@@ -1,0 +1,96 @@
+---
+title: "Enterprise Disaster Recovery"
+description: "Import and recover wallets with end-to-end encryption, quorum-controlled access, and a cryptographic audit trail."
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+
+Back up wallets on Turnkey and recover them when you need to for incident response, provider migration, and redundancy. All key material is encrypted directly to Turnkey's secure enclave using [HPKE](/security/enclave-secure-channels), and every recovery operation is cryptographically stamped. For an overview of Turnkey's key management capabilities, see the [Key Management Overview](/solutions/key-management/overview).
+
+## Key implementation decisions
+
+| Decision | What to consider | Learn more |
+| :--- | :--- | :--- |
+| **Organization setup** | Create dedicated recovery users with limited permissions. Distribute authenticators (passkeys, YubiKeys) across geographic locations where possible. | [Organizations](/features/organizations) |
+| **Root quorum** | Require multiple approvers for sensitive operations to prevent any single credential compromise from triggering unauthorized recovery. | [Root Quorum](/features/users/root-quorum) |
+| **Recovery policies** | Restrict what can be done with recovered wallets: limit fund movement to allowed addresses, require multi-party approval, scope signing by chain or value. | [Policy Engine](/features/policies/overview), [Signing Control](/features/policies/examples/signing-control) |
+| **Import method** | Use the NodeJS server SDK for the full import flow including encryption and secure transport, or the React Wallet Kit for client-side import. | [Import Wallets](/features/wallets/import-wallets), [SDK Server](https://github.com/tkhq/sdk/tree/main/examples/import-in-node) |
+
+## Example: treasury recovery
+
+Import wallet keys into Turnkey's secure enclave ahead of time. If a key holder becomes unavailable or a hardware wallet fails, recover treasury assets with quorum-controlled access and policy-restricted fund movement.
+
+<Frame>
+  <img
+    src="/images/key-management/enterprise-disaster-recovery.png"
+    alt="turnkey enclave secure wallet import ceremony"
+  />
+</Frame>
+
+| Need | How Turnkey solves it |
+| :--- | :--- |
+| Import keys with no plaintext exposure in transit | All key material is encrypted directly to the enclave using [HPKE](/security/enclave-secure-channels). Plaintext never exists outside the enclave boundary. |
+| No single person can unilaterally move recovered funds | [Quorum approval](/features/users/root-quorum) requires multiple approvers for sensitive operations |
+| Restrict what can be done with recovered wallets | [Policies](/features/policies/overview) scope fund movement to allowed addresses, chains, and value thresholds |
+| Cryptographic audit trail | Every recovery operation is cryptographically stamped, ensuring recoveries cannot be tampered with |
+| Secondary signing path must always be available | Import backup copies of critical wallet keys so operations continue if a primary signer goes down |
+
+### Implementation steps
+
+<Note>
+  Explore the complete implementation in the [GitHub disaster-recovery example](https://github.com/tkhq/sdk/tree/main/examples/disaster-recovery).
+</Note>
+
+<Steps>
+  <Step title="Set up organization and recovery policies">
+    Create a [Turnkey organization](https://app.turnkey.com/dashboard/auth/initial) and establish the security foundation for recovery operations:
+
+    - Create dedicated recovery users with specific, limited permissions
+    - Configure the [Root Quorum](/features/users/root-quorum) to require multiple approvers for sensitive operations
+    - Distribute authenticators ([passkeys](/features/authentication/passkeys/introduction), YubiKeys) across geographic locations
+    - Define [policies](/features/policies/examples/signing-control) that restrict what can be done with recovered wallets
+  </Step>
+
+  <Step title="Initialize and encrypt the wallet bundle">
+    Use the [NodeJS server SDK](https://github.com/tkhq/sdk/tree/main/examples/import-in-node) to initialize the import and encrypt the wallet material to Turnkey's enclave:
+
+    ```ts
+    import { Turnkey } from "@turnkey/sdk-server";
+    import { encryptPrivateKeyToBundle, encryptWalletToBundle } from "@turnkey/crypto";
+
+    const initResult = await turnkeyClient.apiClient().initImportWallet({
+      userId,
+    });
+
+    const walletBundle = await encryptWalletToBundle({
+      mnemonic,
+      importBundle: initResult.importBundle,
+      userId,
+      organizationId,
+    });
+    ```
+  </Step>
+
+  <Step title="Import the wallet">
+    Use [importWallet()](/generated-docs/core/turnkey-client-import-wallet) to transmit the encrypted bundle. The enclave decrypts and stores the key material. All fund movements are logged with cryptographic signatures.
+
+    ```ts
+    const walletImportResult = await turnkeyClient.apiClient().importWallet({
+      userId: userId,
+      walletName: "Your imported wallet!",
+      encryptedBundle: walletBundle,
+      accounts: [],
+    });
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <FeatureCard title="Import Wallets" icon="upload-01" href="/features/wallets/import-wallets" description="Full guide for importing wallets and private keys into Turnkey." />
+  <FeatureCard title="Export Wallets" icon="download-01" href="/features/wallets/export-wallets" description="Export wallets and keys when needed for migration or backup." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/quickstart" description="Define granular access controls and approval requirements." />
+  <SolutionCard title="Encryption Key Storage" icon="encryption-key-storage" href="/solutions/key-management/encryption-key-storage" description="Store encryption keys with risk separation between your infrastructure and Turnkey." />
+</div>

@@ -721,7 +721,7 @@
     "/public/v1/query/get_wallet_address_balances": {
       "post": {
         "summary": "Get balances",
-        "description": "Get balances of supported assets for an address on the specified network. Only non-zero balances are returned. This feature is in beta - please contact support for access.",
+        "description": "Get balances of supported assets for an address on the specified network. Only non-zero balances are returned.",
         "operationId": "GetWalletAddressBalances",
         "responses": {
           "200": {
@@ -981,7 +981,7 @@
     "/public/v1/query/list_supported_assets": {
       "post": {
         "summary": "List supported assets",
-        "description": "List supported assets for the specified network. This feature is in beta - please contact support for access.",
+        "description": "List supported assets for the specified network.",
         "operationId": "ListSupportedAssets",
         "responses": {
           "200": {
@@ -3136,6 +3136,110 @@
         "tags": ["Broadcasting"]
       }
     },
+    "/public/v1/submit/spark_claim_transfer": {
+      "post": {
+        "summary": "Claim Spark transfer",
+        "description": "Construct receiver-side encrypted operator packages to claim a Spark transfer. Does not perform FROST signing.",
+        "operationId": "SparkClaimTransfer",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SparkClaimTransferRequest"
+            }
+          }
+        ],
+        "tags": ["Signing"]
+      }
+    },
+    "/public/v1/submit/spark_prepare_lightning_receive": {
+      "post": {
+        "summary": "Spark prepare Lightning receive",
+        "description": "Generate a Lightning preimage and distribute Feldman shares to operators for a Spark Lightning receive. Does not perform FROST signing.",
+        "operationId": "SparkPrepareLightningReceive",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SparkPrepareLightningReceiveRequest"
+            }
+          }
+        ],
+        "tags": ["Signing"]
+      }
+    },
+    "/public/v1/submit/spark_prepare_transfer": {
+      "post": {
+        "summary": "Prepare Spark transfer",
+        "description": "Construct sender-side encrypted operator packages for a Spark BTC transfer. Does not perform FROST signing.",
+        "operationId": "SparkPrepareTransfer",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SparkPrepareTransferRequest"
+            }
+          }
+        ],
+        "tags": ["Signing"]
+      }
+    },
+    "/public/v1/submit/spark_sign_frost": {
+      "post": {
+        "summary": "Sign Frost Spark",
+        "description": "Perform pure FROST partial signing for a Spark wallet. Produces partial signatures without constructing operator packages.",
+        "operationId": "SparkSignFrost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SparkSignFrostRequest"
+            }
+          }
+        ],
+        "tags": ["Signing"]
+      }
+    },
     "/public/v1/submit/stamp_login": {
       "post": {
         "summary": "Login with a stamp",
@@ -3854,7 +3958,12 @@
         "ACTIVITY_TYPE_UPDATE_TVC_APP_LIVE_DEPLOYMENT",
         "ACTIVITY_TYPE_DELETE_TVC_DEPLOYMENT",
         "ACTIVITY_TYPE_DELETE_TVC_APP_AND_DEPLOYMENTS",
-        "ACTIVITY_TYPE_RESTORE_TVC_DEPLOYMENT"
+        "ACTIVITY_TYPE_RESTORE_TVC_DEPLOYMENT",
+        "ACTIVITY_TYPE_SPARK_SIGN_FROST",
+        "ACTIVITY_TYPE_SPARK_PREPARE_TRANSFER",
+        "ACTIVITY_TYPE_SPARK_CLAIM_TRANSFER",
+        "ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE",
+        "ACTIVITY_TYPE_POST_TVC_QUORUM_KEY_SHARE"
       ]
     },
     "AddressFormat": {
@@ -4345,11 +4454,11 @@
         },
         "qosManifestB64": {
           "type": "string",
-          "description": "The borsch serialized base64 encoded Manifest."
+          "description": "The base64 encoded QOS manifest. Encoding depends on qos_manifest_version."
         },
         "qosManifestEnvelopeB64": {
           "type": "string",
-          "description": "The borsch serialized base64 encoded Manifest Envelope."
+          "description": "The base64 encoded QOS manifest envelope. Encoding depends on qos_manifest_version."
         },
         "deploymentLabel": {
           "type": "string",
@@ -4365,6 +4474,11 @@
         },
         "createdAt": {
           "$ref": "#/definitions/external.data.v1.Timestamp"
+        },
+        "qosManifestVersion": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "QOS manifest schema version."
         }
       },
       "required": [
@@ -6193,7 +6307,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ACTIVITY_TYPE_APPROVE_TVC_DEPLOYMENT"]
+          "enum": ["ACTIVITY_TYPE_CREATE_TVC_MANIFEST_APPROVALS"]
         },
         "timestampMs": {
           "type": "string",
@@ -9400,6 +9514,8 @@
             "eip155:84532",
             "eip155:137",
             "eip155:80002",
+            "eip155:42161",
+            "eip155:421614",
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
@@ -10809,6 +10925,21 @@
         },
         "restoreTvcDeploymentIntent": {
           "$ref": "#/definitions/RestoreTvcDeploymentIntent"
+        },
+        "sparkSignFrostIntent": {
+          "$ref": "#/definitions/SparkSignFrostIntent"
+        },
+        "sparkPrepareTransferIntent": {
+          "$ref": "#/definitions/SparkPrepareTransferIntent"
+        },
+        "sparkClaimTransferIntent": {
+          "$ref": "#/definitions/SparkClaimTransferIntent"
+        },
+        "sparkPrepareLightningReceiveIntent": {
+          "$ref": "#/definitions/SparkPrepareLightningReceiveIntent"
+        },
+        "postTvcQuorumKeyShareIntent": {
+          "$ref": "#/definitions/PostTvcQuorumKeyShareIntent"
         }
       }
     },
@@ -11000,6 +11131,8 @@
             "eip155:84532",
             "eip155:137",
             "eip155:80002",
+            "eip155:42161",
+            "eip155:421614",
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
@@ -11146,8 +11279,7 @@
         },
         "nonce": {
           "type": "string",
-          "x-nullable": true,
-          "description": "An optional nonce used by the client to prevent replay/substitution of an ID token"
+          "description": "A nonce value set to sha256(publicKey), used to bind the OIDC token to a specific public key"
         },
         "bearerTokenTargetPublicKey": {
           "type": "string",
@@ -11159,7 +11291,8 @@
         "oauth2CredentialId",
         "authCode",
         "redirectUri",
-        "codeVerifier"
+        "codeVerifier",
+        "nonce"
       ]
     },
     "Oauth2AuthenticateRequest": {
@@ -11734,6 +11867,38 @@
         "condition"
       ]
     },
+    "PostTvcQuorumKeyShareIntent": {
+      "type": "object",
+      "properties": {
+        "deploymentId": {
+          "type": "string",
+          "description": "Unique identifier of the TVC deployment receiving quorum key share"
+        },
+        "ephemeralPublicKeyHex": {
+          "type": "string",
+          "description": "Hex-encoded ephemeral public key used to encrypt the quorum key share"
+        },
+        "shareApprovalBundle": {
+          "$ref": "#/definitions/QuorumKeyShareApprovalBundle",
+          "description": "Re-encrypted quorum key share and approval"
+        }
+      },
+      "required": [
+        "deploymentId",
+        "ephemeralPublicKeyHex",
+        "shareApprovalBundle"
+      ]
+    },
+    "PostTvcQuorumKeyShareResult": {
+      "type": "object",
+      "properties": {
+        "provisioningShareId": {
+          "type": "string",
+          "description": "The unique identifier for the provisioning quorum key share"
+        }
+      },
+      "required": ["provisioningShareId"]
+    },
     "PrivateKey": {
       "type": "object",
       "properties": {
@@ -11871,6 +12036,24 @@
       },
       "required": ["id", "type", "rawId", "response", "clientExtensionResults"]
     },
+    "QuorumKeyShareApprovalBundle": {
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "Unique identifier of the operator providing this quorum key share"
+        },
+        "reEncryptedShareHex": {
+          "type": "string",
+          "description": "Hex-encoded re-encrypted quorum key share"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Signature from the share set operator approving the manifest"
+        }
+      },
+      "required": ["operatorId", "reEncryptedShareHex", "signature"]
+    },
     "RecoverUserIntent": {
       "type": "object",
       "properties": {
@@ -11985,6 +12168,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/RemoveIpAllowlistIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -12411,7 +12598,7 @@
           "$ref": "#/definitions/RemoveIpAllowlistResult"
         },
         "updateTvcAppLiveDeploymentResult": {
-          "$ref": "#/definitions/UpdateTvcAppTargetDeploymentResult"
+          "$ref": "#/definitions/UpdateTvcAppLiveDeploymentResult"
         },
         "deleteTvcDeploymentResult": {
           "$ref": "#/definitions/DeleteTvcDeploymentResult"
@@ -12421,6 +12608,21 @@
         },
         "restoreTvcDeploymentResult": {
           "$ref": "#/definitions/RestoreTvcDeploymentResult"
+        },
+        "sparkSignFrostResult": {
+          "$ref": "#/definitions/SparkSignFrostResult"
+        },
+        "sparkPrepareTransferResult": {
+          "$ref": "#/definitions/SparkPrepareTransferResult"
+        },
+        "sparkClaimTransferResult": {
+          "$ref": "#/definitions/SparkClaimTransferResult"
+        },
+        "sparkPrepareLightningReceiveResult": {
+          "$ref": "#/definitions/SparkPrepareLightningReceiveResult"
+        },
+        "postTvcQuorumKeyShareResult": {
+          "$ref": "#/definitions/PostTvcQuorumKeyShareResult"
         }
       }
     },
@@ -12726,6 +12928,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/SetIpAllowlistIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -13312,6 +13518,555 @@
           "description": "The Solana transaction signature, if available."
         }
       }
+    },
+    "SparkClaimLeaf": {
+      "type": "object",
+      "properties": {
+        "leafId": {
+          "type": "string",
+          "description": "Leaf identifier (UUID)."
+        },
+        "ciphertext": {
+          "type": "string",
+          "description": "ECIES ciphertext (hex-encoded) containing the inbound transfer secret. Decrypted inside the enclave using the wallet's Identity key."
+        },
+        "senderSignature": {
+          "type": "string",
+          "description": "Hex-encoded 64-byte compact ECDSA signature binding (leaf_id, transfer_id, ciphertext) to the sender's identity key. Verified inside the enclave before decryption."
+        }
+      },
+      "required": ["leafId", "ciphertext", "senderSignature"]
+    },
+    "SparkClaimPackage": {
+      "type": "object",
+      "properties": {
+        "leaves": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkClaimLeaf"
+          },
+          "description": "Leaves being claimed."
+        },
+        "threshold": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Shamir threshold for reconstructing the per-leaf claim secret."
+        },
+        "operatorRecipients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkOperatorRecipient"
+          },
+          "description": "Operators that will receive Shamir shares."
+        },
+        "transferId": {
+          "type": "string",
+          "description": "Spark transfer identifier (UUID). Used together with each leaf's sender_signature to verify the sender bound this ciphertext to this transfer."
+        },
+        "senderIdentityPublicKey": {
+          "type": "string",
+          "description": "Sender's compressed secp256k1 identity public key (hex-encoded, 33 bytes). Used to verify the per-leaf sender_signature fields."
+        }
+      },
+      "required": [
+        "leaves",
+        "threshold",
+        "operatorRecipients",
+        "transferId",
+        "senderIdentityPublicKey"
+      ]
+    },
+    "SparkClaimTransferIntent": {
+      "type": "object",
+      "properties": {
+        "signWith": {
+          "type": "string",
+          "description": "A Spark wallet account address identifying the wallet."
+        },
+        "claim": {
+          "$ref": "#/definitions/SparkClaimPackage",
+          "description": "Claim package parameters."
+        }
+      },
+      "required": ["signWith", "claim"]
+    },
+    "SparkClaimTransferRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_SPARK_CLAIM_TRANSFER"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/SparkClaimTransferIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "SparkClaimTransferResult": {
+      "type": "object",
+      "properties": {
+        "operatorPackages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkEncryptedOperatorPackage"
+          },
+          "description": "Per-operator ECIES-encrypted packages."
+        },
+        "newLeafPublicKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkLeafPublicKey"
+          },
+          "description": "Newly-derived SigningLeaf public keys, one per leaf, in input order."
+        }
+      },
+      "required": ["operatorPackages", "newLeafPublicKeys"]
+    },
+    "SparkDepositDerivation": {
+      "type": "object"
+    },
+    "SparkEncryptedOperatorPackage": {
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "Spark operator identifier (UUID)."
+        },
+        "encryptedPackage": {
+          "type": "string",
+          "description": "ECIES ciphertext (hex-encoded) opaque to Turnkey after emission."
+        }
+      },
+      "required": ["operatorId", "encryptedPackage"]
+    },
+    "SparkFrostCommitment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "FROST participant identifier, hex-encoded (32-byte scalar)."
+        },
+        "hiding": {
+          "type": "string",
+          "description": "Hiding commitment D, hex-encoded compressed secp256k1 point."
+        },
+        "binding": {
+          "type": "string",
+          "description": "Binding commitment E, hex-encoded compressed secp256k1 point."
+        }
+      },
+      "required": ["id", "hiding", "binding"]
+    },
+    "SparkHtlcPreimageDerivation": {
+      "type": "object"
+    },
+    "SparkIdentityDerivation": {
+      "type": "object"
+    },
+    "SparkKeyDerivation": {
+      "type": "object",
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/SparkIdentityDerivation",
+          "description": "Spark identity key derivation."
+        },
+        "signingLeaf": {
+          "$ref": "#/definitions/SparkSigningLeafDerivation",
+          "description": "Spark signing leaf key derivation, identified by leaf ID."
+        },
+        "deposit": {
+          "$ref": "#/definitions/SparkDepositDerivation",
+          "description": "Spark deposit key derivation."
+        },
+        "staticDeposit": {
+          "$ref": "#/definitions/SparkStaticDepositDerivation",
+          "description": "Spark static deposit key derivation, identified by index."
+        },
+        "htlcPreimage": {
+          "$ref": "#/definitions/SparkHtlcPreimageDerivation",
+          "description": "Spark HTLC preimage key derivation."
+        }
+      }
+    },
+    "SparkLeafPublicKey": {
+      "type": "object",
+      "properties": {
+        "leafId": {
+          "type": "string",
+          "description": "The Spark leaf_id this public key was derived for."
+        },
+        "publicKey": {
+          "type": "string",
+          "description": "Hex-encoded compressed secp256k1 point (33 bytes) for the SigningLeaf derivation at leaf_id."
+        }
+      },
+      "required": ["leafId", "publicKey"]
+    },
+    "SparkLightningReceivePackage": {
+      "type": "object",
+      "properties": {
+        "threshold": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Feldman VSS threshold for reconstructing the preimage."
+        },
+        "operatorRecipients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkOperatorRecipient"
+          },
+          "description": "Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list."
+        }
+      },
+      "required": ["threshold", "operatorRecipients"]
+    },
+    "SparkOperatorRecipient": {
+      "type": "object",
+      "properties": {
+        "operatorId": {
+          "type": "string",
+          "description": "Spark operator identifier (UUID)."
+        },
+        "encryptionPublicKey": {
+          "type": "string",
+          "description": "Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point)."
+        }
+      },
+      "required": ["operatorId", "encryptionPublicKey"]
+    },
+    "SparkPartialSignature": {
+      "type": "object",
+      "properties": {
+        "signatureShare": {
+          "type": "string",
+          "description": "Hex-encoded FROST partial signature."
+        },
+        "hiding": {
+          "type": "string",
+          "description": "Turnkey's hiding commitment D (hex-encoded compressed secp256k1 point). Forward to the Spark Operator."
+        },
+        "binding": {
+          "type": "string",
+          "description": "Turnkey's binding commitment E (hex-encoded compressed secp256k1 point). Forward to the Spark Operator."
+        }
+      },
+      "required": ["signatureShare", "hiding", "binding"]
+    },
+    "SparkPrepareLightningReceiveIntent": {
+      "type": "object",
+      "properties": {
+        "signWith": {
+          "type": "string",
+          "description": "A Spark wallet account address identifying the wallet."
+        },
+        "lightningReceive": {
+          "$ref": "#/definitions/SparkLightningReceivePackage",
+          "description": "Lightning receive package parameters: threshold and operator recipients."
+        }
+      },
+      "required": ["signWith", "lightningReceive"]
+    },
+    "SparkPrepareLightningReceiveRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/SparkPrepareLightningReceiveIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "SparkPrepareLightningReceiveResult": {
+      "type": "object",
+      "properties": {
+        "operatorPackages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkEncryptedOperatorPackage"
+          },
+          "description": "Per-operator ECIES-encrypted Feldman share packages."
+        },
+        "paymentHash": {
+          "type": "string",
+          "description": "Hex-encoded SHA256(preimage). Forward to the Lightning node."
+        }
+      },
+      "required": ["operatorPackages", "paymentHash"]
+    },
+    "SparkPrepareTransferIntent": {
+      "type": "object",
+      "properties": {
+        "signWith": {
+          "type": "string",
+          "description": "A Spark wallet account address identifying the wallet."
+        },
+        "transfer": {
+          "$ref": "#/definitions/SparkTransferPackage",
+          "description": "Transfer package parameters for HD key tweak splitting."
+        }
+      },
+      "required": ["signWith", "transfer"]
+    },
+    "SparkPrepareTransferRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_SPARK_PREPARE_TRANSFER"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/SparkPrepareTransferIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "SparkPrepareTransferResult": {
+      "type": "object",
+      "properties": {
+        "operatorPackages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkEncryptedOperatorPackage"
+          },
+          "description": "Per-operator ECIES-encrypted packages."
+        },
+        "transferUserSignature": {
+          "type": "string",
+          "description": "Hex-encoded ECDSA-DER signature of the TransferPackage signing payload, signed with the wallet's IDENTITY key."
+        },
+        "newLeafPublicKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkLeafPublicKey"
+          },
+          "description": "Newly-derived SigningLeaf public keys, one per leaf, in input order."
+        }
+      },
+      "required": [
+        "operatorPackages",
+        "transferUserSignature",
+        "newLeafPublicKeys"
+      ]
+    },
+    "SparkSignFrostIntent": {
+      "type": "object",
+      "properties": {
+        "signWith": {
+          "type": "string",
+          "description": "A Spark wallet account address identifying the wallet to sign with."
+        },
+        "signatures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkSignatureRequest"
+          },
+          "description": "Batched sign requests. Each produces a partial signature plus Turnkey's public commitments."
+        }
+      },
+      "required": ["signWith", "signatures"]
+    },
+    "SparkSignFrostRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_SPARK_SIGN_FROST"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/SparkSignFrostIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "SparkSignFrostResult": {
+      "type": "object",
+      "properties": {
+        "signatures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkPartialSignature"
+          },
+          "description": "Partial signatures plus Turnkey commitments, one per request, in order."
+        }
+      },
+      "required": ["signatures"]
+    },
+    "SparkSignatureRequest": {
+      "type": "object",
+      "properties": {
+        "derivation": {
+          "$ref": "#/definitions/SparkKeyDerivation",
+          "description": "Which key to sign with."
+        },
+        "message": {
+          "type": "string",
+          "description": "Hex-encoded 32-byte sighash to sign."
+        },
+        "verifyingKey": {
+          "type": "string",
+          "description": "Aggregate group verifying key (hex-encoded compressed secp256k1 point), computed as P_ops + P_user. Bound into the nonce HMAC."
+        },
+        "operatorCommitments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkFrostCommitment"
+          },
+          "description": "Commitments for every non-Turnkey participant. MUST NOT include an entry under Turnkey's identifier. Bound into the nonce HMAC."
+        },
+        "adaptorPublicKey": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Optional adaptor point T (hex-encoded 33-byte compressed secp256k1 pubkey). When set, Turnkey produces a Schnorr adaptor pre-signature with the FROST challenge bound to `R+T` (where `R` is the aggregate group nonce commitment from FROST). The party holding the discrete log `t` completes the pre-sig to a valid BIP-340 signature by adding `t` (or `-t`, for parity) to the signature scalar `s`. This is primarily used by Spark leaves-swap and other adaptor-bound flows; absent or empty leads to plain FROST signing (the typical case)."
+        }
+      },
+      "required": [
+        "derivation",
+        "message",
+        "verifyingKey",
+        "operatorCommitments"
+      ]
+    },
+    "SparkSigningLeafDerivation": {
+      "type": "object",
+      "properties": {
+        "leafId": {
+          "type": "string",
+          "description": "Unique identifier for the Spark signing leaf."
+        }
+      },
+      "required": ["leafId"]
+    },
+    "SparkStaticDepositDerivation": {
+      "type": "object",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Index used to derive the static deposit key."
+        }
+      },
+      "required": ["index"]
+    },
+    "SparkTransferLeaf": {
+      "type": "object",
+      "properties": {
+        "leafId": {
+          "type": "string",
+          "description": "Leaf identifier (UUID)."
+        },
+        "oldLeafDerivation": {
+          "$ref": "#/definitions/SparkKeyDerivation",
+          "description": "Derivation for the existing (pre-transfer) leaf key. Always a SigningLeaf derivation."
+        },
+        "newLeafDerivation": {
+          "$ref": "#/definitions/SparkKeyDerivation",
+          "description": "Derivation for the new (post-transfer) leaf key. Always a SigningLeaf derivation. The enclave ECIES-encrypts this private key to receiver_public_key as the per-leaf secret_cipher; HD-derived rather than random so the sender can re-derive on retry (Turnkey's enclave is stateless)."
+        },
+        "refundSignature": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Client-produced CPFP refund signature (hex-encoded), passed through verbatim into the per-operator SendLeafKeyTweak. Empty omits the field from the operator package."
+        },
+        "directRefundSignature": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Client-produced direct refund signature (hex-encoded). Passed through verbatim."
+        },
+        "directFromCpfpRefundSignature": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Client-produced direct-from-CPFP refund signature (hex-encoded). Passed through verbatim."
+        }
+      },
+      "required": ["leafId", "oldLeafDerivation", "newLeafDerivation"]
+    },
+    "SparkTransferPackage": {
+      "type": "object",
+      "properties": {
+        "transferId": {
+          "type": "string",
+          "description": "Spark transfer identifier (UUID)."
+        },
+        "leaves": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkTransferLeaf"
+          },
+          "description": "Leaves being transferred."
+        },
+        "threshold": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Feldman VSS threshold for reconstructing the per-leaf tweak scalar."
+        },
+        "operatorRecipients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SparkOperatorRecipient"
+          },
+          "description": "Operators that will receive Feldman shares of the per-leaf tweak. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list."
+        },
+        "receiverPublicKey": {
+          "type": "string",
+          "description": "Recipient's identity pubkey (hex-encoded compressed secp256k1 point). Each leaf's new_priv is ECIES-encrypted to this key and embedded in the per-operator package for claim-time delivery."
+        }
+      },
+      "required": [
+        "transferId",
+        "leaves",
+        "threshold",
+        "operatorRecipients",
+        "receiverPublicKey"
+      ]
     },
     "StampLoginIntent": {
       "type": "object",
@@ -14116,6 +14871,10 @@
         },
         "parameters": {
           "$ref": "#/definitions/UpdateOrganizationNameIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
         }
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
@@ -14394,7 +15153,7 @@
       },
       "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
-    "UpdateTvcAppTargetDeploymentResult": {
+    "UpdateTvcAppLiveDeploymentResult": {
       "type": "object"
     },
     "UpdateUserEmailIntent": {
@@ -15528,7 +16287,7 @@
       "properties": {
         "eventType": {
           "type": "string",
-          "description": "The event type to subscribe to (for example, ACTIVITY_UPDATES or BALANCE_CONFIRMED_UPDATES)."
+          "description": "The event type to subscribe to (for example, ACTIVITY_UPDATES, BALANCE_CONFIRMED_UPDATES, or BALANCE_FINALIZED_UPDATES)."
         },
         "filtersJson": {
           "type": "string",
