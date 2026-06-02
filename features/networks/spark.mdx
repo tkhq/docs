@@ -3,7 +3,7 @@ title: "Spark support on Turnkey"
 sidebarTitle: "Spark"
 ---
 
-[Spark](https://www.spark.money/) is a Bitcoin Layer 2 that uses FROST threshold signing across a collective of operators to enable fast, low-fee transfers and Lightning payments without giving up self-custody of the underlying BTC. Turnkey provides enclave-based key management for Spark: your identity key, leaf keys, deposit keys, and Lightning preimages are generated and used inside the Turnkey enclave, and never leave it.
+[Spark](https://www.spark.money/) is a Bitcoin Layer 2 that uses FROST threshold signing across a collective of operators to enable fast, low-fee transfers and Lightning payments without giving up self-custody of the underlying BTC. Turnkey provides enclave-based key management for Spark: your identity key, leaf keys, deposit keys, and Lightning preimages are generated and used inside the Turnkey enclave. None of this key material ever leaves it, with the lone exception being the [static deposit flow](#static-deposits-export-a-key-from-the-enclave). This flow, by necessity, exports one deposit key so a Spark Service Provider can process deposits while your wallet is offline, and that key stops mattering once you claim the deposit.
 
 If you don't know the protocol, read [Spark core concepts](https://docs.spark.money/learn/core-concepts) and [Sovereignty](https://docs.spark.money/learn/sovereignty) first. This page covers what Turnkey adds to a Spark integration.
 
@@ -119,14 +119,24 @@ This is the property that makes Spark Operator unavailability a _liveness_ conce
 
 ### Static deposits export a key from the enclave
 
-Static deposit addresses are reusable: one address can receive many deposits, each creating a separate Spark leaf. To make that work, the SSP needs to process deposits while your wallet is offline, which means it needs co-signing capability on the static deposit key. This is the **only** Spark flow that uses [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to take a raw private key out of the Turnkey enclave.
+Static deposit addresses are reusable: one address can receive many deposits, each creating a separate Spark leaf. To make that work, the SSP needs to process deposits while your wallet is offline, which means it needs co-signing capability on the static deposit key.
 
-From the moment the static deposit key is shared with the SSP until you claim any deposits made to that address, the SSP holds co-signing capability. This is the intentional custodial tradeoff of static deposits. To minimize exposure:
+<Warning>
+  Static deposits are the **only** Spark flow that takes a raw private key out of the Turnkey enclave. The flow uses [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to export the static deposit key so it can be shared with the SSP. Every other Spark flow keeps all key material inside the enclave.
+</Warning>
+
+This is the intentional custodial tradeoff of static deposits — expected behavior, not a leak. The exported key controls only the **static deposit address**; it cannot move existing leaves or touch your identity key. To minimize exposure while the key is in transit:
 
 - Use a fresh ephemeral P-256 keypair for each export and zero it immediately after decrypting.
 - Transmit the key to the SSP only over an encrypted channel.
 - Zero the key in your local memory immediately after transmission.
-- Only use SSPs you trust: a compromised SSP holding this key can co-sign spends from the static deposit address.
+
+<Note>
+  **The exported key stops mattering once you claim the deposit.** Claiming runs through [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer), which rotates the leaf to a fresh key derived inside your enclave; after that, the exported static deposit key has no authority over the funds.
+  {/* TODO: See the static deposit scripts in the [SDK example](#sdk-example) for the full claim flow. */}
+</Note>
+
+**The risk window.** A static deposit address is an aggregate of your static deposit key and the Spark Operators' key, so moving funds out of it requires a signature from both. Between the moment funds arrive at the address and the moment you claim them, the SSP holds your half of that key. During this window — and only this window — an SSP that **colludes with the Spark Operators** could co-sign a spend of the unclaimed deposit. This is the same operator-trust boundary described in Spark's [sovereignty model](https://docs.spark.money/learn/sovereignty); use only SSPs you trust, and claim deposits promptly to keep the window short.
 
 If you don't need a reusable receiving address, prefer single-use deposits. They keep key material inside the enclave throughout.
 
