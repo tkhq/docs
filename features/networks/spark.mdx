@@ -63,17 +63,19 @@ The supported `IDENTITY` address formats are:
 
 When creating a wallet account via the Turnkey dashboard or API, select `ADDRESS_FORMAT_SPARK_MAINNET` or `ADDRESS_FORMAT_SPARK_REGTEST` and the identity path will be set automatically. Only `secp256k1` keys are supported; `ed25519` keys will be rejected.
 
-### Schnorr signing on the identity key
+### Signing configurations
 
-Spark payloads signed with the identity key use **plain BIP-340 Schnorr**, without the Taproot key tweak that Bitcoin P2TR addresses require (see [Bitcoin Schnorr signatures and tweaks](/features/networks/bitcoin#schnorr-signatures-and-tweaks) for the contrast). Turnkey picks the right signing scheme from the address format on your key:
+When you call [`SIGN_RAW_PAYLOAD`](/api-reference/activities/sign-raw-payload) with a Spark identity address as `signWith`, as in the case of signing Spark token transactions (example [here](https://github.com/tkhq/sdk/tree/main/examples/with-spark)), Turnkey produces a **plain BIP-340 Schnorr** signature — without the Taproot key tweak that Bitcoin P2TR addresses require (see [Bitcoin Schnorr signatures and tweaks](/features/networks/bitcoin#schnorr-signatures-and-tweaks) for the contrast). Generally, Turnkey will pick the scheme from the address format passed as `signWith`:
 
-| Address type          | Signing scheme            |
+| `signWith` address    | Signing scheme            |
 | --------------------- | ------------------------- |
 | Bitcoin P2TR          | Tweaked Schnorr (BIP-341) |
 | Spark Mainnet/Regtest | Plain Schnorr (BIP-340)   |
 | All others            | ECDSA                     |
 
-Use [`SIGN_RAW_PAYLOAD`](/api-reference/activities/sign-raw-payload) with the Spark address as `signWith` to produce a plain-Schnorr signature. The `hashFunction` field should match how the payload was prepared (e.g. `HASH_FUNCTION_NO_OP` for a pre-hashed payload). The returned signature always has `V = "00"` since Schnorr signatures do not carry a recovery ID.
+The `hashFunction` field should match how the payload was prepared (e.g. `HASH_FUNCTION_NO_OP` for a pre-hashed payload). The returned signature always has `V = "00"` since Schnorr signatures do not carry a recovery ID.
+
+This scheme selection applies only to `SIGN_RAW_PAYLOAD`. The Spark-specific activities sign with whatever the protocol expects regardless of address format — for example, [`SPARK_PREPARE_TRANSFER`](/api-reference/activities/prepare-spark-transfer) signs its `transferUserSignature` with the identity key using **ECDSA** (DER-encoded), not Schnorr.
 
 This identity-key signing path is sufficient on its own for token operations via the Spark SDK (`@buildonspark/spark-sdk`, `@buildonspark/issuer-sdk`). The FROST-based flows below require the additional Spark-specific activities.
 
@@ -109,11 +111,11 @@ Turnkey supports every Spark wallet operation. For a runnable walkthrough of eac
 
 ## Security model
 
-### Pre-signed exit transactions are seed-phrase-equivalent
+### Pre-signed exit transactions must be secured
 
 When you deposit BTC into Spark, the deposit flow pre-signs two Bitcoin L1 transactions inside the Turnkey enclave: a branch transaction and a timelocked exit transaction. These are your unilateral exit path. If every Spark Operator goes offline or acts maliciously, you can broadcast them directly to Bitcoin L1 and recover your BTC without operator cooperation. Per the [Spark sovereignty docs](https://docs.spark.money/learn/sovereignty), exiting can take "as little as 100 blocks" (~16 hours) — the actual wait depends on leaf depth and how recently the leaf was transferred, since timelocks decrement at each transfer.
 
-The corollary: **these transactions must be stored durably.** If they are lost and the SOs are unavailable, your recovery path is gone. Treat them with the same care as a seed phrase — durable, encrypted, off-device storage, with backups. The Turnkey enclave does not retain them; it signs them once at deposit time and returns them to the client.
+The corollary: **these transactions must be stored durably.** If they are lost and the SOs are unavailable, your recovery path is gone. Treat them with the same care as a seed phrase — durable, encrypted, off-device storage, with backups. Turnkey does not explicitly retain them; it signs them once at deposit time and returns them to the client.
 
 SDKs that wrap Spark model this for you: in the Breez SDK, each leaf's pre-signed exit transaction is the [`refund_tx` field on its `TreeNode`](https://github.com/breez/spark-sdk/blob/aef4a0d8939bb6ed86d9b229116afd9d450d8886/crates/spark/src/tree/mod.rs#L161), saved and reloaded through the SDK's `TreeStore`. If you build on such an SDK, configure a durable, backed-up `TreeStore` backend rather than relying on the default in-memory store.
 
@@ -124,7 +126,11 @@ This is the property that makes Spark Operator unavailability a _liveness_ conce
 Static deposit addresses are reusable: one address can receive many deposits, each creating a separate Spark leaf. To make that work, the SSP needs to process deposits while your wallet is offline, which means it needs co-signing capability on the static deposit key.
 
 <Warning>
-  Static deposits are the **only** Spark flow that takes a raw private key out of the Turnkey enclave. The flow uses [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to export the static deposit key so it can be shared with the SSP. Every other Spark flow keeps all key material inside the enclave.
+  Static deposits are the **only** Spark flow that takes a raw private key out
+  of the Turnkey enclave. The flow uses
+  [`EXPORT_WALLET_ACCOUNT`](/api-reference/activities/export-wallet-account) to
+  export the static deposit key so it can be shared with the SSP. Every other
+  Spark flow keeps all key material inside the enclave.
 </Warning>
 
 This is the intentional custodial tradeoff of static deposits — expected behavior, not a leak. The exported key controls only the **static deposit address**; it cannot move existing leaves or touch your identity key. To minimize exposure while the key is in transit:
@@ -134,7 +140,11 @@ This is the intentional custodial tradeoff of static deposits — expected behav
 - Zero the key in your local memory immediately after transmission.
 
 <Note>
-  **The exported key stops mattering once you claim the deposit.** Claiming runs through [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer), which rotates the leaf to a fresh key derived inside your enclave; after that, the exported static deposit key has no authority over the funds.
+  **The exported key stops mattering once you claim the deposit.** Claiming runs
+  through
+  [`SPARK_CLAIM_TRANSFER`](/api-reference/activities/claim-spark-transfer),
+  which rotates the leaf to a fresh key derived inside your enclave; after that,
+  the exported static deposit key has no authority over the funds.
   {/* TODO: See the static deposit scripts in the [SDK example](#sdk-example) for the full claim flow. */}
 </Note>
 
@@ -151,8 +161,8 @@ Every Spark flow involves direct calls from the client to the Spark Operators (f
 The canonical reference for integrating Turnkey with Spark is [`examples/with-spark`](https://github.com/tkhq/sdk/tree/main/examples/with-spark) in the Turnkey SDK monorepo. It contains:
 
 - A Turnkey-backed Spark signer (`TurnkeySparkSigner`) that plugs into the Spark SDK.
-- End-to-end runnable flows for deposit, transfer (send + claim), withdrawal, Lightning receive and send, and static deposit.
 - Token-operation scripts (create, mint, transfer) using the issuer SDK.
+- (Coming soon) End-to-end runnable flows for deposit, transfer (send + claim), withdrawal, Lightning receive and send, and static deposit.
 - Comments mapping each step to the actor model above.
 
 If you're integrating Spark, start with the SDK example and refer back to this page for the conceptual model and the security notes.
