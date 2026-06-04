@@ -6,7 +6,7 @@ sidebarTitle: "Overview"
 
 Webhooks deliver real-time notifications as signed HTTPS POST requests. Register an endpoint and subscribe to event types, and Turnkey will automatically deliver updates as they occur.
 
-- Signed deliveries with Ed25519 signatures
+- Signed deliveries with Ed25519 signatures -- see [Verify signatures](/features/webhooks/verify-signatures)
 - Organization-aware headers including org ID, event type, and timestamps on every delivery
 - Automatic retries for failed deliveries
 - Dashboard and API management for creating and configuring endpoints
@@ -122,26 +122,6 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 Turnkey treats `2xx` responses as successful. Turnkey automatically retries retryable delivery failures. Retry schedules and attempt counts are subject to change.
 
 Signed retries receive a fresh timestamp and signature. `X-Turnkey-Event-Id` is signed delivery metadata and is stable across retry attempts for the same webhook event. Payload fields such as `msg.idempotencyKey` are event-specific business identifiers. Either may be useful for deduplication depending on the use case, but they are not the same field.
-
-## Verify signatures
-
-Verify the signature before parsing or trusting the webhook body. Signature verification requires the exact raw request body bytes that Turnkey sent. Re-serializing parsed JSON, changing whitespace, or changing key order will cause verification to fail.
-
-The signed message follows this format:
-
-```text
-v1.ed25519.<signing_key_id>.<timestamp_ms>.<event_id>.<raw_body>
-```
-
-The `event_id` segment in the signed message is the value of the `X-Turnkey-Event-Id` header.
-
-Signature verification signs only the signature contract fields shown above plus the raw body. Other delivery headers are useful for routing and observability but are not part of the signed message.
-
-To verify a delivery, reconstruct the signed message from the headers and raw body, then verify the Ed25519 signature against the signing key identified by `X-Turnkey-Signature-Key-Id`. Ensure the timestamp is within an acceptable freshness window (e.g. 5 minutes) to guard against replay attacks.
-
-<Note>
-An SDK verification helper and a key discovery endpoint are releasing soon to simplify this process.
-</Note>
 
 ## Payloads
 
@@ -261,4 +241,4 @@ Read operations, such as listing webhook endpoints, use standard authenticated q
 | Empty or unclear endpoint names | Set `parameters.name` to a non-empty, human-readable name. |
 | Subscription shape errors | Pass event types inside `parameters.subscriptions[]`, not as top-level `eventTypes`. |
 | Invalid webhook URL errors | Use an HTTPS URL that resolves to a public destination. Localhost, private IPs, link-local addresses, metadata endpoints, and URLs with user info are rejected. |
-| Signature verification fails | Verify against the exact raw request body bytes, use the millisecond timestamp and event id from the headers, check clock skew, and select the public key matching the signature key id. |
+| Signature verification fails | See [Verify webhook signatures](/features/webhooks/verify-signatures). Common causes: re-serialized JSON body, clock skew, or missing signing key. |

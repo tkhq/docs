@@ -193,6 +193,7 @@ export const tags = ${tagsStr};`;
         const uniqueActivityPaths = [...new Set(activityPaths)];
         const uniqueQueryPaths = [...new Set(queryPaths)];
         const uniqueAuthProxyPaths = [...new Set(authProxyPaths)];
+        const manualQueryPaths = ["api-reference/queries/get-webhook-jwks"];
 
         // Sort generated paths alphabetically
         uniqueActivityPaths.sort();
@@ -253,10 +254,23 @@ export const tags = ${tagsStr};`;
               (item: any) => typeof item === "object" && item.group === "Queries"
             );
             if (queriesGroup) {
-              queriesGroup.pages = [
+              const queryPages = [
                 "api-reference/queries/overview",
                 ...uniqueQueryPaths,
               ];
+              for (const manualPath of manualQueryPaths) {
+                if (queryPages.includes(manualPath)) continue;
+
+                const webhookEndpointsIndex = queryPages.indexOf(
+                  "api-reference/queries/list-webhook-endpoints"
+                );
+                if (webhookEndpointsIndex === -1) {
+                  queryPages.push(manualPath);
+                } else {
+                  queryPages.splice(webhookEndpointsIndex, 0, manualPath);
+                }
+              }
+              queriesGroup.pages = queryPages;
               console.log(`Updated Queries paths in docs.json`);
             } else {
               console.warn(
