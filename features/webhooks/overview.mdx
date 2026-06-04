@@ -6,7 +6,7 @@ sidebarTitle: "Overview"
 
 Webhooks deliver real-time notifications as signed HTTPS POST requests. Register an endpoint and subscribe to event types, and Turnkey will automatically deliver updates as they occur.
 
-- Signed deliveries with Ed25519 signatures
+- Signed deliveries with Ed25519 signatures -- see [Verify signatures](/features/webhooks/verify-signatures)
 - Organization-aware headers including org ID, event type, and timestamps on every delivery
 - Automatic retries for failed deliveries
 - Dashboard and API management for creating and configuring endpoints
@@ -122,117 +122,6 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 Turnkey treats `2xx` responses as successful. Turnkey automatically retries retryable delivery failures. Retry schedules and attempt counts are subject to change.
 
 Signed retries receive a fresh timestamp and signature. `X-Turnkey-Event-Id` is signed delivery metadata and is stable across retry attempts for the same webhook event. Payload fields such as `msg.idempotencyKey` are event-specific business identifiers. Either may be useful for deduplication depending on the use case, but they are not the same field.
-
-## Verify signatures
-
-Verify the signature before parsing or trusting the webhook body. Signature verification requires the exact raw request body bytes that Turnkey sent. Re-serializing parsed JSON, changing whitespace, or changing key order will cause verification to fail.
-
-The signed message follows this format:
-
-```text
-v1.ed25519.<signing_key_id>.<timestamp_ms>.<event_id>.<raw_body>
-```
-
-The `event_id` segment is the value of the `X-Turnkey-Event-Id` header. Only the signature contract fields and the raw body are signed. Other delivery headers are useful for routing and observability but are not part of the signed message.
-
-### Key discovery
-
-Turnkey publishes webhook signing keys at a public JWKS endpoint. Use this endpoint to fetch the Ed25519 public key needed to verify webhook signatures. Match the `kid` field in the response to the `X-Turnkey-Signature-Key-Id` header on each delivery:
-
-```text
-GET https://api.turnkey.com/public/v1/discovery/webhooks/jwks
-```
-
-This endpoint requires no authentication. The response is a standard [JSON Web Key Set (RFC 7517)](https://datatracker.ietf.org/doc/html/rfc7517) containing Ed25519 public keys:
-
-```json
-{
-  "keys": [
-    {
-      "kid": "<signing-key-id>",
-      "kty": "OKP",
-      "crv": "Ed25519",
-      "alg": "EdDSA",
-      "use": "sig",
-      "x": "<base64url-encoded-public-key>",
-      "turnkey_signature_algorithm": "ed25519",
-      "turnkey_signature_version": "v1"
-    }
-  ]
-}
-```
-
-| Field | Description |
-|---|---|
-| `kid` | Key identifier. Match this against the `X-Turnkey-Signature-Key-Id` delivery header. |
-| `kty` | Key type. `OKP` (Octet Key Pair) for Ed25519 keys. |
-| `crv` | Curve. `Ed25519`. |
-| `alg` | Algorithm. `EdDSA`. |
-| `use` | Key usage. `sig` (signature). |
-| `x` | Base64url-encoded 32-byte Ed25519 public key. |
-| `turnkey_signature_algorithm` | Turnkey-specific. Matches the `X-Turnkey-Signature-Algorithm` header value. |
-| `turnkey_signature_version` | Turnkey-specific. Matches the `X-Turnkey-Signature-Version` header value. |
-
-The JWKS endpoint returns standard `Cache-Control` headers. Cache the response according to those headers and refresh on expiry. If a delivery arrives with a `kid` that does not match any cached key, refetch the JWKS before rejecting the delivery. This avoids stale-cache failures during key rotation while still allowing efficient caching.
-
-### SDK verification helper
-
-The `@turnkey/crypto` package (v2.10.0+) exports `verifyTurnkeyWebhookSignature`, which handles signed-input reconstruction, timestamp freshness, and Ed25519 verification. The helper accepts caller-provided verification keys and returns a typed result instead of throwing.
-
-Fetch the JWKS endpoint, convert each key's base64url-encoded `x` field to hex, and pass the result as `verificationKeys`:
-
-```ts
-import { verifyTurnkeyWebhookSignature } from "@turnkey/crypto";
-
-const JWKS_URL =
-  "https://api.turnkey.com/public/v1/discovery/webhooks/jwks";
-
-// Fetch and cache the JWKS. Convert base64url public keys to hex.
-async function fetchVerificationKeys() {
-  const res = await fetch(JWKS_URL);
-  const jwks = await res.json();
-  return jwks.keys.map((key: any) => ({
-    keyId: key.kid,
-    publicKey: Buffer.from(key.x, "base64url").toString("hex"),
-    algorithm: "ed25519" as const,
-  }));
-}
-
-const verificationKeys = await fetchVerificationKeys();
-
-// In your webhook handler:
-const rawBody = await request.text();
-
-const result = verifyTurnkeyWebhookSignature({
-  headers: request.headers,
-  body: rawBody,
-  verificationKeys,
-  maxTimestampAgeMs: 5 * 60 * 1000, // 5-minute replay window
-});
-
-if (!result.ok) {
-  // result.reason describes the failure (e.g. "stale_timestamp", "missing_key")
-  return new Response("Invalid signature", { status: 401 });
-}
-
-// Signature verified. Safe to parse.
-const payload = JSON.parse(rawBody);
-```
-
-<Warning>
-Always read the raw request body before any middleware parses it. Frameworks like Express require `express.raw({ type: "application/json" })` to preserve the original bytes. If your framework has already parsed the body, the re-serialized output may differ from what Turnkey signed.
-</Warning>
-
-### Manual verification
-
-If you are not using the TypeScript SDK, verify signatures manually:
-
-1. Fetch the JWKS from `https://api.turnkey.com/public/v1/discovery/webhooks/jwks`.
-2. Find the key whose `kid` matches the `X-Turnkey-Signature-Key-Id` header. Base64url-decode the `x` field to obtain the 32-byte Ed25519 public key.
-3. Reconstruct the signed input by concatenating the header values and raw body in the format: `v1.ed25519.<key_id>.<timestamp_ms>.<event_id>.<raw_body>`.
-4. Hex-decode the `X-Turnkey-Signature` header to obtain the 64-byte Ed25519 signature.
-5. Verify the Ed25519 signature over the signed input bytes using the public key from step 2.
-6. Check that `X-Turnkey-Timestamp` is within an acceptable freshness window (e.g. 5 minutes) to guard against replay attacks.
 
 ## Payloads
 
@@ -352,4 +241,4 @@ Read operations, such as listing webhook endpoints, use standard authenticated q
 | Empty or unclear endpoint names | Set `parameters.name` to a non-empty, human-readable name. |
 | Subscription shape errors | Pass event types inside `parameters.subscriptions[]`, not as top-level `eventTypes`. |
 | Invalid webhook URL errors | Use an HTTPS URL that resolves to a public destination. Localhost, private IPs, link-local addresses, metadata endpoints, and URLs with user info are rejected. |
-| Signature verification fails | Verify against the exact raw request body bytes, use the millisecond timestamp and event ID from the headers, check clock skew, and fetch the public key from the [JWKS endpoint](#key-discovery) matching the `X-Turnkey-Signature-Key-Id` header. |
+| Signature verification fails | See [Verify webhook signatures](/features/webhooks/verify-signatures). Common causes: re-serialized JSON body, clock skew, or missing signing key. |
