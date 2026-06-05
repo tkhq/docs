@@ -43,7 +43,7 @@ export function configureCLI(): Command {
     .option("--path <jsonPath>", "JSON path to specific element to output")
     .option(
       "-o, --output <filepath>",
-      "Output file path (stdout if not specified)"
+      "Output file path (stdout if not specified)",
     )
     .option(
       "--format <format>",
@@ -51,45 +51,42 @@ export function configureCLI(): Command {
       (value) => {
         if (value !== "json" && value !== "yaml" && value !== "typescript") {
           throw new Error(
-            'Format must be either "json", "yaml", or "typescript"'
+            'Format must be either "json", "yaml", or "typescript"',
           );
         }
         return value;
       },
-      "json"
+      "json",
     )
     .option(
       "--endpoints",
-      "Generate API Endpoint objects instead of raw OpenAPI spec"
+      "Generate API Endpoint objects instead of raw OpenAPI spec",
     )
     .option(
       "--list-endpoints-tags <outputFile>",
-      "Output a JSON list of endpoint names and tags to the given file"
+      "Output a JSON list of endpoint names and tags to the given file",
     )
     .option(
       "--required-only",
       "Include only required properties in the generated API Endpoint objects",
-      true
+      true,
     )
     .option("--generate-mdx", "Generate MDX files for each API endpoint")
     .option(
       "--mdx-output-dir <path>",
       "Base directory for generated MDX files",
-      "api-reference"
+      "api-reference",
     )
     .option(
       "--mdx-add-only",
       "Only add new MDX files, do not overwrite existing ones",
-      false
+      false,
     )
-    .option(
-      "--nav-group <name>",
-      "Navigation group name in docs.json"
-    )
+    .option("--nav-group <name>", "Navigation group name in docs.json")
     .option(
       "--auth-proxy",
       "Use the auth-proxy generator (flat output, custom URL/auth header, version deduplication)",
-      false
+      false,
     );
 
   return program;

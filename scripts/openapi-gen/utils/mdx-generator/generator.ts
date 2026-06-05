@@ -60,7 +60,7 @@ export function generateEnumOptionsMdx(options: EnumOption[]): string {
 export function generateParamMdxRecursive(
   fieldName: string,
   field: ApiField,
-  parentPath: string
+  parentPath: string,
 ): string {
   let mdx = "";
   const fieldRequired = field.required ?? false;
@@ -116,7 +116,7 @@ export function generateParamMdxRecursive(
           nestedMdx += generateParamMdxRecursive(
             nestedField.name,
             nestedField,
-            childParentPath // Pass the *same* parent path for array items
+            childParentPath, // Pass the *same* parent path for array items
           );
         }
       }
@@ -126,7 +126,7 @@ export function generateParamMdxRecursive(
         nestedMdx += generateParamMdxRecursive(
           nestedField.name,
           nestedField,
-          childParentPath // Pass the *current* path as parent for object properties
+          childParentPath, // Pass the *current* path as parent for object properties
         );
       }
     }
@@ -171,7 +171,7 @@ export function generateParamMdxRecursive(
 // Uses built-in <ResponseField> for top-level, imported <NestedParam> for nested.
 export function generateResponseFieldMdxRecursive(
   field: ApiField,
-  parentKey: string = ""
+  parentKey: string = "",
 ): string {
   let mdx = "";
   const fieldName = field.name;
@@ -243,7 +243,7 @@ export function generateResponseFieldMdxRecursive(
 export function generateJsonPayloadRecursive(
   fields: ApiField[] | undefined,
   endpointPath?: string,
-  parentPath: string = ""
+  parentPath: string = "",
 ): Record<string, any> {
   if (!fields) {
     return {};
@@ -256,7 +256,11 @@ export function generateJsonPayloadRecursive(
     const currentPath = parentPath ? `${parentPath}.${field.name}` : field.name;
 
     // Special handling for ApproveActivity result field
-    if (endpointPath?.includes("approve_activity") && field.name === "result" && field.childFields?.length === 0) {
+    if (
+      endpointPath?.includes("approve_activity") &&
+      field.name === "result" &&
+      field.childFields?.length === 0
+    ) {
       value = "<object> (approved activity result, if completed)";
     } else if (field.type === "object" && field.childFields) {
       // Special handling for get-activity: only include the first intent in the response example
@@ -266,10 +270,18 @@ export function generateJsonPayloadRecursive(
         field.childFields.length > 0
       ) {
         // Only include the first intent child
-        value = generateJsonPayloadRecursive([field.childFields[0]], endpointPath, currentPath);
+        value = generateJsonPayloadRecursive(
+          [field.childFields[0]],
+          endpointPath,
+          currentPath,
+        );
       } else {
         // Recursive call for nested objects
-        value = generateJsonPayloadRecursive(field.childFields, endpointPath, currentPath);
+        value = generateJsonPayloadRecursive(
+          field.childFields,
+          endpointPath,
+          currentPath,
+        );
       }
     } else if (
       field.type === "array" &&
@@ -307,7 +319,11 @@ export function generateJsonPayloadRecursive(
       } else {
         // Items are objects: recursively generate structure using all childFields
         // Pass the *whole* childFields array, representing the structure of ONE item.
-        itemValue = generateJsonPayloadRecursive(field.childFields, endpointPath, currentPath);
+        itemValue = generateJsonPayloadRecursive(
+          field.childFields,
+          endpointPath,
+          currentPath,
+        );
       }
       value = [itemValue]; // Create an array with one example element
     } else {
@@ -321,7 +337,8 @@ export function generateJsonPayloadRecursive(
         // Current behavior: for enum types, we grab the first (which defaults to CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR).
         // However, for `get_api_key` and `get_api_keys` endpoints, we want to use CREDENTIAL_TYPE_API_KEY_P256.
         if (
-          (endpointPath?.includes("get_api_key") || endpointPath?.includes("get_api_keys")) &&
+          (endpointPath?.includes("get_api_key") ||
+            endpointPath?.includes("get_api_keys")) &&
           field.name === "type" &&
           enumValue === "<CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR>"
         ) {
@@ -354,7 +371,6 @@ export function generateJsonPayloadRecursive(
 
 // --- Helper: Map endpoint path to SDK method name ---
 function getSdkMethodName(endpoint: ApiEndpoint): string {
-
   // Prefer operationId if present
   if (endpoint.operationId && endpoint.operationId.trim() !== "") {
     const op = endpoint.operationId.trim();
@@ -374,7 +390,10 @@ function getSdkMethodName(endpoint: ApiEndpoint): string {
 }
 
 // --- Helper: Generate SDK parameter value for a field ---
-function generateSdkParameterValue(field: ApiField, indent: number = 2): string {
+function generateSdkParameterValue(
+  field: ApiField,
+  indent: number = 2,
+): string {
   const indentStr = " ".repeat(indent);
   const fieldName = field.name;
   const fieldType = field.type;
@@ -388,7 +407,7 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
     const firstOption = options[0].value;
     return `${indentStr}${fieldName}: "<${firstOption}>"${description}`;
   } else if (fieldType === "string") {
-    return `${indentStr}${fieldName}: "<string>${field.description ? ` (${field.description})` : ''}"`;
+    return `${indentStr}${fieldName}: "<string>${field.description ? ` (${field.description})` : ""}"`;
   } else if (fieldType === "number") {
     return `${indentStr}${fieldName}: 0${description}`;
   } else if (fieldType === "boolean") {
@@ -398,7 +417,8 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
       // If the array is of objects (multiple fields, or first child is an object)
       if (
         field.childFields.length > 1 ||
-        (field.childFields.length === 1 && field.childFields[0].type === "object")
+        (field.childFields.length === 1 &&
+          field.childFields[0].type === "object")
       ) {
         const lines = [`${indentStr}${fieldName}: [{${description}`];
         for (const child of field.childFields) {
@@ -447,7 +467,10 @@ function generateSdkParameters(endpoint: ApiEndpoint): string {
   const parametersWrapper = fields.find((f) => f.name === "parameters");
 
   if (parametersWrapper) {
-    if (parametersWrapper.childFields && parametersWrapper.childFields.length > 0) {
+    if (
+      parametersWrapper.childFields &&
+      parametersWrapper.childFields.length > 0
+    ) {
       // For activity endpoints, extract parameters from the parameters wrapper only
       const paramLines: string[] = [];
       for (const field of parametersWrapper.childFields) {
@@ -461,7 +484,9 @@ function generateSdkParameters(endpoint: ApiEndpoint): string {
   } else {
     // For query endpoints, use all top-level fields (excluding only type and timestampMs)
     const commonFields = ["type", "timestampMs"]; // organizationId should be included for queries
-    const endpointSpecificFields = fields.filter(f => !commonFields.includes(f.name));
+    const endpointSpecificFields = fields.filter(
+      (f) => !commonFields.includes(f.name),
+    );
 
     if (endpointSpecificFields.length === 0) {
       return ""; // No endpoint-specific parameters
@@ -481,7 +506,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
 
   // Find the 'type' field, often indicates the specific activity type
   const typeField = endpoint.requestBody?.fields?.find(
-    (f) => f.name === "type"
+    (f) => f.name === "type",
   );
   const typeFieldDetails = typeField
     ? getEnumDetails(typeField)
@@ -499,7 +524,7 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
     // activity-style endpoint
     const parametersObject = generateJsonPayloadRecursive(
       parametersWrapper.childFields,
-      endpoint.path
+      endpoint.path,
     );
     dataPayloadObject = {
       type: activityType,
@@ -516,14 +541,14 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   const dataPayloadString = JSON.stringify(
     dataPayloadObject,
     (_key, value) => (typeof value === "bigint" ? value.toString() : value),
-    4
+    4,
   ); // Pretty print with 4 spaces
 
   // Escape single quotes for bash compatibility within single-quoted string
   const escapedDataPayloadString = dataPayloadString.replace(/'/g, "'\\''");
 
   const curlCommand =
-    "```bash title=\"cURL\"\n" +
+    '```bash title="cURL"\n' +
     "curl --request POST \\\n" +
     `  --url ${url} \\\n` +
     "  --header 'Accept: application/json' \\\n" +
@@ -535,14 +560,17 @@ function generateRequestExample(endpoint: ApiEndpoint): string {
   // Generate JavaScript SDK example
   const sdkMethodName = getSdkMethodName(endpoint);
   const sdkParameters = generateSdkParameters(endpoint);
-  const jsParams = sdkParameters.trim() === "" ? "{}" : `{
+  const jsParams =
+    sdkParameters.trim() === ""
+      ? "{}"
+      : `{
 ${sdkParameters}
 }`;
   const javascriptExample =
-    "```javascript title=\"JavaScript\"\n" +
-    "import { Turnkey } from \"@turnkey/sdk-server\";\n\n" +
+    '```javascript title="JavaScript"\n' +
+    'import { Turnkey } from "@turnkey/sdk-server";\n\n' +
     "const turnkeyClient = new Turnkey({\n" +
-    "  apiBaseUrl: \"https://api.turnkey.com\",\n" +
+    '  apiBaseUrl: "https://api.turnkey.com",\n' +
     "  apiPublicKey: process.env.API_PUBLIC_KEY!,\n" +
     "  apiPrivateKey: process.env.API_PRIVATE_KEY!,\n" +
     "  defaultOrganizationId: process.env.ORGANIZATION_ID!,\n" +
@@ -557,7 +585,7 @@ ${sdkParameters}
 function generateResponseExample(endpoint: ApiEndpoint): string {
   // Find the 'type' field from the request to potentially echo in response (common pattern)
   const reqTypeField = endpoint.requestBody?.fields?.find(
-    (f) => f.name === "type"
+    (f) => f.name === "type",
   );
   const reqTypeDetails = reqTypeField
     ? getEnumDetails(reqTypeField)
@@ -569,7 +597,7 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
 
   // Attempt to find the 200 OK response schema
   const successResponse = endpoint.responses?.find(
-    (res) => res.statusCode === 200
+    (res) => res.statusCode === 200,
   );
 
   // Generate payload based on response schema if available, otherwise fallback
@@ -577,7 +605,7 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
   if (successResponse?.fields) {
     resultPayload = generateJsonPayloadRecursive(
       successResponse.fields,
-      endpoint.path
+      endpoint.path,
     );
   } else {
     resultPayload = { "<result_key>": "<result_value>" };
@@ -599,14 +627,14 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
     responseJsonString = JSON.stringify(
       responsePayloadObject,
       (_key, value) => (typeof value === "bigint" ? value.toString() : value),
-      2
+      2,
     ); // 2-space indent
   } else {
     // Query endpoints: just the result object
     responseJsonString = JSON.stringify(
       resultPayload,
       (_key, value) => (typeof value === "bigint" ? value.toString() : value),
-      2
+      2,
     );
   }
 
@@ -632,11 +660,11 @@ function determineSubdirectory(endpointPath: string): string {
 export function generateMdxFile(
   endpoint: ApiEndpoint,
   baseOutputDir: string,
-  addOnly: boolean = false
+  addOnly: boolean = false,
 ): string | null {
   if (!endpoint.title || !endpoint.path) {
     console.warn(
-      `Skipping MDX generation for endpoint (Title: ${endpoint.title}, Path: ${endpoint.path}) due to missing title or path.`
+      `Skipping MDX generation for endpoint (Title: ${endpoint.title}, Path: ${endpoint.path}) due to missing title or path.`,
     );
     return null;
   }
@@ -680,7 +708,7 @@ export function generateMdxFile(
     return relativeOutputPathWithoutExt; // Return the relative path for index generation
   } catch (error: any) {
     console.error(
-      `Error generating MDX file for endpoint "${endpoint.title}": ${error.message}`
+      `Error generating MDX file for endpoint "${endpoint.title}": ${error.message}`,
     );
     if (error.stack) console.error(error.stack);
     return null; // Indicate failure
@@ -723,7 +751,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
   // 3. Response Body Parameters Section (Assuming 200 OK)
   const successResponse = endpoint.responses?.find(
-    (res) => res.statusCode === 200
+    (res) => res.statusCode === 200,
   );
 
   if (successResponse?.fields && successResponse.fields.length > 0) {

@@ -38,7 +38,7 @@ const DEFAULT_OPTIONS: ApiEndpointFormatterOptions = {
  */
 export function formatApiEndpoints(
   result: ApiEndpointParserResult,
-  options: ApiEndpointFormatterOptions = DEFAULT_OPTIONS
+  options: ApiEndpointFormatterOptions = DEFAULT_OPTIONS,
 ): string {
   let output: string;
 
@@ -85,7 +85,7 @@ import { ApiEndpoint } from '../types';
 export const API_ENDPOINTS: ApiEndpoint[] = ${JSON.stringify(
     endpoints,
     null,
-    2
+    2,
   )};
 
 /**

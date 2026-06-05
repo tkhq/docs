@@ -126,7 +126,7 @@ import { Turnkey } from "@turnkey/sdk-server";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   const { walletAccountAddress, targetPublicKey } = req.body;
 
@@ -158,7 +158,7 @@ import axios from "axios";
 async function exportKeyToIframe(
   iframeStamper: IframeStamper,
   walletAccountAddress: string,
-  organizationId: string
+  organizationId: string,
 ) {
   // Step 3a: Get or initialize the embedded key
   let embeddedKey = await iframeStamper.getEmbeddedPublicKey();
@@ -178,7 +178,7 @@ async function exportKeyToIframe(
     response.data.exportBundle,
     organizationId,
     KeyFormat.Hexadecimal, // or KeyFormat.Solana for Solana-formatted keys
-    walletAccountAddress // Required for multi-key support
+    walletAccountAddress, // Required for multi-key support
   );
 
   if (!injected) {
@@ -198,14 +198,14 @@ import { MessageType } from "@turnkey/iframe-stamper";
 async function signMessage(
   iframeStamper: IframeStamper,
   message: string,
-  walletAccountAddress: string
+  walletAccountAddress: string,
 ): Promise<string> {
   const signature = await iframeStamper.signMessage(
     {
       message,
       type: MessageType.Solana,
     },
-    walletAccountAddress // Required when multiple keys are loaded
+    walletAccountAddress, // Required when multiple keys are loaded
   );
 
   return signature; // Returns hex-encoded signature
@@ -220,14 +220,14 @@ import { TransactionType } from "@turnkey/iframe-stamper";
 async function signTransaction(
   iframeStamper: IframeStamper,
   serializedTransaction: string, // Hex-encoded transaction bytes
-  walletAccountAddress: string
+  walletAccountAddress: string,
 ): Promise<string> {
   const signedTransaction = await iframeStamper.signTransaction(
     {
       transaction: serializedTransaction,
       type: TransactionType.Solana,
     },
-    walletAccountAddress
+    walletAccountAddress,
   );
 
   return signedTransaction; // Returns hex-encoded signed transaction
@@ -246,7 +246,7 @@ Since the embedded key persists across bundle injections, you can export multipl
 async function loadMultipleKeys(
   iframeStamper: IframeStamper,
   addresses: string[],
-  organizationId: string
+  organizationId: string,
 ) {
   // Get or initialize the embedded key once
   let embeddedKey = await iframeStamper.getEmbeddedPublicKey();
@@ -264,7 +264,7 @@ async function loadMultipleKeys(
       response.data.exportBundle,
       organizationId,
       KeyFormat.Hexadecimal,
-      address // Each key is stored by its address
+      address, // Each key is stored by its address
     );
   }
 }
@@ -276,13 +276,13 @@ async function loadMultipleKeys(
 // Sign with the first address
 const sig1 = await iframeStamper.signMessage(
   { message: "Hello", type: MessageType.Solana },
-  "address1..."
+  "address1...",
 );
 
 // Sign with the second address
 const sig2 = await iframeStamper.signMessage(
   { message: "World", type: MessageType.Solana },
-  "address2..."
+  "address2...",
 );
 ```
 
@@ -321,13 +321,13 @@ Understanding the key lifecycle is important for building reliable applications.
 async function ensureKeyLoaded(
   iframeStamper: IframeStamper,
   address: string,
-  organizationId: string
+  organizationId: string,
 ) {
   try {
     // Attempt to sign a test message
     await iframeStamper.signMessage(
       { message: "test", type: MessageType.Solana },
-      address
+      address,
     );
   } catch (error) {
     // Key not found or expired - re-export

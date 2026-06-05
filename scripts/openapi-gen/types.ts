@@ -19,5 +19,5 @@ export interface OutputOptions {
   /** Optional JSON path to filter the output */
   jsonPath?: string;
   /** Output format (json or yaml) */
-  format?: 'json' | 'yaml';
+  format?: "json" | "yaml";
 }

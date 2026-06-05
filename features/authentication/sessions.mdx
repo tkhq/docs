@@ -7,8 +7,8 @@ description: "Turnkey sessions allow a user to take multiple, contiguous actions
 
 Such actions can be divided into two buckets:
 
-* Read operations: Retrieving data (e.g., viewing wallet balances)
-* Write operations: Modifying data or performing sensitive actions (e.g., signing transactions)
+- Read operations: Retrieving data (e.g., viewing wallet balances)
+- Write operations: Modifying data or performing sensitive actions (e.g., signing transactions)
 
 ## How can I create a session?
 
@@ -38,12 +38,15 @@ In contrast to read-only sessions, a read-write session makes sense when a user 
 There are several mechanisms to obtain read-write sessions: OTP, OAuth, Passkey sessions, and Session refreshing
 
 <Frame>
-  <img src="/images/features/img/read_write_sessions.png" alt="Read-write sessions" />
+  <img
+    src="/images/features/img/read_write_sessions.png"
+    alt="Read-write sessions"
+  />
 </Frame>
 
 Our SDK contains several abstractions that manage authentication. You can checkout all of our examples leveraging these examples [here](https://github.com/tkhq/sdk/tree/main/examples)
 
-**Note:** The session JWT is only metadata signed by Turnkey that references the client side stored API keypair, and is useful for verifying the session server-side or associating metadata, but it cannot be used to authenticate requests to Turnkey’s API. 
+**Note:** The session JWT is only metadata signed by Turnkey that references the client side stored API keypair, and is useful for verifying the session server-side or associating metadata, but it cannot be used to authenticate requests to Turnkey’s API.
 Only the session keypair can be used to create valid `x-stamp` signatures for API requests to Turnkey. In other words, solely the session JWT cannot be used to stamp requests outside of the client context.
 
 ### Mechanisms
@@ -57,26 +60,27 @@ For web apps that want stronger session persistence without relying on iframes o
 This approach enables long-lived, client-held sessions that survive page reloads, tab closures, and even browser restarts – **without ever exposing the private key** to your JavaScript code.
 
 Turnkey’s SDK provides helpers to:
+
 - Create a new session by generating a P-256 key pair via `crypto.subtle.generateKey()`
 - Sign requests
 - Store and retrieve the key using IndexedDB under a given session ID
-- Abstractions built on top of the `IndexedDBStamper` that simplify authentication flows 
+- Abstractions built on top of the `IndexedDBStamper` that simplify authentication flows
 
 This is currently the **most persistent** session model for modern browsers that support WebCrypto. It is especially valuable in Progressive Web App (PWA) contexts or when iframe and Local Storage approaches are insufficient.
 
 To see the IndexedDB-backed session mechanism in action, check out our Turnkey react-wallet-kit [playground](https://github.com/tkhq/sdk/tree/main/examples/with-sdk-js) or dedicated authentication examples like [oauth](https://github.com/tkhq/sdk/tree/main/examples/oauth), [email OTP](https://github.com/tkhq/sdk/tree/main/examples/otp-auth), and [external wallet authentication](https://github.com/tkhq/sdk/tree/main/examples/wallet-auth).
 Our [Web demo application](https://github.com/tkhq/sdk/tree/main/examples/react-wallet-kit) hosted at [wallets.turnkey.com](https://wallets.turnkey.com) showcases complete end-to-end authentication flows and client-side session persistence backed by IndexedDB.
 
-
 #### SecureStorage (mobile only)
 
-Secure Storage operates essentially the same as IndexedDB with respect to authentication flows for Turnkey except it is mobile native and keys are generated using @turnkey/crypto rather than WebCrypto. 
+Secure Storage operates essentially the same as IndexedDB with respect to authentication flows for Turnkey except it is mobile native and keys are generated using @turnkey/crypto rather than WebCrypto.
 
 #### LocalStorage:
 
 Another option is to create an API key and store it directly within Local Storage. However, this is a riskier setup than IndexedDb/SecureStorage as anyone who is able to access this client-side API key has full access to a User.
 
 ### Sessions FAQ
+
 <AccordionGroup>
   <Accordion title="How can I refresh a session?">
     Once a user has a valid session, it is trivial to use that session to create a new session. The `refreshSession` abstraction will create a brand new session and automatically store the resulting new session in local storage.
@@ -96,6 +100,7 @@ Another option is to create an API key and store it directly within Local Storag
         return true;
       };
     ```
+
   </Accordion>
   <Accordion title="How long are sessions?">
     The expiration of session keys can be specified to any amount of time using the `expirationSeconds` parameter. The default length is 900 seconds (15 minutes).
@@ -105,7 +110,9 @@ Another option is to create an API key and store it directly within Local Storag
 
     * Expired API keys are deleted first
     * If no expired keys exist, the oldest unexpired key is deleted
+
 If you are looking to invalidate existing sessions, you can use the `invalidateExisting` parameter for all `_LOGIN` activities. This will clear all existing session keys.
+
   </Accordion>
   <Accordion title="Can I use the same sessions implementation for web and mobile?">
     Absolutely! Through leveraging IndexedDb you can handle sessions in the same way for Web and PWAs. However, for React Native/Mobile applications you will need to leverage Secure Storage.

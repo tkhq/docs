@@ -60,12 +60,10 @@ For each path in the OpenAPI spec, we will:
 ### Required Utility Functions
 
 1. **String transformations:**
-
    - `snakeToCamel`: Convert snake_case to camelCase
    - `snakeToScreaming`: Convert snake_case to SCREAMING_SNAKE_CASE
 
 2. **Schema processing:**
-
    - `schemaToApiField`: Convert OpenAPI schema to ApiField
    - `findVersionedComponents`: Find all versions of a component by prefix
    - `extractEndpointName`: Extract the endpoint name from a path

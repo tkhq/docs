@@ -25,6 +25,21 @@ mintlify dev
 
 This will start a local development server where you can preview your changes in real-time.
 
+### Formatting
+
+This repo uses [Prettier](https://prettier.io) to format all hand-written content (`.mdx`, `.md`, `.css`, `.json`, `.ts`, `.js`, ...). Generated artifacts (swagger files, `generated-docs/`) are excluded via `.prettierignore`.
+
+```sh
+# Install dev dependencies (one time)
+npm install
+
+# Format everything in place
+npm run format   # or: make format
+
+# Check formatting without writing (useful in CI)
+npm run format:check   # or: make format-check
+```
+
 If you encounter any issues with the development server:
 
 - Run `mintlify install` to reinstall dependencies
@@ -69,10 +84,10 @@ The docs in this repository utilize shared MDX snippets to ensure consistency an
 
 **Important:** Always update the shared MDX file rather than modifying individual duplicate pages. This guarantees that any change propagates throughout all references.
 
-| Duplicate Page Path                                           | Shared MDX File                       |
-| ------------------------------------------------------------- | ------------------------------------- |
-| `concepts/policies/overview.mdx`                              | `/snippets/shared/policy-engine.mdx`  |
-| `products/embedded-wallets/features/policy-engine.mdx`        | `/snippets/shared/policy-engine.mdx`  |
+| Duplicate Page Path                                    | Shared MDX File                       |
+| ------------------------------------------------------ | ------------------------------------- |
+| `concepts/policies/overview.mdx`                       | `/snippets/shared/policy-engine.mdx`  |
+| `products/embedded-wallets/features/policy-engine.mdx` | `/snippets/shared/policy-engine.mdx`  |
 | `products/company-wallets/features/export-wallets.mdx` | `/snippets/shared/export-wallets.mdx` |
 | `products/company-wallets/features/import-wallets.mdx` | `/snippets/shared/import-wallets.mdx` |
 
