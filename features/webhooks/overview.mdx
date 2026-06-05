@@ -35,6 +35,14 @@ Create webhook endpoints from a server-side client using an API key, or from any
 
 SDK methods accept the intent parameters directly. The SDK adds the activity envelope fields (`type`, `timestampMs`, `organizationId`, and `parameters`) before signing and submitting the request. Use the raw envelope shape only when calling the HTTP API directly.
 
+<Note>
+Server-side SDK path: `createWebhookEndpoint` is available in `@turnkey/sdk-server@6.1.0+`. This is the recommended SDK for server-side/API-key automation.
+
+Browser SDK path: `createWebhookEndpoint` is also available in `@turnkey/sdk-browser@6.1.0+`. Browser clients may use it only when they can submit signed activities for the organization.
+
+Raw HTTP and CLI submission remain supported for direct activity submission. SDK methods accept intent parameters directly; raw HTTP uses the activity envelope shape.
+</Note>
+
 ### Activity updates
 
 ```ts
@@ -236,9 +244,9 @@ Read operations, such as listing webhook endpoints, use standard authenticated q
 
 | Symptom | What to check |
 |---|---|
-| `createWebhookEndpoint` is unavailable in your SDK | Upgrade to a webhooks-capable SDK release. The minimum SDK version will be listed in the SDK changelog once published. |
-| `PermissionDenied` on create/update/delete | Confirm the user has an allow policy for the webhook activity type, and confirm balance webhooks are being managed from the billing organization. |
-| Empty or unclear endpoint names | Set `parameters.name` to a non-empty, human-readable name. |
-| Subscription shape errors | Pass event types inside `parameters.subscriptions[]`, not as top-level `eventTypes`. |
+| `createWebhookEndpoint` is unavailable in your SDK | Upgrade to `@turnkey/sdk-server@6.1.0+` or `@turnkey/sdk-browser@6.1.0+`. Use `@turnkey/sdk-server` for server-side/API-key automation. Use `@turnkey/sdk-browser` only when the browser client can submit signed activities for the organization. |
+| `PermissionDenied` on create/update/delete | Confirm the user has an allow policy for the webhook activity type. For balance or transaction-status webhooks, also confirm the endpoint is being managed from the billing organization. |
+| Subscription shape errors | Pass event types inside `subscriptions[]`, not as top-level `eventTypes`. For raw HTTP activity submission, put `subscriptions[]` inside `parameters`. |
+| Empty endpoint names | Set a non-empty, human-readable `name`. For raw HTTP activity submission, set `parameters.name`. |
 | Invalid webhook URL errors | Use an HTTPS URL that resolves to a public destination. Localhost, private IPs, link-local addresses, metadata endpoints, and URLs with user info are rejected. |
-| Signature verification fails | See [Verify webhook signatures](/features/webhooks/verify-signatures). Common causes: re-serialized JSON body, clock skew, or missing signing key. |
+| Signature verification fails | See [Verify webhook signatures](/features/webhooks/verify-signatures). Common causes: not using the exact raw request body, clock skew, or a missing/stale JWKS key. Cache JWKS according to `Cache-Control` and refetch when the signature `kid` is unknown. |
