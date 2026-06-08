@@ -38,14 +38,6 @@ The IframeStamper class, part of the @turnkey/iframe-stamper package, is designe
 #### Parameters
 
 <ParamField
-  body="config"
-  type="TIframeStamperConfig"
-  required
->
-
-An object containing configuration settings for the iframe stamper.
-</ParamField>
-<ParamField
   body="iframeUrl"
   type="string"
   required
@@ -70,6 +62,14 @@ The ID to assign to the iframe element.
 The container element in which the iframe will be inserted.
 </ParamField>
 
+<ParamField
+  body="clearClipboardOnPaste"
+  type="boolean"
+>
+
+Whether to clear the clipboard on paste events.
+</ParamField>
+
 #### Types
 
 ##### `TIframeStamperConfig`
@@ -79,6 +79,7 @@ type TIframeStamperConfig = {
   iframeUrl: string;
   iframeElementId: string;
   iframeContainer: HTMLElement | null | undefined;
+  clearClipboardOnPaste?: boolean;
 };
 ```
 
@@ -212,3 +213,39 @@ Removes the iframe from the DOM. This method is useful for cleaning up the ifram
 
 iframeStamper.clear();
 ```
+
+## Exporting & Importing Private Key Formats
+
+There are five private key formats to choose from. All five are supported in both
+the export and import flows.
+
+#### `HEXADECIMAL`
+- A 64-character hex string representation of the private key (with or without a
+  `0x` prefix). This is the format used by MetaMask, MyEtherWallet, Ledger, and
+  Trezor for Ethereum and Tron keys.
+- Default if no format is specified.
+
+#### `SOLANA`
+- A base58-encoded string concatenating the private key and the public key. This
+  is the format used by Phantom and Solflare for Solana keys.
+- Exporting in this format requires the associated public key (passed as the
+  `address` argument to `injectKeyExportBundle`).
+
+#### `BITCOIN_MAINNET_WIF`
+- Bitcoin mainnet Wallet Import Format (base58check, version byte `0x80`). Used
+  by wallets like Electrum and Bitcoin Core.
+- Only **compressed** WIF keys are supported; uncompressed WIF keys are rejected.
+
+#### `BITCOIN_TESTNET_WIF`
+- Bitcoin testnet Wallet Import Format (base58check, version byte `0xEF`). Same
+  compatibility and constraints as `BITCOIN_MAINNET_WIF`.
+
+#### `SUI_BECH32`
+- A Bech32-encoded string with the human-readable part `suiprivkey`, used by Sui
+  wallets.
+- Only the **Ed25519** scheme (scheme flag `0`) is supported.
+
+These can be used when exporting or importing private keys to ensure
+compatibility with different blockchain ecosystems and tools by passing the
+desired format to the `injectKeyExportBundle` (export) and
+`extractKeyEncryptedBundle` (import) methods of the `IframeStamper`.
