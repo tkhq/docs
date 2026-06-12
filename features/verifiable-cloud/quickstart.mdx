@@ -100,7 +100,7 @@ running verifiable code but not advised for encrypting sensitive data.
 Create your app in TVC by running
 
 ```bash
-tvc app create my-app-template.json
+tvc app create --config-file my-app-template.json
 ```
 
 This creates your app, and saves its quorum key and manifest settings to the Turnkey Verifiable Cloud platform.
@@ -123,6 +123,7 @@ This should open a modal with all your deployment settings:
 
 If you do not have your own app, try our helloworld template:
 - **Container Image URL**: `ghcr.io/tkhq/helloworld:latest@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd`
+  - TVC requires a single-platform `linux/amd64` image digest, not a multi-platform index digest. If you are building your own image, use `docker buildx imagetools inspect <image>` to find the `linux/amd64`-specific digest.
   - If you are bringing private container images, TVC supports uploading pull secrets by encrypting them to a known public key. This will be used by TVC infrastructure to access your container images. Read more about pull secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
 - **Executable Path**: `/tvc_app`
 - **Executable Args**: `--host 0.0.0.0 --port 3000`. These arguments are passed to the executable on startup. Here we are telling the `helloworld` binary to start on port 3000
@@ -162,7 +163,7 @@ a name after the `--output` flag. Open it and fill in each field:
   "ghcr.io/tkhq/helloworld@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd"
   ```
 - `pivotPath`: location of your binary in the container. Use `"/tvc_app"` for the demo app.
-- `pivotArgs`: leave this empty unless you have arguments to pass to your application
+- `pivotArgs`: arguments passed to the binary on startup. For the helloworld demo, use `["--host", "0.0.0.0", "--port", "3000"]`. Leave empty for your own app unless it requires arguments.
 - `expectedPivotDigest`: for the demo, use 
   ```json
   "cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1"
@@ -183,8 +184,18 @@ a name after the `--output` flag. Open it and fill in each field:
 
 Deploy to TVC by running
 
-```bash
-tvc deploy create deploy-YYYY-MM-DD.json [--pull-secret <path-to-pull-secret>.json]
+```
+tvc deploy create --config-file deploy-YYYY-MM-DD.json [--pull-secret <path-to-pull-secret>.json]
+```
+
+On success you'll see your deployment ID logged to console. Save the deployment ID for the approval step (you can also find it by clicking into your app on the dashboard):
+
+```
+Deployment created successfully!
+
+Deployment ID: <DEPLOYMENT_UUID>
+App ID: <APP_UUID>
+Config: deploy-YYYY-MM-DD.json
 ```
 
 Find the newly created deployment by clicking into your app on the [TVC dashboard](https://app.turnkey.com/dashboard/v2/tvc).
@@ -210,7 +221,34 @@ tvc deploy approve \
 You may find your operator ID by clicking into your app, then under **Manifest Operators**:
 <img src="/assets/files/tvc_manifest-operators.png" alt="Manifest Operators in app page" width="200"/>
 
-This command generates an approval from the public keys created in step 1.
+This command walks you through approving each section of the QOS manifest. On success you'll see:
+
+```
+========================================
+         MANIFEST APPROVAL
+========================================
+
+NAMESPACE
+─────────────────────────────────────
+  Name:       prod/tvc/<APP_UUID>
+  Nonce:      <NONCE>
+  Quorum Key: <QUORUM_KEY>
+
+...
+
+========================================
+    ALL SECTIONS APPROVED
+========================================
+
+Posting approval to Turnkey...
+
+Approval posted successfully!
+
+Approval IDs: ["<APPROVAL_UUID>"]
+Manifest ID: <MANIFEST_UUID>
+Operator ID: <OPERATOR_UUID>
+```
+
 If you didn't change anything during the demo, that should be the only required approval from your manifest set.
 
 In the dashboard you will see "Action Required" transition to "none". This means everything is done on your side. You can look at the deployment details in the recap table on on the individual deployment page to know whether your deployment is coming up healthy and whether it's receiving traffic.
@@ -218,6 +256,22 @@ In the dashboard you will see "Action Required" transition to "none". This means
 <img src="/assets/files/tvc_live-deployment-details.png" alt="Deployment details when LIVE" width="620"/>
 
 Our infrastructure automatically provisions network ingress for your application. You can visit `https://app-<YOUR_APP_UUID>.turnkey.cloud` to interact with it. If you used our `helloworld` template, try visiting `/time` in your browser!
+
+</Step>
+
+<Step title="Verify your deployment">
+
+Once the deployment is live, confirm it is healthy by hitting the `/health` endpoint. Before doing so, check the deployment details from the previous step and ensure **Healthy Replicas** reads `3/3`. If replicas aren't fully up yet, the endpoint may return a 404.
+
+```
+curl https://app-<YOUR_APP_UUID>.turnkey.cloud/health
+```
+
+A healthy deployment returns:
+
+```json
+{"status":"ok"}
+```
 
 </Step>
 </Steps>
