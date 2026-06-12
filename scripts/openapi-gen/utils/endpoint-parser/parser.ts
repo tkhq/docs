@@ -548,7 +548,7 @@ interface VersionedComponent {
 /**
  * Matches activity types, intents, and results by version
  */
-function matchVersionedComponents(
+export function matchVersionedComponents(
   activityTypes: string[],
   intents: string[],
   results: string[]

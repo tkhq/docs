@@ -317,9 +317,9 @@ export function generateJsonPayloadRecursive(
         // Simple Enum
         let enumValue = `<${fieldDetails.options[0].value}>`;
 
-        // Special handling for credential type in get-api-key and get-api-keys endpoints.
-        // Current behavior: for enum types, we grab the first (which defaults to CREDENTIAL_TYPE_WEBAUTHN_AUTHENTICATOR).
-        // However, for `get_api_key` and `get_api_keys` endpoints, we want to use CREDENTIAL_TYPE_API_KEY_P256.
+        // --- HARDCODED HACK: get_api_key(s) Credential Type ---
+        // For these specific endpoints, the first enum option (WEBAUTHN_AUTHENTICATOR) is often
+        // not what the user wants to see in an example. We override it to API_KEY_P256.
         if (
           (endpointPath?.includes("get_api_key") || endpointPath?.includes("get_api_keys")) &&
           field.name === "type" &&
@@ -735,6 +735,11 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
     }
   } else {
     mdxContent += `\n{/* No explicit 200 response schema defined. */}\n`;
+  }
+
+  // Add a note about errors for activity endpoints
+  if (endpoint.type === "activity") {
+    mdxContent += `\n<Note>For a detailed breakdown of potential error codes, please refer to our [Error Documentation](/api-reference/overview/errors).</Note>\n`;
   }
 
   // 4. Request Example Section
