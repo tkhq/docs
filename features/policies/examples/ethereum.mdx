@@ -83,13 +83,16 @@ hash of `transfer(address,uint256)`.
 
 #### Inspect nested fields in EIP-712 message payloads
 
-The `eth.eip_712.message` map supports nested field access using bracket notation, allowing policies
-to inspect typed data contents beyond just the domain and primary type.
+The `eth.eip_712.message` map supports nested field access using bracket notation and array iteration operators, 
+allowing policies to inspect and enforce conditions across typed data contents, beyond just the domain and primary type.
 
 **Syntax:**
 
 - Nested struct fields: `eth.eip_712.message['outerField']['innerField']`
 - Array element fields: `eth.eip_712.message['arrayField'][0]['innerField']`
+- Array iteration: `eth.eip_712.message['arrayField'].all(item, <condition>)`
+- Array length: `eth.eip_712.message['arrayField'].count()`
+
 
 **Example: Restrict Hyperliquid orders to a specific asset**
 
@@ -116,16 +119,72 @@ To allow only orders for a specific asset (e.g. ETH = asset index `3`):
 {
   "policyName": "Allow Hyperliquid orders for ETH only",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'][0]['a'] == '3' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'][0]['a'] == 3 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
 <Note>
-  Array access is index-based (`[0]`, `[1]`, etc.). The condition `message['orders'][0]['a'] == '3'`
-  only checks the first order — any additional orders in the array are not evaluated. To restrict
-  all orders in a known-size batch, add a condition for each index: `message['orders'][0]['a'] ==
-  '3' && message['orders'][1]['a'] == '3'`.
+  Array elements can be accessed by index (`[0]`, `[1]`, etc.). The condition `message['orders'][0]['a'] == '3'`
+  only checks the first order — any additional orders in the array are not evaluated. Checking multiple positions 
+  explicitly (message['orders'][0]['a'] == 3 && message['orders'][1]['a'] == 3) works, but is fragile — adding a third 
+  order bypasses the check entirely. Use .all() to enforce a condition across every element regardless of array size.
 </Note>
+
+#### Iterating over array fields
+
+**Enforce batch size with .count():**
+
+```json
+{
+  "policyName": "Limit Hyperliquid batch to 5 orders",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'].count() <= 5 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+**Whitelist a specific asset across all orders with .all():**
+
+```json
+{
+  "policyName": "Allow Hyperliquid orders for asset 3 only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'].all(order, order['a'] == 3) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+**Whitelist multiple assets with .all():**
+
+```json
+{
+  "policyName": "Allow Hyperliquid orders for ETH or BTC only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'].all(order, order['a'] in [3, 5]) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+<Note>
+`in` works for integer fields (e.g. `order['a'] in [3, 5]`). For string fields, use `||` instead.
+</Note>
+
+**Combine size limit and asset whitelist:**
+
+```json
+{
+  "policyName": "Allow Hyperliquid orders for ETH only, max 5 per batch",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'].count() <= 5 && eth.eip_712.message['orders'].all(order, order['a'] == 3) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+**Require at least one reduce-only order with .any():**
+
+```json
+{
+  "policyName": "Require at least one reduce-only order in the batch",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:Order' && eth.eip_712.message['orders'].any(order, order['r'] == true) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
 
 ### Deny signing of `NO_OP` keccak256 payloads
 
