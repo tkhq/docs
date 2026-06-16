@@ -35,6 +35,71 @@ slicing is a fallback for contracts where no ABI is available.
 }
 ```
 
+#### Iterating over contract call arguments
+
+When a contract function takes an array parameter, use  `.count()`, `.all()`, and `.any()` to enforce conditions across every element, 
+rather than checking a single index.
+
+**Syntax:**
+- Array element count: `eth.tx.contract_call_args['arrayArg'].count()`
+- All elements match: `eth.tx.contract_call_args['arrayArg'].all(item, <condition>)`
+- Any element matches: `eth.tx.contract_call_args['arrayArg'].any(item, <condition>)`
+
+<Note>
+  For functions that take a `tuple array` (e.g. `executeBatch((address,uint256,bytes)[] calls)`), tuple fields are currently 
+  accessed by `position` rather than name: `call[0]` (first field), `call[1]` (second field), and so on. 
+  The positions correspond to the order of fields as defined in your ABI — substitute the correct indices for your own struct. 
+  Named access such as `call['target']` is not yet supported and produces `OUTCOME_ERROR`. 
+</Note>
+
+**Enforce exact batch size**
+
+Restrict signing to transactions containing exactly two calls:
+
+```json
+{
+  "policyName": "Allow executeBatch with exactly 2 calls",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'executeBatch' && eth.tx.contract_call_args['calls'].count() == 2"
+}
+```
+
+**Whitelist all call targets in a batch**
+
+Allow signing only when every call targets a specific contract and sends zero ETH. 
+call[0] is the target address and call[1] is the value, based on the field order in the executeBatch ABI:
+
+```json
+{
+  "policyName": "Allow executeBatch to whitelisted contract only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'executeBatch' && eth.tx.contract_call_args['calls'].all(call, call[0] == '<CONTRACT_ADDRESS>' && call[1] == 0)"
+}
+```
+
+**Combine batch size and target restrictions**
+
+```json
+{
+  "policyName": "Allow executeBatch — max 2 calls to whitelisted contract",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'executeBatch' && eth.tx.contract_call_args['calls'].count() <= 2 && eth.tx.contract_call_args['calls'].all(call, call[0] == '<CONTRACT_ADDRESS>' && call[1] == 0)"
+}
+```
+
+**Whitelist recipients in a flat address array**
+
+For functions that take a plain `address[]` parameter — such as a disperse-style multi-send contract — use 
+in to restrict signing to a known set of addresses:
+
+```json
+{
+  "policyName": "Allow disperse to whitelisted recipients only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'disperse' && eth.tx.contract_call_args['recipients'].all(addr, addr in ['<ADDRESS_1>', '<ADDRESS_2>', '<ADDRESS_3>'])"
+}
+```
+
 See [Smart Contract Interfaces](/features/policies/smart-contract-interfaces) for the full upload
 walkthrough and Solana IDL support.
 
