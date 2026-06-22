@@ -1,0 +1,238 @@
+---
+title: "Agentic Payments"
+description: "Let AI agents and automated systems send, receive, and track onchain payments with built-in wallet management, transaction reliability, gas sponsorship, and real-time balance visibility."
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+
+With Turnkey, you can give AI agents and automated systems the ability to send, receive, and track onchain payments, free from gas friction or fragmented infrastructure. Turnkey offers non-custodial wallets, transaction lifecycle management, gas sponsorship, and real-time balances through a single integration. For agent wallet provisioning and policy setup, start with [Agentic Wallets](/solutions/company-wallets/agentic-wallets).
+
+This guide covers the key decisions for building autonomous payment flows, then walks through a production example end-to-end: creating agent wallets, defining payment controls, executing sponsored transactions, and monitoring balances.
+
+## Powered by Turnkey
+
+- [**Catena**](https://www.turnkey.com/customers) built agentic treasury and banking infrastructure on Turnkey, giving AI agents their own accounts, payments, and treasury management. Policy guardrails are enforced at the enclave level, including tamper-proof spend limits, multi-party approvals, and agent-to-agent commerce with built-in identity verification.
+
+## Key implementation decisions
+
+| Decision | What to consider |
+| :--- | :--- |
+| Wallet architecture | Dedicate wallets per agent or per payment flow. Agents should never share wallets across different trust levels. See [Agentic Wallets](/solutions/company-wallets/agentic-wallets) for provisioning patterns. |
+| Payment controls | Define policies that scope what agents can pay, where funds can move, and under what conditions. Use spending caps and destination allowlists to limit blast radius. |
+| Transaction management | Use Turnkey's [transaction lifecycle management](/features/transaction-management) so agents can sign and broadcast in a single API call, with built-in confirmation tracking and retries. |
+| Transaction monitoring | Use [webhooks](/features/webhooks/overview) to track transaction status, confirmations, and failures so agents can react to payment outcomes without polling. |
+| Gas strategy | [Sponsored transactions](/features/transaction-management/broadcasting) eliminate the need for agents or end users to hold native tokens for gas. |
+| Balance visibility | Agents need to know what they can spend before acting. Use [real-time balances](/features/balances) to inform payment decisions without manual reconciliation. |
+| Human-in-the-loop | For high-value payments, require multi-party approval (agent + human, or agent + agent) before the enclave signs. |
+| Chain coverage | EVM and SVM have different transaction models and require separate policies. Plan for the networks your agents will transact on. |
+
+## Example: autonomous payment agent
+
+The following examples walk through three agentic payment patterns, all using the same agent wallet and policy foundation:
+
+1. **Stablecoin payout** - Agent sends USDC to an approved recipient, covering wallet setup, policies, gas sponsorship, and balance checks.
+2. **x402 payment** - Agent responds to an HTTP 402 Payment Required response by completing an onchain payment automatically.
+3. **MPP payment** - Agent fulfills a payment request from a service using Stripe's [Machine Payments Protocol](https://stripe.com/blog/machine-payments-protocol).
+
+| Need | How Turnkey solves it |
+| :--- | :--- |
+| Agent must never access the private key | Keys stay in the [secure enclave](/security/secure-enclaves); the agent authenticates via API key and receives signatures only |
+| Payments restricted to approved recipients | Policies enforce destination allowlists per wallet, so agents can only send to known addresses |
+| Transactions must complete reliably | [Transaction lifecycle management](/features/transaction-management) handles broadcasting, confirmation tracking, and retries in a single API call |
+| End users and agents should not manage gas | [Sponsored transactions](/features/transaction-management/broadcasting) cover gas fees so neither agents nor recipients need native tokens |
+| Agent needs to know available funds before paying | [Real-time balances](/features/balances) let agents check what they can spend before initiating a payment |
+| High-value payments need human approval | Consensus policies require a human co-signer above configurable thresholds |
+| Must support protocol-level payment flows | The same wallet and signing infrastructure works for direct transfers, x402 responses, and MPP authorization |
+
+### 1. Stablecoin payout
+
+<Note>
+  This example assumes you've provisioned an agent wallet and credentials following the [Agentic Wallets](/solutions/company-wallets/agentic-wallets) guide. The agent client below uses those credentials.
+</Note>
+
+<Steps>
+<Step title="Initialize the agent client">
+
+Create a Turnkey client using the agent's API credentials:
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+const agentClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+}).apiClient();
+```
+
+</Step>
+
+<Step title="Check available balance">
+
+Before initiating a payment, the agent checks that it has sufficient funds:
+
+```ts
+const { balances } = await agentClient.getWalletAddressBalances({
+  address: process.env.AGENT_WALLET_ADDRESS!,
+  caip2: "eip155:8453", // Base mainnet
+});
+
+const usdc = balances.find((b) => b.symbol === "USDC");
+console.log("Available USDC:", usdc?.display?.crypto);
+```
+
+</Step>
+
+<Step title="Define a payment policy">
+
+Restrict the agent to only interact with the USDC contract. This policy is created once by an admin:
+
+```json
+{
+  "policyName": "Restrict agent to USDC on Base",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_ETH_SEND_TRANSACTION' && wallet.id == '<AGENT_WALLET_ID>' && eth.tx.to == '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'"
+}
+```
+
+The policy above restricts which contract the agent can interact with. To control the actual recipient addresses within an ERC-20 transfer, you can upload the contract ABI and write policies against individual function parameters. See [Smart Contract Interfaces](/features/policies/smart-contract-interfaces) to learn more.
+
+</Step>
+
+<Step title="Send the USDC payout with gas sponsorship">
+
+With gas sponsorship enabled, the agent doesn't need to hold ETH to pay for transaction fees. Turnkey covers gas costs so the agent can transact using only its USDC balance:
+
+```ts
+const sendTransactionStatusId = await agentClient.ethSendErc20Transfer({
+  transfer: {
+    from: process.env.AGENT_WALLET_ADDRESS!,
+    to: "0xRecipientAddress",
+    tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+    amount: "1000000", // 1 USDC (6 decimals)
+    caip2: "eip155:8453",
+    sponsor: true,
+  },
+});
+```
+
+</Step>
+
+<Step title="Track the transaction">
+
+Once the transaction is broadcast, the agent polls for status updates to confirm the payment landed onchain:
+
+```ts
+const result = await agentClient.pollTransactionStatus({
+  sendTransactionStatusId,
+});
+
+console.log("Transaction hash:", result.eth?.txHash);
+console.log("Status:", result.status); // INCLUDED, FAILED, etc.
+```
+
+</Step>
+</Steps>
+
+### 2. x402 payment
+
+The [x402 protocol](https://www.x402.org/) revives HTTP's 402 Payment Required status code as a payment rail for autonomous agents. When an agent requests a paid resource, the server responds with a 402 and payment requirements. The agent completes the onchain payment and retries the request.
+
+Turnkey plugs into this flow through `@turnkey/viem`, which provides a viem-compatible account that signs via the secure enclave. This replaces the raw private key that x402 clients normally use.
+
+<Steps>
+<Step title="Create a Turnkey-backed viem account">
+
+Instead of using a raw private key with `privateKeyToAccount()`, create a viem account backed by Turnkey:
+
+```ts
+import { createAccount } from "@turnkey/viem";
+
+const turnkeyAccount = await createAccount({
+  client: agentClient,
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: process.env.AGENT_WALLET_ADDRESS!,
+});
+```
+
+</Step>
+
+<Step title="Register the x402 client">
+
+Pass the Turnkey account to the x402 EVM scheme. The `ExactEvmScheme` accepts any viem account, so the Turnkey signer works as a drop-in replacement:
+
+```ts
+import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
+import { ExactEvmScheme } from "@x402/evm/exact/client";
+
+const client = new x402Client();
+client.register("eip155:*", new ExactEvmScheme(turnkeyAccount));
+
+const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+```
+
+</Step>
+
+<Step title="Make a paid request">
+
+The wrapped fetch handles the full 402 flow automatically: it makes the initial request, parses the payment requirements, signs the payment via Turnkey, and retries with the payment header:
+
+```ts
+const response = await fetchWithPayment("https://api.example.com/data", {
+  method: "GET",
+});
+
+const data = await response.json();
+```
+
+</Step>
+</Steps>
+
+### 3. MPP payment
+
+The [Machine Payments Protocol](https://stripe.com/blog/machine-payments-protocol) (MPP) is an open standard co-authored by Tempo and Stripe that lets agents pay for services over HTTP. Like x402, an MPP-enabled server responds with a 402 challenge when payment is required. The agent signs a payment credential and retries the request.
+
+The Turnkey integration follows the same pattern as x402: the `mppx` client accepts a viem account, so a Turnkey-backed signer works as a drop-in.
+
+<Steps>
+<Step title="Create the MPP client with a Turnkey signer">
+
+Pass the Turnkey-backed viem account from the previous example to the MPP client. The `tempo` method handles stablecoin payments on the Tempo network:
+
+```ts
+import { Mppx, tempo } from "mppx/client";
+
+const mppx = Mppx.create({
+  methods: [tempo({ account: turnkeyAccount })],
+  polyfill: false,
+});
+```
+
+</Step>
+
+<Step title="Make a paid request">
+
+The MPP client handles the full 402 flow automatically: it intercepts the challenge, signs a payment credential via Turnkey, and retries the request:
+
+```ts
+const response = await mppx.fetch("https://api.example.com/paid-resource", {
+  method: "GET",
+});
+
+const data = await response.json();
+```
+
+</Step>
+</Steps>
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <SolutionCard title="Agentic Wallets" icon="agentic-wallets" href="/solutions/company-wallets/agentic-wallets" description="Provision agent wallets with scoped signing authority, spending caps, and multi-party consensus." />
+  <FeatureCard title="Transaction Management" icon="switch-horizontal-01" href="/features/transaction-management" description="Sign, broadcast, and track transactions in a single API call with built-in retries." />
+  <FeatureCard title="Gas Sponsorship" icon="bank-note-01" href="/features/transaction-management/broadcasting" description="Eliminate gas costs so agents and end users can transact without holding native tokens." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/quickstart" description="Define granular access controls for every signing action in your organization." />
+</div>
