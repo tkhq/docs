@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_ETH_SEND_TRANSACTION_V2`
+Enum options: `ACTIVITY_TYPE_ETH_SEND_TRANSACTION`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -36,28 +36,40 @@ Unique identifier for a given Organization.
     A wallet or private key address to sign with. This does not support private key IDs.
     </NestedParam>
     
+    <NestedParam parentKey="parameters" childKey="sponsor" type="boolean" required={false} default="">
+    Whether to sponsor this transaction via Gas Station.
+    </NestedParam>
+    
     <NestedParam parentKey="parameters" childKey="caip2" type="enum<string>" required={true} default="">
     Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`, `eip155:137`, `eip155:80002`, `eip155:4217`, `eip155:42431`, `eip155:56`, `eip155:97`
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="sponsor" type="boolean" required={false} default="">
-    Whether to sponsor this transaction via Gas Station. If false or unset, the EOA pays gas. A single call uses EIP-1559; multiple calls use EIP-7702 batch execution via Gas Station.
+    <NestedParam parentKey="parameters" childKey="to" type="string" required={true} default="">
+    Recipient address as a hex string with 0x prefix.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="value" type="string" required={false} default="">
+    Amount of native asset to send in wei.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="data" type="string" required={false} default="">
+    Hex-encoded call data for contract interactions.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="nonce" type="string" required={false} default="">
-    Outer transaction nonce. Omit to auto-fetch.
+    Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="gasLimit" type="string" required={false} default="">
-    Maximum amount of gas for the outer transaction. Omit to auto-estimate.
+    Maximum amount of gas to use for this transaction, for EIP-1559 transactions.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="maxFeePerGas" type="string" required={false} default="">
-    Maximum total fee per gas unit (base fee + priority fee) in wei. Omit to auto-estimate.
+    Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="maxPriorityFeePerGas" type="string" required={false} default="">
-    Maximum priority fee (tip) per gas unit in wei. Omit to auto-estimate.
+    Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="deadline" type="string" required={false} default="">
@@ -65,25 +77,8 @@ Unique identifier for a given Organization.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="gasStationNonce" type="string" required={false} default="">
-    The gas station delegate contract nonce. Only used when sponsor=true. Omit to auto-fetch.
+    The gas station delegate contract nonce. Only used when sponsor=true. Include this if you want maximal security posture.
     </NestedParam>
-    
-    <ParamField body="calls" type="array" required={true} path="parameters.calls">
-      <p>Ordered list of calls to execute. Must contain between 1 and 50 entries. A single entry with sponsor=false uses EIP-1559; multiple entries use EIP-7702 batch execution via Gas Station.</p>
-      <Expandable title="item details">
-        <NestedParam parentKey="parameters.calls" childKey="to" type="string" required={true} default="">
-        Recipient address as a hex string with 0x prefix.
-        </NestedParam>
-        
-        <NestedParam parentKey="parameters.calls" childKey="value" type="string" required={false} default="">
-        Amount of native asset to send in wei.
-        </NestedParam>
-        
-        <NestedParam parentKey="parameters.calls" childKey="data" type="string" required={false} default="">
-        Hex-encoded call data for contract interactions.
-        </NestedParam>
-      </Expandable>
-    </ParamField>
   </Expandable>
 </ParamField>
 <ParamField body="generateAppProofs" type="boolean" required={false}>
@@ -113,54 +108,48 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="ethSendTransactionIntentV2" type="object" required={true}>
-      The ethSendTransactionIntentV2 object
-      <Expandable title="ethSendTransactionIntentV2 details">
-        <NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="from" type="string" required={true}>
+        <NestedParam parentKey="activity.intent" childKey="ethSendTransactionIntent" type="object" required={true}>
+      The ethSendTransactionIntent object
+      <Expandable title="ethSendTransactionIntent details">
+        <NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="from" type="string" required={true}>
 A wallet or private key address to sign with. This does not support private key IDs.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="caip2" type="enum" required={true}>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="sponsor" type="boolean" required={false}>
+Whether to sponsor this transaction via Gas Station.
+</NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="caip2" type="enum" required={true}>
 CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).
   
 Enum options: `eip155:1`, `eip155:11155111`, `eip155:8453`, `eip155:84532`, `eip155:137`, `eip155:80002`, `eip155:4217`, `eip155:42431`, `eip155:56`, `eip155:97`
 
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="sponsor" type="boolean" required={false}>
-Whether to sponsor this transaction via Gas Station. If false or unset, the EOA pays gas. A single call uses EIP-1559; multiple calls use EIP-7702 batch execution via Gas Station.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="nonce" type="string" required={false}>
-Outer transaction nonce. Omit to auto-fetch.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="gasLimit" type="string" required={false}>
-Maximum amount of gas for the outer transaction. Omit to auto-estimate.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="maxFeePerGas" type="string" required={false}>
-Maximum total fee per gas unit (base fee + priority fee) in wei. Omit to auto-estimate.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="maxPriorityFeePerGas" type="string" required={false}>
-Maximum priority fee (tip) per gas unit in wei. Omit to auto-estimate.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="deadline" type="string" required={false}>
-Unix timestamp in seconds for EIP-712 execution deadline. Only used when sponsor=true.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="gasStationNonce" type="string" required={false}>
-The gas station delegate contract nonce. Only used when sponsor=true. Omit to auto-fetch.
-</NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2" childKey="calls" type="array" required={true}>
-      Ordered list of calls to execute. Must contain between 1 and 50 entries. A single entry with sponsor=false uses EIP-1559; multiple entries use EIP-7702 batch execution via Gas Station.
-      <Expandable title="calls details">
-        <NestedParam parentKey="activity.intent.ethSendTransactionIntentV2.calls" childKey="to" type="string" required={true}>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="to" type="string" required={true}>
 Recipient address as a hex string with 0x prefix.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2.calls" childKey="value" type="string" required={false}>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="value" type="string" required={false}>
 Amount of native asset to send in wei.
 </NestedParam>
-<NestedParam parentKey="activity.intent.ethSendTransactionIntentV2.calls" childKey="data" type="string" required={false}>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="data" type="string" required={false}>
 Hex-encoded call data for contract interactions.
 </NestedParam>
-
-      </Expandable>
-    </NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="nonce" type="string" required={false}>
+Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.
+</NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="gasLimit" type="string" required={false}>
+Maximum amount of gas to use for this transaction, for EIP-1559 transactions.
+</NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxFeePerGas" type="string" required={false}>
+Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
+</NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="maxPriorityFeePerGas" type="string" required={false}>
+Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.
+</NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="deadline" type="string" required={false}>
+Unix timestamp in seconds for EIP-712 execution deadline. Only used when sponsor=true.
+</NestedParam>
+<NestedParam parentKey="activity.intent.ethSendTransactionIntent" childKey="gasStationNonce" type="string" required={false}>
+The gas station delegate contract nonce. Only used when sponsor=true. Include this if you want maximal security posture.
+</NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -170,10 +159,10 @@ Hex-encoded call data for contract interactions.
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="ethSendTransactionResultV2" type="object" required={true}>
-      The ethSendTransactionResultV2 object
-      <Expandable title="ethSendTransactionResultV2 details">
-        <NestedParam parentKey="activity.result.ethSendTransactionResultV2" childKey="sendTransactionStatusId" type="string" required={true}>
+        <NestedParam parentKey="activity.result" childKey="ethSendTransactionResult" type="object" required={true}>
+      The ethSendTransactionResult object
+      <Expandable title="ethSendTransactionResult details">
+        <NestedParam parentKey="activity.result.ethSendTransactionResult" childKey="sendTransactionStatusId" type="string" required={true}>
 The send_transaction_status ID associated with the transaction submission
 </NestedParam>
 
@@ -213,26 +202,22 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_ETH_SEND_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_ETH_SEND_TRANSACTION",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
         "from": "<string>",
-        "caip2": "<eip155:1>",
         "sponsor": "<boolean>",
+        "caip2": "<eip155:1>",
+        "to": "<string>",
+        "value": "<string>",
+        "data": "<string>",
         "nonce": "<string>",
         "gasLimit": "<string>",
         "maxFeePerGas": "<string>",
         "maxPriorityFeePerGas": "<string>",
         "deadline": "<string>",
-        "gasStationNonce": "<string>",
-        "calls": [
-            {
-                "to": "<string>",
-                "value": "<string>",
-                "data": "<string>"
-            }
-        ]
+        "gasStationNonce": "<string>"
     }
 }'
 ```
@@ -249,19 +234,17 @@ const turnkeyClient = new Turnkey({
 
 const response = await turnkeyClient.apiClient().ethSendTransaction({
   from: "<string> (A wallet or private key address to sign with. This does not support private key IDs.)",
+  sponsor: true // Whether to sponsor this transaction via Gas Station.,
   caip2: "<eip155:1>" // CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet).,
-  sponsor: true // Whether to sponsor this transaction via Gas Station. If false or unset, the EOA pays gas. A single call uses EIP-1559; multiple calls use EIP-7702 batch execution via Gas Station.,
-  nonce: "<string> (Outer transaction nonce. Omit to auto-fetch.)",
-  gasLimit: "<string> (Maximum amount of gas for the outer transaction. Omit to auto-estimate.)",
-  maxFeePerGas: "<string> (Maximum total fee per gas unit (base fee + priority fee) in wei. Omit to auto-estimate.)",
-  maxPriorityFeePerGas: "<string> (Maximum priority fee (tip) per gas unit in wei. Omit to auto-estimate.)",
+  to: "<string> (Recipient address as a hex string with 0x prefix.)",
+  value: "<string> (Amount of native asset to send in wei.)",
+  data: "<string> (Hex-encoded call data for contract interactions.)",
+  nonce: "<string> (Transaction nonce, for EIP-1559 and Turnkey Gas Station authorizations.)",
+  gasLimit: "<string> (Maximum amount of gas to use for this transaction, for EIP-1559 transactions.)",
+  maxFeePerGas: "<string> (Maximum total fee per gas unit (base fee + priority fee) in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.)",
+  maxPriorityFeePerGas: "<string> (Maximum priority fee (tip) per gas unit in wei. Required for non-sponsored (EIP-1559) transactions. Not used for sponsored transactions.)",
   deadline: "<string> (Unix timestamp in seconds for EIP-712 execution deadline. Only used when sponsor=true.)",
-  gasStationNonce: "<string> (The gas station delegate contract nonce. Only used when sponsor=true. Omit to auto-fetch.)",
-  calls: [{ // Ordered list of calls to execute. Must contain between 1 and 50 entries. A single entry with sponsor=false uses EIP-1559; multiple entries use EIP-7702 batch execution via Gas Station.,
-    to: "<string> (Recipient address as a hex string with 0x prefix.)",
-    value: "<string> (Amount of native asset to send in wei.)",
-    data: "<string> (Hex-encoded call data for contract interactions.)",
-  }]
+  gasStationNonce: "<string> (The gas station delegate contract nonce. Only used when sponsor=true. Include this if you want maximal security posture.)"
 });
 ```
 
@@ -274,7 +257,7 @@ const response = await turnkeyClient.apiClient().ethSendTransaction({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_ETH_SEND_TRANSACTION_V2",
+    "type": "ACTIVITY_TYPE_ETH_SEND_TRANSACTION",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -284,27 +267,23 @@ const response = await turnkeyClient.apiClient().ethSendTransaction({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "ethSendTransactionIntentV2": {
+          "ethSendTransactionIntent": {
             "from": "<string>",
-            "caip2": "<eip155:1>",
             "sponsor": "<boolean>",
+            "caip2": "<eip155:1>",
+            "to": "<string>",
+            "value": "<string>",
+            "data": "<string>",
             "nonce": "<string>",
             "gasLimit": "<string>",
             "maxFeePerGas": "<string>",
             "maxPriorityFeePerGas": "<string>",
             "deadline": "<string>",
-            "gasStationNonce": "<string>",
-            "calls": [
-              {
-                "to": "<string>",
-                "value": "<string>",
-                "data": "<string>"
-              }
-            ]
+            "gasStationNonce": "<string>"
           }
         },
         "result": {
-          "ethSendTransactionResultV2": {
+          "ethSendTransactionResult": {
             "sendTransactionStatusId": "<string>"
           }
         },
