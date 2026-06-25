@@ -1,0 +1,198 @@
+---
+title: "Canton support on Turnkey"
+sidebarTitle: "Canton"
+---
+
+## Address derivation
+
+Canton identities are derived from the Ed25519 curve, which Turnkey fully supports. Rather than deriving a single chain-specific address, Canton uses a two-step process: Turnkey generates an Ed25519 key pair (using `ADDRESS_FORMAT_COMPRESSED` with `CURVE_ED25519`), and the resulting public key is then registered with a specific Canton network node. Registration creates a new **Party** and returns its `PartyId` along with a Canton-internal fingerprint of your public key. The party participates in network activity by identifying itself with its `PartyId` and fingerprint. Note that a party is not a global concept (unlike e.g. ENS) — it lives only on the node where it was registered.
+
+## Transaction construction and signing
+
+Turnkey supports Canton transaction signing through our core signing capabilities, using the `SignRawPayload` endpoint to sign transaction hashes with Ed25519. We have an example repository that demonstrates how to construct and sign Canton transactions:
+
+- [`examples/chain-integrations/with-canton`](https://github.com/tkhq/sdk/tree/main/examples/chain-integrations/with-canton): demonstrates party registration, transaction construction and broadcast on Canton.
+
+## Example
+
+Here's a comprehensive example showing how to register a party and sign a Canton transaction with Turnkey:
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-server";
+import { Curve } from "@turnkey/core";
+import { uint8ArrayFromHexString } from "@turnkey/encoding";
+import { createLedgerApiClient } from "@/api/ledger/client";
+import { v7 as uuidv7 } from "uuid";
+// Initialize the Turnkey client
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+const client = turnkey.apiClient();
+// A Canton Ledger API client (local sandbox, or a live node via CANTON_LEDGER_API_URL)
+const ledgerClient = createLedgerApiClient({
+  baseUrl: process.env.CANTON_LEDGER_API_URL || "http://localhost:6864",
+});
+// 1/ Create a wallet with an Ed25519 account.
+// Canton keys use ADDRESS_FORMAT_COMPRESSED on the Ed25519 curve.
+const { walletId } = await client.createWallet({
+  walletName: "Canton Wallet",
+  accounts: [
+    {
+      curve: Curve.ED25519,
+      pathFormat: "PATH_FORMAT_BIP32",
+      path: "m/44'/0'/0'/0/0",
+      addressFormat: "ADDRESS_FORMAT_COMPRESSED",
+    },
+  ],
+});
+const { accounts } = await client.getWalletAccounts({ walletId });
+const ed25519Account = accounts.find(({ curve }) => curve === Curve.ED25519)!;
+// 2/ Register the public key with a Canton node to create a Party.
+const { data: synchronizersData } = await ledgerClient.GET(
+  "/v2/state/connected-synchronizers",
+);
+const synchronizerId =
+  synchronizersData!.connectedSynchronizers![0].synchronizerId;
+const keyData = Buffer.from(ed25519Account.publicKey!, "hex").toString("base64");
+const { data: partyTopology } = await ledgerClient.POST(
+  "/v2/parties/external/generate-topology",
+  {
+    body: {
+      synchronizer: synchronizerId,
+      partyHint: `party-${uuidv7()}`,
+      publicKey: {
+        keySpec: "SIGNING_KEY_SPEC_EC_CURVE25519",
+        format: "CRYPTO_KEY_FORMAT_RAW",
+        keyData,
+      },
+    },
+  },
+);
+// Sign the topology multi-hash with Turnkey. Ed25519 signatures are the
+// concatenation of r and s (there is no v component).
+const multiHashPayload = Buffer.from(
+  partyTopology!.multiHash,
+  "base64",
+).toString("hex");
+const signedMultiHash = await client.signRawPayload({
+  signWith: ed25519Account.address,
+  payload: multiHashPayload,
+  encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+  hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+});
+const multiHashSignature = uint8ArrayFromHexString(
+  signedMultiHash.r + signedMultiHash.s,
+);
+// Allocate the party on the node. The topology result includes your PartyId
+// and the Canton-internal fingerprint of your public key.
+await ledgerClient.POST("/v2/parties/external/allocate", {
+  body: {
+    waitForAllocation: true,
+    synchronizer: synchronizerId,
+    onboardingTransactions: partyTopology!.topologyTransactions.map(
+      (transaction) => ({ transaction }),
+    ),
+    multiHashSignatures: [
+      {
+        format: "SIGNATURE_FORMAT_CONCAT",
+        signature: Buffer.from(multiHashSignature).toString("base64"),
+        signedBy: partyTopology!.publicKeyFingerprint,
+        signingAlgorithmSpec: "SIGNING_ALGORITHM_SPEC_ED25519",
+      },
+    ],
+  },
+});
+const partyId = partyTopology!.partyId;
+// 3/ Create a user associated with the party.
+const userId = `user-${uuidv7()}`;
+await ledgerClient.POST("/v2/users", {
+  body: { user: { id: userId, partyId } },
+});
+// 4/ Prepare a transaction, then sign its hash with Turnkey.
+const { data: prepared } = await ledgerClient.POST(
+  "/v2/interactive-submission/prepare",
+  {
+    body: {
+      commandId: `command-${uuidv7()}`,
+      synchronizerId,
+      userId,
+      actAs: [partyId],
+      hashingSchemeVersion: "HASHING_SCHEME_VERSION_V3",
+      commands: [
+        // ...your Daml commands, e.g. a CreateCommand on a template
+      ],
+    },
+  },
+);
+// Hash the prepared transaction using the hashing helpers provided in the
+// example repo, then sign the resulting hash.
+const preparedTransactionHash = prepared!.preparedTransactionHash; // base64
+const txPayload = Buffer.from(preparedTransactionHash, "base64").toString("hex");
+const signedTx = await client.signRawPayload({
+  signWith: ed25519Account.address,
+  payload: txPayload,
+  encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+  hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+});
+const txSignature = uint8ArrayFromHexString(signedTx.r + signedTx.s);
+// 5/ Execute the signed transaction.
+await ledgerClient.POST(
+  "/v2/interactive-submission/executeAndWaitForTransaction",
+  {
+    body: {
+      preparedTransaction: prepared!.preparedTransaction,
+      submissionId: `submission-${uuidv7()}`,
+      userId,
+      hashingSchemeVersion: "HASHING_SCHEME_VERSION_V3",
+      deduplicationPeriod: { Empty: {} },
+      partySignatures: {
+        signatures: [
+          {
+            party: partyId,
+            signatures: [
+              {
+                format: "SIGNATURE_FORMAT_CONCAT",
+                signature: Buffer.from(txSignature).toString("base64"),
+                signedBy: partyTopology!.publicKeyFingerprint,
+                signingAlgorithmSpec: "SIGNING_ALGORITHM_SPEC_ED25519",
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+);
+```
+
+## Canton network support
+
+Because there is no public Canton testnet, Turnkey's signing works against:
+
+- A local Canton network (spun up via `docker compose` / `dpm sandbox`)
+- A live Canton node (pointed to via the `CANTON_LEDGER_API_URL` environment variable)
+
+## Key features for Canton
+
+- **Ed25519 Signing**: Turnkey fully supports the Ed25519 curve used by Canton
+- **External party registration**: Register your Turnkey-managed public key with a Canton node to obtain a `PartyId` and fingerprint
+- **Interactive submission support**: Sign prepared transaction hashes for both v2 and v3 hashing schemes
+- **Integration Example**: Our example repository provides a reference implementation for integrating with the Canton ecosystem
+
+## Benefits of using Turnkey with Canton
+
+- **Secure Key Management**: Private keys are securely stored in Turnkey's infrastructure
+- **Policy Controls**: Apply custom policies to authorize signing based on criteria
+- **Developer-Friendly**: Integrate with existing Canton development workflows
+- **Multi-environment Support**: Use the same code across a local sandbox and live nodes
+
+## Daml development
+
+Canton applications are written in the Daml smart contract language. When building Daml applications on Canton, Turnkey can securely manage your private keys for:
+
+- Deploying DARs (Daml Archive packages)
+- Executing commands on Daml contracts
+- Managing external party identities If you're building on Canton and need assistance with your Turnkey integration, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).
