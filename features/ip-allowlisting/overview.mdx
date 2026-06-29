@@ -1,9 +1,9 @@
 ---
-title: "IP Allowlisting"
+title: "Overview"
 description: "Restrict API access to your Turnkey organization based on the source IP address of incoming requests."
 ---
 
-IP Allowlist is a security feature that lets you define a set of trusted CIDR blocks (IP ranges), ensuring that only requests originating from known, authorized networks can interact with your organization's resources.
+IP Allowlist is a security feature that lets you define a set of trusted CIDR blocks (IP ranges) at the parent organization level, ensuring that only requests originating from known, authorized networks can reach your organization's API. This feature applies to the parent organization only; sub-organizations are not subject to IP allowlist enforcement and cannot configure their own allowlists.
 
 <CardGroup cols={2}>
   <Card title="Organization-level" icon="building">
@@ -27,8 +27,9 @@ This feature is ideal for:
   Enabling an organization-level allowlist with no CIDR rules configured will **block all API traffic**. Stage your rules with `enabled: false` first, verify they're correct, then set `enabled: true`.
 </Warning>
 
+- **IP allowlisting applies to the parent organization only.** Sub-organizations do not inherit the parent's allowlist rules and cannot create their own. API requests that authenticate against a sub-organization are not evaluated against any IP allowlist.
 - **The org-level allowlist must be enabled for API key-level rules to take effect.** If the org-level allowlist is disabled, API key-level allowlists are not enforced.
-- **Dashboard actions are never subject to IP allowlisting.** You can always use the Dashboard to manage your configuration, even if you misconfigure your rules.
+- **Dashboard and auth-proxy requests are never subject to IP allowlisting.** You can always use the Dashboard to manage your configuration, even if you misconfigure your rules. Requests signed by your organization's auth-proxy are also exempt.
 - **Unresolvable source IPs default to fail-closed.** In rare cases, intermediary infrastructure may prevent Turnkey from resolving a request's source IP. The `onEvaluationError` parameter controls whether these requests are allowed (fail-open) or denied (fail-closed). It defaults to `DENY`.
 
 <Note>
@@ -69,7 +70,7 @@ This feature is ideal for:
 ### Precedence rules
 
 - The org-level allowlist **must be enabled** for API key-level allowlists to be evaluated.
-- If an API key has its own allowlist, only that key-level allowlist is checked for requests using that key.
+- If an API key has its own allowlist with one or more rules, only that key-level allowlist is checked for requests using that key. If the key-level allowlist exists but has no rules, evaluation falls back to the org-level allowlist.
 - If an API key does not have its own allowlist, the org-level allowlist is checked (if enabled).
 - If neither exists, requests are allowed from any IP.
 
@@ -129,7 +130,7 @@ Creates or updates an IP allowlist. If one already exists for the specified scop
     ],
     "enabled": true,
     "publicKey": "<optional-api-key-public-key>",
-    "onEvaluationError": "ALLOW"
+    "onEvaluationError": "DENY"
   }
 }
 ```
@@ -138,7 +139,7 @@ Creates or updates an IP allowlist. If one already exists for the specified scop
 | --- | --- | --- | --- |
 | `type` | string | Yes | Must be `"ACTIVITY_TYPE_SET_IP_ALLOWLIST"` |
 | `timestampMs` | string | Yes | Current timestamp in milliseconds (epoch) — used for request liveness verification |
-| `organizationId` | string | Yes | Your Turnkey organization ID |
+| `organizationId` | string | Yes | Your parent organization ID |
 | `parameters.rules` | array | Yes | Array of allowlist rules. Can be empty. |
 | `parameters.rules[].cidr` | string | Yes | CIDR block (e.g., `"192.168.1.0/24"`, `"2001:db8::/48"`) |
 | `parameters.rules[].label` | string | No | Optional human-readable label (e.g., `"Office VPN"`) |
@@ -188,7 +189,7 @@ Deletes an IP allowlist and all its associated rules. After removal, access fall
 | --- | --- | --- | --- |
 | `type` | string | Yes | Must be `"ACTIVITY_TYPE_REMOVE_IP_ALLOWLIST"` |
 | `timestampMs` | string | Yes | Current timestamp in milliseconds (epoch) |
-| `organizationId` | string | Yes | Your Turnkey organization ID |
+| `organizationId` | string | Yes | Your parent organization ID |
 | `parameters.publicKey` | string | No | If omitted, removes the org-level allowlist. If set, removes the allowlist for that specific API key. |
 
 ### Get IP allowlist
@@ -204,7 +205,7 @@ Retrieves the current IP allowlist and rules for an organization or specific API
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `organizationId` | string | Yes | Your Turnkey organization ID |
+| `organizationId` | string | Yes | Your parent organization ID |
 | `publicKey` | string | No | If provided, returns the allowlist for that API key. If omitted, returns the org-level allowlist. |
 
 ```json Response
