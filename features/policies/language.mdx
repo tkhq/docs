@@ -313,12 +313,21 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                              | UPDATE |         ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT |
 |                              | DELETE |         ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT |
 
-<Note> ** Legacy features, deprecated in the latest SDKs. </Note>
+<Note>
+  ** In the Activity breakdown table above, `**` marks legacy features deprecated in the latest
+  SDKs. This note applies only to that table.
+</Note>
 
 ### Activity kinds
 
 `activity.kind` groups all versions of an activity under one version-agnostic value. The table
 below lists each kind and the activity types it matches.
+
+<Note>
+  This table covers policy-governed activities only. Activities governed by the root quorum (see
+  [Root quorum activities](#root-quorum-activities)) are not policy-governed and have no
+  `activity.kind`.
+</Note>
 
 | Kind | Matches Activity Types |
 | ---- | ---------------------- |
@@ -420,6 +429,23 @@ below lists each kind and the activity types it matches.
   Prefer `activity.kind` over `activity.type` when you want a policy to apply across all versions
   of an activity. `activity.type` targets one exact version and will not match newer versions
   introduced later.
+</Note>
+
+### Choosing between `type`, `kind`, and `resource` + `action`
+
+There are three ways to target activities in a policy condition. Pick based on how broad you want
+the match to be:
+
+| Field(s) | Scope | Use when |
+| --- | --- | --- |
+| `activity.type` | One exact activity **version** (e.g. `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`) | You need to pin a specific version. Most precise, but **brittle**: it will not match when the activity is upgraded to a new version. |
+| `activity.kind` | One logical activity, **all versions** (e.g. `SIGN_TRANSACTION`) | You want to allow/deny a specific activity and keep the policy working across future version upgrades. **Recommended default** for activity-specific policies. |
+| `activity.resource` + `activity.action` | A **group** of activities sharing a resource and action (e.g. all `CREATE` on `CREDENTIAL`) | You want a coarse, category-level rule spanning many activities at once. |
+
+<Note>
+  Rule of thumb: use `activity.kind` to target a single activity (version-agnostic), and
+  `activity.resource` + `activity.action` to target a broad category. Reach for `activity.type`
+  only when you deliberately need one exact version.
 </Note>
 
 ## Appendix
