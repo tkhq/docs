@@ -24,23 +24,26 @@ cargo install tvc
 
 ## Create your first verifiable app
 
-<Steps>
-<Step title="Login">
+### Login
+
 With your new organization ID ready, login through the CLI.
 
 ```bash
 tvc login
 ```
 
-You will be asked to paste in your organization ID, and prompted to add a new generated API key to your organization.
+You will be asked to paste in your organization ID, and prompted to add a new generated API key to your organization. When adding it in the dashboard's **Create API Key** modal, click **Advanced Settings**, then **Generate API key via CLI**, and paste in the public key printed by `tvc login`. See [Create an API key](/get-started/quickstart#create-an-api-key) for the full walkthrough.
 
 <Note>
 This step generates an operator P256 keypair locally for you. It is stored in `~/.config/turnkey/orgs/<name>/operator.json`. 
 The public key will be used in the following steps.
 </Note>
 
-</Step>
+Once you're logged in, choose how you'd like to create your app and deployment. The **Dashboard** and **CLI** paths perform the same actions — pick whichever you prefer and follow it end to end.
 
+<Tabs>
+<Tab title="Dashboard">
+<Steps>
 <Step title="Create a new TVC app">
 
 Visit the [TVC dashboard](https://app.turnkey.com/dashboard/v2/tvc) and click on "Create app".
@@ -58,7 +61,53 @@ A modal should appear:
 Name your app something identifiable; for this demo it can be `"TVC Hello World"`.
 Paste in your operator public key from the TVC CLI login step, then click "Create new TVC App" to create your app.
 
-<Accordion title="CLI steps (same functionality as dashboard)">
+</Step>
+
+<Step title="Create new TVC deployment">
+
+Once your app is created, click into it on the [dashboard](https://app.turnkey.com/dashboard/v2/tvc). Click on "Create deployment"
+to start a new deployment for your app. 
+
+<img src="/assets/files/tvc_create-deployment.png" alt="Create deployment button" width="200"/>
+
+This should open a modal with all your deployment settings:
+
+<Frame>
+  ![Deployment settings modal](/assets/files/tvc_deployment-modal.png)
+</Frame>
+
+If you do not have your own app, try our helloworld template:
+- **Container Image URL**: `ghcr.io/tkhq/helloworld:latest@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd`
+  - TVC requires a single-platform `linux/amd64` image digest, not a multi-platform index digest. If you are building your own image, use `docker buildx imagetools inspect <image>` to find the `linux/amd64`-specific digest.
+  - If you are bringing private container images, TVC supports uploading pull secrets by encrypting them to a known public key. This will be used by TVC infrastructure to access your container images. Read more about pull secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+- **Executable Path**: `/tvc_app`
+- **Executable Args**: `--host 0.0.0.0 --port 3000`. These arguments are passed to the executable on startup. Here we are telling the `helloworld` binary to start on port 3000
+- **Public ingress port**: `3000`. This is the port that will be exposed to the outside world
+- **Health check port**: `3000`. Our `tvc_app` binary answers healthchecks on `/health` on the same port (3000)
+- **Health check type**: `HTTP`.
+- **Executable digest**: the hash of the binary file inside the container. For our helloworld example this should be `cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1`. You can compute it locally with:
+  ```
+  # Pull the container image, create a "tmp-extract" container, and extract our helloworld binary
+  docker create --name tmp-extract ghcr.io/tkhq/helloworld@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd /bin/true \
+        && docker cp tmp-extract:/tvc_app ./tvc_app \
+        && docker rm tmp-extract
+
+  # Locally compute the digest of the binary file
+  sha256sum ./tvc_app
+  cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1
+  ```
+  This digest will be to ensure TVC is running the code you expect.
+
+When ready, click "Deploy TVC App"!
+
+</Step>
+</Steps>
+</Tab>
+
+<Tab title="CLI">
+<Steps>
+<Step title="Create a new TVC app">
+
 Create a local app template by running
 
 ```
@@ -105,48 +154,11 @@ tvc app create --config-file my-app-template.json
 
 This creates your app, and saves its quorum key and manifest settings to the Turnkey Verifiable Cloud platform.
 Check out your new app on the [TVC dashboard](https://app.turnkey.com/dashboard/v2/tvc).
-</Accordion>
+
 </Step>
 
 <Step title="Create new TVC deployment">
 
-Once your app is created, click into it on the [dashboard](https://app.turnkey.com/dashboard/v2/tvc). Click on "Create deployment"
-to start a new deployment for your app. 
-
-<img src="/assets/files/tvc_create-deployment.png" alt="Create deployment button" width="200"/>
-
-This should open a modal with all your deployment settings:
-
-<Frame>
-  ![Deployment settings modal](/assets/files/tvc_deployment-modal.png)
-</Frame>
-
-If you do not have your own app, try our helloworld template:
-- **Container Image URL**: `ghcr.io/tkhq/helloworld:latest@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd`
-  - TVC requires a single-platform `linux/amd64` image digest, not a multi-platform index digest. If you are building your own image, use `docker buildx imagetools inspect <image>` to find the `linux/amd64`-specific digest.
-  - If you are bringing private container images, TVC supports uploading pull secrets by encrypting them to a known public key. This will be used by TVC infrastructure to access your container images. Read more about pull secrets [here](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
-- **Executable Path**: `/tvc_app`
-- **Executable Args**: `--host 0.0.0.0 --port 3000`. These arguments are passed to the executable on startup. Here we are telling the `helloworld` binary to start on port 3000
-- **Public ingress port**: `3000`. This is the port that will be exposed to the outside world
-- **Health check port**: `3000`. Our `tvc_app` binary answers healthchecks on `/health` on the same port (3000)
-- **Health check type**: `HTTP`.
-- **Executable digest**: the hash of the binary file inside the container. For our helloworld example this should be `cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1`. You can compute it locally with:
-  ```
-  # Pull the container image, create a "tmp-extract" container, and extract our helloworld binary
-  docker create --name tmp-extract ghcr.io/tkhq/helloworld@sha256:c9c18f78b05d29ebfc2c60ab7143df4b0a808765a34d6a88bbf99523f473cafd /bin/true \
-        && docker cp tmp-extract:/tvc_app ./tvc_app \
-        && docker rm tmp-extract
-
-  # Locally compute the digest of the binary file
-  sha256sum ./tvc_app
-  cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1
-  ```
-  This digest will be to ensure TVC is running the code you expect.
-
-When ready, click "Deploy TVC App"!
-
-
-<Accordion title="CLI steps (same functionality as dashboard)">
 Start with this local-only step, which generates a deployment template:
 
 ```bash
@@ -199,11 +211,15 @@ Config: deploy-YYYY-MM-DD.json
 ```
 
 Find the newly created deployment by clicking into your app on the [TVC dashboard](https://app.turnkey.com/dashboard/v2/tvc).
-</Accordion>
 
 </Step>
+</Steps>
+</Tab>
+</Tabs>
 
-<Step title="Approve deployment">
+Once your deployment is created, the remaining steps are the same for both paths.
+
+### Approve deployment
 
 By design, your deployment is not live yet. TVC requires approvals by the manifest set to fully deploy your application.
 Your app should be at the `Approval Required` stage on the dashboard:
@@ -257,9 +273,7 @@ In the dashboard you will see "Action Required" transition to "none". This means
 
 Our infrastructure automatically provisions network ingress for your application. You can visit `https://app-<YOUR_APP_UUID>.turnkey.cloud` to interact with it. If you used our `helloworld` template, try visiting `/time` in your browser!
 
-</Step>
-
-<Step title="Verify your deployment">
+### Verify your deployment
 
 Once the deployment is live, confirm it is healthy by hitting the `/health` endpoint. Before doing so, check the deployment details from the previous step and ensure **Healthy Replicas** reads `3/3`. If replicas aren't fully up yet, the endpoint may return a 404.
 
@@ -272,9 +286,6 @@ A healthy deployment returns:
 ```json
 {"status":"ok"}
 ```
-
-</Step>
-</Steps>
 
 ## Next steps
 
