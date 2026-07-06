@@ -1,0 +1,127 @@
+---
+title: "Get TVC Deployment debug logs"
+description: "Get a bounded window of application logs from a debug-mode TVC deployment. Returned lines are collected from every running replica and sorted by platform timestamp."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="get_tvc_deployment_debug_logs" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="deploymentId" type="string" required={true}>
+
+Unique identifier for a given TVC Deployment. The deployment must be running in debug mode.
+</ParamField>
+
+<ParamField body="tailLines" type="number" required={false}>
+
+Limit returned history to the last N lines per replica. If unset or zero, no tail-line limit is applied.
+</ParamField>
+
+<ParamField body="sinceSeconds" type="string" required={false}>
+
+Return logs newer than this many seconds ago. If unset or zero, no since-time limit is applied. Useful for clients that poll to follow logs.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="entries" type="array" required={true}>
+  Application log entries sorted by platform timestamp.
+  <Expandable title="entries details">
+    <NestedParam parentKey="entries" childKey="line" type="object" required={true}>
+      line field
+      <Expandable title="line details">
+        <NestedParam parentKey="entries.line" childKey="content" type="string" required={true}>
+One log line, exactly as the application printed it (without the trailing newline)
+</NestedParam>
+<NestedParam parentKey="entries.line" childKey="ts" type="object" required={false}>
+      ts field
+      <Expandable title="ts details">
+        <NestedParam parentKey="entries.line.ts" childKey="seconds" type="string" required={true}>
+seconds field
+</NestedParam>
+<NestedParam parentKey="entries.line.ts" childKey="nanos" type="string" required={true}>
+nanos field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="entries" childKey="replicaLabel" type="string" required={true}>
+Public replica label that produced this log line, for example 'replica 2/3'.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_tvc_deployment_debug_logs \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "deploymentId": "<string>",
+    "tailLines": "<number>",
+    "sinceSeconds": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().getTvcDeploymentDebugLogs({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  deploymentId: "<string> (Unique identifier for a given TVC Deployment. The deployment must be running in debug mode.)",
+  tailLines: 0 // Limit returned history to the last N lines per replica. If unset or zero, no tail-line limit is applied.,
+  sinceSeconds: "<string> (Return logs newer than this many seconds ago. If unset or zero, no since-time limit is applied. Useful for clients that poll to follow logs.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "entries": [
+    {
+      "line": {
+        "content": "<string>",
+        "ts": {
+          "seconds": "<string>",
+          "nanos": "<string>"
+        }
+      },
+      "replicaLabel": "<string>"
+    }
+  ]
+}
+```
+
+</ResponseExample>
