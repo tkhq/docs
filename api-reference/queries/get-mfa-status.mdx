@@ -1,0 +1,152 @@
+---
+title: "Get MFA status"
+description: "Get the MFA status of an activity for a specific user or all voting users."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="get_mfa_status" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given organization.
+</ParamField>
+
+<ParamField body="activityId" type="string" required={true}>
+
+The unique identifier of the activity to get MFA status for.
+</ParamField>
+
+<ParamField body="userId" type="string" required={false}>
+
+Optional user ID to filter MFA status for a specific user.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="mfaStatuses" type="array" required={true}>
+  A list of MFA statuses for the activity's votes.
+  <Expandable title="mfaStatuses details">
+    <NestedParam parentKey="mfaStatuses" childKey="mfaPolicyId" type="string" required={true}>
+Unique identifier for a given MFA Policy.
+</NestedParam>
+<NestedParam parentKey="mfaStatuses" childKey="userId" type="string" required={true}>
+Unique identifier for a given User.
+</NestedParam>
+<NestedParam parentKey="mfaStatuses" childKey="satisfied" type="boolean" required={true}>
+Whether the MFA policy requirements are currently satisfied.
+</NestedParam>
+<NestedParam parentKey="mfaStatuses" childKey="satisfiedMethods" type="array" required={true}>
+      A list of authentication methods already satisfied for this MFA policy.
+      <Expandable title="satisfiedMethods details">
+        <NestedParam parentKey="mfaStatuses.satisfiedMethods" childKey="type" type="enum" required={true}>
+type field
+  
+Enum options: `AUTHENTICATION_TYPE_EMAIL_OTP`, `AUTHENTICATION_TYPE_SMS_OTP`, `AUTHENTICATION_TYPE_PASSKEY`, `AUTHENTICATION_TYPE_API_KEY`, `AUTHENTICATION_TYPE_OAUTH`, `AUTHENTICATION_TYPE_SESSION`
+
+</NestedParam>
+<NestedParam parentKey="mfaStatuses.satisfiedMethods" childKey="id" type="string" required={false}>
+Optional specific authenticator ID required (e.g., for requiring a specific session profile id)
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="mfaStatuses" childKey="requiredMethods" type="array" required={true}>
+      An ordered list of authentication requirements needed to satisfy this MFA policy.
+      <Expandable title="requiredMethods details">
+        <NestedParam parentKey="mfaStatuses.requiredMethods" childKey="any" type="array" required={true}>
+      A list of authentication methods for this MFA step. If only one method is provided, it is required. If multiple are provided, the user must satisfy ANY one of them.
+      <Expandable title="any details">
+        <NestedParam parentKey="mfaStatuses.requiredMethods.any" childKey="type" type="enum" required={true}>
+type field
+  
+Enum options: `AUTHENTICATION_TYPE_EMAIL_OTP`, `AUTHENTICATION_TYPE_SMS_OTP`, `AUTHENTICATION_TYPE_PASSKEY`, `AUTHENTICATION_TYPE_API_KEY`, `AUTHENTICATION_TYPE_OAUTH`, `AUTHENTICATION_TYPE_SESSION`
+
+</NestedParam>
+<NestedParam parentKey="mfaStatuses.requiredMethods.any" childKey="id" type="string" required={false}>
+Optional specific authenticator ID required (e.g., for requiring a specific session profile id)
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_mfa_status \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "activityId": "<string>",
+    "userId": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().getMfaStatus({
+  organizationId: "<string> (Unique identifier for a given organization.)",
+  activityId: "<string> (The unique identifier of the activity to get MFA status for.)",
+  userId: "<string> (Optional user ID to filter MFA status for a specific user.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "mfaStatuses": [
+    {
+      "mfaPolicyId": "<string>",
+      "userId": "<string>",
+      "satisfied": "<boolean>",
+      "satisfiedMethods": [
+        {
+          "type": "<AUTHENTICATION_TYPE_EMAIL_OTP>",
+          "id": "<string>"
+        }
+      ],
+      "requiredMethods": [
+        {
+          "any": [
+            {
+              "type": "<AUTHENTICATION_TYPE_EMAIL_OTP>",
+              "id": "<string>"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+</ResponseExample>
