@@ -1,6 +1,588 @@
 ---
-title: "Golang"
-description: "Turnkey offers native tooling for interacting with the API using Golang. See [https://github.com/tkhq/go-sdk](https://github.com/tkhq/go-sdk) for more details."
-mode: wide
+title: "Go server"
+description: "Server-side Go SDK for interacting with the Turnkey API"
+sidebarTitle: "Go server"
 ---
 
+[github.com/tkhq/go-sdk/v2](https://pkg.go.dev/github.com/tkhq/go-sdk/v2) lets you build server-side functionality for
+applications that interact with the Turnkey API. It exposes a client that constructs requests
+to the Turnkey API and authenticates, or stamps, them with a valid API key. This is normally the
+API key of your root organization.
+
+## Installation
+
+```bash
+go get github.com/tkhq/go-sdk/v2
+```
+
+## Initializing
+
+Build a stamper from your API private key, then pass it to `NewClient` along with your
+organization ID. The base URL defaults to `https://api.turnkey.com`, so you only need to set it
+when targeting another environment.
+
+```go
+import (
+	"os"
+
+	turnkey "github.com/tkhq/go-sdk/v2"
+)
+
+stamper, err := turnkey.NewAPIKeyStamper(os.Getenv("TURNKEY_API_PRIVATE_KEY"))
+
+client, err := turnkey.NewClient(
+	stamper,
+	os.Getenv("TURNKEY_ORGANIZATION_ID"),
+)
+```
+
+<Note>
+The import is aliased to `turnkey` because the module path ends in `/v2`. Without the alias,
+some tooling assumes the package name is `v2`.
+</Note>
+
+### Parameters
+
+For the stamper constructor, `turnkey.NewAPIKeyStamper`:
+
+<ParamField
+  body="privateKey"
+  type="string"
+  required={true}
+>
+The API Private Key used to sign requests. This is normally the API Private Key for your root
+organization.
+</ParamField>
+
+<ParamField
+  body="opts"
+  type="...APIKeyStamperOption"
+>
+Optional configuration for the stamper. Use `turnkey.WithSignatureScheme` to set the signature
+scheme. The default is `tkcrypto.SchemeP256`.
+</ParamField>
+
+For the client constructor, `turnkey.NewClient`:
+
+<ParamField
+  body="stamper"
+  type="Stamper"
+  required={true}
+>
+The request stamper that signs API requests. Create one with
+`turnkey.NewAPIKeyStamper(apiPrivateKey)`. The public key is derived from the private key, so
+there is no separate public-key parameter. You can also provide your own implementation of the
+`Stamper` interface.
+</ParamField>
+
+<ParamField
+  body="organizationId"
+  type="string"
+  required={true}
+>
+The default organization ID for requests made by this client. Individual request structs can
+override it with their own `OrganizationID` field when targeting a sub-organization.
+</ParamField>
+
+<ParamField
+  body="options"
+  type="...OptionFunc"
+>
+Optional variadic configuration functions. See [Configuration options](#configuration-options).
+</ParamField>
+
+### Stamper interface
+
+The client accepts any value that implements the `Stamper` interface:
+
+```go
+type Stamper interface {
+	Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error)
+}
+```
+
+This makes stamping a replaceable boundary. `NewAPIKeyStamper` is the standard server-side
+implementation for API keys, but the same client can be wired to other signing mechanisms without
+changing how you call Turnkey endpoints.
+
+That is powerful when your application needs a different trust model:
+
+- Use an API key stamper for ordinary backend service calls.
+- Build an attested stamper when requests must be signed only after enclave, device, or workload
+  attestation succeeds.
+- Build a WebAuthn-backed stamper when request authorization should come from a passkey or
+  authenticator ceremony.
+- Route stamping through your own key-management or policy layer while keeping the generated SDK
+  client and typed request/response models unchanged.
+
+Custom stampers let you keep Turnkey API calls ergonomic while moving the signing decision to the
+place that best matches your security boundary.
+
+### Configuration options
+
+Pass any number of `With*` functions as trailing arguments to `NewClient`.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `WithBaseURL(string)` | `https://api.turnkey.com` | Overrides the Turnkey API base URL. |
+| `WithAuthProxyBaseURL(string)` | `https://authproxy.turnkey.com` | Overrides the Turnkey Auth Proxy base URL. |
+| `WithAuthProxyConfigID(string)` | None | Sets the default Auth Proxy config ID header value. |
+| `WithHTTPClient(*http.Client)` | `http.DefaultClient` | Sets the HTTP client used by the SDK. |
+| `WithHTTPRetries(int)` | `3` | Sets the number of retries for transient HTTP errors and network failures. |
+| `WithHTTPRetryDelay(time.Duration)` | `100 * time.Millisecond` | Sets the base delay for HTTP retry backoff. |
+| `WithActivityPollInterval(time.Duration)` | `time.Second` | Sets the polling interval for asynchronous activities. |
+| `WithActivityPollTimeout(time.Duration)` | `2 * time.Minute` | Sets the maximum time to wait for asynchronous activities. |
+| `WithMFAPollInterval(time.Duration)` | Off unless configured | Sets the MFA polling interval. |
+| `WithMFAPollTimeout(time.Duration)` | Off unless configured | Sets the MFA polling timeout. |
+| `WithMFAPolling(interval, timeout time.Duration)` | Off unless configured | Sets both MFA polling values. Both values must be greater than zero. |
+| `WithConsensusPolling(interval, timeout time.Duration)` | Off unless configured | Enables consensus polling. Both values must be greater than zero. |
+| `WithLogger(Logger)` | Default stdout logger | Sets a custom logger implementing `Printf(format string, v ...interface{})`. |
+
+```go
+client, err := turnkey.NewClient(
+	stamper,
+	os.Getenv("TURNKEY_ORGANIZATION_ID"),
+	turnkey.WithHTTPRetries(5),
+	turnkey.WithActivityPollTimeout(3*time.Minute),
+)
+```
+
+## Making requests
+
+Unlike some of our other SDKs, there is no separate `apiClient()` object. The client returned by
+`NewClient` is the API client. Every Turnkey endpoint is a method on it, and every method takes a
+`context.Context` and a typed request struct, returning a typed response and an error.
+
+```go
+resp, err := client.GetWallets(ctx, turnkey.GetWalletsRequest{})
+if err != nil {
+	// handle error
+}
+
+for _, wallet := range resp.Wallets {
+	fmt.Println(wallet.WalletID)
+}
+```
+
+The `OrganizationID` field on every request defaults to the client's organization ID. Set it only
+when you need to target a sub-organization. `TimestampMs` is set automatically.
+
+Common methods include:
+
+| Method | Use |
+| --- | --- |
+| `GetWallets` | List wallets in an organization. |
+| `CreateSubOrganization` | Create a sub-organization. |
+| `CreateWallet` | Create a wallet. |
+| `CreateWalletAccounts` | Create wallet accounts. |
+| `SignRawPayload` | Sign a raw payload. |
+| `SignTransaction` | Sign a transaction. |
+| `EmailAuth`, `InitOTP`, `VerifyOTP`, `OTPLogin`, `OAuthLogin` | Build authentication flows. |
+
+### Context and cancellation
+
+Because every method takes a `context.Context`, you get per-call timeouts and cancellation:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+resp, err := client.GetWallets(ctx, turnkey.GetWalletsRequest{})
+```
+
+### Activity polling
+
+Methods that submit asynchronous activities poll to completion automatically. You receive the final
+result rather than a pending activity.
+
+```go
+resp, err := client.CreateWallet(ctx, turnkey.CreateWalletRequest{
+	WalletName: "Treasury",
+	Accounts: []turnkey.WalletAccountParams{
+		{
+			Curve:         turnkey.CurveSecp256K1,
+			PathFormat:    turnkey.PathFormatBip32,
+			Path:          "m/44'/60'/0'/0/0",
+			AddressFormat: turnkey.AddressFormatEthereum,
+		},
+	},
+})
+if err != nil {
+	// handle error
+}
+
+fmt.Println(resp.WalletID)
+```
+
+Tune polling with `WithActivityPollInterval` and `WithActivityPollTimeout`. If an activity reaches
+a failed or rejected terminal state, the SDK returns an `ActivityFailedError`. If an activity needs
+consensus approval, the SDK returns an `ActivityRequiresApprovalError`.
+
+## Signing without submitting
+
+Some server flows need a request signed by your root organization's key but submitted by another
+party, such as a browser client. For these flows, use the `Stamp*` variant of a method. Instead of
+sending the request to Turnkey, it returns a `*SignedRequest` that you can forward.
+
+```go
+appName := "Example App"
+
+signed, err := client.StampEmailAuth(ctx, turnkey.EmailAuthRequest{
+	Email:           "user@example.com",
+	TargetPublicKey: userPublicKey,
+	EmailCustomization: turnkey.EmailAuthCustomizationParams{
+		AppName: &appName,
+	},
+})
+if err != nil {
+	// handle error
+}
+
+// Submit signed.URL, signed.Body, and signed.Stamp.HeaderValue from the caller that should
+// send the request to Turnkey.
+```
+
+<ParamField
+  body="URL"
+  type="string"
+  required={true}
+>
+The Turnkey endpoint URL for the signed request.
+</ParamField>
+
+<ParamField
+  body="Body"
+  type="string"
+  required={true}
+>
+The serialized JSON request body that was signed.
+</ParamField>
+
+<ParamField
+  body="Stamp"
+  type="*Stamp"
+>
+The authentication stamp. Add `Stamp.HeaderName` as the HTTP header name and `Stamp.HeaderValue`
+as the HTTP header value when submitting the request.
+</ParamField>
+
+<ParamField
+  body="Type"
+  type="RequestType"
+>
+The request type, such as `query` or `activity`.
+</ParamField>
+
+## Authentication flows
+
+The SDK exposes methods for common authentication flows. These methods are regular client calls:
+pass a `context.Context`, pass the typed request struct, and handle the typed response.
+
+### Auth Proxy
+
+For deployments that use the Turnkey Auth Proxy, the SDK provides `AuthProxy*` methods that route
+authentication flows through the proxy. Configure the proxy with `WithAuthProxyBaseURL` and
+`WithAuthProxyConfigID`.
+
+```go
+client, err := turnkey.NewClient(
+	stamper,
+	os.Getenv("TURNKEY_ORGANIZATION_ID"),
+	turnkey.WithAuthProxyConfigID(os.Getenv("TURNKEY_AUTH_PROXY_CONFIG_ID")),
+)
+```
+
+<Note>
+These methods are calls to the Turnkey Auth Proxy. They are not a proxy server that you host.
+</Note>
+
+| Method | Use |
+| --- | --- |
+| `AuthProxyInitOTP`, `AuthProxyInitOTPV2` | Send an email or SMS OTP code. |
+| `AuthProxyVerifyOTP`, `AuthProxyVerifyOTPV2` | Verify an OTP code. |
+| `AuthProxyOTPLogin`, `AuthProxyOTPLoginV2` | Exchange a verification token for a session. |
+| `AuthProxyOAuth2Authenticate` | Exchange an OAuth 2.0 auth code for a Turnkey-issued OIDC token. |
+| `AuthProxyOAuthLogin` | Create a session from an OIDC token. |
+| `AuthProxySignup`, `AuthProxySignupV2` | Create an account. |
+| `AuthProxyGetAccount`, `AuthProxyGetWalletKitConfig` | Fetch account and Wallet Kit config data. |
+
+Core Auth Proxy parameters:
+
+<ParamField
+  body="Contact"
+  type="string"
+  required={true}
+>
+Email address or phone number for `AuthProxyInitOTP`.
+</ParamField>
+
+<ParamField
+  body="OTPType"
+  type="string"
+  required={true}
+>
+OTP delivery channel for `AuthProxyInitOTP`, such as `OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`.
+</ParamField>
+
+<ParamField
+  body="OTPCode"
+  type="string"
+  required={true}
+>
+Code sent to the user's contact for `AuthProxyVerifyOTP`.
+</ParamField>
+
+<ParamField
+  body="OTPID"
+  type="string"
+  required={true}
+>
+OTP flow ID returned by the init step.
+</ParamField>
+
+<ParamField
+  body="OidcToken"
+  type="string"
+  required={true}
+>
+Base64-encoded OIDC token for `AuthProxyOAuthLogin`.
+</ParamField>
+
+<ParamField
+  body="PublicKey"
+  type="string"
+  required={true}
+>
+Client-side public key to bind to the resulting session.
+</ParamField>
+
+<ParamField
+  body="Optional fields"
+  type="ClientSignature, InvalidateExisting, OrganizationID, EmailCustomization"
+>
+Use these to prove client-side authorization, invalidate previous sessions, target a specific
+organization, or customize OTP email delivery.
+</ParamField>
+
+### OTP
+
+OTP auth is a three-step flow: send a code, verify the code, then exchange the verification token
+for a session.
+
+```go
+initResp, err := client.InitOTP(ctx, turnkey.InitOTPRequest{
+	AppName: "Example App",
+	Contact: "user@example.com",
+	OTPType: "OTP_TYPE_EMAIL",
+})
+```
+
+| Step | Method | Result |
+| --- | --- | --- |
+| Send code | `InitOTP` | Returns an OTP flow ID and encryption target bundle. |
+| Verify code | `VerifyOTP` | Returns a verification token. |
+| Create session | `OTPLogin` | Returns a session JWT. |
+
+Required parameters:
+
+<ParamField
+  body="AppName"
+  type="string"
+  required={true}
+>
+Application name shown in the OTP message for `InitOTP`.
+</ParamField>
+
+<ParamField
+  body="Contact"
+  type="string"
+  required={true}
+>
+Email address or phone number to send the OTP code to.
+</ParamField>
+
+<ParamField
+  body="OTPType"
+  type="string"
+  required={true}
+>
+OTP delivery channel, such as `OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`.
+</ParamField>
+
+<ParamField
+  body="EncryptedOTPBundle"
+  type="string"
+  required={true}
+>
+Encrypted code bundle passed to `VerifyOTP`. It is encrypted using the target bundle from
+`InitOTP`.
+</ParamField>
+
+<ParamField
+  body="OTPID"
+  type="string"
+  required={true}
+>
+OTP flow ID returned by `InitOTP`.
+</ParamField>
+
+<ParamField
+  body="ClientSignature"
+  type="ClientSignature"
+  required={true}
+>
+Signature over the verification token ID and public key for `OTPLogin`.
+</ParamField>
+
+<ParamField
+  body="PublicKey"
+  type="string"
+  required={true}
+>
+Client-side public key to bind to the resulting session.
+</ParamField>
+
+<ParamField
+  body="VerificationToken"
+  type="string"
+  required={true}
+>
+Signed token returned by `VerifyOTP` and consumed by `OTPLogin`.
+</ParamField>
+
+Common optional fields include `OrganizationID`, `ExpirationSeconds`, `InvalidateExisting`,
+`SessionProfileID`, `EmailCustomization`, `SmsCustomization`, `OTPLength`, and
+`UserIdentifier`.
+
+### OAuth
+
+Use `OAuthLogin` when you already have an OIDC token and want to create a Turnkey session bound to
+a client-side public key. If you need Turnkey's Auth Proxy to exchange an OAuth authorization code
+for an OIDC token first, use `AuthProxyOAuth2Authenticate`.
+
+```go
+resp, err := client.OAuthLogin(ctx, turnkey.OAuthLoginRequest{
+	OidcToken: oidcToken,
+	PublicKey: sessionPublicKey,
+})
+```
+
+<ParamField
+  body="OidcToken"
+  type="string"
+  required={true}
+>
+Base64-encoded OIDC token from an OAuth provider or Auth Proxy.
+</ParamField>
+
+<ParamField
+  body="PublicKey"
+  type="string"
+  required={true}
+>
+Client-side public key to bind to the resulting session.
+</ParamField>
+
+Common optional fields include `OrganizationID`, `ExpirationSeconds`, `InvalidateExisting`, and
+`SessionProfileID`.
+
+### Email auth
+
+Use `EmailAuth` to send an authentication credential bundle to a user's email address. The bundle
+is encrypted to the target public key.
+
+```go
+resp, err := client.EmailAuth(ctx, turnkey.EmailAuthRequest{
+	Email:           "user@example.com",
+	TargetPublicKey: targetPublicKey,
+	EmailCustomization: emailCustomization,
+})
+```
+
+<ParamField
+  body="Email"
+  type="string"
+  required={true}
+>
+Email address of the authenticating user.
+</ParamField>
+
+<ParamField
+  body="EmailCustomization"
+  type="EmailAuthCustomizationParams"
+  required={true}
+>
+Email customization parameters. `AppName` is required by the email template.
+</ParamField>
+
+<ParamField
+  body="TargetPublicKey"
+  type="string"
+  required={true}
+>
+Client-side public key that the email auth credential bundle will be encrypted to.
+</ParamField>
+
+Common optional fields include `OrganizationID`, `APIKeyName`, `ExpirationSeconds`,
+`InvalidateExisting`, `ReplyToEmailAddress`, `SendFromEmailAddress`, and
+`SendFromEmailSenderName`.
+
+## Error handling
+
+Every method returns `(*Response, error)`. Check the error before using the response. API-level
+failures do not panic.
+
+```go
+resp, err := client.GetWallets(ctx, turnkey.GetWalletsRequest{})
+if err != nil {
+	var requestErr *turnkey.RequestError
+	if errors.As(err, &requestErr) {
+		log.Printf("turnkey request failed: status=%d body=%s", requestErr.StatusCode, string(requestErr.Body))
+		return
+	}
+
+	var activityErr *turnkey.ActivityFailedError
+	if errors.As(err, &activityErr) {
+		log.Printf("activity failed: id=%s status=%s", activityErr.ActivityID, activityErr.Status)
+		return
+	}
+
+	log.Fatalf("get wallets: %v", err)
+}
+```
+
+Typed errors include:
+
+| Error | When it is returned |
+| --- | --- |
+| `RequestError` | A non-2xx Turnkey API response. Includes `StatusCode`, parsed RPC status, and raw body. |
+| `ActivityFailedError` | An activity reaches a failed or rejected terminal state. |
+| `ActivityRequiresApprovalError` | An activity requires consensus approval before it can complete. |
+
+Use `turnkey.ActivityFromApprovalError(err)` to recover the full activity from an
+`ActivityRequiresApprovalError` when you need to drive your own approval flow.
+
+## Signature schemes
+
+`NewAPIKeyStamper` defaults to the P256 scheme. To use a different API key scheme, import the
+crypto module and pass `WithSignatureScheme`:
+
+```go
+import (
+	turnkey "github.com/tkhq/go-sdk/v2"
+	tkcrypto "github.com/tkhq/go-sdk/crypto"
+)
+
+stamper, err := turnkey.NewAPIKeyStamper(
+	apiPrivateKey,
+	turnkey.WithSignatureScheme(tkcrypto.SchemeSECP256K1),
+)
+```
+
+Supported schemes:
+
+| Scheme | Value |
+| --- | --- |
+| `tkcrypto.SchemeP256` | `SIGNATURE_SCHEME_TK_API_P256` |
+| `tkcrypto.SchemeSECP256K1` | `SIGNATURE_SCHEME_TK_API_SECP256K1` |
+| `tkcrypto.SchemeED25519` | `SIGNATURE_SCHEME_TK_API_ED25519` |
