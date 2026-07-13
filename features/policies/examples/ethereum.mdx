@@ -192,22 +192,12 @@ To allow signing only when the first permitted token is USDC:
 
 <Note>
   Array elements can be accessed by index (`[0]`, `[1]`, etc.). The condition `message['permitted'][0]['token'] == '0xA0b8...'`
-  only checks the first entry — any additional tokens in the array are not evaluated. Checking multiple positions
-  explicitly (message['permitted'][0]['token'] == '0xA0b8...' && message['permitted'][1]['token'] == '0xA0b8...') works,
-  but is fragile — adding a third token bypasses the check entirely. Use .all() to enforce a condition across every element regardless of array size.
+  checks the first entry. You can also check specific positions explicitly
+  (for example, `message['permitted'][0]['token'] == '0xA0b8...' && message['permitted'][1]['token'] == '0xA0b8...'`).
+  Use `.all()` when you want to apply the same token check across the entire `permitted` array. A `.all()` example is included below.
 </Note>
 
 #### Iterating over array fields
-
-**Enforce batch size with .count():**
-
-```json
-{
-  "policyName": "Limit Permit2 batch to 3 token approvals",
-  "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 3 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
-}
-```
 
 **Whitelist a specific token across all approvals with .all():**
 
@@ -219,39 +209,29 @@ To allow signing only when the first permitted token is USDC:
 }
 ```
 
-**Whitelist multiple tokens with .all():**
+**Allow Permit2 batches with two or fewer token permissions:**
 
 ```json
 {
-  "policyName": "Allow Permit2 batch only for USDC or USDT",
+  "policyName": "Allow Permit2 batches with <= 2 token permissions",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' || p['token'] == '0xdAC17F958D2ee523a2206206994597C13D831ec7') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+**Allow token permissions below 100 USDC:**
+
+```json
+{
+  "policyName": "Allow USDC token permissions below 100 USDC",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
 <Note>
 `in` works for integer fields. For string fields such as token addresses, use `||` instead.
 </Note>
-
-**Combine size limit and token whitelist:**
-
-```json
-{
-  "policyName": "Allow Permit2 batch — max 3 approvals, USDC only",
-  "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 3 && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
-}
-```
-
-**Require at least one approval below an amount threshold with .any():**
-
-```json
-{
-  "policyName": "Require at least one Permit2 approval below 1 USDC",
-  "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['amount'] < 1000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
-}
-```
 
 ### Deny signing of `NO_OP` keccak256 payloads
 
