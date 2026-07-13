@@ -70,6 +70,40 @@ To create a valid, WebAuthn authenticator stamped request follow these steps:
    </Step>
 </Steps>
 
+### Attested
+
+Attested stamps allow authenticators that cannot directly sign requests (Email OTP, SMS OTP, and OAuth) to prove identity. Instead of the public key itself being a stored credential, the public key is _attested_ by a token that proves ownership of an identity (an email address, phone number, or OAuth provider).
+
+To create a valid attested stamp:
+<Steps>
+   <Step>
+      Generate a P256 key pair on the client
+   </Step>
+   <Step>
+      Obtain a token that attests this key pair belongs to the identity. The token must contain the client public key, cryptographically binding the key to the identity:
+
+         * For **Email OTP / SMS OTP**: a `verificationToken` issued by Turnkey after a successful OTP verification. The token embeds the client `public_key` alongside the contact (email or phone).
+         * For **OAuth**: an `oidcToken` from the OAuth provider (e.g., Google). The token's `nonce` must be set to the hash of the client public key.
+   </Step>
+   <Step>
+      Sign the JSON-encoded POST body with the client private key to produce a `signature`
+   </Step>
+   <Step>
+      Create a JSON-encoded stamp:
+
+         * `publicKey`: the client public key (hex-encoded)
+         * `signature`: the signature over the request body (hex-encoded)
+         * `publicKeyAttestation`: the token (verification token or OIDC token) that ties the public key to the identity
+         * `scheme`: the attestation scheme. `STAMP_ATTESTED_SCHEME_P256_VERIFICATION_TOKEN` for Email/SMS OTP, or `STAMP_ATTESTED_SCHEME_P256_OIDC` for OAuth
+   </Step>
+   <Step>
+      Attach the JSON-encoded stamp to your request as a `X-Stamp-Attested` header
+   </Step>
+   <Step>
+      Submit the stamped request to Turnkey's API
+   </Step>
+</Steps>
+
 ### Stampers
 
 Our [JS SDK](https://github.com/tkhq/sdk) and [CLI](https://github.com/tkhq/tkcli) abstract request stamping for you. If you choose to use an independent client, you will need to implement this yourself. For reference, check out our implementations:
