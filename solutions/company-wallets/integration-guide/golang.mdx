@@ -1,8 +1,10 @@
 ---
-title: "Go server"
+title: "Go"
 description: "Server-side Go SDK for interacting with the Turnkey API"
-sidebarTitle: "Go server"
+sidebarTitle: "Go"
 ---
+
+## Overview 
 
 [github.com/tkhq/go-sdk/v2](https://pkg.go.dev/github.com/tkhq/go-sdk/v2) lets you build server-side functionality for
 applications that interact with the Turnkey API. It exposes a client that constructs requests
@@ -11,6 +13,8 @@ API key of your root organization.
 
 ## Installation
 
+Run `go get` from inside a Go module:
+
 ```bash
 go get github.com/tkhq/go-sdk/v2
 ```
@@ -18,8 +22,7 @@ go get github.com/tkhq/go-sdk/v2
 ## Initializing
 
 Build a stamper from your API private key, then pass it to `NewClient` along with your
-organization ID. The base URL defaults to `https://api.turnkey.com`, so you only need to set it
-when targeting another environment.
+organization ID.
 
 ```go
 import (
@@ -93,7 +96,8 @@ Optional variadic configuration functions. See [Configuration options](#configur
 
 ### Stamper interface
 
-The client accepts any value that implements the `Stamper` interface:
+Every request the client sends is authenticated, or *stamped*, before it leaves your process. The
+client delegates that step to any value implementing the `Stamper` interface:
 
 ```go
 type Stamper interface {
@@ -101,22 +105,138 @@ type Stamper interface {
 }
 ```
 
-This makes stamping a replaceable boundary. `NewAPIKeyStamper` is the standard server-side
-implementation for API keys, but the same client can be wired to other signing mechanisms without
-changing how you call Turnkey endpoints.
+`Stamp` receives the serialized request body and returns a `*turnkey.Stamp`, which carries the HTTP
+header the client attaches to the outbound request:
 
-That is powerful when your application needs a different trust model:
+```go
+type Stamp struct {
+	HeaderName  string // e.g. "X-Stamp" or "X-Stamp-WebAuthn"
+	HeaderValue string // the stamp payload for that header
+}
+```
 
-- Use an API key stamper for ordinary backend service calls.
-- Build an attested stamper when requests must be signed only after enclave, device, or workload
-  attestation succeeds.
-- Build a WebAuthn-backed stamper when request authorization should come from a passkey or
-  authenticator ceremony.
-- Route stamping through your own key-management or policy layer while keeping the generated SDK
-  client and typed request/response models unchanged.
+Because this is the only contract the client depends on, stamping is a replaceable boundary.
+`NewAPIKeyStamper` is the standard server-side implementation for API keys, but you can supply any
+implementation to move the signing decision to the place that best matches your security boundary:
 
-Custom stampers let you keep Turnkey API calls ergonomic while moving the signing decision to the
-place that best matches your security boundary.
+- An **API key stamper** (the built-in default) for ordinary backend service calls.
+- A **policy or KMS stamper** that routes signing through your own key-management or approval layer.
+- A **WebAuthn-backed stamper** when request authorization should come from a passkey or
+  authenticator ceremony. See [Example: WebAuthn stamper](#example-webauthn-stamper).
+
+#### Implementing a custom stamper
+
+A stamper only needs to sign the exact bytes it is handed and return the header the API expects.
+The skeleton below shows the shape every implementation shares — take the body, produce a
+signature with whatever mechanism you control, and package it as a `Stamp`:
+
+```go
+type Signer interface {
+	Sign(ctx context.Context, body []byte) (string, error)
+}
+
+type CustomStamper struct {
+	signer Signer // your signing mechanism (KMS, HSM, remote service, etc.)
+}
+
+func (s *CustomStamper) Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error) {
+	// Sign the request body exactly as received — do not re-marshal it.
+	stamp, err := s.signer.Sign(ctx, body)
+	if err != nil {
+		return nil, fmt.Errorf("stamp request: %w", err)
+	}
+
+	return &turnkey.Stamp{
+		HeaderName:  "X-Stamp",
+		HeaderValue: stamp,
+	}, nil
+}
+```
+
+After you have a `signer` value that implements the `Signer` interface, pass the custom stamper to
+`NewClient` in place of the API key stamper:
+
+```go
+customStamper := &CustomStamper{signer: signer}
+
+client, err := turnkey.NewClient(
+	customStamper,
+	os.Getenv("TURNKEY_ORGANIZATION_ID"),
+)
+```
+
+<Note>
+Sign the `body` bytes as received. Re-serializing the request can reorder fields or change
+whitespace, which invalidates the signature Turnkey verifies against.
+</Note>
+
+### Example: WebAuthn stamper
+
+A WebAuthn stamper authorizes requests with a passkey or hardware authenticator instead of a static
+API key. The ceremony that produces the assertion runs wherever the authenticator lives — usually a
+browser or native client — so the stamper's job is to derive the WebAuthn challenge from the request
+body, obtain an assertion, and encode it into the `X-Stamp-WebAuthn` header the API expects.
+
+The Go SDK does not currently expose a dedicated WebAuthn stamper constructor, so this example shows
+the interface you would implement around your own WebAuthn transport. The stamp payload uses the
+generated `turnkey.WebAuthnStamp` type.
+
+```go
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+
+	turnkey "github.com/tkhq/go-sdk/v2"
+)
+
+// Authenticator runs a WebAuthn assertion over the given challenge and returns
+// the signed result. Implement this against your browser or device transport.
+type Authenticator interface {
+	Assert(ctx context.Context, challenge []byte) (*turnkey.WebAuthnStamp, error)
+}
+
+type WebAuthnStamper struct {
+	authenticator Authenticator
+}
+
+func NewWebAuthnStamper(a Authenticator) *WebAuthnStamper {
+	return &WebAuthnStamper{authenticator: a}
+}
+
+func (s *WebAuthnStamper) Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error) {
+	hash := sha256.Sum256(body)
+	challenge := []byte(hex.EncodeToString(hash[:]))
+
+	assertion, err := s.authenticator.Assert(ctx, challenge)
+	if err != nil {
+		return nil, fmt.Errorf("webauthn assertion: %w", err)
+	}
+
+	value, err := json.Marshal(assertion)
+	if err != nil {
+		return nil, fmt.Errorf("encode webauthn stamp: %w", err)
+	}
+
+	return &turnkey.Stamp{
+		HeaderName:  "X-Stamp-WebAuthn",
+		HeaderValue: string(value),
+	}, nil
+}
+```
+
+Wire it into the client the same way as any other stamper:
+
+```go
+webauthnStamper := NewWebAuthnStamper(authenticator)
+
+client, err := turnkey.NewClient(webauthnStamper, os.Getenv("TURNKEY_ORGANIZATION_ID"))
+```
+
+The client now attaches a WebAuthn stamp to every request without any change to how you call
+Turnkey endpoints, the typed request and response models are identical to the API key path.
 
 ### Configuration options
 
@@ -164,8 +284,8 @@ for _, wallet := range resp.Wallets {
 }
 ```
 
-The `OrganizationID` field on every request defaults to the client's organization ID. Set it only
-when you need to target a sub-organization. `TimestampMs` is set automatically.
+The `OrganizationID` field defaults to the client's organization ID. Set it only when you need to
+target a sub-organization. For activity requests, `TimestampMs` is set automatically.
 
 Common methods include:
 
@@ -238,8 +358,8 @@ if err != nil {
 	// handle error
 }
 
-// Submit signed.URL, signed.Body, and signed.Stamp.HeaderValue from the caller that should
-// send the request to Turnkey.
+// Submit signed.URL and signed.Body from the caller that should send the request to Turnkey.
+// Add signed.Stamp.HeaderName as the HTTP header name and signed.Stamp.HeaderValue as its value.
 ```
 
 <ParamField
@@ -280,9 +400,10 @@ pass a `context.Context`, pass the typed request struct, and handle the typed re
 
 ### Auth Proxy
 
-For deployments that use the Turnkey Auth Proxy, the SDK provides `AuthProxy*` methods that route
-authentication flows through the proxy. Configure the proxy with `WithAuthProxyBaseURL` and
-`WithAuthProxyConfigID`.
+If your deployment uses the Turnkey Auth Proxy, configure the proxy config ID once with
+`WithAuthProxyConfigID`, then use the corresponding `AuthProxy*` method for the auth step you want
+to run. The most common server-side use is OTP, because it lets your backend trigger email or SMS
+codes without exposing a root organization API key to the client.
 
 ```go
 client, err := turnkey.NewClient(
@@ -290,79 +411,18 @@ client, err := turnkey.NewClient(
 	os.Getenv("TURNKEY_ORGANIZATION_ID"),
 	turnkey.WithAuthProxyConfigID(os.Getenv("TURNKEY_AUTH_PROXY_CONFIG_ID")),
 )
+
+initResp, err := client.AuthProxyInitOTP(ctx, turnkey.AuthProxyInitOTPRequest{
+	Contact: "user@example.com",
+	OTPType: "OTP_TYPE_EMAIL",
+})
 ```
 
 <Note>
-These methods are calls to the Turnkey Auth Proxy. They are not a proxy server that you host.
+These methods call Turnkey's hosted Auth Proxy. They are not a proxy server that you host. Keep this
+section as a configuration pattern: OTP, OAuth, and email auth parameters mirror the direct flows
+documented below, so they are not repeated here.
 </Note>
-
-| Method | Use |
-| --- | --- |
-| `AuthProxyInitOTP`, `AuthProxyInitOTPV2` | Send an email or SMS OTP code. |
-| `AuthProxyVerifyOTP`, `AuthProxyVerifyOTPV2` | Verify an OTP code. |
-| `AuthProxyOTPLogin`, `AuthProxyOTPLoginV2` | Exchange a verification token for a session. |
-| `AuthProxyOAuth2Authenticate` | Exchange an OAuth 2.0 auth code for a Turnkey-issued OIDC token. |
-| `AuthProxyOAuthLogin` | Create a session from an OIDC token. |
-| `AuthProxySignup`, `AuthProxySignupV2` | Create an account. |
-| `AuthProxyGetAccount`, `AuthProxyGetWalletKitConfig` | Fetch account and Wallet Kit config data. |
-
-Core Auth Proxy parameters:
-
-<ParamField
-  body="Contact"
-  type="string"
-  required={true}
->
-Email address or phone number for `AuthProxyInitOTP`.
-</ParamField>
-
-<ParamField
-  body="OTPType"
-  type="string"
-  required={true}
->
-OTP delivery channel for `AuthProxyInitOTP`, such as `OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`.
-</ParamField>
-
-<ParamField
-  body="OTPCode"
-  type="string"
-  required={true}
->
-Code sent to the user's contact for `AuthProxyVerifyOTP`.
-</ParamField>
-
-<ParamField
-  body="OTPID"
-  type="string"
-  required={true}
->
-OTP flow ID returned by the init step.
-</ParamField>
-
-<ParamField
-  body="OidcToken"
-  type="string"
-  required={true}
->
-Base64-encoded OIDC token for `AuthProxyOAuthLogin`.
-</ParamField>
-
-<ParamField
-  body="PublicKey"
-  type="string"
-  required={true}
->
-Client-side public key to bind to the resulting session.
-</ParamField>
-
-<ParamField
-  body="Optional fields"
-  type="ClientSignature, InvalidateExisting, OrganizationID, EmailCustomization"
->
-Use these to prove client-side authorization, invalidate previous sessions, target a specific
-organization, or customize OTP email delivery.
-</ParamField>
 
 ### OTP
 
@@ -415,7 +475,7 @@ OTP delivery channel, such as `OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`.
   required={true}
 >
 Encrypted code bundle passed to `VerifyOTP`. It is encrypted using the target bundle from
-`InitOTP`.
+`InitOTP` and includes the OTP code and client-side public key.
 </ParamField>
 
 <ParamField
@@ -457,8 +517,7 @@ Common optional fields include `OrganizationID`, `ExpirationSeconds`, `Invalidat
 ### OAuth
 
 Use `OAuthLogin` when you already have an OIDC token and want to create a Turnkey session bound to
-a client-side public key. If you need Turnkey's Auth Proxy to exchange an OAuth authorization code
-for an OIDC token first, use `AuthProxyOAuth2Authenticate`.
+a client-side public key.
 
 ```go
 resp, err := client.OAuthLogin(ctx, turnkey.OAuthLoginRequest{
@@ -472,7 +531,7 @@ resp, err := client.OAuthLogin(ctx, turnkey.OAuthLoginRequest{
   type="string"
   required={true}
 >
-Base64-encoded OIDC token from an OAuth provider or Auth Proxy.
+Base64-encoded OIDC token from an OAuth provider.
 </ParamField>
 
 <ParamField
