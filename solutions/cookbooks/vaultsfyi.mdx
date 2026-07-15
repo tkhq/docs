@@ -1,37 +1,49 @@
 ---
-title: 'Use Turnkey wallets with vaults.fyi'
-sidebarTitle: "vaults.fyi integration"
+title: "Use Turnkey wallets with vaults.fyi"
+sidebarTitle: "Vaults.fyi integration"
 ---
-
-# Use Turnkey wallets with vaults.fyi
 
 ## Overview
 
-[vaults.fyi](https://vaults.fyi) is the infrastructure layer for DeFi yield. One API gives you discovery, ready-to-sign transaction payloads, and position tracking across 80+ protocols and 1,000+ yield strategies on Ethereum, Base, Arbitrum, Optimism, Polygon, and 15+ other networks. Coverage spans stablecoin vaults (Morpho, Sky, Aave, Euler, Spark), vaults accepting liquid staking collateral (wstETH, rETH), and emerging strategies as soon as curators launch them.
+This guide shows how to combine Turnkey wallets with the vaults.fyi API to discover yields, build
+deposit and withdraw transactions, and execute them under a Turnkey policy that restricts signing to
+approved vault contracts.
 
-vaults.fyi powers Beholder, Kraken's non-custodial DeFi hub at [beholder.kraken.com](https://beholder.kraken.com).
-
-This guide shows how to combine Turnkey wallets with the vaults.fyi API to discover yields, build deposit and withdraw transactions, and execute them under a Turnkey policy that restricts signing to approved vault contracts.
+[vaults.fyi](https://vaults.fyi) is an infrastructure layer for DeFi yield. One API provides
+discovery, ready-to-sign transaction payloads, and position tracking across 80+ protocols and 1,000+
+yield strategies on Ethereum, Base, Arbitrum, Optimism, Polygon, and 15+ other networks. Coverage
+spans stablecoin vaults (Morpho, Sky, Aave, Euler, Spark), vaults accepting liquid staking
+collateral (wstETH, rETH), and emerging strategies as soon as curators launch them.
 
 ### Direct-to-protocol, with no wrapper contract
 
-vaults.fyi returns calldata against the underlying protocol contracts directly. The user's position is identical to one they would hold by interacting with Morpho, Sky, or Aave from any other wallet. There is no intermediary proxy holding funds on the user's behalf, no idle cash buffer dragging APY, and no required user-facing fee.
+vaults.fyi returns calldata against the underlying protocol contracts directly. The user's position
+is identical to one they would hold by interacting with Morpho, Sky, or Aave from any other wallet.
+There is no intermediary proxy holding funds on the user's behalf, no idle cash buffer dragging APY,
+and no required user-facing fee.
 
 This has two consequences worth understanding before you integrate:
 
-1. **No lock-in for your users.** If you stop using vaults.fyi, every existing user position remains a real, addressable position in the canonical vault. Users can continue to manage it from any tool that supports the underlying protocol.
-2. **Your portfolio view sees every existing position.** The positions endpoint reads on-chain state directly across every supported protocol, so it returns positions the user already holds in DeFi outside your app, not only the ones they deposited through your integration.
+1. **No lock-in for your users.** If you stop using vaults.fyi, every existing user position remains
+   a real, addressable position in the canonical vault. Users can continue to manage it from any
+   tool that supports the underlying protocol.
+2. **Your portfolio view sees every existing position.** The positions endpoint reads on-chain state
+   directly across every supported protocol, so it returns positions the user already holds in DeFi
+   outside your app, not only the ones they deposited through your integration.
 
 ## Getting started
 
 Before you begin, complete the [Turnkey Quickstart](/getting-started/quickstart). You should have:
 
-* A Turnkey **organization ID**
-* A **root user** with an API key pair
-* A **non-root user** with a separate API key pair, which we'll restrict with a policy below
-* A **wallet with an Ethereum account** funded with ETH for gas and USDC on Base Mainnet
+- A Turnkey **organization ID**
+- A **root user** with an API key pair
+- A **non-root user** with a separate API key pair, which we'll restrict with a policy below
+- A **wallet with an Ethereum account** funded with ETH for gas and USDC on Base Mainnet
 
 Sign up at the [vaults.fyi portal](https://portal.vaults.fyi) to get a `VAULTS_FYI_API_KEY`.
+
+The working example can be found
+[here](https://github.com/tkhq/sdk/tree/main/examples/defi/with-vaultsfyi).
 
 ## Install dependencies
 
@@ -51,9 +63,14 @@ const vaultsFyi = new VaultsSdk({
 
 ## Setting up the policy for the non-root user
 
-We'll restrict the non-root signer to only the contract addresses that vaults.fyi will actually target for a given vault. The simplest approach is an address allowlist.
+We'll restrict the non-root signer to only the contract addresses that vaults.fyi will actually
+target for a given vault. The simplest approach is an address allowlist.
 
-For most ERC-4626 vaults (Morpho, Aave, Euler), the deposit targets the vault contract directly. But some protocols route through intermediary contracts. For example, Veda Boring Vaults route deposits through a Teller contract whose address differs from the vault. Rather than hardcoding addresses, we do a dry-run: call the vaults.fyi deposit and redeem endpoints, collect the `tx.to` addresses from the responses, and build the policy from those.
+For most ERC-4626 vaults (Morpho, Aave, Euler), the deposit targets the vault contract directly. But
+some protocols route through intermediary contracts. For example, Veda Boring Vaults route deposits
+through a Teller contract whose address differs from the vault. Rather than hardcoding addresses, we
+do a dry-run: call the vaults.fyi deposit and redeem endpoints, collect the `tx.to` addresses from
+the responses, and build the policy from those.
 
 ```tsx theme={"system"}
 import { Turnkey } from "@turnkey/sdk-server";
@@ -86,9 +103,7 @@ const [deposit, redeem] = await Promise.all([
 
 // Extract unique tx.to addresses (typically: asset contract + vault or routing contract)
 const targets = [
-  ...new Set(
-    [...deposit.actions, ...redeem.actions].map((a) => a.tx.to.toLowerCase()),
-  ),
+  ...new Set([...deposit.actions, ...redeem.actions].map((a) => a.tx.to.toLowerCase())),
 ];
 const addressList = targets.map((a) => `'${a}'`).join(", ");
 
@@ -101,11 +116,15 @@ const { policyId } = await turnkeyClient.createPolicy({
 });
 ```
 
-Because vaults.fyi handles all protocol-specific encoding internally, the same address allowlist works regardless of which protocol or curator the vault belongs to. There is no need to enumerate per-protocol function selectors. To support more vaults, run the dry-run for each vault or extend the allowlist.
+Because vaults.fyi handles all protocol-specific encoding internally, the same address allowlist
+works regardless of which protocol or curator the vault belongs to. There is no need to enumerate
+per-protocol function selectors. To support more vaults, run the dry-run for each vault or extend
+the allowlist.
 
 ## Set up the Turnkey signer
 
-We'll use `@turnkey/viem` to create a Turnkey custom signer backed by the **non-root** API key, so every transaction is evaluated against the policy above.
+We'll use `@turnkey/viem` to create a Turnkey custom signer backed by the **non-root** API key, so
+every transaction is evaluated against the policy above.
 
 ```tsx theme={"system"}
 import { createAccount } from "@turnkey/viem";
@@ -142,7 +161,8 @@ const userAddress = turnkeyAccount.address;
 
 ## Build and execute a deposit
 
-`getActions` returns the ordered list of transactions required to perform an action against a vault. For a deposit, this is typically an ERC-20 approval followed by the vault deposit call.
+`getActions` returns the ordered list of transactions required to perform an action against a vault.
+For a deposit, this is typically an ERC-20 approval followed by the vault deposit call.
 
 ```tsx theme={"system"}
 const NETWORK = "base";
@@ -180,11 +200,16 @@ for (const step of actions.slice(currentActionIndex)) {
 }
 ```
 
-The calldata targets the canonical vault contract (or the protocol's routing contract). The resulting position is held by the user's Turnkey-controlled address against the underlying protocol, with no proxy holding funds on their behalf.
+The calldata targets the canonical vault contract (or the protocol's routing contract). The
+resulting position is held by the user's Turnkey-controlled address against the underlying protocol,
+with no proxy holding funds on their behalf.
 
 ## Check positions
 
-`getPositions` reads on-chain state and returns every vault position the user holds across every supported network and protocol, including positions the user opened outside your app. This is the call to power a portfolio view that reflects the user's full DeFi footprint, not only the deposits they made through your integration.
+`getPositions` reads on-chain state and returns every vault position the user holds across every
+supported network and protocol, including positions the user opened outside your app. This is the
+call to power a portfolio view that reflects the user's full DeFi footprint, not only the deposits
+they made through your integration.
 
 ```tsx theme={"system"}
 const { data: positions } = await vaultsFyi.getPositions({
@@ -201,7 +226,8 @@ for (const p of positions) {
 
 ## Withdraw
 
-Use `getActions` with the `redeem` action. Pass `all: true` to redeem the full position, or `amount` for a specific share amount.
+Use `getActions` with the `redeem` action. Pass `all: true` to redeem the full position, or `amount`
+for a specific share amount.
 
 ```tsx theme={"system"}
 const { currentActionIndex, actions } = await vaultsFyi.getActions({
@@ -228,11 +254,15 @@ for (const step of actions.slice(currentActionIndex)) {
 }
 ```
 
-For protocols with redemption cooldowns (Sky sUSDS, Ethena sUSDe, and similar), the action enum also exposes `request-redeem`, `start-redeem-cooldown`, and `claim-redeem`. Check `getTransactionsContext` for the current step the user needs to take.
+For protocols with redemption cooldowns (Sky sUSDS, Ethena sUSDe, and similar), the action enum also
+exposes `request-redeem`, `start-redeem-cooldown`, and `claim-redeem`. Check
+`getTransactionsContext` for the current step the user needs to take.
 
 ## Setting up the policy for reward claims
 
-Reward claim transactions might target different contracts than deposit and redeem. Use the same dry-run approach: fetch claimable rewards, build the claim transactions, and extract the `tx.to` addresses for the policy.
+Reward claim transactions might target different contracts than deposit and redeem. Use the same
+dry-run approach: fetch claimable rewards, build the claim transactions, and extract the `tx.to`
+addresses for the policy.
 
 ```tsx theme={"system"}
 const rewardsContext = await vaultsFyi.getRewardsTransactionsContext({
@@ -248,9 +278,7 @@ if (baseRewards.length > 0) {
     query: { claimIds },
   });
 
-  const targets = [
-    ...new Set(claim.base.actions.map((a) => a.tx.to.toLowerCase())),
-  ];
+  const targets = [...new Set(claim.base.actions.map((a) => a.tx.to.toLowerCase()))];
   const addressList = targets.map((a) => `'${a}'`).join(", ");
 
   const { policyId } = await turnkeyClient.createPolicy({
@@ -276,7 +304,8 @@ const baseRewards = rewardsContext.claimable.base ?? [];
 const claimIds = baseRewards.map((r) => r.claimId);
 ```
 
-Then build and execute the claim transactions. The response is keyed by network; each network has its own `currentActionIndex` and `actions` array.
+Then build and execute the claim transactions. The response is keyed by network; each network has
+its own `currentActionIndex` and `actions` array.
 
 ```tsx theme={"system"}
 if (claimIds.length > 0) {
@@ -301,9 +330,14 @@ if (claimIds.length > 0) {
 
 vaults.fyi gives integrators two independent revenue streams. Use either, both, or neither.
 
-**Curator-side rebates.** Curators with rebate agreements in place route a share of their performance fees back to you on attributed deposits, settled automatically. The user pays the same fee they would pay going direct to the protocol, so this revenue stream costs your user nothing.
+**Curator-side rebates.** Curators with rebate agreements in place route a share of their
+performance fees back to you on attributed deposits, settled automatically. The user pays the same
+fee they would pay going direct to the protocol, so this revenue stream costs your user nothing.
 
-**Optional integrator-set user fees.** If you want to charge your users on top of the underlying yield, you can set any fee you choose, from zero to whatever the market will bear. This is fully optional and entirely your call. There is no minimum, no required cut, and no wrapper contract intermediating the deposit.
+**Optional integrator-set user fees.** If you want to charge your users on top of the underlying
+yield, you can set any fee you choose, from zero to whatever the market will bear. This is fully
+optional and entirely your call. There is no minimum, no required cut, and no wrapper contract
+intermediating the deposit.
 
 Configure both from the [vaults.fyi portal](https://portal.vaults.fyi).
 
@@ -311,8 +345,11 @@ Configure both from the [vaults.fyi portal](https://portal.vaults.fyi).
 
 You've now learned how to:
 
-* Discover the actual contract addresses vaults.fyi will target and build a Turnkey policy from them automatically
-* Build and execute deposit, redeem, and reward-claim transactions against the canonical vault contracts directly
-* Track positions across every supported network
+- Discover the actual contract addresses vaults.fyi will target and build a Turnkey policy from them
+  automatically
+- Build and execute deposit, redeem, and reward-claim transactions against the canonical vault
+  contracts directly
+- Track positions across every supported network
 
-For the full API reference, see [docs.vaults.fyi](https://docs.vaults.fyi) and the live OpenAPI spec at `https://api.vaults.fyi/v2/documentation/`.
+For the full API reference, see [docs.vaults.fyi](https://docs.vaults.fyi) and the live OpenAPI spec
+at `https://api.vaults.fyi/v2/documentation/`.
