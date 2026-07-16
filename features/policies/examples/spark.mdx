@@ -38,7 +38,8 @@ leaf keys to use the `signing_leaf` variant.
 {
   "policyName": "Allow transfers of approved Spark leaves",
   "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_TRANSFER' && activity.params.transfer.leaves.count() > 0 && activity.params.transfer.leaves.all(leaf, leaf.old_leaf_derivation.type == 'signing_leaf' && leaf.new_leaf_derivation.type == 'signing_leaf' && leaf.leaf_id in ['<LEAF_ID_1>', '<LEAF_ID_2>'])"
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_TRANSFER' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.transfer.leaves.count() > 0 && activity.params.transfer.leaves.all(leaf, leaf.old_leaf_derivation.type == 'signing_leaf' && leaf.new_leaf_derivation.type == 'signing_leaf' && leaf.leaf_id in ['<LEAF_ID_1>', '<LEAF_ID_2>'])"
 }
 ```
 
@@ -48,7 +49,8 @@ leaf keys to use the `signing_leaf` variant.
 
 This policy requires every signature in the batch to use a signing-leaf derivation and include an
 adaptor public key. An omitted adaptor public key evaluates to an empty string and fails the
-condition. Adaptor-key presence does not identify the business operation being authorized.
+condition. A non-empty adaptor public key confirms that adaptor signing is requested, but does not
+bind the signature to a particular swap, transfer, counterparty, or amount.
 
 ```json
 {
@@ -65,7 +67,8 @@ condition. Adaptor-key presence does not identify the business operation being a
 {
   "policyName": "Allow FROST signing for approved Spark leaves",
   "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'signing_leaf' && sig.derivation.signing_leaf.leaf_id in ['<LEAF_ID_1>', '<LEAF_ID_2>'])"
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'signing_leaf' && sig.derivation.signing_leaf.leaf_id in ['<LEAF_ID_1>', '<LEAF_ID_2>'])"
 }
 ```
 
@@ -78,7 +81,8 @@ Always pair `static_deposit.index` with `derivation.type == 'static_deposit'`. A
 {
   "policyName": "Allow FROST signing for static deposit index 0",
   "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'static_deposit' && sig.derivation.static_deposit.index == 0)"
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'static_deposit' && sig.derivation.static_deposit.index == 0)"
 }
 ```
 
@@ -102,11 +106,16 @@ from the section above.
 
 #### Allow Lightning receive preparation for approved operators
 
+Bind every approved operator ID to its expected encryption public key. The enclave encrypts each
+share to the key supplied in the request; an operator ID by itself does not authenticate that key.
+This example also pins the threshold and recipient count so the request contains exactly the
+approved operator set.
+
 ```json
 {
   "policyName": "Allow Spark Lightning receives with approved operators",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.lightning_receive.operator_recipients.count() > 0 && activity.params.lightning_receive.operator_recipients.all(recipient, recipient.operator_id in ['<OPERATOR_ID_1>', '<OPERATOR_ID_2>'])"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.lightning_receive.threshold == 2 && activity.params.lightning_receive.operator_recipients.count() == 2 && activity.params.lightning_receive.operator_recipients.all(recipient, (recipient.operator_id == '<OPERATOR_ID_1>' && recipient.encryption_public_key == '<OPERATOR_ENCRYPTION_PUBLIC_KEY_1>') || (recipient.operator_id == '<OPERATOR_ID_2>' && recipient.encryption_public_key == '<OPERATOR_ENCRYPTION_PUBLIC_KEY_2>'))"
 }
 ```
