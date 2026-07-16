@@ -16,8 +16,8 @@ recipients. Checking only one list index can leave other items in the same reque
 
 #### Allow a delegated user to prepare transfers only to approved receivers
 
-This pattern can authorize leaf swaps with known Spark Service Providers (SSPs) without allowing
-the delegated user to prepare a transfer to an arbitrary receiver.
+This pattern restricts transfer preparation to known Spark Service Provider (SSP) receiver public
+keys. It does not distinguish a leaf swap from another transfer to an allowlisted receiver.
 
 ```json
 {
@@ -48,7 +48,7 @@ leaf keys to use the `signing_leaf` variant.
 
 This policy requires every signature in the batch to use a signing-leaf derivation and include an
 adaptor public key. An omitted adaptor public key evaluates to an empty string and fails the
-condition.
+condition. Adaptor-key presence does not identify the business operation being authorized.
 
 ```json
 {
@@ -109,20 +109,3 @@ from the section above.
   "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.lightning_receive.operator_recipients.count() > 0 && activity.params.lightning_receive.operator_recipients.all(recipient, recipient.operator_id in ['<OPERATOR_ID_1>', '<OPERATOR_ID_2>'])"
 }
 ```
-
-## Current limitations
-
-The Spark activity parameters available today do not expose every business-level detail of a Spark
-operation:
-
-- `SPARK_PREPARE_TRANSFER` does not expose a transfer amount or an operation type that distinguishes
-  a leaf swap from an external send. A receiver allowlist can identify trusted SSP receivers when
-  that distinction is sufficient.
-- `SparkKeyDerivation.type` identifies the cryptographic key variant, not the business operation.
-  It cannot distinguish two operations that both sign with a `signing_leaf` derivation.
-- `EXPORT_WALLET_ACCOUNT` does not expose the Spark derivation type or derivation path. The
-  `static_deposit` FROST policy above governs `SPARK_SIGN_FROST`; it does not restrict wallet-account
-  exports to the static-deposit path.
-- Spark token operations use `SIGN_RAW_PAYLOAD`. Spark token ID, amount, recipient, and validity
-  fields are not parsed into `activity.params`, so the policies on this page cannot enforce those
-  limits.
