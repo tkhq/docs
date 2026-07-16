@@ -510,55 +510,6 @@ produces a `MissingField` evaluation error.
 |                    | `ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE` | `sign_with`          | string                        | The Spark wallet account address identifying the wallet                                                                                                       |
 |                    |                                                 | `lightning_receive`  | SparkLightningReceivePackage  | The Lightning receive package                                                                                                                                 |
 
-#### Spark parameter structs
-
-Spark optional string fields evaluate to an empty string when omitted. Fields belonging to an
-inactive key derivation variant evaluate to an empty string or `0`, rather than producing an
-evaluation error. Use `SparkKeyDerivation.type` to distinguish variants; `0` is also a valid static
-deposit index.
-
-| Struct                       | Field                               | Type                           | Description                                                                                                       |
-| ---------------------------- | ----------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| SparkSignatureRequest        | `derivation`                        | SparkKeyDerivation             | The key derivation for the signature request                                                                      |
-|                              | `message`                           | string                         | The message to sign                                                                                               |
-|                              | `verifying_key`                     | string                         | The verifying key                                                                                                 |
-|                              | `operator_commitments`              | list\<SparkFrostCommitment\>   | Per-operator FROST commitments                                                                                    |
-|                              | `adaptor_public_key`                | string                         | The adaptor public key, or an empty string when omitted                                                           |
-| SparkKeyDerivation           | `type`                              | string                         | The active variant: `identity`, `signing_leaf`, `deposit`, `static_deposit`, or `htlc_preimage`; empty when unset |
-|                              | `signing_leaf`                      | SparkSigningLeafDerivation     | The signing-leaf variant fields                                                                                   |
-|                              | `static_deposit`                    | SparkStaticDepositDerivation   | The static-deposit variant fields                                                                                 |
-| SparkSigningLeafDerivation   | `leaf_id`                           | string                         | The leaf ID, or an empty string when `signing_leaf` is not active                                                 |
-| SparkStaticDepositDerivation | `index`                             | int                            | The deposit index, or `0` when `static_deposit` is not active                                                     |
-| SparkFrostCommitment         | `id`                                | string                         | The commitment ID                                                                                                 |
-|                              | `hiding`                            | string                         | The hiding nonce commitment                                                                                       |
-|                              | `binding`                           | string                         | The binding nonce commitment                                                                                      |
-| SparkTransferPackage         | `transfer_id`                       | string                         | The transfer ID                                                                                                   |
-|                              | `leaves`                            | list\<SparkTransferLeaf\>      | The leaves included in the transfer                                                                               |
-|                              | `threshold`                         | int                            | The signing threshold                                                                                             |
-|                              | `operator_recipients`               | list\<SparkOperatorRecipient\> | The operator recipients                                                                                           |
-|                              | `receiver_public_key`               | string                         | The receiver public key                                                                                           |
-| SparkTransferLeaf            | `leaf_id`                           | string                         | The leaf ID                                                                                                       |
-|                              | `old_leaf_derivation`               | SparkKeyDerivation             | The old leaf derivation                                                                                           |
-|                              | `new_leaf_derivation`               | SparkKeyDerivation             | The new leaf derivation                                                                                           |
-|                              | `refund_signature`                  | string                         | The refund signature, or an empty string when omitted                                                             |
-|                              | `direct_refund_signature`           | string                         | The direct refund signature, or an empty string when omitted                                                      |
-|                              | `direct_from_cpfp_refund_signature` | string                         | The direct-from-CPFP refund signature, or an empty string when omitted                                            |
-| SparkOperatorRecipient       | `operator_id`                       | string                         | The operator ID                                                                                                   |
-|                              | `encryption_public_key`             | string                         | The operator's encryption public key                                                                              |
-| SparkClaimPackage            | `leaves`                            | list\<SparkClaimLeaf\>         | The leaves included in the claim                                                                                  |
-|                              | `threshold`                         | int                            | The signing threshold                                                                                             |
-|                              | `operator_recipients`               | list\<SparkOperatorRecipient\> | The operator recipients                                                                                           |
-|                              | `transfer_id`                       | string                         | The transfer ID                                                                                                   |
-|                              | `sender_identity_public_key`        | string                         | The sender's identity public key                                                                                  |
-| SparkClaimLeaf               | `leaf_id`                           | string                         | The leaf ID                                                                                                       |
-|                              | `ciphertext`                        | string                         | The encrypted leaf data                                                                                           |
-|                              | `sender_signature`                  | string                         | The sender signature                                                                                              |
-| SparkLightningReceivePackage | `threshold`                         | int                            | The signing threshold                                                                                             |
-|                              | `operator_recipients`               | list\<SparkOperatorRecipient\> | The operator recipients                                                                                           |
-
-See the [Spark policy examples](/features/policies/examples/spark) for sample policies covering
-receiver allowlists, FROST key derivations, static deposits, and receive-only delegated access.
-
 #### Examples
 
 To deny signing raw payloads with the NO_OP hash function (except for EIP-712):
@@ -703,6 +654,59 @@ signing flow, check out this section in our
 page.
 
 See the [Bitcoin policy examples](/features/policies/examples/bitcoin) for sample Bitcoin policies.
+
+### Spark
+
+Spark-specific activities expose their request data through `activity.params`. The
+[activity parameter table](#activity-parameters) lists the top-level fields for all four Spark
+activities, and the structs below describe the nested values available to policies.
+
+Spark optional string fields evaluate to an empty string when omitted. Fields belonging to an
+inactive key derivation variant evaluate to an empty string or `0`, rather than producing an
+evaluation error. Use `SparkKeyDerivation.type` to distinguish variants; `0` is also a valid static
+deposit index.
+
+| Struct                       | Field                               | Type                           | Description                                                                                                       |
+| ---------------------------- | ----------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| SparkSignatureRequest        | `derivation`                        | SparkKeyDerivation             | The key derivation for the signature request                                                                      |
+|                              | `message`                           | string                         | The message to sign                                                                                               |
+|                              | `verifying_key`                     | string                         | The verifying key                                                                                                 |
+|                              | `operator_commitments`              | list\<SparkFrostCommitment\>   | Per-operator FROST commitments                                                                                    |
+|                              | `adaptor_public_key`                | string                         | The adaptor public key, or an empty string when omitted                                                           |
+| SparkKeyDerivation           | `type`                              | string                         | The active variant: `identity`, `signing_leaf`, `deposit`, `static_deposit`, or `htlc_preimage`; empty when unset |
+|                              | `signing_leaf`                      | SparkSigningLeafDerivation     | The signing-leaf variant fields                                                                                   |
+|                              | `static_deposit`                    | SparkStaticDepositDerivation   | The static-deposit variant fields                                                                                 |
+| SparkSigningLeafDerivation   | `leaf_id`                           | string                         | The leaf ID, or an empty string when `signing_leaf` is not active                                                 |
+| SparkStaticDepositDerivation | `index`                             | int                            | The deposit index, or `0` when `static_deposit` is not active                                                     |
+| SparkFrostCommitment         | `id`                                | string                         | The commitment ID                                                                                                 |
+|                              | `hiding`                            | string                         | The hiding nonce commitment                                                                                       |
+|                              | `binding`                           | string                         | The binding nonce commitment                                                                                      |
+| SparkTransferPackage         | `transfer_id`                       | string                         | The transfer ID                                                                                                   |
+|                              | `leaves`                            | list\<SparkTransferLeaf\>      | The leaves included in the transfer                                                                               |
+|                              | `threshold`                         | int                            | The signing threshold                                                                                             |
+|                              | `operator_recipients`               | list\<SparkOperatorRecipient\> | The operator recipients                                                                                           |
+|                              | `receiver_public_key`               | string                         | The receiver public key                                                                                           |
+| SparkTransferLeaf            | `leaf_id`                           | string                         | The leaf ID                                                                                                       |
+|                              | `old_leaf_derivation`               | SparkKeyDerivation             | The old leaf derivation                                                                                           |
+|                              | `new_leaf_derivation`               | SparkKeyDerivation             | The new leaf derivation                                                                                           |
+|                              | `refund_signature`                  | string                         | The refund signature, or an empty string when omitted                                                             |
+|                              | `direct_refund_signature`           | string                         | The direct refund signature, or an empty string when omitted                                                      |
+|                              | `direct_from_cpfp_refund_signature` | string                         | The direct-from-CPFP refund signature, or an empty string when omitted                                            |
+| SparkOperatorRecipient       | `operator_id`                       | string                         | The operator ID                                                                                                   |
+|                              | `encryption_public_key`             | string                         | The operator's encryption public key                                                                              |
+| SparkClaimPackage            | `leaves`                            | list\<SparkClaimLeaf\>         | The leaves included in the claim                                                                                  |
+|                              | `threshold`                         | int                            | The signing threshold                                                                                             |
+|                              | `operator_recipients`               | list\<SparkOperatorRecipient\> | The operator recipients                                                                                           |
+|                              | `transfer_id`                       | string                         | The transfer ID                                                                                                   |
+|                              | `sender_identity_public_key`        | string                         | The sender's identity public key                                                                                  |
+| SparkClaimLeaf               | `leaf_id`                           | string                         | The leaf ID                                                                                                       |
+|                              | `ciphertext`                        | string                         | The encrypted leaf data                                                                                           |
+|                              | `sender_signature`                  | string                         | The sender signature                                                                                              |
+| SparkLightningReceivePackage | `threshold`                         | int                            | The signing threshold                                                                                             |
+|                              | `operator_recipients`               | list\<SparkOperatorRecipient\> | The operator recipients                                                                                           |
+
+See the [Spark policy examples](/features/policies/examples/spark) for sample policies covering
+receiver allowlists, FROST key derivations, static deposits, and receive-only delegated access.
 
 ### Tempo
 
