@@ -1,0 +1,121 @@
+---
+title: "Spark"
+description: "This page provides examples of policies governing Spark activities."
+sidebarTitle: "Spark"
+---
+
+Spark-specific activities expose their request data through `activity.params`. See the
+[activity parameter reference](/features/policies/language#activity-parameters) for the complete
+field inventory and [Spark support](/features/networks/spark) for how each activity fits into a
+Spark flow.
+
+The examples below use `.all()` when an activity contains multiple leaves, signatures, or operator
+recipients. Checking only one list index can leave other items in the same request unconstrained.
+
+## Transfer preparation
+
+#### Allow a delegated user to prepare transfers only to approved receivers
+
+This pattern restricts transfer preparation to known Spark Service Provider (SSP) receiver public
+keys. It does not distinguish a leaf swap from another transfer to an allowlisted receiver.
+
+```json
+{
+  "policyName": "Allow Spark transfers to approved receivers",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_TRANSFER' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.transfer.receiver_public_key in ['<RECEIVER_PUBLIC_KEY_1>', '<RECEIVER_PUBLIC_KEY_2>']"
+}
+```
+
+#### Allow transfer preparation only for known signing leaves
+
+Use a non-empty check with `.all()` so that every leaf in the transfer is constrained. The leaf ID
+allowlist limits the leaves that may move, while the derivation checks require both the old and new
+leaf keys to use the `signing_leaf` variant.
+
+```json
+{
+  "policyName": "Allow transfers of approved Spark leaves",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_TRANSFER' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.transfer.leaves.count() > 0 && activity.params.transfer.leaves.all(leaf, leaf.old_leaf_derivation.type == 'signing_leaf' && leaf.new_leaf_derivation.type == 'signing_leaf' && leaf.leaf_id in ['<LEAF_ID_1>', '<LEAF_ID_2>'])"
+}
+```
+
+## FROST signing
+
+#### Allow signing-leaf FROST signatures with adaptor keys
+
+This policy requires every signature in the batch to use a signing-leaf derivation and include an
+adaptor public key. An omitted adaptor public key evaluates to an empty string and fails the
+condition. A non-empty adaptor public key confirms that adaptor signing is requested, but does not
+bind the signature to a particular swap, transfer, counterparty, or amount.
+
+```json
+{
+  "policyName": "Allow adaptor Spark leaf FROST signing",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'signing_leaf' && sig.adaptor_public_key != '')"
+}
+```
+
+#### Restrict signing-leaf FROST signatures to known leaves
+
+```json
+{
+  "policyName": "Allow FROST signing for approved Spark leaves",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'signing_leaf' && sig.derivation.signing_leaf.leaf_id in ['<LEAF_ID_1>', '<LEAF_ID_2>'])"
+}
+```
+
+#### Restrict static-deposit FROST signing to one index
+
+Always pair `static_deposit.index` with `derivation.type == 'static_deposit'`. An inactive
+`static_deposit` variant evaluates its index as `0`, and `0` is also a valid static-deposit index.
+
+```json
+{
+  "policyName": "Allow FROST signing for static deposit index 0",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_SIGN_FROST' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.signatures.count() > 0 && activity.params.signatures.all(sig, sig.derivation.type == 'static_deposit' && sig.derivation.static_deposit.index == 0)"
+}
+```
+
+## Receive-only flows
+
+#### Allow claims from approved sender identity keys
+
+Because claim and transfer preparation are separate activity types, this policy can authorize the
+claim step without granting `SPARK_PREPARE_TRANSFER`. A complete Spark transfer claim also uses
+`SPARK_SIGN_FROST`; authorize that activity separately with the narrowest applicable FROST policy
+from the section above.
+
+```json
+{
+  "policyName": "Allow Spark claims from approved senders",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_CLAIM_TRANSFER' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.claim.sender_identity_public_key in ['<SENDER_IDENTITY_PUBLIC_KEY_1>', '<SENDER_IDENTITY_PUBLIC_KEY_2>']"
+}
+```
+
+#### Allow Lightning receive preparation for approved operators
+
+Bind every approved operator ID to its expected encryption public key. The enclave encrypts each
+share to the key supplied in the request; an operator ID by itself does not authenticate that key.
+This example also pins the threshold and recipient count so the request contains exactly the
+approved operator set.
+
+```json
+{
+  "policyName": "Allow Spark Lightning receives with approved operators",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.lightning_receive.threshold == 2 && activity.params.lightning_receive.operator_recipients.count() == 2 && activity.params.lightning_receive.operator_recipients.all(recipient, (recipient.operator_id == '<OPERATOR_ID_1>' && recipient.encryption_public_key == '<OPERATOR_ENCRYPTION_PUBLIC_KEY_1>') || (recipient.operator_id == '<OPERATOR_ID_2>' && recipient.encryption_public_key == '<OPERATOR_ENCRYPTION_PUBLIC_KEY_2>'))"
+}
+```
