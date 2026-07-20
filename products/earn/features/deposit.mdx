@@ -1,0 +1,178 @@
+---
+title: "Deposit into a vault"
+description: "Move assets from a Turnkey wallet into an enabled yield vault in one atomic transaction, optionally gas-sponsored."
+noindex: true
+mode: wide
+---
+
+import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+
+A deposit moves assets from a user's wallet into your organization's fee wrapper for a vault. The token approval and the vault deposit execute as a single atomic batch transaction, so there is no separate approval step to manage.
+
+<EarnBetaNote />
+
+## Prerequisites
+
+- Your organization has [deployed a wrapper](/products/earn/features/deploy-wrapper) for the vault, and its deployment status is `COMPLETED`. Deposits targeting an address with no deployed wrapper fail with `EARN_SETUP_REQUIRED`.
+- The `signWith` wallet holds enough of the vault's underlying asset. For non-sponsored deposits it also needs the chain's native token for gas.
+
+<Note>
+  Sub-organization wallets can deposit into (and withdraw from) wrappers
+  deployed by their parent organization. The wrapper configuration lives on
+  the parent, the sub-org wallet signs, and no per-sub-org deployment is
+  needed.
+</Note>
+
+## Submit the deposit
+
+<ParamField body="type" type="enum<string>" required>
+  `ACTIVITY_TYPE_EARN_DEPOSIT`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required>
+  Timestamp (in milliseconds) of the request, used to verify liveness.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier for your organization (or the sub-organization whose wallet is depositing).
+</ParamField>
+
+<ParamField body="parameters.wrapperAddress" type="string" required>
+  Address of the deployed fee wrapper to deposit into, from [`earn_enabled_vaults`](/products/earn/features/vault-catalog#list-your-enabled-vaults).
+</ParamField>
+
+<ParamField body="parameters.signWith" type="string" required>
+  The wallet account address to deposit from and sign with.
+</ParamField>
+
+<ParamField body="parameters.assets" type="string" required>
+  Amount of the underlying asset to deposit, in raw on-chain units (e.g. `"1000000"` for 1 USDC at 6 decimals).
+</ParamField>
+
+<ParamField body="parameters.chainCaip2" type="string" required>
+  CAIP-2 chain identifier, e.g. `eip155:8453`.
+</ParamField>
+
+<ParamField body="parameters.sponsor" type="boolean">
+  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`.
+</ParamField>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/earn_deposit \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EARN_DEPOSIT",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<ORGANIZATION_ID>",
+    "parameters": {
+      "wrapperAddress": "<WRAPPER_ADDRESS>",
+      "signWith": "<WALLET_ADDRESS>",
+      "assets": "1000000",
+      "chainCaip2": "eip155:8453",
+      "sponsor": false
+    }
+  }'
+```
+
+```javascript title="JavaScript"
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+const client = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  }),
+);
+
+const { activity } = await client.request("/public/v1/submit/earn_deposit", {
+  type: "ACTIVITY_TYPE_EARN_DEPOSIT",
+  timestampMs: String(Date.now()),
+  organizationId: "<ORGANIZATION_ID>",
+  parameters: {
+    wrapperAddress: "<WRAPPER_ADDRESS>",
+    signWith: "<WALLET_ADDRESS>",
+    assets: "1000000",
+    chainCaip2: "eip155:8453",
+    sponsor: false,
+  },
+});
+```
+
+</CodeGroup>
+
+The result contains only a poll handle:
+
+```json
+{
+  "activity": {
+    "id": "<ACTIVITY_ID>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_EARN_DEPOSIT",
+    "result": {
+      "earnDepositResult": {
+        "depositRequestId": "<DEPOSIT_REQUEST_ID>"
+      }
+    }
+  }
+}
+```
+
+## Gas: sponsored vs self-funded
+
+With `sponsor: true`, Gas Station pays the gas and the batch executes as an EIP-7702 sponsored transaction. The `signWith` wallet needs no native token at all. This requires a Pro plan or higher.
+
+With `sponsor: false`, the `signWith` wallet pays gas itself, so fund it with the chain's native token before depositing.
+
+## Poll deposit status (required)
+
+<Warning>
+  A `COMPLETED` activity means the transaction was enqueued for broadcast,
+  not that it landed on-chain. A transaction that later fails (for example,
+  from an insufficient token balance) is invisible in the activity result.
+  Poll `earn_deposit_status` until it reports `COMPLETED` (included on-chain)
+  or `FAILED`.
+</Warning>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/earn_deposit_status \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "organizationId": "<ORGANIZATION_ID>",
+    "depositRequestId": "<DEPOSIT_REQUEST_ID>"
+  }'
+```
+
+```javascript title="JavaScript"
+const status = await client.request("/public/v1/query/earn_deposit_status", {
+  organizationId: "<ORGANIZATION_ID>",
+  depositRequestId: "<DEPOSIT_REQUEST_ID>",
+});
+```
+
+</CodeGroup>
+
+```json
+{
+  "status": "COMPLETED",
+  "depositTxHash": "<TRANSACTION_HASH>"
+}
+```
+
+`status` is `PENDING`, `COMPLETED`, or `FAILED`. On `FAILED`, the response includes an `error` field with the reason. See [Submissions](/developer-reference/api-overview/submissions) for general activity semantics.
+
+## Next steps
+
+- [Track positions](/products/earn/features/positions) once the deposit is `COMPLETED`
+- [Withdraw from a vault](/products/earn/features/withdraw)

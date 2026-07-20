@@ -1,0 +1,287 @@
+---
+title: "End-to-end example: earn on Base"
+description: "Deploy a wrapper for a Morpho USDC vault on Base, deposit, track the position, and withdraw: the full Earn lifecycle."
+sidebarTitle: "End-to-end example"
+noindex: true
+mode: wide
+---
+
+import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+
+This walkthrough runs the complete Earn lifecycle against Base mainnet: find a Morpho USDC vault (we'll use Steakhouse USDC), enable it, deposit 100 USDC from a Turnkey wallet, check the position, and withdraw everything.
+
+<EarnBetaNote />
+
+**Prerequisites**
+
+- Earn beta access enabled for your organization (and a Pro plan or higher if you want gas sponsorship)
+- A Turnkey API key pair
+- A wallet account holding USDC on Base, plus ETH on Base for gas if you don't sponsor
+- An org-owned wallet address to receive your fee payouts
+
+<Steps>
+  <Step title="Initialize the client">
+    All requests go through the generic `request` method of `TurnkeyClient`, stamped by your API key. Deposits, withdrawals, and deployments all confirm asynchronously, so define a small polling helper here as well.
+
+    ```javascript
+    import { TurnkeyClient } from "@turnkey/http";
+    import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+    const organizationId = "<ORGANIZATION_ID>";
+
+    const client = new TurnkeyClient(
+      { baseUrl: "https://api.turnkey.com" },
+      new ApiKeyStamper({
+        apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+        apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+      }),
+    );
+
+    // Poll an earn status endpoint until the transaction lands on-chain.
+    async function pollEarnStatus(path, idField, id) {
+      for (;;) {
+        const res = await client.request(path, {
+          organizationId,
+          [idField]: id,
+        });
+        if (res.status === "COMPLETED") return res;
+        if (res.status === "FAILED") {
+          throw new Error(`${path} failed: ${res.error}`);
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Find a vault">
+    Query the catalog for USDC vaults on Base. The chain comes from the CAIP-19 asset identifier; results are sorted by TVL.
+
+    <CodeGroup>
+
+    ```javascript title="JavaScript"
+    const { vaults } = await client.request("/public/v1/query/earn_vaults", {
+      organizationId,
+      caip19: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      provider: "EARN_PROVIDER_MORPHO",
+    });
+
+    // Pick the vault you want to offer. Here we use Steakhouse USDC.
+    const vault = vaults[0];
+    console.log(vault.vaultAddress, vault.apyPct, vault.display.usd);
+    ```
+
+    ```bash title="cURL"
+    curl --request POST \
+      --url https://api.turnkey.com/public/v1/query/earn_vaults \
+      --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' \
+      --header "X-Stamp: <string> (see Stamps)" \
+      --data '{
+        "organizationId": "<ORGANIZATION_ID>",
+        "caip19": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "provider": "EARN_PROVIDER_MORPHO"
+      }'
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Deploy the wrapper">
+    Enable the vault for your organization with a 1% performance fee (`"100"` bps) paid to your fee wallet. Turnkey pays the deployment gas. This step is safe to re-run: identical parameters return the same addresses without redeploying.
+
+    <CodeGroup>
+
+    ```javascript title="JavaScript"
+    const { activity: deploy } = await client.request(
+      "/public/v1/submit/earn_deploy_wrapper",
+      {
+        type: "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
+        timestampMs: String(Date.now()),
+        organizationId,
+        parameters: {
+          vaultAddress: vault.vaultAddress,
+          chainCaip2: "eip155:8453",
+          clientFeeBps: "100",
+          clientFeeWallet: "<CLIENT_FEE_WALLET_ADDRESS>",
+        },
+      },
+    );
+
+    const { deployRequestId, wrapperAddress } =
+      deploy.result.earnDeployWrapperResult;
+    ```
+
+    ```bash title="cURL"
+    curl --request POST \
+      --url https://api.turnkey.com/public/v1/submit/earn_deploy_wrapper \
+      --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' \
+      --header "X-Stamp: <string> (see Stamps)" \
+      --data '{
+        "type": "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
+        "timestampMs": "<string> (e.g. 1745474677453)",
+        "organizationId": "<ORGANIZATION_ID>",
+        "parameters": {
+          "vaultAddress": "<VAULT_ADDRESS>",
+          "chainCaip2": "eip155:8453",
+          "clientFeeBps": "100",
+          "clientFeeWallet": "<CLIENT_FEE_WALLET_ADDRESS>"
+        }
+      }'
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Wait for the deployment">
+    Poll until the wrapper is live on-chain.
+
+    ```javascript
+    await pollEarnStatus(
+      "/public/v1/query/earn_deploy_status",
+      "deployRequestId",
+      deployRequestId,
+    );
+    ```
+  </Step>
+
+  <Step title="Deposit 100 USDC">
+    USDC has 6 decimals, so 100 USDC is `"100000000"` raw units. The approval and deposit run as one atomic transaction. With `sponsor: true`, Gas Station pays the gas (Pro plan or higher); set it to `false` to have the wallet pay with its own ETH.
+
+    <CodeGroup>
+
+    ```javascript title="JavaScript"
+    const { activity: deposit } = await client.request(
+      "/public/v1/submit/earn_deposit",
+      {
+        type: "ACTIVITY_TYPE_EARN_DEPOSIT",
+        timestampMs: String(Date.now()),
+        organizationId,
+        parameters: {
+          wrapperAddress,
+          signWith: "<WALLET_ADDRESS>",
+          assets: "100000000",
+          chainCaip2: "eip155:8453",
+          sponsor: true,
+        },
+      },
+    );
+
+    const { depositRequestId } = deposit.result.earnDepositResult;
+    ```
+
+    ```bash title="cURL"
+    curl --request POST \
+      --url https://api.turnkey.com/public/v1/submit/earn_deposit \
+      --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' \
+      --header "X-Stamp: <string> (see Stamps)" \
+      --data '{
+        "type": "ACTIVITY_TYPE_EARN_DEPOSIT",
+        "timestampMs": "<string> (e.g. 1745474677453)",
+        "organizationId": "<ORGANIZATION_ID>",
+        "parameters": {
+          "wrapperAddress": "<WRAPPER_ADDRESS>",
+          "signWith": "<WALLET_ADDRESS>",
+          "assets": "100000000",
+          "chainCaip2": "eip155:8453",
+          "sponsor": true
+        }
+      }'
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Wait for the deposit">
+    The activity completing only means the transaction was enqueued. Poll until it's included on-chain.
+
+    ```javascript
+    const { depositTxHash } = await pollEarnStatus(
+      "/public/v1/query/earn_deposit_status",
+      "depositRequestId",
+      depositRequestId,
+    );
+    console.log("deposited:", depositTxHash);
+    ```
+  </Step>
+
+  <Step title="Check the position">
+    Query the wallet's positions and compute the yield earned so far from the raw fields, using `BigInt` rather than floats or the `display` values.
+
+    ```javascript
+    const { positions } = await client.request(
+      "/public/v1/query/earn_positions",
+      {
+        organizationId,
+        walletAddress: "<WALLET_ADDRESS>",
+      },
+    );
+
+    const p = positions.find((p) => p.wrapperAddress === wrapperAddress);
+
+    const yieldEarned =
+      BigInt(p.currentValue) -
+      BigInt(p.totalDeposited) +
+      BigInt(p.totalWithdrawn);
+
+    console.log(`current value: ${p.display.currentValueUsd} USD`);
+    console.log(`yield earned:  ${yieldEarned} raw units`);
+    ```
+  </Step>
+
+  <Step title="Withdraw everything">
+    Exit the full position with `"MAX"`, which redeems the exact live share balance, then poll the withdrawal to confirmation.
+
+    ```javascript
+    const { activity: withdraw } = await client.request(
+      "/public/v1/submit/earn_withdraw",
+      {
+        type: "ACTIVITY_TYPE_EARN_WITHDRAW",
+        timestampMs: String(Date.now()),
+        organizationId,
+        parameters: {
+          wrapperAddress,
+          signWith: "<WALLET_ADDRESS>",
+          amountValue: "MAX",
+          chainCaip2: "eip155:8453",
+          sponsor: true,
+        },
+      },
+    );
+
+    const { withdrawRequestId } = withdraw.result.earnWithdrawResult;
+
+    const { withdrawTxHash } = await pollEarnStatus(
+      "/public/v1/query/earn_withdraw_status",
+      "withdrawRequestId",
+      withdrawRequestId,
+    );
+    console.log("withdrawn:", withdrawTxHash);
+    ```
+  </Step>
+</Steps>
+
+## Dive deeper
+
+<CardGroup cols={2}>
+  <Card title="Earn overview" href="/products/earn/overview">
+    Fee model, chains, and the full API surface.
+  </Card>
+  <Card title="Browse the vault catalog" href="/products/earn/features/vault-catalog">
+    Catalog and enabled-vault queries in detail.
+  </Card>
+  <Card title="Deploy a vault wrapper" href="/products/earn/features/deploy-wrapper">
+    Fee configuration, idempotency, and status polling.
+  </Card>
+  <Card title="Deposit into a vault" href="/products/earn/features/deposit">
+    Gas options and deposit semantics.
+  </Card>
+  <Card title="Withdraw from a vault" href="/products/earn/features/withdraw">
+    Partial and yield-only withdrawals.
+  </Card>
+  <Card title="Track positions" href="/products/earn/features/positions">
+    Position fields, units, and precision.
+  </Card>
+</CardGroup>
