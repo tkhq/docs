@@ -4,9 +4,9 @@ sidebarTitle: "OTP migration guide"
 description: "How to migrate to Turnkey's new security-upgraded OTP authentication flows."
 ---
 
-Turnkey's current email and SMS OTP flows encrypt each OTP attempt before it leaves the client. The client encrypts the code and a session public key to a Turnkey enclave target key, and the resulting verification token is bound to that key. This prevents an application server from reading or replaying an OTP code.
+Turnkey's current email and SMS OTP flows encrypt each OTP attempt before it leaves the client. The client encrypts the code and a session public key to a Turnkey enclave target key. After successful verification, the resulting verification token is bound to the client public key, so an application server cannot read the OTP or use the token to authenticate without the matching client private key.
 
-This guide is for integrations that use legacy OTP activities or SDK methods that sent `otpCode` in plaintext. New integrations should use the current flow documented in [Email auth & recovery](/features/authentication/email) and [SMS authentication](/features/authentication/sms).
+This guide is for integrations that use legacy OTP activities or SDK methods that send `otpCode` in plaintext. New integrations should use the current flow documented in [Email auth & recovery](/features/authentication/email) and [SMS authentication](/features/authentication/sms).
 
 <Warning>
   Migrate each OTP attempt as a unit. Do not start an attempt with a legacy
@@ -18,12 +18,20 @@ This guide is for integrations that use legacy OTP activities or SDK methods tha
 
 ## What changed
 
-| Stage    | Legacy flow                                             | Updated flow                                        | Required change                                                                                                                                     |
-| -------- | ------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Initiate | `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2` | `ACTIVITY_TYPE_INIT_OTP_V3`                         | Keep the returned `otpEncryptionTargetBundle` with the `otpId` until verification.                                                                  |
-| Verify   | `ACTIVITY_TYPE_VERIFY_OTP`                              | `ACTIVITY_TYPE_VERIFY_OTP_V2`                       | Replace plaintext `otpCode` and `publicKey` with an `encryptedOtpBundle`.                                                                           |
-| Log in   | `ACTIVITY_TYPE_OTP_LOGIN`                               | `ACTIVITY_TYPE_OTP_LOGIN_V2`                        | Include a `clientSignature` made by the key bound during verification.                                                                              |
-| Sign up  | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`              | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` or later | Include a `clientSignature` when the verification token is bound to a public key. Version 8 and later do not accept legacy OTP verification tokens. |
+| Stage    | Legacy SDK activity                                     | Current SDK activity                       | Required change                                                                                                                                     |
+| -------- | ------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initiate | `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2` | `ACTIVITY_TYPE_INIT_OTP_V3`                | Keep the returned `otpEncryptionTargetBundle` with the `otpId` until verification.                                                                  |
+| Verify   | `ACTIVITY_TYPE_VERIFY_OTP`                              | `ACTIVITY_TYPE_VERIFY_OTP_V2`              | Replace plaintext `otpCode` and `publicKey` with an `encryptedOtpBundle`.                                                                           |
+| Log in   | `ACTIVITY_TYPE_OTP_LOGIN`                               | `ACTIVITY_TYPE_OTP_LOGIN_V2`               | Include a `clientSignature` made by the key bound during verification.                                                                              |
+| Sign up  | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`              | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` | Include a `clientSignature` when the verification token is bound to a public key. Version 8 and later do not accept legacy OTP verification tokens. |
+
+<Note>
+  `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` is transitional: it accepts both
+  legacy verification tokens and the enclave-issued tokens returned by
+  `VERIFY_OTP_V2`. `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` accepts only
+  enclave-issued tokens. During a staged rollout, legacy attempts must remain on
+  V7; updated attempts can use V7 or V8.
+</Note>
 
 The updated verification flow is:
 
@@ -116,6 +124,8 @@ Choose the section below that matches your integration.
       contact={contact}
       otpId={otpId}
       otpEncryptionTargetBundle={otpEncryptionTargetBundle}
+      onValidateSuccess={handleValidateSuccess}
+      onResendCode={handleResendCode}
     />
     ```
 
@@ -176,15 +186,21 @@ If a policy checks exact activity versions, update it before the new SDKs begin 
 - `ACTIVITY_TYPE_OTP_LOGIN`
 - `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`
 
-During a staged rollout, allow both legacy and updated versions until all clients and servers use the new flow. Alternatively, use resource/action conditions so future activity version bumps do not require another policy change:
+During a staged rollout, exact-type policies must allow both legacy and updated versions until all clients and servers use the new flow. This does not make the activity versions interchangeable within an OTP attempt. Prefer `activity.kind` when the same policy should cover every version of a specific activity:
 
 ```json
 {
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
-  "condition": "(activity.resource == 'AUTH' && activity.action == 'CREATE') || (activity.resource == 'OTP' && activity.action == 'CREATE') || (activity.resource == 'OTP' && activity.action == 'VERIFY') || (activity.resource == 'ORGANIZATION' && activity.action == 'CREATE')"
+  "condition": "activity.kind in ['INIT_OTP', 'VERIFY_OTP', 'OTP_LOGIN', 'CREATE_SUB_ORGANIZATION']"
 }
 ```
+
+<Note>
+  `CREATE_SUB_ORGANIZATION` covers every version of sub-organization creation,
+  not only OTP signup. Preserve any existing restrictions on who may create a
+  sub-organization and which parameters they may submit.
+</Note>
 
 ## Rollout checklist
 
