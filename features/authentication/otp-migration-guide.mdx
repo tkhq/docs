@@ -1,37 +1,52 @@
 ---
-title: "Updated OTP login and signup flow"
-sidebarTitle: "OTP login and signup"
+title: "Migrate to encrypted OTP flows"
+sidebarTitle: "OTP migration guide"
 description: "How to migrate to Turnkey's new security-upgraded OTP authentication flows."
 ---
 
-Turnkey's OTP authentication flows (email and SMS) have been upgraded to pass OTP code attempts as encrypted bundles rather than in plaintext. When encryption and signing happen on the client, an application backend that relays OTP requests cannot read the OTP code or use the resulting verification token to log in or sign up without the matching client private key. The new flow is recommended for its security improvements, and we've included a migration guide from legacy flows to the new flow below.
+Turnkey's current email and SMS OTP flows encrypt each OTP attempt before it leaves the client. The client encrypts the code and a session public key to a Turnkey enclave target key. After successful verification, the resulting verification token is bound to the client public key, so an application server cannot read the OTP or use the token to log in or sign up without the matching client private key.
 
-## Migration guide
-
-For implementations using Turnkey's legacy OTP flows, migrating to the updated OTP flows is a breaking change and will require some tweaks to implementations beyond just upgrading SDK versions.
+This guide is for integrations that use legacy OTP activities or SDK methods that send `otpCode` in plaintext. New integrations should use the current flow documented in [Email auth & recovery](/features/authentication/email) and [SMS authentication](/features/authentication/sms).
 
 <Warning>
-  If you have policies written against specific versions of the activities
-  mentioned below, you will need to update those policies to reference the new
-  activity versions.
+  Migrate each OTP attempt as a unit. Do not start an attempt with a legacy
+  `INIT_OTP` activity and finish it with the updated `VERIFY_OTP_V2` or
+  `OTP_LOGIN_V2` activities. The encryption bundle, verification token, and
+  client key belong to the same attempt and are not interchangeable with the
+  legacy flow.
 </Warning>
 
-### Updated OTP flow activity types
+## What changed
 
-The following activities (and any subsequent versions) use the updated OTP flow:
+| Stage    | Legacy SDK activity                                     | Current SDK activity                       | Required change                                                                                                                                     |
+| -------- | ------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initiate | `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2` | `ACTIVITY_TYPE_INIT_OTP_V3`                | Keep the returned `otpEncryptionTargetBundle` with the `otpId` until verification.                                                                  |
+| Verify   | `ACTIVITY_TYPE_VERIFY_OTP`                              | `ACTIVITY_TYPE_VERIFY_OTP_V2`              | Replace plaintext `otpCode` and `publicKey` with an `encryptedOtpBundle`.                                                                           |
+| Log in   | `ACTIVITY_TYPE_OTP_LOGIN`                               | `ACTIVITY_TYPE_OTP_LOGIN_V2`               | Include a `clientSignature` made by the key bound during verification.                                                                              |
+| Sign up  | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`              | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` | Include a `clientSignature` when the verification token is bound to a public key. Version 8 and later do not accept legacy OTP verification tokens. |
 
-| Activity                                   | Description                                                                                                           |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `ACTIVITY_TYPE_INIT_OTP_V3`                | Initiates an OTP flow via email or SMS, returns an encryption bundle to be used during OTP verification               |
-| `ACTIVITY_TYPE_VERIFY_OTP_V2`              | Verifies OTP attempt securely, returns a verification token (JWT)                                                     |
-| `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` | Used to sign up; consumes verification token received after successful `VERIFY_OTP_V2` activity                       |
-| `ACTIVITY_TYPE_OTP_LOGIN_V2`               | Used to log in and generate a session; consumes verification token received after successful `VERIFY_OTP_V2` activity |
+<Note>
+  `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` is transitional: it accepts both
+  legacy verification tokens and the enclave-issued tokens returned by
+  `VERIFY_OTP_V2`. `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` accepts only
+  enclave-issued tokens. During a staged rollout, legacy attempts must remain on
+  V7; updated attempts can use V7 or V8.
+</Note>
 
-NOTE: Older activity versions such as `ACTIVITY_TYPE_INIT_OTP_V2`, `ACTIVITY_TYPE_VERIFY_OTP` use our legacy OTP flow and are not interchangeable with the new ones due to the new encryption protocol. Notably, for sub organization creation, which accepts OTP verification tokens, `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` can be used as part of the legacy flow and the new updated flow. Current SDK signup flows use `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8`, which is not compatible with legacy OTP verification tokens.
+The updated verification flow is:
 
-### Minimum SDK versions
+1. `INIT_OTP_V3` returns `otpId` and `otpEncryptionTargetBundle`.
+2. The client generates or selects a P-256 key pair.
+3. The client uses `encryptOtpCodeToBundle` to encrypt the OTP code and public key with `otpEncryptionTargetBundle`.
+4. `VERIFY_OTP_V2` accepts the encrypted bundle and returns a verification token bound to the client public key.
+5. The client signs the login or signup payload with the same private key.
+6. `OTP_LOGIN_V2` or the sub-organization creation flow validates the verification token and client signature.
 
-The encrypted OTP flow was introduced in the releases below. Upgrade related Turnkey packages together:
+See [OTP login flow](/security/enclave-secure-channels#otp-login-flow) for the protocol diagram and security properties.
+
+## Upgrade the SDKs
+
+The encrypted flow was introduced in the following releases. Use these versions or later, and upgrade related Turnkey packages together so their generated activity types and request shapes remain compatible.
 
 | Package                            | Minimum version                                                                                    |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -46,14 +61,159 @@ The encrypted OTP flow was introduced in the releases below. Upgrade related Tur
 | `@turnkey/sdk-types`               | [`1.0.0`](https://github.com/tkhq/sdk/blob/main/packages/sdk-types/CHANGELOG.md#100)               |
 | `@turnkey/crypto`                  | [`2.9.0`](https://github.com/tkhq/sdk/blob/main/packages/crypto/CHANGELOG.md#290)                  |
 
-### Required updates to implementations
+Choose the section below that matches your integration.
 
-The following updates are required to legacy OTP implementations to migrate to the updated OTP flow, after bumping SDK versions:
+<Tabs>
+  <Tab title="Wallet Kit and Core">
+    In `@turnkey/react-wallet-kit`, `@turnkey/react-native-wallet-kit`, and `@turnkey/core`, `initOtp` now returns an object instead of a plain OTP ID. Keep both values:
 
-- The response shape for `ACTIVITY_TYPE_INIT_OTP_V3` now includes an `otpEncryptionTargetBundle` which is to be used during OTP verification. The client performing verification must keep the `otpId` and `otpEncryptionTargetBundle` from the same OTP attempt. If a backend initiates the OTP, return both values to the app client; do not send the plaintext OTP code to the backend.
-- The request shape for `ACTIVITY_TYPE_VERIFY_OTP_V2` now includes an `encryptedOtpBundle` which is generated using the `otpEncryptionTargetBundle` received from `ACTIVITY_TYPE_INIT_OTP_V3`. This bundle will include a client-generated public key and the OTP code attempt. Use the `encryptOtpCodeToBundle` helper function from [@turnkey/crypto](https://www.npmjs.com/package/@turnkey/crypto) on the client to generate the `encryptedOtpBundle` used during OTP verification.
-- The verification token received in the response of `ACTIVITY_TYPE_VERIFY_OTP_V2` is signed by a different key than legacy OTP verification tokens. This key is included in our updated SDKs.
-- Login and signup flows initiated using OTP verification tokens now require client signature objects, generated using the client-generated keypair whose public key was used during OTP verification. The OTP helpers and components in `@turnkey/core`, Wallet Kit, and `@turnkey/sdk-react` handle this automatically. Integrations using low-level clients such as `@turnkey/sdk-browser`, `@turnkey/sdk-server`, or `@turnkey/http` must generate the `clientSignature` on the app client and include it in the login or signup request. If the backend submits that request, pass the signature to the backend. See the [`otp-auth/with-backend`](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend) example for the complete flow.
-- Finally, users managing OTP flows with policies will need to update any policies referencing a specific OTP-related activity type so they point to the new activity versions.
+    ```ts
+    // Before
+    const otpId = await initOtp({
+      otpType: OtpType.Email,
+      contact: "user@example.com",
+    });
 
-For more information and a diagram of the new OTP flow, please refer to additional documentation [here](/security/enclave-secure-channels#otp-login-flow).
+    // After
+    const { otpId, otpEncryptionTargetBundle } = await initOtp({
+      otpType: OtpType.Email,
+      contact: "user@example.com",
+    });
+    ```
+
+    Pass the bundle to `verifyOtp`. The SDK encrypts the OTP code and public key before calling Turnkey:
+
+    ```ts
+    const { verificationToken } = await verifyOtp({
+      otpId,
+      otpCode,
+      otpEncryptionTargetBundle,
+    });
+    ```
+
+    `verifyOtp` no longer accepts `contact` or `otpType`, and it no longer returns `subOrganizationId`. Use `completeOtp` to perform verification plus account lookup and login/signup, or call `proxyGetAccount` separately after verification.
+
+    `loginWithOtp` and `signUpWithOtp` no longer accept a separate `publicKey`. They reuse the key bound during `verifyOtp` and generate the required client signature automatically.
+
+    ```ts
+    await loginWithOtp({
+      verificationToken,
+      invalidateExisting: true,
+    });
+    ```
+
+  </Tab>
+
+  <Tab title="Legacy React SDK">
+    `@turnkey/sdk-react` is the legacy React SDK. For new projects, use `@turnkey/react-wallet-kit`; see [Migrating from `@turnkey/sdk-react`](/solutions/embedded-wallets/integration-guide/react/migrating-sdk-react).
+
+    If you are maintaining an `@turnkey/sdk-react` integration, the `OtpVerification` component now requires the encryption target bundle returned by `sendOtp`:
+
+    ```ts
+    const { otpId, otpEncryptionTargetBundle } = await server.sendOtp({
+      appName: "Example App",
+      otpType: OtpType.Sms,
+      contact: phoneInput,
+      customSmsMessage: "Your OTP is {{.OtpCode}}",
+      userIdentifier: publicKey,
+    });
+    ```
+
+    ```tsx
+    <OtpVerification
+      type={type}
+      contact={contact}
+      otpId={otpId}
+      otpEncryptionTargetBundle={otpEncryptionTargetBundle}
+      onValidateSuccess={handleValidateSuccess}
+      onResendCode={handleResendCode}
+    />
+    ```
+
+    The component handles creation of the encrypted OTP bundle. Make sure a resend replaces both `otpId` and `otpEncryptionTargetBundle`; never combine values from separate attempts.
+
+  </Tab>
+
+  <Tab title="Server and low-level clients">
+    Legacy `@turnkey/sdk-react-native` integrations also follow this section. That package re-exports the low-level `@turnkey/http` client and does not automate OTP bundle creation or client signatures. For new React Native integrations, use [React Native Wallet Kit](/solutions/embedded-wallets/integration-guide/react-native/overview).
+
+    `sendOtp` and `initOtp` now return an encryption target bundle. Persist it only for the lifetime of the OTP attempt and return it to the client that will verify the code.
+
+    ```ts
+    const { otpId, otpEncryptionTargetBundle } = await server.sendOtp({
+      // ...
+    });
+    ```
+
+    Replace the plaintext `otpCode` field with a bundle created on the client:
+
+    ```ts
+    import { encryptOtpCodeToBundle } from "@turnkey/crypto";
+
+    const encryptedOtpBundle = await encryptOtpCodeToBundle(
+      otpCode,
+      otpEncryptionTargetBundle,
+      publicKey,
+    );
+
+    const { verificationToken } = await server.verifyOtp({
+      otpId,
+      encryptedOtpBundle,
+      sessionLengthSeconds,
+    });
+    ```
+
+    The private key matching `publicKey` must stay on the client. Use it to sign the login or signup message, then send the resulting `clientSignature` to the backend:
+
+    ```ts
+    await server.otpLogin({
+      suborgID,
+      verificationToken,
+      publicKey,
+      clientSignature,
+      sessionLengthSeconds,
+    });
+    ```
+
+    The [`otp-auth/with-backend`](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend) example shows the full split between client-side encryption and signing and server-side Turnkey API calls.
+
+  </Tab>
+</Tabs>
+
+## Update policies before deploying
+
+If a policy checks exact activity versions, update it before the new SDKs begin submitting activities. At minimum, review policies that name:
+
+- `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2`
+- `ACTIVITY_TYPE_VERIFY_OTP`
+- `ACTIVITY_TYPE_OTP_LOGIN`
+- `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`
+
+During a staged rollout, exact-type policies must allow both legacy and updated versions until all clients and servers use the new flow. This does not make the activity versions interchangeable within an OTP attempt. Prefer `activity.kind` when the same policy should cover every version of a specific activity:
+
+```json
+{
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.kind in ['INIT_OTP', 'VERIFY_OTP', 'OTP_LOGIN', 'CREATE_SUB_ORGANIZATION']"
+}
+```
+
+<Note>
+  `CREATE_SUB_ORGANIZATION` covers every version of sub-organization creation,
+  not only OTP signup. Preserve any existing restrictions on who may create a
+  sub-organization and which parameters they may submit.
+</Note>
+
+## Rollout checklist
+
+- Update policies before deploying updated SDKs.
+- Upgrade the frontend and backend Turnkey packages together.
+- Store `otpId`, `otpEncryptionTargetBundle`, and the client key as state for one OTP attempt.
+- On resend, replace all attempt state rather than reusing an old bundle or key.
+- Test email and SMS separately if your application supports both.
+- Test both an existing-user login and a new-user signup.
+- Confirm that OTP codes are sent to your backend only as `encryptedOtpBundle`.
+- After all clients have migrated, remove legacy activity versions from exact-version policies.
+
+For the complete set of SDK breaking changes shipped with this migration, see [tkhq/sdk#1250](https://github.com/tkhq/sdk/pull/1250).
