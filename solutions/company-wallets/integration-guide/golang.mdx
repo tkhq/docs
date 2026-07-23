@@ -46,7 +46,7 @@ some tooling assumes the package name is `v2`.
 
 ### Parameters
 
-For the stamper constructor, `turnkey.NewAPIKeyStamper`:
+#### `turnkey.NewAPIKeyStamper` parameters
 
 <ParamField
   body="privateKey"
@@ -65,7 +65,7 @@ Optional configuration for the stamper. Use `turnkey.WithSignatureScheme` to set
 scheme. The default is `tkcrypto.SchemeP256`.
 </ParamField>
 
-For the client constructor, `turnkey.NewClient`:
+#### `turnkey.NewClient` parameters
 
 <ParamField
   body="stamper"
@@ -75,7 +75,7 @@ For the client constructor, `turnkey.NewClient`:
 The request stamper that signs API requests. Create one with
 `turnkey.NewAPIKeyStamper(apiPrivateKey)`. The public key is derived from the private key, so
 there is no separate public-key parameter. You can also provide your own implementation of the
-`Stamper` interface.
+`Stamper` interface for advanced signing setups.
 </ParamField>
 
 <ParamField
@@ -93,150 +93,6 @@ override it with their own `OrganizationID` field when targeting a sub-organizat
 >
 Optional variadic configuration functions. See [Configuration options](#configuration-options).
 </ParamField>
-
-### Stamper interface
-
-Every request the client sends is authenticated, or *stamped*, before it leaves your process. The
-client delegates that step to any value implementing the `Stamper` interface:
-
-```go
-type Stamper interface {
-	Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error)
-}
-```
-
-`Stamp` receives the serialized request body and returns a `*turnkey.Stamp`, which carries the HTTP
-header the client attaches to the outbound request:
-
-```go
-type Stamp struct {
-	HeaderName  string // e.g. "X-Stamp" or "X-Stamp-WebAuthn"
-	HeaderValue string // the stamp payload for that header
-}
-```
-
-Because this is the only contract the client depends on, stamping is a replaceable boundary.
-`NewAPIKeyStamper` is the standard server-side implementation for API keys, but you can supply any
-implementation to move the signing decision to the place that best matches your security boundary:
-
-- An **API key stamper** (the built-in default) for ordinary backend service calls.
-- A **policy or KMS stamper** that routes signing through your own key-management or approval layer.
-- A **WebAuthn-backed stamper** when request authorization should come from a passkey or
-  authenticator ceremony. See [Example: WebAuthn stamper](#example-webauthn-stamper).
-
-#### Implementing a custom stamper
-
-A stamper only needs to sign the exact bytes it is handed and return the header the API expects.
-The skeleton below shows the shape every implementation shares — take the body, produce a
-signature with whatever mechanism you control, and package it as a `Stamp`:
-
-```go
-type Signer interface {
-	Sign(ctx context.Context, body []byte) (string, error)
-}
-
-type CustomStamper struct {
-	signer Signer // your signing mechanism (KMS, HSM, remote service, etc.)
-}
-
-func (s *CustomStamper) Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error) {
-	// Sign the request body exactly as received — do not re-marshal it.
-	stamp, err := s.signer.Sign(ctx, body)
-	if err != nil {
-		return nil, fmt.Errorf("stamp request: %w", err)
-	}
-
-	return &turnkey.Stamp{
-		HeaderName:  "X-Stamp",
-		HeaderValue: stamp,
-	}, nil
-}
-```
-
-After you have a `signer` value that implements the `Signer` interface, pass the custom stamper to
-`NewClient` in place of the API key stamper:
-
-```go
-customStamper := &CustomStamper{signer: signer}
-
-client, err := turnkey.NewClient(
-	customStamper,
-	os.Getenv("TURNKEY_ORGANIZATION_ID"),
-)
-```
-
-<Note>
-Sign the `body` bytes as received. Re-serializing the request can reorder fields or change
-whitespace, which invalidates the signature Turnkey verifies against.
-</Note>
-
-### Example: WebAuthn stamper
-
-A WebAuthn stamper authorizes requests with a passkey or hardware authenticator instead of a static
-API key. The ceremony that produces the assertion runs wherever the authenticator lives — usually a
-browser or native client — so the stamper's job is to derive the WebAuthn challenge from the request
-body, obtain an assertion, and encode it into the `X-Stamp-WebAuthn` header the API expects.
-
-The Go SDK does not currently expose a dedicated WebAuthn stamper constructor, so this example shows
-the interface you would implement around your own WebAuthn transport. The stamp payload uses the
-generated `turnkey.WebAuthnStamp` type.
-
-```go
-import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-
-	turnkey "github.com/tkhq/go-sdk/v2"
-)
-
-// Authenticator runs a WebAuthn assertion over the given challenge and returns
-// the signed result. Implement this against your browser or device transport.
-type Authenticator interface {
-	Assert(ctx context.Context, challenge []byte) (*turnkey.WebAuthnStamp, error)
-}
-
-type WebAuthnStamper struct {
-	authenticator Authenticator
-}
-
-func NewWebAuthnStamper(a Authenticator) *WebAuthnStamper {
-	return &WebAuthnStamper{authenticator: a}
-}
-
-func (s *WebAuthnStamper) Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error) {
-	hash := sha256.Sum256(body)
-	challenge := []byte(hex.EncodeToString(hash[:]))
-
-	assertion, err := s.authenticator.Assert(ctx, challenge)
-	if err != nil {
-		return nil, fmt.Errorf("webauthn assertion: %w", err)
-	}
-
-	value, err := json.Marshal(assertion)
-	if err != nil {
-		return nil, fmt.Errorf("encode webauthn stamp: %w", err)
-	}
-
-	return &turnkey.Stamp{
-		HeaderName:  "X-Stamp-WebAuthn",
-		HeaderValue: string(value),
-	}, nil
-}
-```
-
-Wire it into the client the same way as any other stamper:
-
-```go
-webauthnStamper := NewWebAuthnStamper(authenticator)
-
-client, err := turnkey.NewClient(webauthnStamper, os.Getenv("TURNKEY_ORGANIZATION_ID"))
-```
-
-The client now attaches a WebAuthn stamp to every request without any change to how you call
-Turnkey endpoints, the typed request and response models are identical to the API key path.
 
 ### Configuration options
 
@@ -645,3 +501,142 @@ Supported schemes:
 | `tkcrypto.SchemeP256` | `SIGNATURE_SCHEME_TK_API_P256` |
 | `tkcrypto.SchemeSECP256K1` | `SIGNATURE_SCHEME_TK_API_SECP256K1` |
 | `tkcrypto.SchemeED25519` | `SIGNATURE_SCHEME_TK_API_ED25519` |
+
+## Custom stampers
+
+Most integrations should use `NewAPIKeyStamper`. If you need signing to happen somewhere else,
+such as an HSM, KMS, remote signing service, or WebAuthn ceremony, implement the `Stamper` interface
+and pass that implementation to `NewClient`.
+
+Every request the client sends is authenticated, or *stamped*, before it leaves your process. The
+client delegates that step to any value implementing this interface:
+
+```go
+type Stamper interface {
+	Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error)
+}
+```
+
+`Stamp` receives the serialized request body and returns a `*turnkey.Stamp`, which carries the HTTP
+header the client attaches to the outbound request:
+
+```go
+type Stamp struct {
+	HeaderName  string // e.g. "X-Stamp" or "X-Stamp-WebAuthn"
+	HeaderValue string // the stamp payload for that header
+}
+```
+
+### Implementing a custom stamper
+
+A stamper only needs to sign the exact bytes it is handed and return the header the API expects.
+The skeleton below shows the shape every implementation shares: take the body, produce a signature
+with whatever mechanism you control, and package it as a `Stamp`.
+
+```go
+type Signer interface {
+	Sign(ctx context.Context, body []byte) (string, error)
+}
+
+type CustomStamper struct {
+	signer Signer // your signing mechanism (KMS, HSM, remote service, etc.)
+}
+
+func (s *CustomStamper) Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error) {
+	// Sign the request body exactly as received; do not re-marshal it.
+	stamp, err := s.signer.Sign(ctx, body)
+	if err != nil {
+		return nil, fmt.Errorf("stamp request: %w", err)
+	}
+
+	return &turnkey.Stamp{
+		HeaderName:  "X-Stamp",
+		HeaderValue: stamp,
+	}, nil
+}
+```
+
+After you have a `signer` value that implements the `Signer` interface, pass the custom stamper to
+`NewClient` in place of the API key stamper:
+
+```go
+customStamper := &CustomStamper{signer: signer}
+
+client, err := turnkey.NewClient(
+	customStamper,
+	os.Getenv("TURNKEY_ORGANIZATION_ID"),
+)
+```
+
+<Note>
+Sign the `body` bytes as received. Re-serializing the request can reorder fields or change
+whitespace, which invalidates the signature Turnkey verifies against.
+</Note>
+
+### Example: WebAuthn stamper
+
+A WebAuthn stamper authorizes requests with a passkey or hardware authenticator instead of a static
+API key. The ceremony that produces the assertion runs wherever the authenticator lives, usually a
+browser or native client, so the stamper's job is to derive the WebAuthn challenge from the request
+body, obtain an assertion, and encode it into the `X-Stamp-WebAuthn` header the API expects.
+
+The Go SDK does not currently expose a dedicated WebAuthn stamper constructor, so this example shows
+the interface you would implement around your own WebAuthn transport. The stamp payload uses the
+generated `turnkey.WebAuthnStamp` type.
+
+```go
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+
+	turnkey "github.com/tkhq/go-sdk/v2"
+)
+
+// Authenticator runs a WebAuthn assertion over the given challenge and returns
+// the signed result. Implement this against your browser or device transport.
+type Authenticator interface {
+	Assert(ctx context.Context, challenge []byte) (*turnkey.WebAuthnStamp, error)
+}
+
+type WebAuthnStamper struct {
+	authenticator Authenticator
+}
+
+func NewWebAuthnStamper(a Authenticator) *WebAuthnStamper {
+	return &WebAuthnStamper{authenticator: a}
+}
+
+func (s *WebAuthnStamper) Stamp(ctx context.Context, body []byte) (*turnkey.Stamp, error) {
+	hash := sha256.Sum256(body)
+	challenge := []byte(hex.EncodeToString(hash[:]))
+
+	assertion, err := s.authenticator.Assert(ctx, challenge)
+	if err != nil {
+		return nil, fmt.Errorf("webauthn assertion: %w", err)
+	}
+
+	value, err := json.Marshal(assertion)
+	if err != nil {
+		return nil, fmt.Errorf("encode webauthn stamp: %w", err)
+	}
+
+	return &turnkey.Stamp{
+		HeaderName:  "X-Stamp-WebAuthn",
+		HeaderValue: string(value),
+	}, nil
+}
+```
+
+Wire it into the client the same way as any other stamper:
+
+```go
+webauthnStamper := NewWebAuthnStamper(authenticator)
+
+client, err := turnkey.NewClient(webauthnStamper, os.Getenv("TURNKEY_ORGANIZATION_ID"))
+```
+
+The client now attaches a WebAuthn stamp to every request without any change to how you call
+Turnkey endpoints. The typed request and response models are identical to the API key path.
