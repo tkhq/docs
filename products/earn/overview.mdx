@@ -1,0 +1,107 @@
+---
+title: "Earn"
+description: "Deposit into DeFi yield vaults from Turnkey wallets, with on-chain fee collection for your organization."
+noindex: true
+---
+
+import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+
+Earn lets wallets in your organization deposit into DeFi yield vaults, track their positions, and withdraw, all through Turnkey activities with the usual audit trail and policy controls. You can take your own performance fee on the yield your users earn, paid on-chain to a wallet you control.
+
+<EarnBetaNote />
+
+## What is Earn
+
+Earn connects Turnkey wallets to [ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) yield vaults. Morpho vaults are supported today; Aave is coming. Users don't deposit into the raw vault directly. Instead, they deposit into a **fee wrapper**: a vault contract we deploy once per vault for your organization. The wrapper forwards deposits to the underlying vault and takes the performance fees out of its share price, so users never submit separate fee transactions.
+
+Deploying a wrapper is a one-time setup step per vault. After that, deposits, withdrawals, and position queries are each a single API call.
+
+## How it works
+
+1. Query [`earn_vaults`](/products/earn/features/vault-catalog) for the vaults available for an asset, with live TVL and APY.
+2. Run [`earn_deploy_wrapper`](/products/earn/features/deploy-wrapper) once per vault to enable it for your organization and set your fee. Turnkey pays the deployment gas.
+3. Call [`earn_deposit`](/products/earn/features/deposit) to move assets from a user's wallet into the vault.
+4. Poll the matching status endpoint until the transaction confirms. Deposits, withdrawals, and deployments all confirm asynchronously.
+5. Query [`earn_positions`](/products/earn/features/positions) for a wallet's current value and lifetime totals.
+6. Call [`earn_withdraw`](/products/earn/features/withdraw) for a partial amount, the yield only, or the full position.
+
+## Supported protocols and chains
+
+| Chain | CAIP-2 | Providers |
+| :--- | :--- | :--- |
+| Ethereum | `eip155:1` | Morpho (Aave upcoming) |
+| Base | `eip155:8453` | Morpho (Aave upcoming) |
+| Arbitrum | `eip155:42161` | Morpho (Aave upcoming) |
+| Polygon | `eip155:137` | Morpho (Aave upcoming) |
+| BNB Chain | `eip155:56` | Aave (upcoming) |
+
+Earn is EVM-only in V1. The vault catalog only includes vaults with at least $100k TVL.
+
+## Fees
+
+Earn fees are performance fees: a percentage of the yield a position earns. Principal is never charged. Two fees apply, both in basis points of gross yield:
+
+- **Your fee**: you set it per wrapper at deploy time (`clientFeeBps`), along with the payout wallet (`clientFeeWallet`, a wallet account owned by your organization). Payouts accrue on-chain to that wallet.
+- **Turnkey's fee**: resolved automatically when you deploy. The default is 10% of yield (1,000 bps); enterprise customers can have custom rates.
+
+The combined fee is capped at 50% of yield (5,000 bps), and deployments above the cap are rejected. Both fees come out of the wrapper's share price and are split on-chain by a payment splitter contract deployed alongside the wrapper.
+
+The net APY your users earn is `grossApy × (1 - totalFeeBps / 10000)`. The [`earn_enabled_vaults`](/products/earn/features/vault-catalog#list-your-enabled-vaults) endpoint returns gross APY, net APY, and both fee rates for every wrapper you've deployed.
+
+<Warning>
+  The fee configuration is fixed per wrapper. To change your fee, deploy a new wrapper for the same vault. Existing positions in the old wrapper remain fully withdrawable, and new deposits go to the new wrapper. See [Deploy a vault wrapper](/products/earn/features/deploy-wrapper#choose-your-fee-configuration).
+</Warning>
+
+## API surface
+
+Earn adds three activities:
+
+| Activity | Endpoint | Purpose |
+| :--- | :--- | :--- |
+| `ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER` | `POST /public/v1/submit/earn_deploy_wrapper` | Enable a vault for your org by deploying its fee wrapper |
+| `ACTIVITY_TYPE_EARN_DEPOSIT` | `POST /public/v1/submit/earn_deposit` | Deposit assets from a wallet into an enabled vault |
+| `ACTIVITY_TYPE_EARN_WITHDRAW` | `POST /public/v1/submit/earn_withdraw` | Withdraw assets or exit a position |
+
+and six queries:
+
+| Query | Endpoint | Purpose |
+| :--- | :--- | :--- |
+| Vault catalog | `POST /public/v1/query/earn_vaults` | All wrappable vaults for an asset, with live TVL/APY |
+| Enabled vaults | `POST /public/v1/query/earn_enabled_vaults` | Your org's deployed wrappers (management view) |
+| Positions | `POST /public/v1/query/earn_positions` | A wallet's active positions |
+| Deploy status | `POST /public/v1/query/earn_deploy_status` | Poll a wrapper deployment |
+| Deposit status | `POST /public/v1/query/earn_deposit_status` | Poll a deposit until it lands on-chain |
+| Withdraw status | `POST /public/v1/query/earn_withdraw_status` | Poll a withdrawal until it lands on-chain |
+
+<Note>
+  Earn requests are stamped and submitted like any other Turnkey request. See
+  [Stamps](/developer-reference/api-overview/stamps) and
+  [Submissions](/developer-reference/api-overview/submissions). There are no
+  Earn-specific SDK methods during the beta, so the examples on these pages
+  use cURL and the generic `request` method of
+  [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s
+  `TurnkeyClient`.
+</Note>
+
+## Explore
+
+<CardGroup cols={2}>
+  <Card title="Browse the vault catalog" href="/products/earn/features/vault-catalog">
+    Discover vaults and check your enabled wrappers.
+  </Card>
+  <Card title="Deploy a vault wrapper" href="/products/earn/features/deploy-wrapper">
+    Enable a vault and set your fee.
+  </Card>
+  <Card title="Deposit into a vault" href="/products/earn/features/deposit">
+    One transaction, optionally gas-sponsored.
+  </Card>
+  <Card title="Withdraw from a vault" href="/products/earn/features/withdraw">
+    Partial, yield-only, or full exit.
+  </Card>
+  <Card title="Track positions" href="/products/earn/features/positions">
+    Current value, lifetime totals, and yield.
+  </Card>
+  <Card title="End-to-end example" href="/products/earn/end-to-end-example">
+    Deploy, deposit, and withdraw USDC on Base.
+  </Card>
+</CardGroup>

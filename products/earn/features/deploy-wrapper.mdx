@@ -1,0 +1,188 @@
+---
+title: "Deploy a vault wrapper"
+description: "Enable a yield vault for your organization by deploying its fee wrapper, a one-time setup step that also sets your fee."
+sidebarTitle: "Deploy wrapper"
+noindex: true
+mode: wide
+---
+
+import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+
+Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into. It routes funds to the underlying vault and takes the performance fees out of its share price. Deploying it is a one-time activity per vault, and Turnkey pays the gas.
+
+<EarnBetaNote />
+
+## When to deploy
+
+Deploy once per vault you want to offer, per fee configuration. Deposits into a vault with no deployed wrapper fail with `EARN_SETUP_REQUIRED` (see [Deposit into a vault](/products/earn/features/deposit#prerequisites)). Pick vaults from the [vault catalog](/products/earn/features/vault-catalog); the catalog's `enabled` flag tells you which vaults your organization has already enabled.
+
+## Choose your fee configuration
+
+The deploy intent carries your fee:
+
+- `clientFeeBps`: your performance fee on gross yield, in basis points (`"2000"` = 20%). Combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected.
+- `clientFeeWallet`: the address that receives your fee payouts on-chain. It must be a wallet account owned by your organization; addresses outside your org are rejected.
+
+<Warning>
+  The fee configuration is bound into the wrapper's deterministic (CREATE2)
+  address. Deploying the same vault with a different `clientFeeBps` or
+  `clientFeeWallet` produces a new wrapper at a new address. Positions in the
+  old wrapper remain fully withdrawable; new deposits should target the new
+  wrapper. To change your fee, redeploy and point deposits at the new address.
+</Warning>
+
+## Submit the activity
+
+<ParamField body="type" type="enum<string>" required>
+  `ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required>
+  Timestamp (in milliseconds) of the request, used to verify liveness.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier for your organization.
+</ParamField>
+
+<ParamField body="parameters.vaultAddress" type="string" required>
+  Address of the underlying yield vault to wrap, from the [vault catalog](/products/earn/features/vault-catalog).
+</ParamField>
+
+<ParamField body="parameters.chainCaip2" type="string" required>
+  CAIP-2 chain identifier the vault lives on, e.g. `eip155:8453` for Base.
+</ParamField>
+
+<ParamField body="parameters.clientFeeBps" type="string" required>
+  Your performance fee on gross yield, in basis points (e.g. `"2000"` for 20%).
+</ParamField>
+
+<ParamField body="parameters.clientFeeWallet" type="string" required>
+  The org-owned wallet address that receives your fee payouts.
+</ParamField>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/earn_deploy_wrapper \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<ORGANIZATION_ID>",
+    "parameters": {
+      "vaultAddress": "<VAULT_ADDRESS>",
+      "chainCaip2": "eip155:8453",
+      "clientFeeBps": "2000",
+      "clientFeeWallet": "<CLIENT_FEE_WALLET_ADDRESS>"
+    }
+  }'
+```
+
+```javascript title="JavaScript"
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+const client = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  }),
+);
+
+const { activity } = await client.request(
+  "/public/v1/submit/earn_deploy_wrapper",
+  {
+    type: "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
+    timestampMs: String(Date.now()),
+    organizationId: "<ORGANIZATION_ID>",
+    parameters: {
+      vaultAddress: "<VAULT_ADDRESS>",
+      chainCaip2: "eip155:8453",
+      clientFeeBps: "2000",
+      clientFeeWallet: "<CLIENT_FEE_WALLET_ADDRESS>",
+    },
+  },
+);
+```
+
+</CodeGroup>
+
+The activity result returns the deployed addresses immediately; they are derived deterministically before the transaction confirms:
+
+```json
+{
+  "activity": {
+    "id": "<ACTIVITY_ID>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
+    "result": {
+      "earnDeployWrapperResult": {
+        "deployRequestId": "<DEPLOY_REQUEST_ID>",
+        "wrapperAddress": "<WRAPPER_ADDRESS>",
+        "splitterAddress": "<SPLITTER_ADDRESS>"
+      }
+    }
+  }
+}
+```
+
+- `wrapperAddress`: the deposit target for this vault.
+- `splitterAddress`: the payment splitter that distributes fees between you and Turnkey.
+- `deployRequestId`: poll handle for the deployment transaction.
+
+## Poll deployment status
+
+The activity completes when the deployment transaction is broadcast, not when it confirms. Poll `earn_deploy_status` until it reports `COMPLETED` before accepting deposits:
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/earn_deploy_status \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "organizationId": "<ORGANIZATION_ID>",
+    "deployRequestId": "<DEPLOY_REQUEST_ID>"
+  }'
+```
+
+```javascript title="JavaScript"
+const status = await client.request("/public/v1/query/earn_deploy_status", {
+  organizationId: "<ORGANIZATION_ID>",
+  deployRequestId: "<DEPLOY_REQUEST_ID>",
+});
+```
+
+</CodeGroup>
+
+```json
+{
+  "status": "COMPLETED",
+  "deployTxHash": "<TRANSACTION_HASH>"
+}
+```
+
+`status` is `PENDING`, `COMPLETED`, or `FAILED`. On `FAILED`, the response includes an `error` field with the reason.
+
+## Gas and idempotency
+
+<Note>
+  Turnkey pays the wrapper deployment gas (roughly 7.1M gas per deployment),
+  not you or your users. Deployments are also idempotent: resubmitting the
+  activity with identical parameters re-derives the same wrapper and splitter
+  addresses and skips the broadcast if the contracts already exist, so
+  retries are safe.
+</Note>
+
+## Next steps
+
+- [Browse the vault catalog](/products/earn/features/vault-catalog) to pick vaults to enable
+- [Deposit into a vault](/products/earn/features/deposit) once the deployment is `COMPLETED`
+- Review the [fee model](/products/earn/overview#fees)

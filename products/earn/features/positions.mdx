@@ -1,0 +1,117 @@
+---
+title: "Track positions"
+description: "Query a wallet's active Earn positions: current value, lifetime deposits and withdrawals, and the yield earned."
+noindex: true
+mode: wide
+---
+
+import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+
+`earn_positions` returns the active positions for a single wallet address, one entry per wrapper the wallet holds shares in, with live on-chain values.
+
+<EarnBetaNote />
+
+## Query positions
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier for your organization (or the sub-organization that owns the wallet).
+</ParamField>
+
+<ParamField body="walletAddress" type="string" required>
+  The wallet address to return positions for. Positions are scoped per wallet, not org-wide.
+</ParamField>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/earn_positions \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "organizationId": "<ORGANIZATION_ID>",
+    "walletAddress": "<WALLET_ADDRESS>"
+  }'
+```
+
+```javascript title="JavaScript"
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+const client = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  }),
+);
+
+const { positions } = await client.request("/public/v1/query/earn_positions", {
+  organizationId: "<ORGANIZATION_ID>",
+  walletAddress: "<WALLET_ADDRESS>",
+});
+```
+
+</CodeGroup>
+
+```json
+{
+  "positions": [
+    {
+      "vaultAddress": "<VAULT_ADDRESS>",
+      "wrapperAddress": "<WRAPPER_ADDRESS>",
+      "provider": "EARN_PROVIDER_MORPHO",
+      "caip19": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "currentValue": "100512340",
+      "totalDeposited": "100000000",
+      "totalWithdrawn": "0",
+      "display": {
+        "currentValueUsd": "100.51",
+        "totalDepositedUsd": "100.00",
+        "totalWithdrawnUsd": "0.00",
+        "currentValueCrypto": "100.512340",
+        "totalDepositedCrypto": "100.000000",
+        "totalWithdrawnCrypto": "0.000000"
+      }
+    }
+  ]
+}
+```
+
+## Understanding the fields
+
+| Field | Units | Meaning |
+| :--- | :--- | :--- |
+| `currentValue` | raw on-chain units of the underlying asset | Live value of the position, already net of the wrapper's performance fees. This is what a full withdrawal would return right now |
+| `totalDeposited` | raw on-chain units | Lifetime amount deposited into this position since it was opened (or since the last full `MAX` exit) |
+| `totalWithdrawn` | raw on-chain units | Lifetime amount withdrawn over the same window |
+| `display.*` | formatted strings | USD and asset-denominated renderings for UI display only |
+
+Raw fields are exact base-10 integers in the asset's smallest unit (e.g. `"100512340"` = 100.51234 USDC at 6 decimals). The totals accumulate from your deposit and withdrawal amounts; a [`MAX` withdrawal](/products/earn/features/withdraw#full-exit-with-max) closes the position and resets both totals to zero.
+
+<Warning>
+  Don't do arithmetic with `display` values; they are formatted, rounded
+  strings for presentation. Compute with the raw fields using `BigInt` (or
+  your language's arbitrary-precision integers) rather than floats.
+</Warning>
+
+## Computing yield
+
+Yield earned to date is:
+
+```
+yield = currentValue - totalDeposited + totalWithdrawn
+```
+
+For example, a position with `totalDeposited = "100000000"` (100 USDC), `totalWithdrawn = "0"`, and `currentValue = "100512340"` has earned `512340` raw units (0.51234 USDC), net of all fees. To pay out just the yield, see [Claiming yield only](/products/earn/features/withdraw#claiming-yield-only).
+
+## Access notes
+
+- Positions are per wallet address: deposits made by a sub-organization wallet appear under that wallet's address, queried with the sub-organization's ID.
+- Some Earn management reads are restricted to the parent organization; position queries work for both parent and sub-organizations.
+
+## Next steps
+
+- [Withdraw from a vault](/products/earn/features/withdraw) for a partial, yield-only, or `MAX` exit
+- [Deposit into a vault](/products/earn/features/deposit) to grow a position

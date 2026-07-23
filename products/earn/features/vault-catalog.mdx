@@ -1,0 +1,165 @@
+---
+title: "Browse the vault catalog"
+description: "Discover the yield vaults available for an asset with live TVL and APY, and list the vaults your organization has enabled."
+sidebarTitle: "Vault catalog"
+noindex: true
+mode: wide
+---
+
+import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+
+Two queries cover vault discovery: `earn_vaults` returns the market of wrappable vaults for an asset, and `earn_enabled_vaults` returns the wrappers your organization has already deployed.
+
+<EarnBetaNote />
+
+## Discover vaults with earn_vaults
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier for your organization. Used to annotate which vaults you have already enabled.
+</ParamField>
+
+<ParamField body="caip19" type="string" required>
+  CAIP-19 asset identifier to return vaults for, e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` for USDC on Base. The chain is derived from this identifier.
+</ParamField>
+
+<ParamField body="provider" type="enum<string>">
+  Optional filter: `EARN_PROVIDER_MORPHO` or `EARN_PROVIDER_AAVE`. Omit to return all providers.
+</ParamField>
+
+<ParamField body="paginationOptions" type="object">
+  Cursor pagination over the TVL-sorted catalog. `limit` defaults to 10 (max 100); pass the last `vaultAddress` of a page as the `after` cursor for the next page.
+</ParamField>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/earn_vaults \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "organizationId": "<ORGANIZATION_ID>",
+    "caip19": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  }'
+```
+
+```javascript title="JavaScript"
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+const client = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  }),
+);
+
+const { vaults } = await client.request("/public/v1/query/earn_vaults", {
+  organizationId: "<ORGANIZATION_ID>",
+  caip19: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+});
+```
+
+</CodeGroup>
+
+```json
+{
+  "vaults": [
+    {
+      "vaultAddress": "<VAULT_ADDRESS>",
+      "provider": "EARN_PROVIDER_MORPHO",
+      "caip19": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "tvl": "182734550123456",
+      "apyPct": "0.0812",
+      "enabled": false,
+      "display": {
+        "usd": "182,734,550.12",
+        "crypto": "182,734,550.123456"
+      }
+    }
+  ]
+}
+```
+
+<Note>
+  - The catalog is sorted by TVL in USD, descending, and only includes vaults
+    with at least **$100k TVL**.
+  - `tvl` is in raw on-chain units of the underlying asset; `apyPct` is a
+    decimal fraction (`"0.0812"` = 8.12% gross APY, before fees).
+  - `display` values are for presentation only. Don't do arithmetic with
+    them.
+  - `enabled: true` means your organization already has a wrapper deployed for
+    the vault.
+</Note>
+
+## List your enabled vaults
+
+The management view of every wrapper your organization has deployed, with on-chain totals and the full fee breakdown:
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier for your organization.
+</ParamField>
+
+<ParamField body="provider" type="enum<string>">
+  Optional provider filter.
+</ParamField>
+
+<ParamField body="caip19" type="string">
+  Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 identifier.
+</ParamField>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/earn_enabled_vaults \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "organizationId": "<ORGANIZATION_ID>"
+  }'
+```
+
+```javascript title="JavaScript"
+const { enabledVaults } = await client.request(
+  "/public/v1/query/earn_enabled_vaults",
+  { organizationId: "<ORGANIZATION_ID>" },
+);
+```
+
+</CodeGroup>
+
+```json
+{
+  "enabledVaults": [
+    {
+      "vaultAddress": "<VAULT_ADDRESS>",
+      "wrapperAddress": "<WRAPPER_ADDRESS>",
+      "provider": "EARN_PROVIDER_MORPHO",
+      "caip19": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "apyPct": "0.0812",
+      "netApyPct": "0.0568",
+      "turnkeyFeeBps": "1000",
+      "clientFeeBps": "2000",
+      "totalDeposited": "2500000000",
+      "display": {
+        "usd": "2,500.00",
+        "crypto": "2,500.00"
+      }
+    }
+  ]
+}
+```
+
+`apyPct` is the gross APY; `netApyPct` is what depositors earn after both performance fees: `netApy = grossApy × (1 - (turnkeyFeeBps + clientFeeBps) / 10000)`. `totalDeposited` is the wrapper's TVL in raw units of the underlying asset. `wrapperAddress` is the deposit target to pass to [`earn_deposit`](/products/earn/features/deposit).
+
+## Providers
+
+Morpho vaults are available today. Aave support is upcoming; the API shape is identical, so no integration changes will be needed. See the [chain support table](/products/earn/overview#supported-protocols-and-chains).
+
+## Next steps
+
+- [Deploy a vault wrapper](/products/earn/features/deploy-wrapper) for a vault from the catalog
