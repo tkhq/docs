@@ -1,0 +1,124 @@
+---
+title: "Smart Contract Management"
+description: "Secure the full smart contract lifecycle with policy-enforced deployment, function-level access control, and safe upgrade workflows."
+mode: wide
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+
+This guide covers the key implementation decisions for securing smart contract operations, then walks through the contract lifecycle end-to-end: permissioned deployment, function-level interaction policies, and minimizing risk during upgrades. For basic signing, start with the [Quickstart](/solutions/company-wallets/quickstart).
+
+## Powered by Turnkey
+
+Teams managing high-value contracts use Turnkey for policy-enforced signing at every stage:
+
+- [**Polymarket**](/solutions/cookbooks/polymarket-builders) transitioned to Turnkey for secure contract interactions at scale, including Safe deployment and gasless trading infrastructure.
+- [**Brale**](/solutions/cookbooks/brale) uses Turnkey's policy engine to constrain stablecoin minting and transfer operations to an allowlist of approved contracts.
+
+Turnkey also fits **existing** contract deployments. You don't need to redeploy to start managing signing through Turnkey.
+
+## Key implementation decisions
+
+| Decision | What to consider |
+| :--- | :--- |
+| Role isolation | Separate wallets for deployer, operator, and upgrade owner so each role has its own keys and scoped policies |
+| Deployment permissions | Policy scoping the deployer to a specific wallet and network |
+| Function-level controls | Policies targeting specific contract addresses and function signatures, or [upload the ABI](/features/policies/smart-contract-interfaces) for full parsing |
+| Value thresholds | Automated approval for routine operations (small mints), multi-party consensus for large ones |
+| Upgrade controls | Grant upgrade permissions only when needed via temporary policies, then revoke immediately after |
+
+## Example: stablecoins and RWAs
+
+Stablecoins and tokenized Real-World Assets often secure billions of dollars in value. These contracts typically involve minting, burning, pausing, and upgrades, each requiring different levels of authorization.
+
+| Need | How Turnkey solves it |
+| :--- | :--- |
+| Minting must be constrained to approved limits | Policies can bound mint amounts and require multi-party approval above a threshold via [smart contract interfaces](/features/policies/smart-contract-interfaces) |
+| Only authorized addresses can receive new supply | Policies target specific contract addresses and function arguments, restricting who the `mint` recipient can be |
+| Must support emergency pause | A dedicated pause operator wallet with a scoped policy for the `pause` function, separate from day-to-day minting |
+| Upgrades must not introduce unreviewed logic | Temporary upgrade policies with multi-party consensus, revoked immediately after execution |
+| Full audit trail of every operation | Every signing action is an activity in Turnkey with a complete audit log of who approved what and when |
+
+![rbac](/assets/files/rbac.png)
+
+### Implementation steps
+
+<Note>
+  This guide assumes you've completed the [Quickstart](/solutions/company-wallets/quickstart) and have a Turnkey client initialized. If not, start there first.
+</Note>
+
+<Steps>
+<Step title="Permissioned contract deployment">
+
+Deployment is strictly permissioned. A designated deployer user must have a policy that explicitly grants them permission to sign the deployment transaction for a specific wallet and network.
+
+```json
+{
+  "policyName": "Allow deployer to deploy on Base",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DEPLOYER_USER_ID>')",
+  "condition": "activity.action == 'SIGN' && wallet.id == '<DEPLOYER_WALLET_ID>' && eth.tx.to == '' && eth.tx.chain_id == '8453'"
+}
+```
+
+The `eth.tx.to == ''` condition matches contract creation transactions (where the `to` field is empty). Combined with a chain ID constraint, this ensures the deployer can only deploy on the intended network.
+
+</Step>
+
+<Step title="Function-level interaction policies">
+
+Once deployed, interactions like minting new token supply are governed by precise policies. For example, a minting policy can be configured to:
+
+- Allow a specific operator user to sign
+- Require the transaction to originate from a designated wallet
+- Target the deployed contract's exact address
+- Call only the `mint` function
+
+```json
+{
+  "policyName": "Allow minter to mint tokens",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<MINTER_USER_ID>')",
+  "condition": "activity.action == 'SIGN' && wallet.id == '<MINTER_WALLET_ID>' && eth.tx.to == '<CONTRACT_ADDRESS>' && eth.tx.data[0..10] == '0x40c10f19'"
+}
+```
+
+The `0x40c10f19` value is the function selector for `mint(address,uint256)`. For production use, the recommended approach is to [upload the contract ABI](/features/policies/smart-contract-interfaces) so policies can reference function names and constrain arguments directly (e.g., bounding mint amounts or requiring multi-party approval above a threshold).
+
+</Step>
+
+<Step title="Safe contract upgrades">
+
+Upgrading a contract redirects the underlying implementation logic, making it one of the most sensitive operations. Turnkey minimizes the risk window:
+
+1. Designate a specific upgrade owner wallet (separate from the operator wallet).
+2. Create a temporary, highly restrictive policy **only when an upgrade is needed**, granting the upgrade owner permission to sign the upgrade transaction.
+3. Once the upgrade is complete, remove the policy. The wallet remains dormant and secured until the next upgrade.
+
+```json
+{
+  "policyName": "Temporary: allow upgrade owner to upgrade proxy",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<UPGRADE_OWNER_ID>')",
+  "condition": "activity.action == 'SIGN' && wallet.id == '<UPGRADE_WALLET_ID>' && eth.tx.to == '<PROXY_ADDRESS>' && eth.tx.data[0..10] == '0x3659cfe6'"
+}
+```
+
+The `0x3659cfe6` selector matches `upgradeTo(address)`. After the upgrade completes, delete this policy to close the window.
+
+</Step>
+</Steps>
+
+<Tip>
+  This lifecycle is further explored in the [Smart Contract Management demo](https://github.com/tkhq/solutions/tree/main/smart-contract-mgmt) on GitHub.
+</Tip>
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <FeatureCard title="Smart Contract Interfaces" icon="file-code-02" href="/features/policies/smart-contract-interfaces" description="Upload ABIs and Solana IDLs for human-readable, argument-level policy control." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/quickstart" description="Define granular access controls for every signing action in your organization." />
+  <SolutionCard title="Payment Orchestration" icon="payment-orchestration" href="/solutions/company-wallets/payment-orchestration" description="Build deposit wallets, sweep automations, and treasury flows with the same RBAC model." />
+  <FeatureCard title="EVM Policy Examples" icon="file-shield-02" href="/features/policies/examples/ethereum" description="Ready-made policy patterns for ERC-20 transfers, EIP-712 signing, and more." />
+</div>

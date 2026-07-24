@@ -1,0 +1,158 @@
+---
+title: "Company Wallets quickstart"
+description: "Get from zero to a signed transaction with Turnkey's Company Wallets. Initialize the server SDK, create a wallet, and sign your first Ethereum transaction using Viem or Ethers."
+sidebarTitle: "Quickstart"
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+
+## Prerequisites
+
+This guide assumes you've completed the steps to create an account, organization, and API keypair as described in the [account setup](/get-started/quickstart) section. This guide uses the TypeScript server SDK (`@turnkey/sdk-server`). For other languages, see [Server SDKs](/sdks/introduction).
+
+## Installation
+
+Install the server SDK and your preferred Ethereum library:
+
+<CodeGroup>
+
+```bash Viem
+npm install @turnkey/sdk-server @turnkey/viem viem
+```
+
+```bash Ethers
+npm install @turnkey/sdk-server @turnkey/ethers ethers
+```
+
+</CodeGroup>
+
+<Tip>
+  This quickstart uses Ethereum, but Turnkey supports all EVM and SVM chains, along with Bitcoin, Tron, and [more](/features/networks/overview). To sign Solana transactions, derive a Solana address using `ADDRESS_FORMAT_SOLANA` with `CURVE_ED25519` and use [`@turnkey/solana`](https://www.npmjs.com/package/@turnkey/solana) or the server SDK's [`solSendTransaction`](/features/networks/solana) method.
+</Tip>
+
+## Sign your first transaction
+
+<Steps>
+<Step title="Initialize the Turnkey client">
+
+Add your API credentials to a `.env` file:
+
+```bash
+TURNKEY_ORGANIZATION_ID=<your-organization-id>
+TURNKEY_API_PRIVATE_KEY=<your-api-private-key>
+TURNKEY_API_PUBLIC_KEY=<your-api-public-key>
+```
+
+Then initialize the client in your application:
+
+```ts
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+});
+```
+
+</Step>
+<Step title="Create a wallet">
+
+Create a wallet and derive an Ethereum address in a single call:
+
+```ts
+const { walletId, addresses } = await turnkeyClient.apiClient().createWallet({
+  walletName: "default",
+  accounts: [
+    {
+      curve: "CURVE_SECP256K1",
+      pathFormat: "PATH_FORMAT_BIP32",
+      path: "m/44'/60'/0'/0/0",
+      addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+    },
+  ],
+});
+
+const ethereumAddress = addresses[0];
+console.log("Ethereum address:", ethereumAddress);
+```
+
+</Step>
+<Step title="Initialize a wallet signer">
+
+<Tabs>
+  <Tab title="Viem">
+```ts
+import { createAccount } from "@turnkey/viem";
+import { createWalletClient, http } from "viem";
+import { mainnet } from "viem/chains";
+
+const turnkeyAccount = await createAccount({
+  client: turnkeyClient.apiClient(),
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: ethereumAddress,
+});
+
+const walletClient = createWalletClient({
+  account: turnkeyAccount,
+  chain: mainnet,
+  transport: http(),
+});
+```
+  </Tab>
+  <Tab title="Ethers">
+```ts
+import { ethers } from "ethers";
+import { TurnkeySigner } from "@turnkey/ethers";
+
+const provider = new ethers.JsonRpcProvider("YOUR_RPC_URL");
+const turnkeySigner = new TurnkeySigner({
+  client: turnkeyClient.apiClient(),
+  organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+  signWith: ethereumAddress,
+});
+const connectedSigner = turnkeySigner.connect(provider);
+```
+  </Tab>
+</Tabs>
+
+</Step>
+<Step title="Send a transaction">
+
+<Tabs>
+  <Tab title="Viem">
+```ts
+import { parseEther } from "viem";
+
+const txHash = await walletClient.sendTransaction({
+  to: "<destination address>",
+  value: parseEther("<amount to send>"),
+});
+console.log("Transaction hash:", txHash);
+```
+  </Tab>
+  <Tab title="Ethers">
+```ts
+const txHash = await connectedSigner.sendTransaction({
+  to: "<destination address>",
+  value: ethers.parseEther("<amount to send>"),
+  type: 2,
+});
+console.log("Transaction hash:", txHash.hash);
+```
+  </Tab>
+</Tabs>
+
+</Step>
+</Steps>
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <SolutionCard title="Payment Orchestration" icon="payment-orchestration" href="/solutions/company-wallets/payment-orchestration" description="Build deposit wallets, sweep automations, and treasury flows with policy-enforced access control." />
+  <SolutionCard title="Smart Contract Management" icon="smart-contract-management" href="/solutions/company-wallets/smart-contract-management" description="Secure the full contract lifecycle from deployment to upgrades with granular RBAC." />
+  <FeatureCard title="Policies" icon="file-shield-02" href="/features/policies/quickstart" description="Define who can sign what with Turnkey's default-deny policy engine." />
+  <FeatureCard title="Server SDKs" icon="server-04" href="/sdks/introduction" description="Explore server SDKs for TypeScript, Go, Ruby, Rust, and Python." />
+</div>

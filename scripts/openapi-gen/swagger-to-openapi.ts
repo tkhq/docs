@@ -2,8 +2,19 @@ import * as fs from "fs";
 import * as path from "path";
 import { convertObj } from "swagger2openapi";
 
-const SWAGGER_PATH = path.resolve(__dirname, "../../public_api.swagger.json");
-const OUTPUT_PATH = path.resolve(__dirname, "openapi.json");
+const serviceArg = process.argv.find((a: string) => a.startsWith("--service="));
+const service = serviceArg ? serviceArg.split("=")[1] : "turnkey";
+
+const isAuthProxy = service === "auth-proxy";
+
+const SWAGGER_PATH = path.resolve(
+  __dirname,
+  isAuthProxy ? "../../proxy_api.swagger.json" : "../../public_api.swagger.json"
+);
+const OUTPUT_PATH = path.resolve(
+  __dirname,
+  isAuthProxy ? "proxy_api_openapi.json" : "openapi.json"
+);
 
 // Doing some custom key ordering to match the old openapi.json and minimize diffs in initial change
 const KEY_ORDERS: Record<string, string[]> = {
@@ -45,6 +56,12 @@ function reorderPaths(paths: any): any {
 
 async function main() {
   const swagger = JSON.parse(fs.readFileSync(SWAGGER_PATH, "utf-8"));
+
+  // Inject host/schemes for services that don't declare them in the spec
+  if (isAuthProxy) {
+    swagger.host = "authproxy.turnkey.com";
+    swagger.schemes = ["https"];
+  }
 
   const { openapi } = await convertObj(swagger, {
     patch: true,

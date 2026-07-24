@@ -1,0 +1,274 @@
+---
+title: "Ethereum (EVM)"
+description: "This page provides examples of policies governing Ethereum (EVM) signing."
+sidebarTitle: "Ethereum (EVM)"
+---
+
+Note: see the [language section](/features/policies/language#ethereum) for more details.
+
+#### Allow ABI-specific contract call parameters
+
+For contract interactions, use
+[Smart Contract Interfaces](/features/policies/smart-contract-interfaces) (ABI upload) rather than
+raw calldata slicing. ABI-based policies use named arguments
+(`eth.tx.contract_call_args['arg_name']`) instead of byte offsets — they're more readable, less
+error-prone, and won't silently break if the contract encoding changes. Raw `eth.tx.data[...]`
+slicing is a fallback for contracts where no ABI is available.
+
+**Restrict a `transfer` call to a maximum amount and a specific recipient:**
+
+```json
+{
+  "policyName": "Limit WETH transfers",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.contract_call_args['wad'] < 1000000000000000000 && eth.tx.contract_call_args['dst'] == '0x08d2b0a37F869FF76BACB5Bab3278E26ab7067B7'"
+}
+```
+
+**Restrict by function name or selector (also requires an ABI upload):**
+
+```json
+{
+  "policyName": "Allow only transfer calls to a contract",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.to == '<CONTRACT_ADDRESS>' && eth.tx.function_name == 'transfer'"
+}
+```
+
+#### Iterating over contract call arguments
+
+When a contract function takes an array parameter, use  `.count()`, `.all()`, and `.any()` to enforce conditions across every element, 
+rather than checking a single index.
+
+**Syntax:**
+- Array element count: `eth.tx.contract_call_args['arrayArg'].count()`
+- All elements match: `eth.tx.contract_call_args['arrayArg'].all(item, <condition>)`
+- Any element matches: `eth.tx.contract_call_args['arrayArg'].any(item, <condition>)`
+
+<Note>
+  For functions that take a `tuple array` (e.g. `executeBatch((address,uint256,bytes)[] calls)`), tuple fields are currently 
+  accessed by `position` rather than name: `call[0]` (first field), `call[1]` (second field), and so on. 
+  The positions correspond to the order of fields as defined in your ABI — substitute the correct indices for your own struct. 
+  Named access such as `call['target']` is not yet supported and produces `OUTCOME_ERROR`. 
+</Note>
+
+**Enforce exact batch size**
+
+Restrict signing to transactions containing exactly two calls:
+
+```json
+{
+  "policyName": "Allow executeBatch with exactly 2 calls",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'executeBatch' && eth.tx.contract_call_args['calls'].count() == 2"
+}
+```
+
+**Whitelist all call targets in a batch**
+
+Allow signing only when every call targets a specific contract and sends zero ETH. 
+call[0] is the target address and call[1] is the value, based on the field order in the executeBatch ABI:
+
+```json
+{
+  "policyName": "Allow executeBatch to whitelisted contract only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'executeBatch' && eth.tx.contract_call_args['calls'].all(call, call[0] == '<CONTRACT_ADDRESS>' && call[1] == 0)"
+}
+```
+
+**Combine batch size and target restrictions**
+
+```json
+{
+  "policyName": "Allow executeBatch — max 2 calls to whitelisted contract",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'executeBatch' && eth.tx.contract_call_args['calls'].count() <= 2 && eth.tx.contract_call_args['calls'].all(call, call[0] == '<CONTRACT_ADDRESS>' && call[1] == 0)"
+}
+```
+
+**Whitelist recipients in a flat address array**
+
+For functions that take a plain `address[]` parameter — such as a disperse-style multi-send contract — use 
+in to restrict signing to a known set of addresses:
+
+```json
+{
+  "policyName": "Allow disperse to whitelisted recipients only",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.function_name == 'disperse' && eth.tx.contract_call_args['recipients'].all(addr, addr in ['<ADDRESS_1>', '<ADDRESS_2>', '<ADDRESS_3>'])"
+}
+```
+
+See [Smart Contract Interfaces](/features/policies/smart-contract-interfaces) for the full upload
+walkthrough and Solana IDL support.
+
+#### Allow ERC-20 transfers for a specific token smart contract (raw calldata fallback)
+
+Use this pattern only when an ABI is unavailable. The selector `0xa9059cbb` is the 4-byte keccak256
+hash of `transfer(address,uint256)`.
+
+```json
+{
+  "policyName": "Enable ERC-20 transfers for <CONTRACT_ADDRESS>",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.to == '<CONTRACT_ADDRESS>' && eth.tx.data[0..10] == '0xa9059cbb'"
+}
+```
+
+#### Allow anyone to sign transactions for testnet (Sepolia)
+
+```json
+{
+  "policyName": "Allow signing ethereum sepolia transactions",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.chain_id == 11155111"
+}
+```
+
+#### Allow ETH transactions with a specific nonce range
+
+```json
+{
+  "policyName": "Allow signing Ethereum transactions with an early nonce",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.tx.nonce <= 3"
+}
+```
+
+#### Allow signing of EIP-712 payloads for Hyperliquid `ApproveAgent` operations
+
+```json
+{
+  "policyName": "Allow signing of EIP-712 Payloads for Hyperliquid `ApproveAgent` operations",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'HyperliquidSignTransaction' && eth.eip_712.primary_type == 'HyperliquidTransaction:ApproveAgent' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+#### Inspect nested fields in EIP-712 message payloads
+
+The `eth.eip_712.message` map supports nested field access using bracket notation and array iteration operators, 
+allowing policies to inspect and enforce conditions across typed data contents, beyond just the domain and primary type.
+
+**Syntax:**
+
+- Nested struct fields: `eth.eip_712.message['outerField']['innerField']`
+- Array element fields: `eth.eip_712.message['arrayField'][0]['innerField']`
+- Array iteration: `eth.eip_712.message['arrayField'].all(item, <condition>)`
+- Array length: `eth.eip_712.message['arrayField'].count()`
+
+
+**Example: Restrict Permit2 batch token approvals by token address**
+
+Uniswap's [Permit2](https://github.com/Uniswap/permit2) `PermitBatchTransferFrom` type lets users sign a single message authorizing
+multiple token transfers. The message contains a `permitted` array of `TokenPermissions` structs,
+each with a `token` address and an `amount`.
+
+```json
+{
+  "primaryType": "PermitBatchTransferFrom",
+  "domain": { "name": "Permit2", "chainId": 1, "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3" },
+  "message": {
+    "permitted": [
+      { "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "amount": "1000000000" }
+    ],
+    "spender": "0x<SPENDER_ADDRESS>",
+    "nonce": 0,
+    "deadline": 1234567890
+  }
+}
+```
+
+To allow signing only when the first permitted token is USDC:
+
+```json
+{
+  "policyName": "Allow Permit2 batch only if first token is USDC",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+<Note>
+  Array elements can be accessed by index (`[0]`, `[1]`, etc.). The condition `message['permitted'][0]['token'] == '0xA0b8...'`
+  checks the first entry. You can also check specific positions explicitly
+  (for example, `message['permitted'][0]['token'] == '0xA0b8...' && message['permitted'][1]['token'] == '0xA0b8...'`).
+  Use `.all()` when you want to apply the same token check across the entire `permitted` array. A `.all()` example is included below.
+</Note>
+
+#### Iterating over array fields
+
+**Whitelist a specific token across all approvals with .all():**
+
+```json
+{
+  "policyName": "Allow Permit2 batch only for USDC",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+**Allow Permit2 batches with two or fewer token permissions:**
+
+```json
+{
+  "policyName": "Allow Permit2 batches with <= 2 token permissions",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+**Allow token permissions below 100 USDC:**
+
+```json
+{
+  "policyName": "Allow USDC token permissions below 100 USDC",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+<Note>
+`in` works for integer fields. For string fields such as token addresses, use `||` instead.
+</Note>
+
+### Deny signing of `NO_OP` keccak256 payloads
+
+```json
+{
+  "policyName": "Deny NO_OP hash signing",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
+}
+```
+
+#### Allow signing of EIP-712 payloads for EIP-3009 transfers
+
+```json
+{
+  "policyName": "Allow signing of EIP-712 payloads for EIP-3009 Transfers for USD Coin",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'TransferWithAuthorization' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+#### Allow signing of EIP-712 payloads for EIP-2612 permits for USD Coin
+
+```json
+{
+  "policyName": "Allow signing of EIP-712 payloads for EIP-2612 Permits for USD Coin",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'Permit' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+#### Allow signing of EIP-7702 authorizations
+
+```json
+{
+  "policyName": "Allow signing of EIP-7702 Authorizations",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_7702_authorization.address == '<ADDRESS>' && eth.eip_7702_authorization.chain_id == '<CHAIN_ID>' && eth.eip_7702_authorization.nonce == '<NONCE>' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```

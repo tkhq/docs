@@ -1,0 +1,125 @@
+---
+title: "Cosmos support on Turnkey"
+sidebarTitle: "Cosmos"
+---
+
+## Address derivation
+
+Turnkey supports Cosmos address derivation. The address formats we support follow the [Cosmos SDK](https://docs.cosmos.network/) standard for bech32 addresses.
+
+## Transaction construction and signing
+
+To construct and sign Cosmos transactions with Turnkey, we offer:
+
+- [`@turnkey/cosmjs`](https://www.npmjs.com/package/@turnkey/cosmjs): exports a `TurnkeyDirectWallet` that serves as a drop-in replacement for a CosmJS direct wallet. It includes support for `signDirect`.
+
+See it in action in our example:
+
+- [`examples/chain-integrations/with-cosmjs`](https://github.com/tkhq/sdk/tree/main/examples/chain-integrations/with-cosmjs): demonstrates transaction construction and broadcast on Cosmos.
+
+## Example
+
+Here's a minimal example showing how to initialize a Turnkey signer for Cosmos and perform basic operations:
+
+<CodeGroup>
+
+```typescript example.ts [expandable]
+import { Turnkey } from "@turnkey/sdk-server";
+import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
+import { toHex } from "@cosmjs/encoding";
+import { SigningStargateClient } from "@cosmjs/stargate";
+
+// Initialize the Turnkey client
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: process.env.API_PRIVATE_KEY,
+  apiPublicKey: process.env.API_PUBLIC_KEY,
+  defaultOrganizationId: process.env.ORGANIZATION_ID,
+});
+
+const signer = await initializeCosmosSigner(turnkeyClient);
+
+// Connect to a Cosmos chain RPC endpoint
+const rpcEndpoint = "https://rpc.celestia-arabica-11.com";
+const client = await SigningStargateClient.connectWithSigner(
+  rpcEndpoint,
+  signer
+);
+
+// Get account balance
+const balance = await client.getAllBalances(signer.address);
+
+const recipient = "celestia1vsvx8n7f8dh5udesqqhgrjutyun7zqrgehdq2l";
+const amount = coins(1000, "utia");
+const fee = calculateFee(200000, GasPrice.fromString("0.01usei"));
+
+const result = await client.sendTokens(
+  signer.address,
+  recipient,
+  amount,
+  fee,
+  "Sent via Turnkey"
+);
+
+const result = await signingClient.sendTokens(
+  signer.address,
+  recipient,
+  [{ denom: "utia", amount: transactionAmount }],
+  {
+    amount: [{ denom: "utia", amount: "20000" }],
+    gas: "200000",
+  },
+  "Hello from Turnkey!"
+);
+```
+
+```typescript wallet.ts [expandable]
+import { type TurnkeyApiClient } from "@turnkey/sdk-server";
+import { TurnkeyDirectWallet } from "@turnkey/cosmjs";
+
+// Connect to Cosmos and initialize signer
+export async function initializeCosmosSigner(turnkeyClient: TurnkeyApiClient) {
+  // Create a Turnkey-powered Cosmos signer
+  const signer = await TurnkeyDirectWallet.init({
+    config: {
+      client: turnkeyClient.apiClient(),
+      organizationId: process.env.ORGANIZATION_ID,
+      signWith: process.env.COSMOS_ADDRESS, // Your Cosmos address in Turnkey
+    },
+    prefix: "cosmos", // Change to the appropriate chain prefix (e.g., "celestia", "osmo", etc.)
+  });
+
+  // Get the account details
+  const accounts = await wallet.getAccounts();
+  const account = accounts[0];
+
+  console.log("Cosmos wallet address:", account.address);
+  console.log("Public key:", toHex(account.pubkey));
+
+  return signer;
+}
+```
+
+</CodeGroup>
+
+## Supported cosmos chains
+
+Turnkey supports various Cosmos ecosystem chains for address derivation and signing, including but not limited to:
+
+- Cosmos Hub (ATOM)
+- Celestia
+- Osmosis
+- Injective
+- Juno
+- Stargaze
+- Akash
+- Secret Network
+
+## Key features
+
+- **Drop-in Replacement**: `TurnkeyDirectWallet` works as a direct replacement for standard CosmJS signers
+- **Chain Agnostic**: Works with any Cosmos SDK-based chain by changing the prefix
+- **Secure Signing**: All private keys remain secure in Turnkey's infrastructure
+- **Policy Control**: Apply custom signing policies to control transaction approvals
+
+If you are using a Cosmos chain we do not explicitly support, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).

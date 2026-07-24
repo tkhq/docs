@@ -1,0 +1,76 @@
+---
+title: "Get webhook JWKS"
+description: "Fetch Turnkey webhook signature verification keys."
+api: "GET https://api.turnkey.com/public/v1/discovery/webhooks/jwks"
+authMethod: "none"
+playground: "interactive"
+---
+
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+
+Fetch the public Ed25519 keys used to verify Turnkey webhook signatures. This endpoint requires no authentication.
+
+For full verification guidance, including signed message construction and SDK helper usage, see [Verify webhook signatures](/features/webhooks/verify-signatures).
+
+Cache the JWKS response according to the `Cache-Control` header. Match each JWK `kid` to the webhook delivery's `X-Turnkey-Signature-Key-Id` header, and refetch JWKS before rejecting a delivery with an unknown `kid`.
+
+Current production `Cache-Control`:
+
+```text
+public, max-age=86400, s-maxage=86400, stale-if-error=604800
+```
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="keys" type="array" required={true}>
+  Public webhook signature verification keys.
+  <Expandable title="keys details">
+    <NestedParam parentKey="keys" childKey="kid" type="string" required={true}>
+      Key identifier. Match this value against the `X-Turnkey-Signature-Key-Id` delivery header.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="kty" type="string" required={true}>
+      Key type. The current value is `OKP` for Ed25519 public keys.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="crv" type="string" required={true}>
+      Key curve. The current value is `Ed25519`.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="alg" type="string" required={true}>
+      JWK algorithm. The current value is `EdDSA`.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="use" type="string" required={true}>
+      Key use. The current value is `sig` for signature verification.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="x" type="string" required={true}>
+      Base64url-encoded Ed25519 public key.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="turnkey_signature_algorithm" type="string" required={true}>
+      Turnkey signature algorithm metadata. The current value is `ed25519`.
+    </NestedParam>
+    <NestedParam parentKey="keys" childKey="turnkey_signature_version" type="string" required={true}>
+      Turnkey signature contract version metadata. The current value is `v1`.
+    </NestedParam>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+
+```json 200
+{
+  "keys": [
+    {
+      "kid": "<signing-key-id>",
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "alg": "EdDSA",
+      "use": "sig",
+      "x": "<base64url-encoded-public-key>",
+      "turnkey_signature_algorithm": "ed25519",
+      "turnkey_signature_version": "v1"
+    }
+  ]
+}
+```
+
+</ResponseExample>

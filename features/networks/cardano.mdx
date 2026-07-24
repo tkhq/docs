@@ -1,0 +1,145 @@
+---
+title: "Cardano support on Turnkey"
+sidebarTitle: "Cardano"
+---
+
+## Address derivation
+
+Cardano support is at the **curve level**: Turnkey holds an Ed25519 key pair (`ADDRESS_FORMAT_COMPRESSED` with `CURVE_ED25519`) and returns the public key, from which you derive the Cardano address **client-side** (the payment credential is the Blake2b-224 hash of the public key). The example below uses [MeshJS](https://meshjs.dev/), but any Cardano library works.
+
+## Transaction construction and signing
+
+Turnkey supports Cardano transaction signing through our core signing capabilities, using the `SignRawPayload` endpoint to sign the transaction body hash with Ed25519. Construction, fee calculation, and submission are handled by your Cardano library of choice — the example below uses [MeshJS](https://meshjs.dev/). We have an example repository that demonstrates how to construct and sign Cardano transactions:
+
+- [`examples/chain-integrations/with-cardano`](https://github.com/tkhq/sdk/tree/main/examples/chain-integrations/with-cardano): demonstrates address derivation, transaction construction, and broadcast on Cardano.
+
+## Example
+
+Here's a practical example showing how to derive an address, then build, sign, and submit a Cardano transaction with Turnkey:
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-server";
+import { MeshTxBuilder, KoiosProvider } from "@meshsdk/core";
+import {
+  EnterpriseAddress,
+  CredentialType,
+  Hash28ByteBase16,
+  VkeyWitness,
+  TransactionWitnessSet,
+  Ed25519PublicKeyHex,
+  Ed25519SignatureHex,
+  Serialization,
+  resolveTxHash,
+  addVKeyWitnessSetToTransaction,
+} from "@meshsdk/core-cst";
+import { blake2b } from "@noble/hashes/blake2b";
+import { bytesToHex } from "@noble/hashes/utils";
+
+// CARDANO_PUBLIC_KEY is your Turnkey Ed25519 account's public key (hex); for an
+// ADDRESS_FORMAT_COMPRESSED account it doubles as `signWith`.
+const { ORGANIZATION_ID, API_PUBLIC_KEY, API_PRIVATE_KEY, CARDANO_PUBLIC_KEY } =
+  process.env;
+
+// Address network id: 1 = mainnet, 0 = any testnet (preprod/preview).
+const NETWORK = "preprod"; // "preprod" | "preview" | "mainnet"
+const NETWORK_ID = NETWORK === "mainnet" ? 1 : 0;
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPrivateKey: API_PRIVATE_KEY!,
+  apiPublicKey: API_PUBLIC_KEY!,
+  defaultOrganizationId: ORGANIZATION_ID!,
+});
+const client = turnkey.apiClient();
+
+// Koios: a free, public Cardano API (no signup). "api" = mainnet.
+const provider = new KoiosProvider(NETWORK === "mainnet" ? "api" : NETWORK);
+
+async function main() {
+  // Derive the enterprise address client-side (Blake2b-224 of the public key).
+  const pubKeyBytes = Buffer.from(CARDANO_PUBLIC_KEY!, "hex");
+  const paymentKeyHash = bytesToHex(blake2b(pubKeyBytes, { dkLen: 28 }));
+  const cardanoAddress = EnterpriseAddress.fromCredentials(NETWORK_ID, {
+    hash: Hash28ByteBase16(paymentKeyHash),
+    type: CredentialType.KeyHash,
+  })
+    .toAddress()
+    .toBech32()
+    .toString();
+
+  // Build an unsigned transaction (1 ADA back to ourselves).
+  const utxos = await provider.fetchAddressUTxOs(cardanoAddress);
+  const txBuilder = new MeshTxBuilder({
+    fetcher: provider,
+    submitter: provider,
+  });
+  const unsignedTx = await txBuilder
+    .setNetwork(NETWORK)
+    .txOut(cardanoAddress, [{ unit: "lovelace", quantity: "1000000" }])
+    .changeAddress(cardanoAddress)
+    .selectUtxosFrom(utxos)
+    .complete();
+
+  // Sign the tx body hash with Turnkey. Ed25519 does not pre-hash, so use
+  // HASH_FUNCTION_NOT_APPLICABLE; signWith is the account key, not the address.
+  const txBodyHash = resolveTxHash(unsignedTx);
+  const { r, s } = await client.signRawPayload({
+    signWith: CARDANO_PUBLIC_KEY!,
+    payload: txBodyHash,
+    encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+    hashFunction: "HASH_FUNCTION_NOT_APPLICABLE",
+  });
+
+  // Assemble the vkey witness (signature is r + s, no v) and attach it.
+  const vkeyWitness = new VkeyWitness(
+    Ed25519PublicKeyHex(CARDANO_PUBLIC_KEY!),
+    Ed25519SignatureHex(r + s),
+  );
+  const witnessSet = new TransactionWitnessSet();
+  witnessSet.setVkeys(
+    Serialization.CborSet.fromCore(
+      [vkeyWitness.toCore()],
+      VkeyWitness.fromCore,
+    ),
+  );
+  const signedTx = addVKeyWitnessSetToTransaction(
+    unsignedTx,
+    witnessSet.toCbor(),
+  );
+
+  // Submit the signed transaction.
+  const submittedTxHash = await provider.submitTx(signedTx);
+  console.log("Transaction submitted:", submittedTxHash);
+}
+
+main().catch((err) => {
+  console.error("Error:", err);
+  process.exit(1);
+});
+```
+
+## Cardano network support
+
+A Cardano address encodes only a **network id** — `1` for mainnet, `0` for *any* testnet — so preprod and preview share the same id. The specific network is chosen by your provider and the builder's `setNetwork`:
+
+| Network         | Builder `setNetwork` | Address `NETWORK_ID` |
+| --------------- | -------------------- | -------------------- |
+| Mainnet         | `mainnet`            | `1`                  |
+| Preprod testnet | `preprod`            | `0`                  |
+| Preview testnet | `preview`            | `0`                  |
+
+## Key features for Cardano
+
+- **Ed25519 Signing**: Turnkey fully supports the Ed25519 curve used by Cardano
+- **Client-side address derivation**: Derive enterprise or base addresses from your Turnkey-managed public key using any Cardano library
+- **Raw Transaction Signing**: Sign any Cardano transaction format by signing its Blake2b-256 body hash
+- **Integration Example**: Our example repository provides a reference implementation for integrating with the Cardano ecosystem
+
+## Benefits of using Turnkey with Cardano
+
+- **Secure Key Management**: Private keys never leave Turnkey's secure infrastructure
+- **Policy Controls**: Apply custom policies to authorize signing based on criteria
+- **Developer-Friendly**: Integrate with existing Cardano development workflows (MeshJS, CSL, Lucid)
+- **Multi-network Support**: Use the same code across mainnet and the preprod/preview testnets
+
+If you're building on Cardano and need assistance with your Turnkey integration, feel free to contact us at [hello@turnkey.com](mailto:hello@turnkey.com), on [X](https://x.com/turnkeyhq/), or [on Slack](https://join.slack.com/t/clubturnkey/shared_invite/zt-3aemp2g38-zIh4V~3vNpbX5PsSmkKxcQ).

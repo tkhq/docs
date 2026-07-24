@@ -1,0 +1,270 @@
+---
+title: "Spark prepare Lightning receive"
+description: "Generate a Lightning preimage and distribute Feldman shares to operators for a Spark Lightning receive. Does not perform FROST signing."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="submit" path="spark_prepare_lightning_receive" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}>
+
+Enum options: `ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required={true}>
+
+Timestamp (in milliseconds) of the request, used to verify liveness of user requests.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="parameters" type="object" required={true} path="parameters">
+  <p>The parameters object containing the specific intent data for this activity.</p>
+  <Expandable title="details">
+    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
+    A Spark wallet account address identifying the wallet.
+    </NestedParam>
+    
+    <ParamField body="lightningReceive" type="object" required={true} path="parameters.lightningReceive">
+      <p>lightningReceive field</p>
+      <Expandable title="details">
+        <NestedParam parentKey="parameters.lightningReceive" childKey="threshold" type="number" required={true} default="">
+        Feldman VSS threshold for reconstructing the preimage.
+        </NestedParam>
+        
+        <ParamField body="operatorRecipients" type="array" required={true} path="parameters.lightningReceive.operatorRecipients">
+          <p>Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list.</p>
+          <Expandable title="item details">
+            <NestedParam parentKey="parameters.lightningReceive.operatorRecipients" childKey="operatorId" type="string" required={true} default="">
+            Spark operator identifier (UUID).
+            </NestedParam>
+            
+            <NestedParam parentKey="parameters.lightningReceive.operatorRecipients" childKey="encryptionPublicKey" type="string" required={true} default="">
+            Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point).
+            </NestedParam>
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="activity" type="object" required={true}>
+  The activity object containing type, intent, and result
+  <Expandable title="activity details">
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+The activity type
+</NestedParam>
+<NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
+      The intent of the activity
+      <Expandable title="intent details">
+        <NestedParam parentKey="activity.intent" childKey="sparkPrepareLightningReceiveIntent" type="object" required={true}>
+      The sparkPrepareLightningReceiveIntent object
+      <Expandable title="sparkPrepareLightningReceiveIntent details">
+        <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent" childKey="signWith" type="string" required={true}>
+A Spark wallet account address identifying the wallet.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent" childKey="lightningReceive" type="object" required={true}>
+      lightningReceive field
+      <Expandable title="lightningReceive details">
+        <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive" childKey="threshold" type="number" required={true}>
+Feldman VSS threshold for reconstructing the preimage.
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive" childKey="operatorRecipients" type="array" required={true}>
+      Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list.
+      <Expandable title="operatorRecipients details">
+        <NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive.operatorRecipients" childKey="operatorId" type="string" required={true}>
+Spark operator identifier (UUID).
+</NestedParam>
+<NestedParam parentKey="activity.intent.sparkPrepareLightningReceiveIntent.lightningReceive.operatorRecipients" childKey="encryptionPublicKey" type="string" required={true}>
+Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point).
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="result" type="object" required={true}>
+      The result of the activity
+      <Expandable title="result details">
+        <NestedParam parentKey="activity.result" childKey="sparkPrepareLightningReceiveResult" type="object" required={true}>
+      The sparkPrepareLightningReceiveResult object
+      <Expandable title="sparkPrepareLightningReceiveResult details">
+        <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult" childKey="operatorPackages" type="array" required={true}>
+      Per-operator ECIES-encrypted Feldman share packages.
+      <Expandable title="operatorPackages details">
+        <NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult.operatorPackages" childKey="operatorId" type="string" required={true}>
+Spark operator identifier (UUID).
+</NestedParam>
+<NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult.operatorPackages" childKey="encryptedPackage" type="string" required={true}>
+ECIES ciphertext (hex-encoded) opaque to Turnkey after emission.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.result.sparkPrepareLightningReceiveResult" childKey="paymentHash" type="string" required={true}>
+Hex-encoded SHA256(preimage). Forward to the Lightning node.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/spark_prepare_lightning_receive \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE",
+    "timestampMs": "<string> (e.g. 1746736509954)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "signWith": "<string>",
+        "lightningReceive": {
+            "threshold": "<number>",
+            "operatorRecipients": [
+                {
+                    "operatorId": "<string>",
+                    "encryptionPublicKey": "<string>"
+                }
+            ]
+        }
+    }
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().sparkPrepareLightningReceive({
+  signWith: "<string> (A Spark wallet account address identifying the wallet.)",
+  lightningReceive: { // lightningReceive field,
+    threshold: 0 // Feldman VSS threshold for reconstructing the preimage.,
+    operatorRecipients: [{ // Operators that will receive Feldman shares of the preimage. Order must match the operators' numeric IDs in the Spark operator config - share index is the 1-based position in this list.,
+      operatorId: "<string> (Spark operator identifier (UUID).)",
+      encryptionPublicKey: "<string> (Operator's ECIES encryption pubkey (hex-encoded compressed secp256k1 point).)",
+    }],
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g. 1746736509954)",
+    "result": {
+      "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
+        "type": "<string>",
+        "intent": {
+          "sparkPrepareLightningReceiveIntent": {
+            "signWith": "<string>",
+            "lightningReceive": {
+              "threshold": "<number>",
+              "operatorRecipients": [
+                {
+                  "operatorId": "<string>",
+                  "encryptionPublicKey": "<string>"
+                }
+              ]
+            }
+          }
+        },
+        "result": {
+          "sparkPrepareLightningReceiveResult": {
+            "operatorPackages": [
+              {
+                "operatorId": "<string>",
+                "encryptedPackage": "<string>"
+              }
+            ],
+            "paymentHash": "<string>"
+          }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>
