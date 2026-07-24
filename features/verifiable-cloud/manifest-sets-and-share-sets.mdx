@@ -1,0 +1,235 @@
+---
+title: "Manifest sets and share sets"
+description: "Understand the two operator sets that control a TVC app: who approves what runs, and who guards the Quorum Key."
+sidebarTitle: "Manifest sets and share sets"
+tag: "Beta"
+---
+
+<Warning>
+Turnkey Verifiable Cloud is currently in Private Beta. [Join the waitlist](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist) to request access. Once our team reaches out, share your organization ID to get enabled. If you already have a dedicated Slack channel with us, reach out there directly. Once enabled, you will see a new "Verifiable Cloud" section appear in the top-level navigation.
+</Warning>
+
+Every TVC app is controlled by two groups of [operators](/features/verifiable-cloud/overview#operators). They have the same shape in the API, and their members can even overlap, but they answer two different questions:
+
+- The **manifest set** is the set of operators authorized to approve [QOS manifests](/features/verifiable-cloud/overview#manifests). It answers: *what code and configuration is allowed to run?*
+- The **share set** is the set of operators authorized to provision [Quorum Key](/features/verifiable-cloud/overview#keys-signatures-and-verification) shares to an enclave during boot. It answers: *which enclaves are allowed to receive the Quorum Key?*
+
+## Operator sets
+
+Both sets are instances of the same building block, an **operator set**:
+
+- A **name**, so you can identify the set on the dashboard.
+- A list of **operators**, up to 50 per set. Each operator is an alias plus a P-256 public key. `tvc login` generates a local operator key for you; `tvc operator create` creates a Turnkey-hosted operator instead.
+- A **threshold**: the number of operators whose signatures are required before the set's authority takes effect. The threshold can't exceed the number of members.
+
+You define both sets when creating an app, via `manifestSetParams` and `shareSetParams` on the [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) activity. If you already have an operator set from a previous app, reuse it by passing its ID (`manifestSetId` or `shareSetId`) instead. TVC also deduplicates automatically: defining a set with the exact same name, threshold, and members as an existing one reuses the existing set.
+
+The manifest set ID and its operator IDs are printed when you create an app:
+
+```
+App created successfully!
+
+App ID: <APP_UUID>
+Name: <APP_NAME>
+Manifest Set ID: <MANIFEST_SET_UUID>
+Manifest Set Operator IDs: <OPERATOR_UUID>, <OPERATOR_UUID>
+Config: app.json
+
+Use one of the Manifest Set Operator IDs above with `tvc deploy approve --operator-id`
+```
+
+The share set ID is not part of this output. To find it, fetch the app with the [`get_tvc_app`](/api-reference/queries/get-tvc-app) query: the returned app includes both the manifest set and the share set with their IDs and each operator's ID. The dashboard's app page shows the same records.
+
+The same person can be an operator in both sets. Whether they *should* be depends on your security model; see [Choosing your sets](#choosing-your-sets) below.
+
+## The manifest set: who approves what runs
+
+Every TVC deployment is specified by a QOS manifest: the container image, expected binary digest, executable arguments, ports, the operator sets themselves, and everything else QOS uses to boot your application. Nothing is deployed onto TVC infrastructure until the manifest is cryptographically approved by a threshold of manifest set members.
+
+When you create a deployment, TVC generates the manifest and the deployment shows as `Approval Required` on the dashboard. Each manifest set member reviews and signs the manifest with their operator key via the TVC CLI:
+
+```bash
+tvc deploy approve \
+  --deploy-id <DEPLOYMENT_UUID> \
+  --operator-id <OPERATOR_UUID>
+```
+
+The CLI walks the operator through the manifest section by section: the namespace and Quorum Key, the enclave PCR measurements, the pivot binary digest and arguments, and the membership and thresholds of both operator sets. The signature is posted via the [`create_tvc_manifest_approvals`](/api-reference/activities/create-tvc-manifest-approvals) activity.
+
+Once approvals from distinct operators reach the manifest set's threshold, TVC infrastructure proceeds with the deployment (and, if the app has no live deployment yet, promotes it to live). Below the threshold, nothing runs: a single compromised or careless operator cannot ship code on their own if your threshold is at least 2.
+
+Approvals are recorded in the manifest envelope, so they travel with the deployment as an audit trail. Anyone verifying your app can see exactly which operators approved the manifest as part of its [Boot Proof](/features/verifiable-cloud/proofs-and-verification#boot-proof).
+
+The manifest set acts on **every new deployment**. Upgrading your app to a new image, changing its arguments, or modifying its configuration all produce a new manifest that must be approved again.
+
+## The share set: who guards the Quorum Key
+
+Your app's Quorum Key is its long-lived identity: it is the same across all enclaves and across deployments, and it can encrypt or sign state that must survive application upgrades. That durability is exactly why it needs stronger custody than any single machine or person can provide.
+
+The Quorum Key is never stored whole. It is split into shares using Shamir's Secret Sharing, each share is encrypted to one share set member's key, and reassembly requires the share set's threshold to be met. By design this only ever happens inside an enclave.
+
+You can create a Quorum Key with the TVC CLI, either locally (`tvc keys init-local-quorum-key` then `tvc keys generate-local-quorum-key`, which splits the key and encrypts one share per operator public key on your machine) or Turnkey-hosted (`tvc keys create-quorum-key`, which generates and splits it server-side, encrypting shares to hosted operator keys). Share set thresholds must be at least 2.
+
+The local flow writes a `quorum_key_metadata.json` file containing one encrypted share per operator and no plaintext material. Back it up securely: it is required to provision every future deployment, and losing enough operator keys or encrypted shares to fall below the threshold makes the Quorum Key permanently unusable.
+
+<Note>
+Looking to use a custom Quorum Key for your app? Reach out to us via your dedicated Slack channel and we'll get your organization set up.
+</Note>
+
+<Warning>
+If your app uses a custom Quorum Key, always set `shareSetParams` (or `shareSetId`) explicitly when creating the app, with the same operators and threshold used to generate the key. Left empty, the CLI falls back to its development share set, which cannot provision your locally generated shares.
+</Warning>
+
+### Provisioning a deployment
+
+When enclaves boot for a new deployment, each one generates an [Ephemeral Key](/features/verifiable-cloud/overview#keys-signatures-and-verification) that never leaves it and produces an attestation document binding that key to the approved manifest. Share set members then provision the Quorum Key in three steps, following the [QOS quorum provisioning protocol](https://github.com/tkhq/qos/blob/main/docs/boot_standard.md):
+
+1. **Fetch and verify** the enclave's attestation document and manifest envelope. The CLI verifies the attestation, the PCR measurements, and the manifest approvals before writing a provision bundle:
+
+   ```bash
+   tvc deploy provisioning-details \
+     --deploy-id <DEPLOYMENT_UUID> \
+     --provision-bundle-out bundle.json
+   ```
+
+2. **Re-encrypt your share** to the verified enclave's Ephemeral Key. This step also signs the manifest hash, so posting a share doubles as the share holder's endorsement of what the enclave is running:
+
+   ```bash
+   tvc keys re-encrypt-local-share \
+     --quorum-key-metadata quorum_key_metadata.json \
+     --provision-bundle bundle.json \
+     --re-encrypted-out share.json
+   ```
+
+3. **Post the share** to Turnkey:
+
+   ```bash
+   tvc deploy post-share \
+     --re-encrypted-share share.json \
+     --share-operator-id <OPERATOR_UUID>
+   ```
+
+The `--share-operator-id` is the operator's Turnkey ID, a UUID distinct from their public key; find it on the app's share set record in the dashboard or API.
+
+Turnkey's coordinator independently verifies the enclave's attestation document before accepting each share. Once the threshold number of shares arrives, TVC infrastructure submits them to the enclave, which reconstructs the Quorum Key internally and launches your application. No share set member ever sees another member's share, and the full key never exists in plaintext outside an enclave. Each re-encrypted share is bound to one deployment, manifest, and Ephemeral Key, so it cannot be reused for any other provisioning session.
+
+To watch provisioning complete, run `tvc deploy get-status --deploy-id <DEPLOYMENT_UUID>`: replicas only report ready once the Quorum Key is reconstructed and your application is answering health checks, so ready replicas reaching the desired count means provisioning succeeded.
+
+Share set members act **once per deployment**, not per enclave: within a deployment, replacement enclaves and autoscaled replicas are provisioned automatically from already-running enclaves via [key forwarding](https://github.com/tkhq/qos/blob/main/docs/key_forward.md), so share holders are not on call for routine operations. A new deployment, however, must be provisioned again by the share set.
+
+<Note>
+The [quickstart](/features/verifiable-cloud/quickstart) uses a well-known development quorum key, which is sufficient for running verifiable code but not for encrypting or signing anything sensitive. Apps created that way are paired with a fixed development share set and provisioned automatically, with no share posting involved, because a public key leaves nothing to guard. The share set earns its keep once your app has a custom Quorum Key.
+</Note>
+
+## Side by side
+
+|                                | Manifest set                                        | Share set                                                                 |
+| :----------------------------- | :--------------------------------------------------- | :------------------------------------------------------------------------ |
+| Authorizes                     | Which code and configuration may run                 | Which verified enclaves receive the Quorum Key                            |
+| Members hold                   | An operator signing key                              | An operator signing key plus an encrypted share of the Quorum Key         |
+| Acts when                      | Every new deployment, before enclaves boot           | Every new deployment, after enclaves boot and attest                      |
+| CLI flow                       | `tvc deploy approve`                                 | `tvc deploy provisioning-details`, `tvc keys re-encrypt-local-share`, `tvc deploy post-share` |
+| Threshold protects against     | A minority of operators shipping unauthorized code   | A minority of share holders reconstructing or leaking the Quorum Key      |
+| If the threshold isn't met     | The deployment never leaves `Approval Required`      | The Quorum Key cannot be reconstructed; the app cannot unlock its secrets |
+| Defined in `create_tvc_app` as | `manifestSetId` / `manifestSetParams`                | `shareSetId` / `shareSetParams`                                           |
+
+## How they fit together
+
+The two sets act at different points in a deployment's life. The manifest set gates the boot; the share set gates the key injection that follows it.
+
+```mermaid
+sequenceDiagram
+    participant Dev as App developer
+    participant TVC as TVC platform
+    participant MS as Manifest set
+    participant Enc as Enclave (QOS)
+    participant SS as Share set
+
+    Dev->>TVC: Create deployment (image, digest, config)
+    TVC->>TVC: Generate QOS manifest
+    MS->>TVC: Review and sign manifest (threshold of approvals)
+    TVC->>Enc: Boot enclaves from approved manifest
+    Enc->>Enc: Generate Ephemeral Key
+    Enc->>TVC: Attestation document (Boot Proof)
+    SS->>TVC: Verify attestation, post shares encrypted to Ephemeral Key
+    TVC->>Enc: Submit threshold of shares
+    Enc->>Enc: Reconstruct Quorum Key, launch app
+    Enc-->>Dev: App live and serving traffic
+```
+
+Note the chain of trust between the two sets: share set members only release their shares to an enclave whose attestation proves it booted from a manifest the manifest set approved. The manifest set's review is what makes the share set's verification meaningful.
+
+## Worked example
+
+Acme runs a price oracle on TVC. The oracle derives its signing identity from the app's Quorum Key, so key custody matters. Acme sets up:
+
+- **Manifest set** `"Acme Deploy Reviewers"`: three platform engineers (Alice, Bob, Carol), threshold **2**. Any production deployment needs two engineers to independently review the manifest.
+- **Share set** `"Acme Key Custodians"`: three members of the security team (Dana, Erin, Frank), threshold **2**. No single custodian can reconstruct the oracle's signing key.
+
+Acme first generates a Quorum Key split across the custodians. `tvc keys generate-local-quorum-key` produces `quorum_key_metadata.json` with one share encrypted to each custodian's operator key, plus the `quorumPublicKey` to use at app creation.
+
+The app configuration passed to [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) then looks like this:
+
+```json
+{
+  "name": "Acme Price Oracle",
+  "quorumPublicKey": "<ACME_QUORUM_PUBLIC_KEY>",
+  "manifestSetId": null,
+  "manifestSetParams": {
+    "name": "Acme Deploy Reviewers",
+    "threshold": 2,
+    "newOperators": [
+      { "name": "alice", "publicKey": "<ALICE_PUBLIC_KEY>" },
+      { "name": "bob", "publicKey": "<BOB_PUBLIC_KEY>" },
+      { "name": "carol", "publicKey": "<CAROL_PUBLIC_KEY>" }
+    ],
+    "existingOperatorIds": []
+  },
+  "shareSetId": null,
+  "shareSetParams": {
+    "name": "Acme Key Custodians",
+    "threshold": 2,
+    "newOperators": [
+      { "name": "dana", "publicKey": "<DANA_PUBLIC_KEY>" },
+      { "name": "erin", "publicKey": "<ERIN_PUBLIC_KEY>" },
+      { "name": "frank", "publicKey": "<FRANK_PUBLIC_KEY>" }
+    ],
+    "existingOperatorIds": []
+  }
+}
+```
+
+### Shipping the first deployment
+
+1. An Acme engineer creates a deployment: the oracle's container image, expected binary digest, ports, and arguments. TVC generates the QOS manifest and the deployment sits at `Approval Required`.
+2. Alice and Bob each run `tvc deploy approve`, review the manifest section by section, and sign it. Carol is on vacation; with a 2-of-3 threshold, that's fine. The threshold is met and TVC boots the enclaves.
+3. Each enclave generates its Ephemeral Key and produces an attestation document.
+4. Dana and Erin each run `tvc deploy provisioning-details` to verify an enclave's attestation, `tvc keys re-encrypt-local-share` to re-encrypt their share to its Ephemeral Key, and `tvc deploy post-share` to submit it. At 2 shares, the enclave reconstructs the Quorum Key and launches the oracle.
+5. The oracle is live at `https://app-<APP_UUID>.turnkey.cloud`, signing responses with keys derived from the Quorum Key.
+
+### Shipping an upgrade
+
+Acme releases `v2` of the oracle. The new image produces a new manifest, so both sets act again: two of Alice, Bob, and Carol review and approve the new manifest, then two of Dana, Erin, and Frank verify the new enclaves' attestations and post their shares. Key forwarding does not cross deployment boundaries, so a fresh deployment always requires fresh share postings.
+
+The Quorum Key itself stays the same across deployments, which is the point: state encrypted by `v1` remains readable by `v2`, and consumers see a continuous signing identity.
+
+### What the thresholds bought Acme
+
+- Alice's laptop is compromised. The attacker can sign manifests as Alice, but cannot reach the 2-approval threshold alone: no unauthorized code ships.
+- Frank's Quorum Key share leaks. One share reveals nothing about the key, and an attacker cannot get a second share released to anything but a verified enclave running manifest-set-approved code.
+
+## Choosing your sets
+
+- **Manifest set membership** should mirror who reviews production changes today. Treat a manifest approval like a code review with teeth: members are expected to actually inspect the image digest, arguments, and configuration they sign.
+- **Share set membership** is key custody. Prefer people (or systems) with strong operational security, and prefer separating them from the manifest set where your team size allows, so that shipping code and unlocking secrets require different people.
+- **Thresholds**: share set thresholds must be at least 2, and for production a threshold of at least 2 on the manifest set too means no single actor can ship code or expose the key. Keep thresholds comfortably below the member count so vacations and lost keys don't halt deployments.
+- **Reuse**: operator sets can be shared across apps by passing `manifestSetId` / `shareSetId` at app creation, so a platform team can maintain one reviewed set of operators for many apps.
+- **Demos and prototypes**: the [quickstart](/features/verifiable-cloud/quickstart) flow, with a 1-of-1 manifest set (just your login key) and the well-known development quorum key, is the fastest way to a running app. Graduate to real sets before handling anything sensitive.
+
+## See also
+
+- [Overview: Manifests](/features/verifiable-cloud/overview#manifests) and [Operators](/features/verifiable-cloud/overview#operators)
+- [Quickstart](/features/verifiable-cloud/quickstart) for the end-to-end deployment and approval flow
+- [Proofs and Verification](/features/verifiable-cloud/proofs-and-verification) for how manifests and attestations surface in Boot Proofs
+- [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) and [`create_tvc_manifest_approvals`](/api-reference/activities/create-tvc-manifest-approvals) API references
+- [QOS boot standard](https://github.com/tkhq/qos/blob/main/docs/boot_standard.md) for the underlying provisioning protocol
