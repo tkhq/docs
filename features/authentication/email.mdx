@@ -405,3 +405,216 @@ turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization
         }
 }' --organization <YOUR-ORG-ID>
 ```
+
+## Email delivery events
+
+Email self serve gives you visibility into email delivery events sent from your parent
+organization. Use it to confirm whether an email was delivered, investigate delayed delivery, and
+debug recipient-side failures such as bounces or complaints.
+
+- Parent organization scoped event history
+- Per-recipient lookup by email address
+- Optional filtering by event type
+- Cursor-based pagination for delivery history
+
+<Note>
+Email event lookup is scoped to the authenticated organization. If the request originated from a
+sub-organization, the events are read from the parent organization.
+</Note>
+
+### Event types
+
+Email events represent the delivery lifecycle reported by Turnkey's email provider.
+
+| Event type | Description |
+| --- | --- |
+| `Send` | The email was accepted for sending. |
+| `Delivery` | The email was delivered to the recipient's mail server. |
+| `DeliveryDelay` | Delivery was delayed and will be retried later. |
+| `Bounce` | The recipient's mail server rejected the email. |
+| `Complaint` | The recipient or mailbox provider reported the email as unwanted. |
+
+The Dashboard may display these in a more user-friendly form:
+
+| Dashboard status | API event type | Meaning |
+| --- | --- | --- |
+| Delivered | `Delivery` | The email was delivered to the recipient. |
+| Delivery delayed | `DeliveryDelay` | Delivery was delayed by the email provider and may be retried. |
+| Bounced | `Bounce` | The recipient's mail server rejected the email. |
+| Complained | `Complaint` | The recipient or provider reported the message as unwanted. |
+
+### Before you begin
+
+- **Email is required.** Event lookup is recipient-based and requires an email address.
+- **Email addresses are normalized.** The API normalizes `email` to lowercase server-side.
+- **Results are newest first.** The most recent events are returned first.
+
+### How it works
+
+<Steps>
+  <Step title="Choose a recipient">
+    Provide the recipient email address you want to inspect.
+  </Step>
+  <Step title="Filter by event type">
+    Optionally pass `eventType` to show only sends, deliveries, delays, bounces, or complaints.
+  </Step>
+  <Step title="Page through results">
+    Use `paginationOptions.limit`, `paginationOptions.after`, and `paginationOptions.before` to
+    move through event history.
+  </Step>
+  <Step title="Inspect delivery details">
+    Use fields such as `eventType`, `timestamp`, `fromAddress`, `toAddress`, and `details` to
+    understand what happened to the message.
+  </Step>
+</Steps>
+
+### API reference
+
+This endpoint uses `HTTP POST` and requires a signed request body stamped with your API key.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /public/v1/query/list_email_events` | Retrieve email delivery events for a recipient |
+
+#### List email events
+
+Retrieves email delivery events for a recipient in the authenticated organization.
+
+#### Request body
+
+```json Request body
+{
+  "organizationId": "<your-organization-id>",
+  "email": "user@example.com",
+  "paginationOptions": {
+    "limit": "10"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `organizationId` | string | Yes | Customer organization ID. |
+| `email` | string | Yes | Recipient email address to list events for. Normalized to lowercase server-side. |
+| `eventType` | string | No | Exact event type filter. Useful values are `Send`, `Delivery`, `Bounce`, `DeliveryDelay`, and `Complaint`. |
+| `paginationOptions.limit` | string | No | Maximum number of rows to return, up to `100`. |
+| `paginationOptions.after` | string | No | Cursor event ID for fetching results after that event. |
+| `paginationOptions.before` | string | No | Cursor event ID for fetching results before that event. |
+
+#### Response
+
+```json Response
+{
+  "emailEvents": [
+    {
+      "id": "<email-event-id>",
+      "organizationId": "<organization-id>",
+      "messageId": "<provider-message-id>",
+      "eventType": "Bounce",
+      "fromAddress": "no-reply@turnkey.com",
+      "toAddress": "user@example.com",
+      "senderTenant": "<sender-tenant>",
+      "timestamp": "1784840060374",
+      "createdAt": "1784840060374",
+      "details": {
+        "bounceType": "Permanent",
+        "bounceSubType": "General",
+        "diagnosticCode": "smtp; 550 5.1.1 user unknown",
+        "deliverySmtpResponse": "",
+        "deliveryProcessingTimeMillis": "0",
+        "deliveryDelayType": ""
+      }
+    }
+  ]
+}
+```
+
+### Data types
+
+#### `EmailEvent` (response)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | string | Yes | Unique email event ID. Use this value with pagination cursors. |
+| `organizationId` | string | Yes | Organization associated with the event. |
+| `messageId` | string | Yes | Email provider message ID. |
+| `eventType` | string | Yes | Event type, such as `Delivery`, `Bounce`, or `DeliveryDelay`. |
+| `fromAddress` | string | Yes | Sender email address. |
+| `toAddress` | string | Yes | Recipient email address. |
+| `senderTenant` | string | No | Sender tenant associated with the event. |
+| `timestamp` | string | Yes | Event timestamp in milliseconds. |
+| `createdAt` | string | Yes | Record creation timestamp in milliseconds. |
+| `details` | object | No | Provider-specific delivery details. Fields depend on the event type. |
+
+#### `EmailEventDetails` (response)
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `bounceType` | string | No | Bounce category, such as `Permanent` or `Transient`. |
+| `bounceSubType` | string | No | More specific bounce reason. |
+| `diagnosticCode` | string | No | SMTP diagnostic code returned by the recipient's mail server. |
+| `deliverySmtpResponse` | string | No | SMTP response for a delivery event. |
+| `deliveryProcessingTimeMillis` | string | No | Time spent processing a delivery event, in milliseconds. |
+| `deliveryDelayType` | string | No | Delay category for delayed delivery events. |
+
+#### `ListEmailEventsResponse`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `emailEvents` | `EmailEvent[]` | Yes | Email delivery events matching the request. Results are ordered newest first. |
+
+### Troubleshooting
+
+#### Delivery delayed
+
+`DeliveryDelay` means the email provider could not complete delivery immediately. Delivery may be
+retried later. Check the recipient address, mailbox provider status, and any details returned with
+the event.
+
+#### Bounced
+
+`Bounce` means the recipient's mail server rejected the message. The `details` object may include
+fields such as `bounceType`, `bounceSubType`, and `diagnosticCode` to explain the rejection.
+
+Permanent bounces usually indicate that the address is invalid, unreachable, or rejected by the
+recipient's domain. Temporary failures may resolve after retry.
+
+#### Complained
+
+`Complaint` means the recipient or mailbox provider reported the email as unwanted or spam.
+Complaint events are typically generated when a recipient marks the email as spam or when a
+mailbox provider sends spam feedback.
+
+### Code examples
+
+<Tabs>
+  <Tab title="List email events">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/query/list_email_events \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "organizationId": "<your-organization-id>",
+        "email": "user@example.com",
+        "paginationOptions": {
+          "limit": "10"
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Filter by event type">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/query/list_email_events \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "organizationId": "<your-organization-id>",
+        "email": "user@example.com",
+        "eventType": "Bounce",
+        "paginationOptions": {
+          "limit": "10"
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
