@@ -120,7 +120,7 @@ Acme runs a price oracle on TVC. The oracle derives its signing identity from th
 - **Manifest set** `"Acme Deploy Reviewers"`: three platform engineers (Alice, Bob, Carol), threshold **2**. Any production deployment needs two engineers to independently review the manifest.
 - **Share set** `"Acme Key Custodians"`: three members of the security team (Dana, Erin, Frank), threshold **2**. No single custodian can reconstruct the oracle's signing key.
 
-Acme first generates a Quorum Key split across the custodians. `tvc keys generate-local-quorum-key` produces `quorum_key_metadata.json` with one share encrypted to each custodian's operator key, plus the `quorumPublicKey` to use at app creation.
+Acme first generates a custom Quorum Key split across the custodians, producing one share encrypted to each custodian's operator key and a `quorumPublicKey` to declare at app creation. No custodian ever holds the whole key.
 
 The app configuration passed to [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) then looks like this:
 
@@ -158,7 +158,7 @@ The app configuration passed to [`create_tvc_app`](/api-reference/activities/cre
 1. An Acme engineer creates a deployment: the oracle's container image, expected binary digest, ports, and arguments. TVC generates the QOS manifest and the deployment sits at `Approval Required`.
 2. Alice and Bob each run `tvc deploy approve`, review the manifest section by section, and sign it. Carol is on vacation; with a 2-of-3 threshold, that's fine. The threshold is met and TVC boots the enclaves.
 3. Each enclave generates its Ephemeral Key and produces an attestation document.
-4. Dana and Erin each run `tvc deploy provisioning-details` to verify an enclave's attestation, `tvc keys re-encrypt-local-share` to re-encrypt their share to its Ephemeral Key, and `tvc deploy post-share` to submit it. At 2 shares, the enclave reconstructs the Quorum Key and launches the oracle.
+4. Dana and Erin each verify an enclave's attestation, re-encrypt their share to its Ephemeral Key, and submit it. At 2 shares, the enclave reconstructs the Quorum Key and launches the oracle.
 5. The oracle is live at `https://app-<APP_UUID>.turnkey.cloud`, signing responses with keys derived from the Quorum Key.
 
 ### Shipping an upgrade
