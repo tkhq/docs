@@ -76,47 +76,6 @@ Looking to use a custom Quorum Key for your app? Reach out to us via your dedica
 If your app uses a custom Quorum Key, always set `shareSetParams` (or `shareSetId`) explicitly when creating the app, with the same operators and threshold used to generate the key. Left empty, the CLI falls back to its development share set, which cannot provision your locally generated shares.
 </Warning>
 
-### Provisioning a deployment
-
-When enclaves boot for a new deployment, each one generates an [Ephemeral Key](/features/verifiable-cloud/overview#keys-signatures-and-verification) that never leaves it and produces an attestation document binding that key to the approved manifest. Share set members then provision the Quorum Key in three steps, following the [QOS quorum provisioning protocol](https://github.com/tkhq/qos/blob/main/docs/boot_standard.md):
-
-1. **Fetch and verify** the enclave's attestation document and manifest envelope. The CLI verifies the attestation, the PCR measurements, and the manifest approvals before writing a provision bundle:
-
-   ```bash
-   tvc deploy provisioning-details \
-     --deploy-id <DEPLOYMENT_UUID> \
-     --provision-bundle-out bundle.json
-   ```
-
-2. **Re-encrypt your share** to the verified enclave's Ephemeral Key. This step also signs the manifest hash, so posting a share doubles as the share holder's endorsement of what the enclave is running:
-
-   ```bash
-   tvc keys re-encrypt-local-share \
-     --quorum-key-metadata quorum_key_metadata.json \
-     --provision-bundle bundle.json \
-     --re-encrypted-out share.json
-   ```
-
-3. **Post the share** to Turnkey:
-
-   ```bash
-   tvc deploy post-share \
-     --re-encrypted-share share.json \
-     --share-operator-id <OPERATOR_UUID>
-   ```
-
-The `--share-operator-id` is the operator's Turnkey ID, a UUID distinct from their public key; find it on the app's share set record in the dashboard or API.
-
-Turnkey's coordinator independently verifies the enclave's attestation document before accepting each share. Once the threshold number of shares arrives, TVC infrastructure submits them to the enclave, which reconstructs the Quorum Key internally and launches your application. No share set member ever sees another member's share, and the full key never exists in plaintext outside an enclave. Each re-encrypted share is bound to one deployment, manifest, and Ephemeral Key, so it cannot be reused for any other provisioning session.
-
-To watch provisioning complete, run `tvc deploy get-status --deploy-id <DEPLOYMENT_UUID>`: replicas only report ready once the Quorum Key is reconstructed and your application is answering health checks, so ready replicas reaching the desired count means provisioning succeeded.
-
-Share set members act **once per deployment**, not per enclave: within a deployment, replacement enclaves and autoscaled replicas are provisioned automatically from already-running enclaves via [key forwarding](https://github.com/tkhq/qos/blob/main/docs/key_forward.md), so share holders are not on call for routine operations. A new deployment, however, must be provisioned again by the share set.
-
-<Note>
-The [quickstart](/features/verifiable-cloud/quickstart) uses a well-known development quorum key, which is sufficient for running verifiable code but not for encrypting or signing anything sensitive. Apps created that way are paired with a fixed development share set and provisioned automatically, with no share posting involved, because a public key leaves nothing to guard. The share set earns its keep once your app has a custom Quorum Key.
-</Note>
-
 ## Side by side
 
 |                                | Manifest set                                        | Share set                                                                 |
