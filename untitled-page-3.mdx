@@ -1,0 +1,179 @@
+---
+title: "Executing Swaps"
+description: "Sign, broadcast, and settle a token swap from a Turnkey wallet. Handle quote refresh, ERC-20 approvals, and (optionally) gas sponsorship internally."
+mode: "wide"
+noindex: true
+---
+
+import SwapBetaNote from "/snippets/shared/swaps-beta-note.mdx";
+
+`ACTIVITY_TYPE_EXECUTE_SWAP` is the signing activity that runs a swap end-to-end. The caller signs a swap intent. Turnkey fetches a fresh executable quote from the provider, constructs the transaction (batching any required ERC-20 approvals via Permit2), signs it with the wallet in the intent, and broadcasts. Policy engines evaluate the derived transaction, so existing wallet policies apply to the resulting on-chain transfer.
+
+<SwapBetaNote />
+
+## Prerequisites
+
+- The parent organization has [enabled swaps](/features/transaction-management/swap/enable-swap). Execute requests against orgs with swaps disabled are rejected.
+- The `walletAccount` in the intent holds enough of the input token to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native token for gas.
+- For cross-chain routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
+
+## Submit execute\_swap
+
+<ParamField body="type" type="enum<string>" required>
+  `ACTIVITY_TYPE_EXECUTE_SWAP`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required>
+  Timestamp (in milliseconds) of the request, used to verify liveness.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier of the sub-organization executing the swap. Fee configuration is loaded from the parent organization server-side.
+</ParamField>
+
+<ParamField body="parameters.inputToken" type="string" required>
+  CAIP-19 identifier for the token being sold. Example: `eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913` (USDC on Base). The origin chain is derived from this identifier.
+</ParamField>
+
+<ParamField body="parameters.outputToken" type="string" required>
+  CAIP-19 identifier for the token being bought. Example: `eip155:8453/erc20:0x4200000000000000000000000000000000000006` (WETH on Base). Same-chain if the CAIP-2 prefix matches `inputToken`. Otherwise a cross-chain route.
+</ParamField>
+
+<ParamField body="parameters.inputAmount" type="string" required>
+  Amount of the input token, in raw on-chain units.
+</ParamField>
+
+<ParamField body="parameters.walletAccount" type="string" required>
+  The wallet account address to sign with and swap from. Part of the user-signed intent. Authentication identifies the caller. It does not determine the signing wallet.
+</ParamField>
+
+<ParamField body="parameters.slippage" type="string" required>
+  Slippage tolerance in basis points, expressed as a stringified integer. Enforced at execute time as protection against market movement between quote fetch and settlement.
+</ParamField>
+
+<ParamField body="parameters.sponsor" type="boolean">
+  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`. Requires a Pro plan or higher when set to `true`. _(To Confirm: plan gating.)_
+</ParamField>
+
+<CodeGroup>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/execute_swap \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<SUB_ORGANIZATION_ID>",
+    "parameters": {
+      "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+      "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+      "inputAmount": "1000000",
+      "walletAccount": "<WALLET_ADDRESS>",
+      "slippage": "50",
+      "sponsor": false
+    }
+  }'
+```
+
+```javascript title="JavaScript"
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+const client = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  }),
+);
+
+const { activity } = await client.request("/public/v1/submit/execute_swap", {
+  type: "ACTIVITY_TYPE_EXECUTE_SWAP",
+  timestampMs: String(Date.now()),
+  organizationId: "<SUB_ORGANIZATION_ID>",
+  parameters: {
+    inputToken: "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+    outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+    inputAmount: "1000000",
+    walletAccount: "<WALLET_ADDRESS>",
+    slippage: "50",
+    sponsor: false,
+  },
+});
+```
+
+</CodeGroup>
+
+The activity result returns a poll handle:
+
+```json
+{
+  "activity": {
+    "id": "<ACTIVITY_ID>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP",
+    "result": {
+      "executeSwapResult": {
+        "sendTransactionStatusId": "<SEND_TRANSACTION_STATUS_ID>"
+      }
+    }
+  }
+}
+```
+
+_(Field name `sendTransactionStatusId` `To Confirm`. Response shape mirrors other send-transaction activities.)_
+
+## Gas: sponsored vs. self-funded
+
+With `sponsor: true`, Gas Station pays the gas and the batch executes as an EIP-7702 sponsored transaction. The `walletAccount` needs no native token at all. This requires a Pro plan or higher. _(To Confirm.)_
+
+With `sponsor: false`, the `walletAccount` pays gas itself. Fund it with the origin chain's native token before executing.
+
+## What the caller does not provide
+
+The user-signed intent covers only the swap parameters listed above. Turnkey generates or fetches the rest server-side and never accepts them from callers:
+
+- Provider quote JSON
+- Transaction calldata
+- Serialized transactions
+- Permit2 payloads
+- Approval payloads
+- Fee receiver wallet address (loaded from parent org)
+- Fee bps (loaded from parent org)
+
+This is a hard trust boundary. Requests that include provider payloads or fee overrides are rejected.
+
+## Approvals and Permit2
+
+For ERC-20 swaps, Turnkey batches token approvals into `execute_swap` using Permit2. There is no separate approval activity for customers to run. Permit2 signatures are generated inside the activity and included in the transaction as needed.
+
+Native token swaps (e.g., ETH as `inputToken`) bypass Permit2 and require no approval step.
+
+<Note>
+  Some non-standard ERC-20 tokens may fail Permit2 approval flows. If a swap fails with a Permit2-related error, verify the token supports the standard Permit2 flow before retrying.
+</Note>
+
+## Same-chain vs. cross-chain execution
+
+The execute call itself is identical for same-chain and cross-chain routes. The provider selects the route from the CAIP-19 pair. After broadcast, the lifecycle diverges:
+
+- **Same-chain swaps** complete on origin inclusion. Poll `get_send_transaction_status` with the returned handle.
+- **Cross-chain swaps** continue past origin inclusion until the destination-chain leg settles or funds are recovered. Poll `get_swap_status` for the full lifecycle.
+
+See [Track swap status](/features/transaction-management/swap/track-swap-status) for the two lifecycle models.
+
+## Poll swap status (required)
+
+<Warning>
+  `ACTIVITY_STATUS_COMPLETED` on the execute response means the activity was accepted and enqueued for broadcast. It does not mean the transaction landed on-chain. Poll the appropriate status endpoint until it reports a terminal state.
+</Warning>
+
+For same-chain, poll `get_send_transaction_status`. For cross-chain, poll `get_swap_status`. Full lifecycle semantics on [Track swap status](/features/transaction-management/swap/track-swap-status).
+
+## Next steps
+
+- [Track swap status](/features/transaction-management/swap/track-swap-status): same-chain vs. cross-chain polling.
+- [End-to-end example](/features/transaction-management/swap/end-to-end-example): full flow from enable to confirmation.

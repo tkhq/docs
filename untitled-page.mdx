@@ -1,0 +1,101 @@
+---
+title: "Swaps"
+description: "Execute token swaps from Turnkey wallets through a unified DEX aggregator abstraction, with on-chain integrator fees for your organization."
+mode: "wide"
+noindex: true
+---
+
+import SwapBetaNote from "/snippets/shared/swaps-beta-note.mdx";
+
+Swap lets wallets in your organization exchange tokens through DEX aggregators via a single Turnkey activity, with the usual audit trail and policy controls. Same-chain and EVM ↔ EVM cross-chain routes are supported. You can take an integrator fee on every swap, paid on-chain to a wallet you control.
+
+<SwapBetaNote />
+
+## What are Swaps
+
+Swaps connects Turnkey wallets to DEX aggregators through a unified interface. 0x is supported today; additional providers are on the roadmap. Callers submit signed intents describing what they want to swap while Turnkey handles quote fetching, transaction construction, ERC-20 approvals via Permit2, and broadcast. Callers never see provider quote payloads, transaction calldata, or approval data.
+
+Swaps enablement is a one-time setup step per parent organization. After that, each swap is a signed intent and a poll.
+
+## How it works
+
+1. Enable swaps once on your parent organization via [`enable_swap`](/features/transaction-management/swap/enable-swap), setting your integrator fee (bps) and fee-receiver wallet.
+2. Optionally call [`get_swap_quote`](/features/transaction-management/swap/get-swap-quote) for an indicative quote to display to users. Quotes reflect your active fee configuration.
+3. Submit [`execute_swap`](/features/transaction-management/swap/execute-swap) from the sub-organization whose wallet is swapping. Turnkey handles quote refresh, Permit2 approvals, and transaction construction internally. For cross-chain routes, the origin-chain transaction is broadcast here.
+4. Poll swap status until settlement. Same-chain swaps complete on origin inclusion; cross-chain swaps have a longer lifecycle that continues until the destination-chain leg settles or funds are recovered. See [Track swap status](/features/transaction-management/swap/track-swap-status).
+
+## Supported providers, chains, and routes
+
+| Provider | Chains (V1) |
+| :-- | :-- |
+| 0x | Ethereum (`eip155:1`), Base (`eip155:8453`), Arbitrum (`eip155:42161`), Polygon (`eip155:137`), BNB Chain (`eip155:56`) |
+
+**Route support in V1:**
+
+- **Same-chain EVM ↔ EVM** — e.g., USDC → USDT on Base.
+- **Cross-chain EVM ↔ EVM** — e.g., Arbitrum USDC → Base USDC, where supported by the provider.
+
+**On the roadmap:** Solana ↔ Solana, EVM ↔ SVM (e.g., Ethereum ↔ Solana), additional providers, provider selection, and multiple quote options.
+
+## Fees
+
+Swap fees are integrator fees: a percentage of the swap amount, expressed in basis points, applied to quote amounts and collected onchain during execution.
+
+- **Your integrator fee**: set via (`feeBps`), along with the payout wallet (`feeReceiverWalletAddress`, a wallet address you control). Fees accrue onchain to that wallet.
+- **Cap**: `feeBps` is bounded by a Turnkey-controlled maximum threshold. Requests above the cap are rejected.
+
+Fees are configured **on the parent organization** and applied to every swap submitted by any sub-organization under it. Sub-organizations cannot override the parent's fee configuration.
+
+<Warning>
+  To change your fee configuration, submit `enable_swap` again with the new values. Quote and execute activities submitted after the change immediately use the new fee configuration.
+</Warning>
+
+## API surface
+
+Swap adds three activities:
+
+| Activity | Endpoint _To Confirm_ | Purpose |
+| :-- | :-- | :-- |
+| `ACTIVITY_TYPE_ENABLE_SWAP` | `POST /public/v1/submit/enable_swap` | Enable swaps on your parent organization and set your fee |
+| `ACTIVITY_TYPE_GET_SWAP_QUOTE` | `POST /public/v1/submit/get_swap_quote` | Indicative fee-aware quote for an input token / amount pair |
+| `ACTIVITY_TYPE_EXECUTE_SWAP` | `POST /public/v1/submit/execute_swap` | Sign, broadcast, and settle a swap from a sub-org wallet |
+
+and one query for status:
+
+| Query | Endpoint _To Confirm_ | Purpose |
+| :-- | :-- | :-- |
+| Swap status | `POST /public/v1/query/get_swap_status` | Poll the full swap lifecycle. Handles same-chain and cross-chain with a unified response shape. |
+
+<Note>
+  Swap requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). There are no Swap-specific SDK methods during the early access period, so the examples on these pages use cURL and the generic `request` method of [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`.
+</Note>
+
+## Trust boundary
+
+Swap intentionally does not expose executable provider data to API callers. The user-signed `ExecuteSwapIntent` is the source of truth for `inputToken`, `outputToken`, `inputAmount`, `walletAccount`, `sponsor`, and `slippage`. Fee configuration, provider quote payloads, transaction calldata, Permit2 signatures, and approval payloads are all handled server-side and never accepted from callers.
+
+Policy engines evaluate the derived on-chain transaction, not the swap intent — so existing wallet policies apply to the resulting transfer behavior.
+
+## Explore
+
+<CardGroup cols={2}>
+  <Card title="Enable swaps" href="/features/transaction-management/swap/enable-swap">
+    One-time parent-org setup with fee configuration.
+  </Card>
+
+  <Card title="Get a quote" href="/features/transaction-management/swap/get-swap-quote">
+    Indicative fee-aware quote for display.
+  </Card>
+
+  <Card title="Execute a swap" href="/features/transaction-management/swap/execute-swap">
+    One activity, optionally gas-sponsored.
+  </Card>
+
+  <Card title="Track swap status" href="/features/transaction-management/swap/track-swap-status">
+    Same-chain and cross-chain lifecycle.
+  </Card>
+
+  <Card title="End-to-end example" href="/features/transaction-management/swap/end-to-end-example">
+    Enable, quote, execute, and confirm.
+  </Card>
+</CardGroup>

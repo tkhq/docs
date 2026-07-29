@@ -1,0 +1,133 @@
+---
+title: "Track Swap Status"
+description: "Poll swap lifecycle from broadcast to settlement using get_swap_status. Same-chain and cross-chain operations normalize to a single PENDING/COMPLETED/FAILED model."
+mode: "wide"
+noindex: true
+---
+
+import SwapBetaNote from "/snippets/shared/swaps-beta-note.mdx";
+
+`execute_swap` returns a poll handle. Query `get_swap_status` with that handle to observe the full lifecycle. Same-chain and cross-chain swaps share the same endpoint and the same response shape. The endpoint normalizes provider-specific state machines to three states: `PENDING`, `COMPLETED`, `FAILED`.
+
+## Lifecycle model
+
+Turnkey normalizes swap lifecycle to three states across same-chain and cross-chain routes:
+
+- **PENDING**: still in flight. Broadcast pending, origin transaction not yet included, or (cross-chain) destination-side execution not yet settled.
+- **COMPLETED**: the user received the destination asset. Terminal, happy path.
+- **FAILED**: the swap will not fill as intended. Reported only when Turnkey knows what the user holds. Terminal.
+
+Intermediate provider states (`bridge_pending`, `delayed`, `submitted`, and so on) collapse into `PENDING` on purpose. Every state maps to exactly one customer action: `PENDING` means wait, `COMPLETED` means you got the output, `FAILED` means look at what you hold and consider re-swapping.
+
+## Query get\_swap\_status
+
+<ParamField body="organizationId" type="string" required>
+  Unique identifier of the sub-organization that executed the swap.
+</ParamField>
+
+<ParamField body="sendTransactionStatusId" type="string" required>
+  The poll handle returned from `execute_swap`.
+</ParamField>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_swap_status \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "organizationId": "<SUB_ORGANIZATION_ID>",
+    "sendTransactionStatusId": "<SEND_TRANSACTION_STATUS_ID>"
+  }'
+```
+
+```javascript title="JavaScript"
+const status = await client.request("/public/v1/query/get_swap_status", {
+  organizationId: "<SUB_ORGANIZATION_ID>",
+  sendTransactionStatusId: "<SEND_TRANSACTION_STATUS_ID>",
+});
+```
+
+Response:
+
+```json
+{
+  "status": "PENDING | COMPLETED | FAILED",
+  "swapKind": "same_chain | cross_chain",
+  "provider": "zero_x",
+  "inputToken": "<CAIP-19>",
+  "outputToken": "<CAIP-19>",
+  "inputAmount": "<RAW_AMOUNT>",
+  "quotedOutputAmount": "<QUOTED_OUTPUT>",
+  "minOutputAmount": "<MIN_OUTPUT>",
+  "outputAmount": "<ACTUAL_OUTPUT_ON_COMPLETED>",
+  "destinationTxHash": "<TX_HASH_ON_COMPLETED_CROSS_CHAIN_ONLY>",
+  "settledAsset": "<CAIP-19_ON_FAILED>",
+  "settledAmount": "<RAW_AMOUNT_ON_FAILED>",
+  "settlementTxHash": "<TX_HASH_ON_FAILED>",
+  "providerStatus": "<RAW_PROVIDER_STATUS_CROSS_CHAIN_ONLY>",
+  "updatedAt": "<TIMESTAMP>"
+}
+```
+
+_(Field names and JSON casing `To Confirm`.)_
+
+### Response fields
+
+- `status`: normalized state. `PENDING`, `COMPLETED`, or `FAILED`.
+- `swapKind`: `same_chain` or `cross_chain`. Set at execute time; does not change.
+- `provider`: the provider that executed the swap. Currently `zero_x` in V1.
+- `inputToken`, `outputToken`, `inputAmount`: echoed from the execute intent.
+- `quotedOutputAmount`, `minOutputAmount`: from the quote. Always present. `minOutputAmount` is a guaranteed floor.
+- `outputAmount`: actual amount received, on `COMPLETED`. May lag the `status` transition by seconds while the monitor fetches the final settled amount.
+- `destinationTxHash`: destination-chain transaction on `COMPLETED`. Cross-chain only.
+- `settledAsset`, `settledAmount`, `settlementTxHash`: on `FAILED`. See [What FAILED means](#what-failed-means).
+- `providerStatus`: raw provider status passthrough for UI use. Cross-chain only. Not normative.
+- `updatedAt`: last observed state change.
+
+## Same-chain vs. cross-chain differences
+
+The response shape is identical. Only two behaviors differ in practice:
+
+- **Timing.** Same-chain reaches a terminal state within one block time. Cross-chain can take tens of seconds to several minutes depending on the route and bridge.
+- **Field population.** `destinationTxHash` and `providerStatus` are cross-chain only. On same-chain `FAILED`, the settled triple derives directly from the origin transaction: `settledAsset = inputToken`, `settledAmount = inputAmount`, `settlementTxHash = <revert hash>` (nothing moved on-chain in a swap sense).
+
+Use `swapKind` in the response to branch client-side handling only when it matters.
+
+## What FAILED means
+
+`FAILED` is reported only when Turnkey knows what the user holds. A bridge failure with a refund still in flight stays `PENDING` until the refund lands (or is confirmed impossible).
+
+On `FAILED`, three fields describe the outcome:
+
+- `settledAsset` (CAIP-19): the asset the user ended up with.
+- `settledAmount`: raw on-chain amount of that asset.
+- `settlementTxHash`: the on-chain transaction that settled the funds.
+
+Provider-specific recovery scenarios normalize to this triple:
+
+- **Provider refunded on the origin chain**: `settledAsset` is the origin-chain refund token. It may differ from the original input token if the route included an origin-side swap.
+- **Funds never left the user** (e.g., origin transaction reverted): `settledAsset` equals `inputToken`, `settledAmount` equals `inputAmount`, `settlementTxHash` is the origin transaction hash.
+- **Nothing was recoverable**: `settledAsset` is `null`. Internal alerts fire on this state.
+
+If `settledAsset` is non-null, you can call [`execute_swap`](/features/transaction-management/swap/execute-swap) again with the settled asset as the new input to re-attempt. Caveats worth surfacing to end users:
+
+- The refunded amount is reduced by refund gas and any origin-side swap losses.
+- A re-swap pays its own fees and slippage.
+- If the refund landed on the origin chain and the original destination was on a different chain, the re-swap is again cross-chain.
+
+<Warning>
+  `FAILED` with `settledAsset: null` means Turnkey could not recover funds through the provider's automated flows. Contact support if you encounter this state.
+</Warning>
+
+## Polling cadence
+
+- **Same-chain**: poll every ~1 second while `PENDING`. Typically settles within one block time.
+- **Cross-chain**: poll every 5 to 10 seconds while `PENDING`. Settlement can take from tens of seconds to several minutes depending on route.
+
+Websocket and event-driven updates are on the roadmap and will replace polling for cross-chain lifecycles.
+
+## Next steps
+
+- [End-to-end example](/features/transaction-management/swap/end-to-end-example): full flow from enable to confirmation.
+- [Execute a swap](/features/transaction-management/swap/execute-swap): request semantics that generate the poll handle.
