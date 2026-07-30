@@ -97,8 +97,19 @@ Open-source tooling is available in:
 - [TypeScript](https://github.com/tkhq/sdk/tree/main/packages/crypto/src/proof.ts)
 - [Go](https://github.com/tkhq/go-sdk/tree/main/pkg/proofs)
 
+## Example applications
+
+The fastest way to see the full producer-and-verifier flow is to read a working app. The [`tkhq/tvc-examples`](https://github.com/tkhq/tvc-examples) repository has end-to-end examples, and the [`tkhq/tvc-template`](https://github.com/tkhq/tvc-template) starter includes a minimal proof route:
+
+- **Minimal producer (Rust).** The template's [`/random_app_proof`](https://github.com/tkhq/tvc-template/blob/main/crates/helloworld/src/handlers/keys.rs) route signs a payload with the enclave Ephemeral Key and returns the standard `{ scheme, publicKey, proofPayload, signature }` envelope. It's the smallest thing that produces a valid App Proof, and a good place to start.
+- **Custom proof type (Rust).** [`tvc-cosign`](https://github.com/tkhq/tvc-examples/tree/main/tvc-cosign) defines its own `APP_PROOF_TYPE_COSIGN_DECISION` payload committing to the wallet, transaction, classification, and the key that stamped the request. Its [`src/proof.rs`](https://github.com/tkhq/tvc-examples/blob/main/tvc-cosign/src/proof.rs) shows how to design a typed payload and sign it with the Ephemeral Key.
+- **Producer plus client-side verifier (Go + TypeScript).** [`tvc-chainalysis`](https://github.com/tkhq/tvc-examples/tree/main/tvc-chainalysis) produces a `sanctionsCheckProof` App Proof from a Go enclave app ([`apps/tvc-app/proof.go`](https://github.com/tkhq/tvc-examples/blob/main/tvc-chainalysis/apps/tvc-app/proof.go)) and verifies it in the browser ([`apps/web/components/ProofBadge.tsx`](https://github.com/tkhq/tvc-examples/blob/main/tvc-chainalysis/apps/web/components/ProofBadge.tsx)): it checks the App Proof signature with WebCrypto and confirms the App Proof public key matches the Ephemeral Key in the fetched Boot Proof. This is the [verification flow](#verification-flow) above, in code.
+
+Each example defines its own proof type and payload schema, but all sign with the Ephemeral Key, so the same Boot Proof linkage and verification steps apply regardless of what the payload commits to.
+
 ## See also
 
+- [`tkhq/tvc-examples`](https://github.com/tkhq/tvc-examples) — end-to-end example apps that produce and verify App Proofs (see [Example applications](#example-applications)).
 - [Turnkey Verified](https://docs.turnkey.com/security/turnkey-verified) — the user-facing feature built on these proofs, including supported App Proof types and example payloads.
 - [Deployment Lifecycle](https://docs.turnkey.com/features/verifiable-cloud/overview) — how an enclave gets from a container image to a running, attested instance.
 - [AWS Nitro Enclaves: Verifying the root of trust](https://docs.aws.amazon.com/enclaves/latest/user/verify-root.html).
