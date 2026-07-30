@@ -1,6 +1,6 @@
 ---
-title: "Set organization feature"
-description: "Set an organization feature. This activity must be approved by the current root quorum."
+title: "Deposit into Earn vault"
+description: "Deposit assets from a wallet into an enabled yield vault."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="set_organization_feature" />
+<EndpointPath type="submit" path="earn_deposit" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`
+Enum options: `ACTIVITY_TYPE_EARN_DEPOSIT`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,12 +32,24 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="name" type="enum<string>" required={true} default="">
-    Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
+    <NestedParam parentKey="parameters" childKey="wrapperAddress" type="string" required={true} default="">
+    Address of the deployed Earn wrapper to deposit into, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="value" type="string" required={true} default="">
-    Optional value for the feature. Will override existing values if feature is already set.
+    <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
+    A Wallet account address or Private Key address to deposit from and sign with. Must be an on-chain address; Private Key identifiers are not supported.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="assets" type="string" required={true} default="">
+    Amount of the underlying asset to deposit, in raw on-chain units (e.g., '1000000' for 1 USDC at 6 decimals).
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="chainCaip2" type="enum<string>" required={true} default="">
+    Enum options: `eip155:1`, `eip155:8453`, `eip155:42161`, `eip155:137`, `eip155:56`, `eip155:4217`
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="sponsor" type="boolean" required={false} default="">
+    Whether to sponsor this transaction via Gas Station.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -68,17 +80,26 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="setOrganizationFeatureIntent" type="object" required={true}>
-      The setOrganizationFeatureIntent object
-      <Expandable title="setOrganizationFeatureIntent details">
-        <NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="name" type="enum" required={true}>
-name field
+        <NestedParam parentKey="activity.intent" childKey="earnDepositIntent" type="object" required={true}>
+      The earnDepositIntent object
+      <Expandable title="earnDepositIntent details">
+        <NestedParam parentKey="activity.intent.earnDepositIntent" childKey="wrapperAddress" type="string" required={true}>
+Address of the deployed Earn wrapper to deposit into, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.
+</NestedParam>
+<NestedParam parentKey="activity.intent.earnDepositIntent" childKey="signWith" type="string" required={true}>
+A Wallet account address or Private Key address to deposit from and sign with. Must be an on-chain address; Private Key identifiers are not supported.
+</NestedParam>
+<NestedParam parentKey="activity.intent.earnDepositIntent" childKey="assets" type="string" required={true}>
+Amount of the underlying asset to deposit, in raw on-chain units (e.g., '1000000' for 1 USDC at 6 decimals).
+</NestedParam>
+<NestedParam parentKey="activity.intent.earnDepositIntent" childKey="chainCaip2" type="enum" required={true}>
+CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base).
   
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
+Enum options: `eip155:1`, `eip155:8453`, `eip155:42161`, `eip155:137`, `eip155:56`, `eip155:4217`
 
 </NestedParam>
-<NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="value" type="string" required={true}>
-Optional value for the feature. Will override existing values if feature is already set.
+<NestedParam parentKey="activity.intent.earnDepositIntent" childKey="sponsor" type="boolean" required={false}>
+Whether to sponsor this transaction via Gas Station.
 </NestedParam>
 
       </Expandable>
@@ -89,24 +110,12 @@ Optional value for the feature. Will override existing values if feature is alre
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="setOrganizationFeatureResult" type="object" required={true}>
-      The setOrganizationFeatureResult object
-      <Expandable title="setOrganizationFeatureResult details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult" childKey="features" type="array" required={true}>
-      Resulting list of organization features.
-      <Expandable title="features details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="name" type="enum" required={false}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.result" childKey="earnDepositResult" type="object" required={true}>
+      The earnDepositResult object
+      <Expandable title="earnDepositResult details">
+        <NestedParam parentKey="activity.result.earnDepositResult" childKey="depositRequestId" type="string" required={true}>
+Identifier to poll deposit status and tx hash via GetEarnDepositStatus.
 </NestedParam>
-<NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="value" type="string" required={false}>
-value field
-</NestedParam>
-
-      </Expandable>
-    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -139,17 +148,20 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/set_organization_feature \
+  --url https://api.turnkey.com/public/v1/submit/earn_deposit \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_EARN_DEPOSIT",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-        "value": "<string>"
+        "wrapperAddress": "<string>",
+        "signWith": "<string>",
+        "assets": "<string>",
+        "chainCaip2": "<eip155:1>",
+        "sponsor": "<boolean>"
     }
 }'
 ```
@@ -164,9 +176,12 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().setOrganizationFeature({
-  name: "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>" // name field,
-  value: "<string> (Optional value for the feature. Will override existing values if feature is already set.)"
+const response = await turnkeyClient.apiClient().earnDeposit({
+  wrapperAddress: "<string> (Address of the deployed Earn wrapper to deposit into, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.)",
+  signWith: "<string> (A Wallet account address or Private Key address to deposit from and sign with. Must be an on-chain address; Private Key identifiers are not supported.)",
+  assets: "<string> (Amount of the underlying asset to deposit, in raw on-chain units (e.g., '1000000' for 1 USDC at 6 decimals).)",
+  chainCaip2: "<eip155:1>" // CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base).,
+  sponsor: true // Whether to sponsor this transaction via Gas Station.
 });
 ```
 
@@ -179,7 +194,7 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_EARN_DEPOSIT",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -189,19 +204,17 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "setOrganizationFeatureIntent": {
-            "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-            "value": "<string>"
+          "earnDepositIntent": {
+            "wrapperAddress": "<string>",
+            "signWith": "<string>",
+            "assets": "<string>",
+            "chainCaip2": "<eip155:1>",
+            "sponsor": "<boolean>"
           }
         },
         "result": {
-          "setOrganizationFeatureResult": {
-            "features": [
-              {
-                "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-                "value": "<string>"
-              }
-            ]
+          "earnDepositResult": {
+            "depositRequestId": "<string>"
           }
         },
         "votes": "<array>",

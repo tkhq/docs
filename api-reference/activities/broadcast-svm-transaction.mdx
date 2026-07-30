@@ -80,26 +80,32 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="solSendTransactionIntent" type="object" required={true}>
-      The solSendTransactionIntent object
-      <Expandable title="solSendTransactionIntent details">
-        <NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="unsignedTransaction" type="string" required={true}>
-Base64-encoded serialized unsigned Solana transaction
+        <NestedParam parentKey="activity.intent" childKey="solSendTransactionIntentV2" type="object" required={true}>
+      The solSendTransactionIntentV2 object
+      <Expandable title="solSendTransactionIntentV2 details">
+        <NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="unsignedTransaction" type="string" required={true}>
+Hex-encoded serialized unsigned Solana transaction (full wire format with zeroed signature placeholders)
 </NestedParam>
-<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="signWith" type="string" required={true}>
-A wallet or private key address to sign with. This does not support private key IDs.
+<NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="signWiths" type="array" required={true}>
+      Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers. For sponsored transactions this must list every required signer of the transaction in transaction order.
+      <Expandable title="signWiths details">
+        <NestedParam parentKey="activity.intent.solSendTransactionIntentV2.signWiths" childKey="item" type="string" required={true}>
+item field
 </NestedParam>
-<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="sponsor" type="boolean" required={false}>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="sponsor" type="boolean" required={false}>
 Whether to sponsor this transaction via Gas Station.
 </NestedParam>
-<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="caip2" type="enum" required={true}>
+<NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="caip2" type="enum" required={true}>
 CAIP-2 chain ID (e.g., 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' for Solana mainnet). Human-readable Solana aliases ('solana:mainnet', 'solana:devnet') are also accepted and normalized to canonical CAIP-2 values.
   
 Enum options: `solana:mainnet`, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d`, `solana:devnet`, `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`, `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG`
 
 </NestedParam>
-<NestedParam parentKey="activity.intent.solSendTransactionIntent" childKey="recentBlockhash" type="string" required={false}>
-user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution
+<NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="recentBlockhash" type="string" required={false}>
+User-provided blockhash for replay protection / deadline control. If provided, it is used as-is, including for sponsored transactions (the transaction is only broadcastable while the blockhash is current). If omitted and sponsor=true, a fresh blockhash is fetched during execution.
 </NestedParam>
 
       </Expandable>
@@ -110,10 +116,10 @@ user-provided blockhash for replay protection / deadline control. If omitted and
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="solSendTransactionResult" type="object" required={true}>
-      The solSendTransactionResult object
-      <Expandable title="solSendTransactionResult details">
-        <NestedParam parentKey="activity.result.solSendTransactionResult" childKey="sendTransactionStatusId" type="string" required={true}>
+        <NestedParam parentKey="activity.result" childKey="solSendTransactionResultV2" type="object" required={true}>
+      The solSendTransactionResultV2 object
+      <Expandable title="solSendTransactionResultV2 details">
+        <NestedParam parentKey="activity.result.solSendTransactionResultV2" childKey="sendTransactionStatusId" type="string" required={true}>
 The send_transaction_status ID associated with the transaction submission
 </NestedParam>
 
@@ -204,16 +210,18 @@ const response = await turnkeyClient.apiClient().solSendTransaction({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "solSendTransactionIntent": {
+          "solSendTransactionIntentV2": {
             "unsignedTransaction": "<string>",
-            "signWith": "<string>",
+            "signWiths": [
+              "<string>"
+            ],
             "sponsor": "<boolean>",
             "caip2": "<solana:mainnet>",
             "recentBlockhash": "<string>"
           }
         },
         "result": {
-          "solSendTransactionResult": {
+          "solSendTransactionResultV2": {
             "sendTransactionStatusId": "<string>"
           }
         },

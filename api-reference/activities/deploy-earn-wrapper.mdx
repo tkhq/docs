@@ -1,6 +1,6 @@
 ---
-title: "Set organization feature"
-description: "Set an organization feature. This activity must be approved by the current root quorum."
+title: "Deploy Earn wrapper"
+description: "Enable a yield vault for an organization by deploying its fee wrapper. Must be called before any deposits into the vault."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="set_organization_feature" />
+<EndpointPath type="submit" path="earn_deploy_wrapper" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`
+Enum options: `ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,12 +32,20 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="name" type="enum<string>" required={true} default="">
-    Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
+    <NestedParam parentKey="parameters" childKey="vaultAddress" type="string" required={true} default="">
+    Address of the underlying yield vault to wrap (from the ListEarnVaults catalog).
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="value" type="string" required={true} default="">
-    Optional value for the feature. Will override existing values if feature is already set.
+    <NestedParam parentKey="parameters" childKey="chainCaip2" type="enum<string>" required={true} default="">
+    Enum options: `eip155:1`, `eip155:8453`, `eip155:42161`, `eip155:137`, `eip155:56`, `eip155:4217`
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="clientFeeBps" type="string" required={true} default="">
+    Your performance fee on gross yield, in basis points (e.g., '2000' for 20%). Your fee plus Turnkey's fee cannot exceed 50% of yield.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="clientFeeWallet" type="string" required={true} default="">
+    The wallet address that receives the client's fee payouts on-chain. Must be a Turnkey-managed wallet address.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -68,17 +76,23 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="setOrganizationFeatureIntent" type="object" required={true}>
-      The setOrganizationFeatureIntent object
-      <Expandable title="setOrganizationFeatureIntent details">
-        <NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="name" type="enum" required={true}>
-name field
+        <NestedParam parentKey="activity.intent" childKey="earnDeployWrapperIntent" type="object" required={true}>
+      The earnDeployWrapperIntent object
+      <Expandable title="earnDeployWrapperIntent details">
+        <NestedParam parentKey="activity.intent.earnDeployWrapperIntent" childKey="vaultAddress" type="string" required={true}>
+Address of the underlying yield vault to wrap (from the ListEarnVaults catalog).
+</NestedParam>
+<NestedParam parentKey="activity.intent.earnDeployWrapperIntent" childKey="chainCaip2" type="enum" required={true}>
+CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base).
   
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
+Enum options: `eip155:1`, `eip155:8453`, `eip155:42161`, `eip155:137`, `eip155:56`, `eip155:4217`
 
 </NestedParam>
-<NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="value" type="string" required={true}>
-Optional value for the feature. Will override existing values if feature is already set.
+<NestedParam parentKey="activity.intent.earnDeployWrapperIntent" childKey="clientFeeBps" type="string" required={true}>
+Your performance fee on gross yield, in basis points (e.g., '2000' for 20%). Your fee plus Turnkey's fee cannot exceed 50% of yield.
+</NestedParam>
+<NestedParam parentKey="activity.intent.earnDeployWrapperIntent" childKey="clientFeeWallet" type="string" required={true}>
+The wallet address that receives the client's fee payouts on-chain. Must be a Turnkey-managed wallet address.
 </NestedParam>
 
       </Expandable>
@@ -89,24 +103,18 @@ Optional value for the feature. Will override existing values if feature is alre
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="setOrganizationFeatureResult" type="object" required={true}>
-      The setOrganizationFeatureResult object
-      <Expandable title="setOrganizationFeatureResult details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult" childKey="features" type="array" required={true}>
-      Resulting list of organization features.
-      <Expandable title="features details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="name" type="enum" required={false}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.result" childKey="earnDeployWrapperResult" type="object" required={true}>
+      The earnDeployWrapperResult object
+      <Expandable title="earnDeployWrapperResult details">
+        <NestedParam parentKey="activity.result.earnDeployWrapperResult" childKey="wrapperAddress" type="string" required={true}>
+Address of the deployed fee wrapper (the deposit target).
 </NestedParam>
-<NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="value" type="string" required={false}>
-value field
+<NestedParam parentKey="activity.result.earnDeployWrapperResult" childKey="splitterAddress" type="string" required={true}>
+Address of the deployed fee splitter (PaymentSplitter for Morpho, RevenueSplitterOwner for Aave).
 </NestedParam>
-
-      </Expandable>
-    </NestedParam>
+<NestedParam parentKey="activity.result.earnDeployWrapperResult" childKey="deployRequestId" type="string" required={true}>
+Identifier to poll deploy status.
+</NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -139,17 +147,19 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/set_organization_feature \
+  --url https://api.turnkey.com/public/v1/submit/earn_deploy_wrapper \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-        "value": "<string>"
+        "vaultAddress": "<string>",
+        "chainCaip2": "<eip155:1>",
+        "clientFeeBps": "<string>",
+        "clientFeeWallet": "<string>"
     }
 }'
 ```
@@ -164,9 +174,11 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().setOrganizationFeature({
-  name: "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>" // name field,
-  value: "<string> (Optional value for the feature. Will override existing values if feature is already set.)"
+const response = await turnkeyClient.apiClient().earnDeployWrapper({
+  vaultAddress: "<string> (Address of the underlying yield vault to wrap (from the ListEarnVaults catalog).)",
+  chainCaip2: "<eip155:1>" // CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base).,
+  clientFeeBps: "<string> (Your performance fee on gross yield, in basis points (e.g., '2000' for 20%). Your fee plus Turnkey's fee cannot exceed 50% of yield.)",
+  clientFeeWallet: "<string> (The wallet address that receives the client's fee payouts on-chain. Must be a Turnkey-managed wallet address.)"
 });
 ```
 
@@ -179,7 +191,7 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -189,19 +201,18 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "setOrganizationFeatureIntent": {
-            "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-            "value": "<string>"
+          "earnDeployWrapperIntent": {
+            "vaultAddress": "<string>",
+            "chainCaip2": "<eip155:1>",
+            "clientFeeBps": "<string>",
+            "clientFeeWallet": "<string>"
           }
         },
         "result": {
-          "setOrganizationFeatureResult": {
-            "features": [
-              {
-                "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-                "value": "<string>"
-              }
-            ]
+          "earnDeployWrapperResult": {
+            "wrapperAddress": "<string>",
+            "splitterAddress": "<string>",
+            "deployRequestId": "<string>"
           }
         },
         "votes": "<array>",

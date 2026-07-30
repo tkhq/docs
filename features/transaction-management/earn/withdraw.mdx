@@ -12,104 +12,16 @@ A withdrawal moves assets from your organization's fee wrapper back to the user'
 
 ## Submit the withdrawal
 
-<ParamField body="type" type="enum<string>" required>
-  `ACTIVITY_TYPE_EARN_WITHDRAW`
-</ParamField>
+Submit an [`ACTIVITY_TYPE_EARN_WITHDRAW`](/api-reference/activities/withdraw-from-earn-vault) activity with:
 
-<ParamField body="timestampMs" type="string" required>
-  Timestamp (in milliseconds) of the request, used to verify liveness.
-</ParamField>
+- the `wrapperAddress` holding the position, from [`list_earn_positions`](/api-reference/queries/get-earn-positions)
+- the `signWith` wallet account to withdraw to and sign with
+- the `amountValue` in raw on-chain units of the underlying asset (e.g. `"500000"` for 0.50 USDC), or the literal `"MAX"` to withdraw the entire position
+- the CAIP-2 chain in `chainCaip2`, and optionally `sponsor` for gas sponsorship
 
-<ParamField body="organizationId" type="string" required>
-  Unique identifier for your organization (or the sub-organization whose wallet is withdrawing).
-</ParamField>
+See [Withdraw from Earn vault](/api-reference/activities/withdraw-from-earn-vault) in the API reference for the full request/response schema and cURL example. The activity result contains only a poll handle, `withdrawRequestId`.
 
-<ParamField body="parameters.wrapperAddress" type="string" required>
-  Address of the deployed fee wrapper holding the position, from [`earn_positions`](/features/transaction-management/earn/positions).
-</ParamField>
-
-<ParamField body="parameters.signWith" type="string" required>
-  The wallet account address to withdraw to and sign with.
-</ParamField>
-
-<ParamField body="parameters.amountValue" type="string" required>
-  Amount of the underlying asset to withdraw, in raw on-chain units (e.g. `"500000"` for 0.50 USDC), or the literal `"MAX"` to withdraw the entire position.
-</ParamField>
-
-<ParamField body="parameters.chainCaip2" type="string" required>
-  CAIP-2 chain identifier, e.g. `eip155:8453`.
-</ParamField>
-
-<ParamField body="parameters.sponsor" type="boolean">
-  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`.
-</ParamField>
-
-<CodeGroup>
-
-```bash title="cURL"
-curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/earn_withdraw \
-  --header 'Accept: application/json' \
-  --header 'Content-Type: application/json' \
-  --header "X-Stamp: <string> (see Stamps)" \
-  --data '{
-    "type": "ACTIVITY_TYPE_EARN_WITHDRAW",
-    "timestampMs": "<string> (e.g. 1745474677453)",
-    "organizationId": "<ORGANIZATION_ID>",
-    "parameters": {
-      "wrapperAddress": "<WRAPPER_ADDRESS>",
-      "signWith": "<WALLET_ADDRESS>",
-      "amountValue": "MAX",
-      "chainCaip2": "eip155:8453",
-      "sponsor": false
-    }
-  }'
-```
-
-```javascript title="JavaScript"
-import { TurnkeyClient } from "@turnkey/http";
-import { ApiKeyStamper } from "@turnkey/api-key-stamper";
-
-const client = new TurnkeyClient(
-  { baseUrl: "https://api.turnkey.com" },
-  new ApiKeyStamper({
-    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-  }),
-);
-
-const { activity } = await client.request("/public/v1/submit/earn_withdraw", {
-  type: "ACTIVITY_TYPE_EARN_WITHDRAW",
-  timestampMs: String(Date.now()),
-  organizationId: "<ORGANIZATION_ID>",
-  parameters: {
-    wrapperAddress: "<WRAPPER_ADDRESS>",
-    signWith: "<WALLET_ADDRESS>",
-    amountValue: "MAX",
-    chainCaip2: "eip155:8453",
-    sponsor: false,
-  },
-});
-```
-
-</CodeGroup>
-
-The result contains only a poll handle:
-
-```json
-{
-  "activity": {
-    "id": "<ACTIVITY_ID>",
-    "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_EARN_WITHDRAW",
-    "result": {
-      "earnWithdrawResult": {
-        "withdrawRequestId": "<WITHDRAW_REQUEST_ID>"
-      }
-    }
-  }
-}
-```
+Withdrawals always work, even when deposits to the wrapper are [paused](/features/transaction-management/earn/deploy-wrapper#manage-a-deployed-wrapper).
 
 ## Full exit with MAX
 
@@ -118,7 +30,7 @@ The result contains only a poll handle:
 <Note>
   A `MAX` withdrawal resets the position's lifetime accounting: after it
   confirms, `totalDeposited` and `totalWithdrawn` in
-  [`earn_positions`](/features/transaction-management/earn/positions) start again from zero
+  [`list_earn_positions`](/features/transaction-management/earn/positions) start again from zero
   for that wrapper.
 </Note>
 
@@ -129,10 +41,13 @@ Positions in wrappers you have since replaced (after a [fee change](/features/tr
 To pay out yield without touching principal, withdraw exactly the yield amount. Compute it from the position's raw fields:
 
 ```javascript title="JavaScript"
-const { positions } = await client.request("/public/v1/query/earn_positions", {
-  organizationId: "<ORGANIZATION_ID>",
-  walletAddress: "<WALLET_ADDRESS>",
-});
+const { positions } = await client.request(
+  "/public/v1/query/list_earn_positions",
+  {
+    organizationId: "<ORGANIZATION_ID>",
+    walletAddress: "<WALLET_ADDRESS>",
+  },
+);
 
 const p = positions.find(
   (p) => p.wrapperAddress === "<WRAPPER_ADDRESS>",
@@ -161,41 +76,12 @@ await client.request("/public/v1/submit/earn_withdraw", {
 
 <Warning>
   As with deposits, a `COMPLETED` activity means the transaction was enqueued
-  for broadcast, not that it confirmed. Poll `earn_withdraw_status` until it
-  reports `COMPLETED` (included on-chain) or `FAILED`.
+  for broadcast, not that it confirmed. Poll
+  [`get_earn_withdraw_status`](/api-reference/queries/get-earn-withdraw-status)
+  until it reports `COMPLETED` (included on-chain) or `FAILED`.
 </Warning>
 
-<CodeGroup>
-
-```bash title="cURL"
-curl --request POST \
-  --url https://api.turnkey.com/public/v1/query/earn_withdraw_status \
-  --header 'Accept: application/json' \
-  --header 'Content-Type: application/json' \
-  --header "X-Stamp: <string> (see Stamps)" \
-  --data '{
-    "organizationId": "<ORGANIZATION_ID>",
-    "withdrawRequestId": "<WITHDRAW_REQUEST_ID>"
-  }'
-```
-
-```javascript title="JavaScript"
-const status = await client.request("/public/v1/query/earn_withdraw_status", {
-  organizationId: "<ORGANIZATION_ID>",
-  withdrawRequestId: "<WITHDRAW_REQUEST_ID>",
-});
-```
-
-</CodeGroup>
-
-```json
-{
-  "status": "COMPLETED",
-  "withdrawTxHash": "<TRANSACTION_HASH>"
-}
-```
-
-`status` is `PENDING`, `COMPLETED`, or `FAILED`. On `FAILED`, the response includes an `error` field with the reason.
+Poll with the `withdrawRequestId` from the activity result. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `withdrawTxHash`, and on `FAILED` it includes an `error` field with the reason.
 
 ## Gas
 

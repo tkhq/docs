@@ -1,6 +1,6 @@
 ---
-title: "Set organization feature"
-description: "Set an organization feature. This activity must be approved by the current root quorum."
+title: "Claim earn fees"
+description: "Claim earn fees through the activity pipeline."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="set_organization_feature" />
+<EndpointPath type="submit" path="claim_earn_fees" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`
+Enum options: `ACTIVITY_TYPE_CLAIM_EARN_FEES`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,12 +32,8 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="name" type="enum<string>" required={true} default="">
-    Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="value" type="string" required={true} default="">
-    Optional value for the feature. Will override existing values if feature is already set.
+    <NestedParam parentKey="parameters" childKey="wrapperAddress" type="string" required={true} default="">
+    Address of the deployed Earn wrapper to claim fees for. Must be one of the org's deployed wrappers.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -68,17 +64,11 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="setOrganizationFeatureIntent" type="object" required={true}>
-      The setOrganizationFeatureIntent object
-      <Expandable title="setOrganizationFeatureIntent details">
-        <NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="name" type="enum" required={true}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
-</NestedParam>
-<NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="value" type="string" required={true}>
-Optional value for the feature. Will override existing values if feature is already set.
+        <NestedParam parentKey="activity.intent" childKey="claimEarnFeesIntent" type="object" required={true}>
+      The claimEarnFeesIntent object
+      <Expandable title="claimEarnFeesIntent details">
+        <NestedParam parentKey="activity.intent.claimEarnFeesIntent" childKey="wrapperAddress" type="string" required={true}>
+Address of the deployed Earn wrapper to claim fees for. Must be one of the org's deployed wrappers.
 </NestedParam>
 
       </Expandable>
@@ -89,24 +79,12 @@ Optional value for the feature. Will override existing values if feature is alre
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="setOrganizationFeatureResult" type="object" required={true}>
-      The setOrganizationFeatureResult object
-      <Expandable title="setOrganizationFeatureResult details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult" childKey="features" type="array" required={true}>
-      Resulting list of organization features.
-      <Expandable title="features details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="name" type="enum" required={false}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.result" childKey="claimEarnFeesResult" type="object" required={true}>
+      The claimEarnFeesResult object
+      <Expandable title="claimEarnFeesResult details">
+        <NestedParam parentKey="activity.result.claimEarnFeesResult" childKey="claimRequestId" type="string" required={true}>
+Identifier to poll claim status and tx hash via GetClaimEarnFeesStatus.
 </NestedParam>
-<NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="value" type="string" required={false}>
-value field
-</NestedParam>
-
-      </Expandable>
-    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -139,17 +117,16 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/set_organization_feature \
+  --url https://api.turnkey.com/public/v1/submit/claim_earn_fees \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_CLAIM_EARN_FEES",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-        "value": "<string>"
+        "wrapperAddress": "<string>"
     }
 }'
 ```
@@ -164,9 +141,8 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().setOrganizationFeature({
-  name: "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>" // name field,
-  value: "<string> (Optional value for the feature. Will override existing values if feature is already set.)"
+const response = await turnkeyClient.apiClient().claimEarnFees({
+  wrapperAddress: "<string> (Address of the deployed Earn wrapper to claim fees for. Must be one of the org's deployed wrappers.)"
 });
 ```
 
@@ -179,7 +155,7 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_CLAIM_EARN_FEES",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -189,19 +165,13 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "setOrganizationFeatureIntent": {
-            "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-            "value": "<string>"
+          "claimEarnFeesIntent": {
+            "wrapperAddress": "<string>"
           }
         },
         "result": {
-          "setOrganizationFeatureResult": {
-            "features": [
-              {
-                "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-                "value": "<string>"
-              }
-            ]
+          "claimEarnFeesResult": {
+            "claimRequestId": "<string>"
           }
         },
         "votes": "<array>",

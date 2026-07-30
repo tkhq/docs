@@ -217,12 +217,14 @@ export function generateResponseFieldMdxRecursive(
 
     // Top-level Primitive: Use <ResponseField>
     if (!parentKey) {
-      mdx += `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>${description.trim()}${
-        isEnum
-          ? `
-  ${generateEnumOptionsMdx(options)}`
-          : ""
-      }</ResponseField>
+      // Enum fields carry a paragraph break before the options list, so the
+      // description must start on its own line (block JSX) to parse as MDX.
+      mdx += isEnum
+        ? `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>
+${description.trim()}
+${generateEnumOptionsMdx(options)}</ResponseField>
+`
+        : `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>${description.trim()}</ResponseField>
 `; // Removed newline before closing tag
     } else {
       // ANY NESTED Primitive: Use <NestedParam>

@@ -1,0 +1,148 @@
+---
+title: "Get Earn positions"
+description: "Get the active Earn positions for a specific wallet, including current value, cost basis, yield, and projected fees."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="list_earn_positions" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="walletAddress" type="string" required={true}>
+
+The wallet address to return positions for.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="positions" type="array" required={false}>
+  The wallet's active Earn positions.
+  <Expandable title="positions details">
+    <NestedParam parentKey="positions" childKey="vaultAddress" type="string" required={false}>
+Address of the underlying yield vault.
+</NestedParam>
+<NestedParam parentKey="positions" childKey="wrapperAddress" type="string" required={false}>
+Address of the fee wrapper holding the position.
+</NestedParam>
+<NestedParam parentKey="positions" childKey="provider" type="enum" required={false}>
+provider field
+  
+Enum options: `EARN_PROVIDER_MORPHO`, `EARN_PROVIDER_AAVE`
+
+</NestedParam>
+<NestedParam parentKey="positions" childKey="caip19" type="string" required={false}>
+CAIP-19 asset ID of the vault's underlying asset (e.g. 'eip155:8453/erc20:0x833589...'); the chain is encoded in the identifier.
+</NestedParam>
+<NestedParam parentKey="positions" childKey="currentValue" type="string" required={false}>
+Current value of the position in the underlying asset, in raw on-chain units (already net of the wrapper fee).
+</NestedParam>
+<NestedParam parentKey="positions" childKey="totalDeposited" type="string" required={false}>
+Lifetime total deposited into this position, in raw on-chain units.
+</NestedParam>
+<NestedParam parentKey="positions" childKey="totalWithdrawn" type="string" required={false}>
+Lifetime total withdrawn from this position, in raw on-chain units.
+</NestedParam>
+<NestedParam parentKey="positions" childKey="display" type="object" required={false}>
+      display field
+      <Expandable title="display details">
+        <NestedParam parentKey="positions.display" childKey="currentValueUsd" type="string" required={false}>
+Current value in USD, for display only.
+</NestedParam>
+<NestedParam parentKey="positions.display" childKey="totalDepositedUsd" type="string" required={false}>
+Total deposited in USD, for display only.
+</NestedParam>
+<NestedParam parentKey="positions.display" childKey="totalWithdrawnUsd" type="string" required={false}>
+Total withdrawn in USD, for display only.
+</NestedParam>
+<NestedParam parentKey="positions.display" childKey="currentValueCrypto" type="string" required={false}>
+Current value in the asset's own units, for display only.
+</NestedParam>
+<NestedParam parentKey="positions.display" childKey="totalDepositedCrypto" type="string" required={false}>
+Total deposited in the asset's own units, for display only.
+</NestedParam>
+<NestedParam parentKey="positions.display" childKey="totalWithdrawnCrypto" type="string" required={false}>
+Total withdrawn in the asset's own units, for display only.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="positions" childKey="depositsDisabled" type="boolean" required={false}>
+When true, deposits to this wrapper are rejected; withdrawals are unaffected. Toggled via EarnSetWrapperState.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/list_earn_positions \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "walletAddress": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().listEarnPositions({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  walletAddress: "<string> (The wallet address to return positions for.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "positions": [
+    {
+      "vaultAddress": "<string>",
+      "wrapperAddress": "<string>",
+      "provider": "<EARN_PROVIDER_MORPHO>",
+      "caip19": "<string>",
+      "currentValue": "<string>",
+      "totalDeposited": "<string>",
+      "totalWithdrawn": "<string>",
+      "display": {
+        "currentValueUsd": "<string>",
+        "totalDepositedUsd": "<string>",
+        "totalWithdrawnUsd": "<string>",
+        "currentValueCrypto": "<string>",
+        "totalDepositedCrypto": "<string>",
+        "totalWithdrawnCrypto": "<string>"
+      },
+      "depositsDisabled": "<boolean>"
+    }
+  ]
+}
+```
+
+</ResponseExample>
