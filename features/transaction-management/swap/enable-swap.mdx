@@ -5,7 +5,7 @@ mode: "wide"
 noindex: true
 ---
 
-`ACTIVITY_TYPE_ENABLE_SWAP` is a parent-organization configuration activity that writes `ORG_FEATURE_SWAP_CONFIG` — the source of truth for whether swaps are enabled, your integrator fee, and the wallet that receives fees. Enable must complete before any sub-organization can call `get_swap_quote` or `execute_swap`.
+`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` is a parent-organization configuration activity that writes `FEATURE_NAME_SWAP_CONFIG` — the source of truth for your integrator fee configuration and the wallet that receives fees. This config must be set before any sub-organization can call `get_swap_quote` or `execute_swap`.
 
 ## Prerequisites
 
@@ -13,10 +13,10 @@ noindex: true
 - You control a wallet that will receive integrator fees. It must be a valid address for the target route and provider _(To Confirm — likely any EVM address in V1)_.
 - You've decided on your fee rate in basis points. See [Choose your fee configuration](#choose-your-fee-configuration).
 
-## Submit enable\_swap
+## Submit upsert\_swap\_config
 
 <ParamField body="type" type="enum<string>" required>
-  `ACTIVITY_TYPE_ENABLE_SWAP`
+  `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required>
@@ -27,10 +27,6 @@ noindex: true
   Unique identifier of the **parent** organization. Requests from sub-organizations are rejected.
 </ParamField>
 
-<ParamField body="parameters.enabled" type="boolean" required>
-  Whether quote and execute activities are permitted. Set `true` to enable, `false` to disable.
-</ParamField>
-
 <ParamField body="parameters.feeReceiverWalletAddress" type="string" required>
   The wallet address that receives integrator fees on-chain. Must be valid for the route and provider _(To Confirm — likely any EVM address in V1)_.
 </ParamField>
@@ -39,18 +35,25 @@ noindex: true
   Your integrator fee in basis points, expressed as a stringified integer. For example, `"50"` = 0.5%. Must be non-negative and no greater than the Turnkey-defined maximum.
 </ParamField>
 
+<ParamField body="parameters.stableFeeBps" type="string">
+  Optional. A separate integrator fee in basis points applied to stablecoin-to-stablecoin swaps _(To Confirm — verify this is the exact scope)_.
+</ParamField>
+
+<ParamField body="parameters.provider" type="string">
+  Optional. The DEX aggregator provider. Omit in V1 — `0x` is the only supported provider and is used by default.
+</ParamField>
+
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/enable_swap \
+  --url https://api.turnkey.com/public/v1/submit/upsert_swap_config \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_ENABLE_SWAP",
+    "type": "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<PARENT_ORGANIZATION_ID>",
     "parameters": {
-      "enabled": true,
       "feeReceiverWalletAddress": "<WALLET_ADDRESS>",
       "feeBps": "50"
     }
@@ -60,7 +63,6 @@ curl --request POST \
 ```javascript title="JavaScript"
 import { TurnkeyClient } from "@turnkey/http";
 import { ApiKeyStamper } from "@turnkey/api-key-stamper";
-
 const client = new TurnkeyClient(
   { baseUrl: "https://api.turnkey.com" },
   new ApiKeyStamper({
@@ -68,34 +70,30 @@ const client = new TurnkeyClient(
     apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
   }),
 );
-
-const { activity } = await client.request("/public/v1/submit/enable_swap", {
-  type: "ACTIVITY_TYPE_ENABLE_SWAP",
+const { activity } = await client.request("/public/v1/submit/upsert_swap_config", {
+  type: "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
   timestampMs: String(Date.now()),
   organizationId: "<PARENT_ORGANIZATION_ID>",
   parameters: {
-    enabled: true,
     feeReceiverWalletAddress: "<WALLET_ADDRESS>",
     feeBps: "50",
   },
 });
 ```
 
-`enable_swap` completes inline. The activity result echoes the applied configuration:
+`upsert_swap_config` completes inline. The activity result echoes the applied configuration:
 
 ```json
 {
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_ENABLE_SWAP",
+    "type": "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
     "result": {
-      "enableSwapResult": {
-        "config": {
-          "enabled": true,
-          "feeReceiverWalletAddress": "<WALLET_ADDRESS>",
-          "feeBps": "50"
-        }
+      "upsertSwapConfigResult": {
+        "feeReceiverWalletAddress": "<WALLET_ADDRESS>",
+        "feeBps": "50",
+        "stableFeeBps": "10"
       }
     }
   }
@@ -115,7 +113,7 @@ Pick a `feeBps` that reflects your intended margin and confirm the receiver wall
 
 ## Change your fee configuration
 
-Configuration changes go through the same `ACTIVITY_TYPE_ENABLE_SWAP` activity — submit again with the updated `feeBps`, `feeReceiverWalletAddress`, or `enabled` flag. There is no separate update activity.
+Configuration changes go through the same `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` activity — submit again with the updated `feeBps`, `feeReceiverWalletAddress`, or `stableFeeBps`. There is no separate update activity.
 
 Quote and execute activities submitted **after** the change immediately use the new configuration. Because executable provider data is fetched fresh during `execute_swap`, an in-flight quote followed by an execute will settle at the fee configuration active at execute time, not at quote time _(To Confirm)_.
 

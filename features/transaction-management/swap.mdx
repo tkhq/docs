@@ -17,7 +17,7 @@ Swaps enablement is a one-time setup step per parent organization. After that, e
 
 ## How it works
 
-1. Enable swaps once on your parent organization via [`enable_swap`](/features/transaction-management/swap/enable-swap), setting your integrator fee (bps) and fee-receiver wallet.
+1. Enable swaps once on your parent organization via [`upsert_swap_config`](/features/transaction-management/swap/enable-swap), setting your integrator fee (bps) and fee-receiver wallet.
 2. Optionally call [`get_swap_quote`](/features/transaction-management/swap/get-swap-quote) for an indicative quote to display to users. Quotes reflect your active fee configuration.
 3. Submit [`execute_swap`](/features/transaction-management/swap/execute-swap) from the sub-organization whose wallet is swapping. Turnkey handles quote refresh, Permit2 approvals, and transaction construction internally. For cross-chain routes, the origin-chain transaction is broadcast here.
 4. Poll swap status until settlement. Same-chain swaps complete on origin inclusion; cross-chain swaps have a longer lifecycle that continues until the destination-chain leg settles or funds are recovered. See [Track swap status](/features/transaction-management/swap/track-swap-status).
@@ -45,23 +45,24 @@ Swap fees are integrator fees: a percentage of the swap amount, expressed in bas
 Fees are configured **on the parent organization** and applied to every swap submitted by any sub-organization under it. Sub-organizations cannot override the parent's fee configuration.
 
 <Warning>
-  To change your fee configuration, submit `enable_swap` again with the new values. Quote and execute activities submitted after the change immediately use the new fee configuration.
+  To change your fee configuration, submit `upsert_swap_config` again with the new values. Quote and execute activities submitted after the change immediately use the new fee configuration.
 </Warning>
 
 ## API surface
 
-Swap adds three activities:
+Swaps add three activities:
 
-| Activity | Endpoint _To Confirm_ | Purpose |
+| Activity | Endpoint | Purpose |
 | :-- | :-- | :-- |
-| `ACTIVITY_TYPE_ENABLE_SWAP` | `POST /public/v1/submit/enable_swap` | Enable swaps on your parent organization and set your fee |
-| `ACTIVITY_TYPE_GET_SWAP_QUOTE` | `POST /public/v1/submit/get_swap_quote` | Indicative fee-aware quote for an input token / amount pair |
+| `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` | `POST /public/v1/submit/upsert_swap_config` | Enable swaps on your parent organization and set your fee configuration |
 | `ACTIVITY_TYPE_EXECUTE_SWAP` | `POST /public/v1/submit/execute_swap` | Sign, broadcast, and settle a swap from a sub-org wallet |
+| `ACTIVITY_TYPE_CLAIM_SWAP_FEES` | `POST /public/v1/submit/claim_swap_fees` | Claim accrued integrator fees to your fee-receiver wallet |
 
-and one query for status:
+and two queries:
 
-| Query | Endpoint _To Confirm_ | Purpose |
+| Query | Endpoint | Purpose |
 | :-- | :-- | :-- |
+| Swap quote | `POST /public/v1/query/get_swap_quote` | Indicative fee-aware quote for an input token / amount pair |
 | Swap status | `POST /public/v1/query/get_swap_status` | Poll the full swap lifecycle. Handles same-chain and cross-chain with a unified response shape. |
 
 <Note>

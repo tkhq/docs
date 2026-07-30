@@ -9,7 +9,7 @@ noindex: true
 
 ## Prerequisites
 
-- The parent organization has [enabled swaps](/features/transaction-management/swap/enable-swap). Execute requests against orgs with swaps disabled are rejected.
+- The parent organization has [configured swaps](/features/transaction-management/swap/enable-swap). Execute requests against orgs with no swap configuration set are rejected.
 - The `walletAccount` in the intent holds enough of the input token to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native token for gas.
 - For cross-chain routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
 
@@ -40,15 +40,23 @@ noindex: true
 </ParamField>
 
 <ParamField body="parameters.walletAccount" type="string" required>
-  The wallet account address to sign with and swap from. Part of the user-signed intent. Authentication identifies the caller. It does not determine the signing wallet.
+  The wallet account address to sign with and swap from. Part of the user-signed intent. Authentication identifies the caller; it does not determine the signing wallet.
 </ParamField>
 
-<ParamField body="parameters.slippage" type="string" required>
-  Slippage tolerance in basis points, expressed as a stringified integer. Enforced at execute time as protection against market movement between quote fetch and settlement.
+<ParamField body="parameters.minOutputAmount" type="string" required>
+  The minimum output amount to accept, in raw on-chain units. This is the hard floor enforced at settlement — if the swap would return less, it fails. Typically set to the `minOutputAmount` returned by [`get_swap_quote`](/features/transaction-management/swap/get-swap-quote).
+</ParamField>
+
+<ParamField body="parameters.slippage" type="string">
+  Optional. Slippage tolerance in basis points, expressed as a stringified integer. Used when fetching the executable quote. `minOutputAmount` is the enforced floor at settlement _(To Confirm — exact interaction between `slippage` and `minOutputAmount`)_.
 </ParamField>
 
 <ParamField body="parameters.sponsor" type="boolean">
-  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`. Requires a Pro plan or higher when set to `true`. _(To Confirm: plan gating.)_
+  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`. Requires a Pro plan or higher when set to `true` _(To Confirm: plan gating)_.
+</ParamField>
+
+<ParamField body="parameters.provider" type="string">
+  Optional. The DEX aggregator provider. Omit in V1 — `0x` is the only supported provider and is used by default.
 </ParamField>
 
 ```bash title="cURL"
@@ -66,6 +74,7 @@ curl --request POST \
       "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
       "inputAmount": "1000000",
       "walletAccount": "<WALLET_ADDRESS>",
+      "minOutputAmount": "<MINIMUM_OUTPUT>",
       "slippage": "50",
       "sponsor": false
     }
@@ -93,6 +102,7 @@ const { activity } = await client.request("/public/v1/submit/execute_swap", {
     outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
     inputAmount: "1000000",
     walletAccount: "<WALLET_ADDRESS>",
+    minOutputAmount: "<MINIMUM_OUTPUT>",
     slippage: "50",
     sponsor: false,
   },
@@ -109,14 +119,16 @@ The activity result returns a poll handle:
     "type": "ACTIVITY_TYPE_EXECUTE_SWAP",
     "result": {
       "executeSwapResult": {
-        "sendTransactionStatusId": "<SEND_TRANSACTION_STATUS_ID>"
+        "sendTransactionStatusId": "<SEND_TRANSACTION_STATUS_ID>",
+        "provider": "0x",
+        "quoteId": "<QUOTE_ID>"
       }
     }
   }
 }
 ```
 
-_(Field name `sendTransactionStatusId` `To Confirm`. Response shape mirrors other send-transaction activities.)_
+`ExecuteSwapResult` returns `sendTransactionStatusId` (used to poll status), plus optional `provider` and `quoteId`.
 
 ## Gas: sponsored vs. self-funded
 

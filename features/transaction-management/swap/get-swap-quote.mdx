@@ -5,55 +5,49 @@ mode: "wide"
 noindex: true
 ---
 
-- The parent organization has [enabled swaps](/features/transaction-management/swap/enable-swap) with a valid `feeReceiverWalletAddress` and `feeBps`. Quote requests against orgs with swaps disabled are rejected.
-- The token pair maps to a supported provider route (0x in V1). Same-chain and EVM ↔ EVM cross-chain routes are supported.
+- The parent organization has [configured swaps](/features/transaction-management/swap/enable-swap) with a valid `feeReceiverWalletAddress` and `feeBps`. Quote requests against orgs with no swap configuration set are rejected.
 
-## Submit get\_swap\_quote
+## Call get\_swap\_quote
 
-<ParamField body="type" type="enum<string>" required>
-  `ACTIVITY_TYPE_GET_SWAP_QUOTE`
-</ParamField>
-
-<ParamField body="timestampMs" type="string" required>
-  Timestamp (in milliseconds) of the request, used to verify liveness.
-</ParamField>
+`get_swap_quote` is a **query**, not an activity — it returns synchronously and is not stamped into an activity envelope. Send the request fields at the top level (there is no `parameters` object, `type`, or `timestampMs`).
 
 <ParamField body="organizationId" type="string" required>
-  Unique identifier of the sub-organization requesting the quote. The parent organization's active `ORG_FEATURE_SWAP_CONFIG` is applied server-side.
+  Unique identifier of the sub-organization requesting the quote. The parent organization's active `FEATURE_NAME_SWAP_CONFIG` is applied server-side.
 </ParamField>
 
-<ParamField body="parameters.inputToken" type="string" required>
+<ParamField body="inputToken" type="string" required>
   CAIP-19 identifier for the token being sold. Example: `eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913` (USDC on Base). The origin chain is derived from this identifier.
 </ParamField>
 
-<ParamField body="parameters.outputToken" type="string" required>
+<ParamField body="outputToken" type="string" required>
   CAIP-19 identifier for the token being bought. Example: `eip155:8453/erc20:0x4200000000000000000000000000000000000006` (WETH on Base). Same-chain if the CAIP-2 prefix matches `inputToken`. Otherwise a cross-chain route.
 </ParamField>
 
-<ParamField body="parameters.inputAmount" type="string" required>
+<ParamField body="inputAmount" type="string" required>
   Amount of the input token, in raw on-chain units. For example, `"1000000"` for 1 USDC at 6 decimals.
 </ParamField>
 
-<ParamField body="parameters.slippage" type="string">
-  Slippage tolerance in basis points, expressed as a stringified integer. For example, `"50"` = 0.5%. Applied to `minOutputAmount` computation. _(To Confirm: required vs. optional, and whether a server default applies if omitted.)_
+<ParamField body="walletAccount" type="string" required>
+  The address of the wallet account that will perform the swap. Used to compute an accurate quote (balances and allowances) _(To Confirm — exact format: on-chain address vs. wallet-account identifier)_.
+</ParamField>
+
+<ParamField body="slippage" type="string">
+  Optional. Slippage tolerance in basis points, expressed as a stringified integer. For example, `"50"` = 0.5%. Applied to `minOutputAmount` computation _(To Confirm — server default when omitted)_.
 </ParamField>
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/get_swap_quote \
+  --url https://api.turnkey.com/public/v1/query/get_swap_quote \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_GET_SWAP_QUOTE",
-    "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<SUB_ORGANIZATION_ID>",
-    "parameters": {
-      "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
-      "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
-      "inputAmount": "1000000",
-      "slippage": "50"
-    }
+    "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+    "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+    "inputAmount": "1000000",
+    "walletAccount": "<WALLET_ACCOUNT_ADDRESS>",
+    "slippage": "50"
   }'
 ```
 
@@ -69,47 +63,45 @@ const client = new TurnkeyClient(
   }),
 );
 
-const { activity } = await client.request("/public/v1/submit/get_swap_quote", {
-  type: "ACTIVITY_TYPE_GET_SWAP_QUOTE",
-  timestampMs: String(Date.now()),
+// Queries return the response body directly — there is no `activity` wrapper.
+const { quotes } = await client.request("/public/v1/query/get_swap_quote", {
   organizationId: "<SUB_ORGANIZATION_ID>",
-  parameters: {
-    inputToken: "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
-    outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
-    inputAmount: "1000000",
-    slippage: "50",
-  },
+  inputToken: "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+  outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+  inputAmount: "1000000",
+  walletAccount: "<WALLET_ACCOUNT_ADDRESS>",
+  slippage: "50",
 });
+
+const bestQuote = quotes[0];
 ```
 
 Response:
 
 ```json
 {
-  "activity": {
-    "id": "<ACTIVITY_ID>",
-    "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_GET_SWAP_QUOTE",
-    "result": {
-      "getSwapQuoteResult": {
-        "quoteId": "<QUOTE_ID>",
-        "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
-        "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
-        "inputAmount": "1000000",
-        "outputAmount": "<EXPECTED_OUTPUT>",
-        "minOutputAmount": "<MINIMUM_OUTPUT>"
-      }
+  "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+  "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+  "inputAmount": "1000000",
+  "quotes": [
+    {
+      "quoteId": "<QUOTE_ID>",
+      "provider": "0x",
+      "outputAmount": "<EXPECTED_OUTPUT>",
+      "minOutputAmount": "<MINIMUM_OUTPUT>"
     }
-  }
+  ]
 }
 ```
 
-_(Response shape `To Confirm`. Field name `getSwapQuoteResult` follows Turnkey activity conventions.)_
-
 ### Response fields
 
-- `quoteId`: opaque identifier for the quote. Not required for execution. Useful for logging and correlation.
-- `inputToken`, `outputToken`, `inputAmount`: echoed from the request for confirmation.
+The top-level `inputToken`, `outputToken`, and `inputAmount` are echoed from the request. Quotes are returned in a `quotes` array — in V1 this contains a single option; multiple options are on the roadmap.
+
+Each entry in `quotes` contains:
+
+- `quoteId`: opaque identifier for the quote. Informational only — `execute_swap` does not accept a `quoteId`, so it cannot be replayed. Useful for logging and correlation.
+- `provider`: the DEX aggregator that produced this quote (`0x` in V1).
 - `outputAmount`: expected output amount, fee-adjusted, in raw on-chain units.
 - `minOutputAmount`: minimum output the caller should accept at execute time, given the requested slippage. Derived from `outputAmount` and the caller's slippage tolerance.
 
@@ -124,9 +116,9 @@ If you display quote amounts to end users, refresh the quote near the moment of 
 
 ## How fees are applied
 
-The `outputAmount` returned in a quote already reflects your organization's `feeBps` from `ORG_FEATURE_SWAP_CONFIG`. There is no separate fee amount to add or subtract on the client. The end user's displayed receive amount is the quote's `outputAmount` (or the actual settled amount at execute time).
+Each quote's `outputAmount` already reflects your organization's `feeBps` from `FEATURE_NAME_SWAP_CONFIG`. There is no separate fee amount to add or subtract on the client. The end user's displayed receive amount is a quote's `outputAmount` (or the actual settled amount at execute time).
 
-Fee configuration is snapshotted server-side per activity. If your fee configuration changes between quote and execute, the execute settles at the fee configuration active when it runs, not when the quote was fetched. _(To Confirm.)_
+Fee configuration is snapshotted server-side per activity. If your fee configuration changes between quote and execute, the execute settles at the fee configuration active when it runs, not when the quote was fetched.
 
 ## Same-chain vs. cross-chain quotes
 
