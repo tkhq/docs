@@ -5,9 +5,9 @@ sidebarTitle: "Quickstart"
 tag: "Beta"
 ---
 
-<Warning>
-Turnkey Verifiable Cloud is currently in Private Beta. [Join the waitlist](https://www.turnkey.com/turnkey-verifiable-cloud#waitlist) to request access. Once our team reaches out, share your organization ID to get enabled. If you already have a dedicated Slack channel with us, reach out there directly. Once enabled, you will see a new "Verifiable Cloud" section appear in the top-level navigation.
-</Warning>
+import { TvcBetaCallout } from "/snippets/tvc-beta-callout.mdx";
+
+<TvcBetaCallout />
 
 ## Prerequisites
 
@@ -110,41 +110,43 @@ When ready, click "Deploy TVC App"!
 
 Create a local app template by running
 
-```
-tvc app init --output <my-app-template>.json
+```bash
+tvc app init --output my-app-template.json
 ```
 
-This step is purely local, and generates an editable json template for your app to be used during creation.
-Your template will look something like this when first generated:
+This step is purely local: it generates an editable JSON template for your app. Fill in the app name and manifest set name (for this demo, `TVC Hello World` and `TVC Manifest`); the CLI auto-populates your operator public key from login and a known quorum key. A completed template looks like this:
 
 ```json
 {
-  "name": "<FILL_IN_APP_NAME>",
-  "quorumPublicKey": KNOWN_QUORUM_KEY,
-  "externalConnectivity": false,
+  "name": "TVC Hello World",
+  "quorumPublicKey": "0445...936683e",
+  "enableEgress": false,
   "manifestSetId": null,
   "manifestSetParams": {
-    "name": "<FILL_IN_MANIFEST_SET_NAME>",
+    "name": "TVC Manifest",
     "threshold": 1,
     "newOperators": [
       {
         "name": "operator-1",
-        "publicKey": PUBLIC_KEY_AUTOPOPULATED_FROM_LOGIN
+        "publicKey": "04...auto-populated from your login"
       }
     ],
     "existingOperatorIds": []
-  }
+  },
+  "shareSetId": null,
+  "shareSetParams": null,
+  "dangerousEnableDebugModeDeployments": false
 }
 ```
 
-Name your app something identifiable; for this demo it can be `"TVC Hello World"`.
-Your manifest set is currently just the public key generated during login;
-give it an easy to remember name, such as `"TVC Manifest"`.
-
 <Warning>
-The CLI has also automatically populated this template with a known quorum key, which is sufficient for
+The CLI automatically populates this template with a known quorum key, which is sufficient for
 running verifiable code but not advised for encrypting sensitive data.
 </Warning>
+
+<Note>
+`dangerousEnableDebugModeDeployments` defaults to `false`, which keeps your app secure and verifiable. See [Debug mode](/features/verifiable-cloud/debug-mode) for when and how to enable it (for development apps only).
+</Note>
 
 Create your app in TVC by running
 
@@ -180,6 +182,7 @@ a name after the `--output` flag. Open it and fill in each field:
   ```json
   "cbe01169428f144086bfaef348bbf3db70f9217628996cafd2ecb85d5f2b47a1"
   ```
+- `dangerousDeployDebugMode`: leave as `false` for a secure, verifiable deployment. Set to `true` only for a debug (development) app to view enclave logs; doing so permanently marks the deployment insecure. See [Debug mode](/features/verifiable-cloud/debug-mode).
 - `pivotContainerEncryptedPullSecret`: your pull secret, if your container image isn't public. Delete this field otherwise.
 - `publicIngressPort`: 3000
 - `healthCheckPort`: 3000
@@ -290,6 +293,21 @@ A healthy deployment returns:
 ```json
 {"status":"ok"}
 ```
+
+## Development vs. production
+
+The flow above creates a secure, verifiable app. While you're iterating on your image, it's often useful to see your application's logs from inside the enclave. That's what **debug mode** is for.
+
+Debug mode is development-only: a debug enclave is not verifiable (its attestation PCRs are zeroed) and its Quorum Key must be treated as public. The recommended setup is two separate apps that run the same image:
+
+- a **dev app** created with debug mode enabled, where you deploy, read logs, and iterate; and
+- your **production app** created with debug mode off.
+
+<Warning>
+  Enabling debug mode permanently marks an app's Quorum Key as insecure, so your dev and production apps must be **different apps, each with its own Quorum Key**. Never reuse a Quorum Key between them.
+</Warning>
+
+Once your image works in the dev app, deploy the same image to your production app for a secure, attested deployment. See [Debug mode](/features/verifiable-cloud/debug-mode) for the full details, security implications, and the flags to enable it.
 
 ## Next steps
 
