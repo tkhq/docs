@@ -215,33 +215,40 @@ that permission to mainnet USDC and a known spender:
 
 #### Iterating over array fields
 
+<Warning>
+  Each `EFFECT_ALLOW` policy is evaluated independently. The token-only example below does not cap
+  the amount or batch length, and the batch-length example does not cap individual amounts. In
+  production, combine every required domain, spender, token, amount, and count constraint in the
+  same condition.
+</Warning>
+
 **Whitelist a specific token across all approvals with .all():**
 
 ```json
 {
   "policyName": "Allow Permit2 batch only for USDC",
   "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')"
 }
 ```
 
-**Allow Permit2 batches with two or fewer token permissions:**
+**Allow Permit2 batches with two or fewer USDC token permissions:**
 
 ```json
 {
-  "policyName": "Allow Permit2 batches with <= 2 token permissions",
+  "policyName": "Allow Permit2 batches with <= 2 USDC token permissions",
   "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].count() <= 2 && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')"
 }
 ```
 
-**Allow token permissions for exactly 100 USDC:**
+**Allow one token permission for exactly 100 USDC:**
 
 ```json
 {
-  "policyName": "Allow exact 100 USDC Permit2 permissions",
+  "policyName": "Allow one exact 100 USDC Permit2 permission",
   "effect": "EFFECT_ALLOW",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] == '100000000')"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].count() == 1 && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] == '100000000')"
 }
 ```
 
