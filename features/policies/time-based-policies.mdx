@@ -1,0 +1,176 @@
+---
+title: "Time-based policies"
+description: "This page provides an overview of the Policy Engine's top-level `time` field, which gates when a policy is active — one-shot windows bounded by explicit timestamps, and recurring active spans"
+sidebarTitle: "Time-based policies"
+---
+
+## Gating when a policy is active
+
+Turnkey policies support a top-level `time` field alongside `consensus` and `condition` which answers the question **When** is this policy active.
+
+Like the `consensus` and `condition` fields, the `time` field must evaluate to a `bool`. It is evaluated by comparing the particular policy's `time` field against
+**trusted server time** to see whether the trusted server timestamp falls within the window considered active (an evaluation of true) or not. 
+
+NOTE: the **trusted server time** is NOT a client-supplied timestamp and cannot be spoofed by the caller.
+
+The `time` field (like the `condition` and `consensus` fields) is optional. When it is absent or an empty string, the policy is always active with
+respect to time. When it evaluates to `true`, the policy is active and participates in evaluation as
+usual. When it evaluates to `false`, the policy is skipped entirely for that request: it neither
+allows nor denies, and does not participate in the outcome.
+
+<Note>
+  A `false` `time` result removes the policy from consideration for that request — this is not the
+  same as an `EFFECT_DENY`. A time-gated `EFFECT_DENY` only denies while its `time` expression is
+  `true`; outside that window the deny does not apply.
+</Note>
+
+Two building blocks are available when authoring the field:
+
+- **`time.now`** — a keyword of type `timestamp` holding the trusted server time for the request. A
+  single value is used for the entire request, so every comparison within a policy sees a consistent
+  instant.
+- **`Timestamp('<rfc3339>')`** — constructs a `timestamp` from an RFC 3339 string. Timestamps must be
+  **UTC**: the string must end in `Z`. Non-zero offsets (e.g. `-05:00`) are rejected.
+
+`timestamp` values support the comparison operators (`<`, `>`, `<=`, `>=`, `==`, `!=`), which is what
+makes time-bounding possible. For the full type and function signatures, see [Time
+expressions](/features/policies/language#time-expressions) in the language reference.
+
+## Time-bound policies (one-shot)
+
+To make a policy active only during a fixed, one-time window, compare `time.now` against explicit
+start and end timestamps. The convention is start-inclusive, end-exclusive:
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign transactions during January 2025",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "time.now >= Timestamp('2025-01-01T00:00:00Z') && time.now < Timestamp('2025-02-01T00:00:00Z')"
+}
+```
+
+This policy becomes active at `2025-01-01T00:00:00Z`, becomes inactive at `2025-02-01T00:00:00Z`,
+and is skipped before and after. 
+
+NOTE: Given that this pattern involves comparing each activity's timestamp (denoted by `time.now`) to specific timestamps, 
+you can define a policy's active time in ways beyond a single start time and a single end time (like allow after timestamp, allow before timestamp, multiple specific time windows etc)
+
+Use this pattern for one-off grants: a temporary elevated
+permission, a scheduled migration window, or an expiring approval.
+
+## Active time spans (recurring)
+
+For policies that should be active on a repeating schedule — every weekday morning, the first of
+every month, and so on — use the `CronSpan` function:
+
+`CronSpan('<cron>', '<duration>', '<tz>') -> bool`
+
+`CronSpan` models a schedule as a series of **fires** plus a **duration**. Each time the cron
+expression fires at instant `f`, it opens an active window `[f, f + duration)`. The function returns
+`true` when `time.now` falls inside **any** such window; the union of all windows defines when the
+policy is active.
+
+Its three arguments are:
+
+| Argument     | Type   | Description                                                                                              |
+| ------------ | ------ | -------------------------------------------------------------------------------------------------------- |
+| `<cron>`     | string | A 5-field cron expression (`minute hour day-of-month month day-of-week`) marking when each window opens.  |
+| `<duration>` | string | How long each window stays open, as a Go-style duration.                                                 |
+| `<tz>`       | string | An IANA time zone name (e.g. `America/New_York`) that the cron fires are interpreted in.                  |
+
+**Cron expressions** use a strict 5-field subset. Numeric fields, ranges (`1-5`), lists (`1,3,5`),
+and `*` are supported. The following are **not** supported: step values (`*/n`), macros (`@daily`,
+`@hourly`), month and day names (`JAN`, `MON`), and a seconds field.
+
+**Durations** are Go-style, composed of days, hours, and minutes (`d`, `h`, `m`) — for example `8h`,
+`90m`, or `1d12h`. A seconds component is not allowed, and the total duration must be **7 days or
+less**.
+
+The `<tz>` argument determines when fires occur and makes windows daylight-saving aware, so a
+schedule pinned to local business hours stays correct across DST transitions.
+
+### Business hours, done correctly
+
+To keep a policy active Monday–Friday from 9:00 AM to 5:00 PM Eastern, fire once at 9:00 AM on
+weekdays and hold each window open for 8 hours:
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign during business hours",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "CronSpan('0 9 * * 1-5', '8h', 'America/New_York')"
+}
+```
+
+<Note>
+  Author business hours as a **single fire plus a duration**, not as an hour range.
+  `CronSpan('0 9 * * 1-5', '8h', 'America/New_York')` opens one 8-hour window per weekday. Do **not**
+  use an hour-range expression like `0 9-17 * * 1-5` to mean "9 to 5": under the fire-plus-duration
+  model each fire opens its own window, so an hour range produces a separate window every hour rather
+  than one continuous span, and will not behave the way you expect.
+</Note>
+
+### Overnight windows (crossing midnight)
+
+Because a window is simply `[fire, fire + duration)`, spans that cross midnight need no special
+handling — fire in the evening and give a duration that runs into the next day:
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign overnight",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "CronSpan('0 22 * * *', '8h', 'America/New_York')"
+}
+```
+
+This opens a window every night at 10:00 PM Eastern that stays active until 6:00 AM the next morning.
+
+## Composability
+
+The `time` field is an ordinary boolean expression, so you can combine multiple spans and windows
+with the logical operators `&&`, `||`, and `!`:
+
+- **Union** (`||`) — active if any span matches. Useful for "business hours **or** the monthly close
+  window."
+- **Intersection** (`&&`) — active only if all sub-expressions match. Useful for bounding a recurring
+  span to a fixed date range.
+- **Negation** (`!`) — active outside a span. Useful for "any time **except** the nightly maintenance
+  window."
+
+This policy grants business-hours signing, but only through the end of 2025; afterward the `&&`
+makes the whole expression `false`.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign during business hours through 2025",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "CronSpan('0 9 * * 1-5', '8h', 'America/New_York') && time.now < Timestamp('2026-01-01T00:00:00Z')"
+}
+```
+
+## Combining time with consensus and condition
+
+The `time` field composes with the other two fields at the policy level: a policy applies only when
+its `consensus`, `condition`, **and** `time` all hold. This lets you express rules like "members of
+the ops team may sign transactions to the treasury address, but only during business hours":
+
+```json
+{
+  "policyName": "Ops may sign to treasury during business hours",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<OPS_TAG_ID>'))",
+  "condition": "activity.kind == 'SIGN_TRANSACTION' && eth.tx.to == '<TREASURY_ADDRESS>'",
+  "time": "CronSpan('0 9 * * 1-5', '8h', 'America/New_York')"
+}
+```
+
+Outside the business-hours window the `time` field evaluates to `false` and the policy is skipped, so
+the same signing request is no longer allowed by this policy.
