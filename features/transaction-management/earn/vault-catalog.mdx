@@ -1,27 +1,31 @@
 ---
 title: "Browse the vault catalog"
 description: "Discover the yield vaults available for an asset with live TVL and APY, and list the vaults your organization has enabled."
-sidebarTitle: "Vault catalog"
-mode: wide
+sidebarTitle: "Browse the vault catalog"
+mode: "wide"
 ---
 
-import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
 
 Two queries cover vault discovery: [`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) returns the market of wrappable vaults for an asset, and [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) returns the wrappers your organization has already deployed. Full request/response schemas and cURL examples are in the API reference.
 
-<EarnBetaNote />
-
-## Discover vaults with list_earn_vaults
+## Discover vaults with list\_earn\_vaults
 
 [`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) takes a required CAIP-19 asset identifier (e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` for USDC on Base) and returns every wrappable vault for that asset. The chain is derived from the identifier, and you can optionally filter by provider.
 
 Reading the results:
 
-- The catalog is sorted by TVL in USD, descending, and only includes vaults with at least **$100k TVL**.
-- `tvl` is in raw on-chain units of the underlying asset; `apyPct` is a decimal fraction (`"0.0812"` = 8.12% gross APY, before fees).
+- The catalog is sorted by TVL in USD, descending, and only includes vaults with at least **\$100k TVL**. Sort order does not reflect a recommendation, ranking, or endorsement of any vault.
+- `tvl` is in raw onchain units of the underlying asset; `apyPct` is a decimal fraction (`"0.0812"` = 8.12% gross APY, before fees).
 - `display` values are formatted strings for presentation only. Don't do arithmetic with them.
 - `enabled: true` means your organization already has a wrapper deployed for the vault.
 - `name` and `curator` carry the provider's human-readable vault name and curator(s), for building vault pickers.
+
+<Warning>
+  `apyPct` reflects the vault's gross annual percentage yield at the time of query. Yield is variable, driven by borrower demand, market utilization, and the vault curator's allocation strategy, and may change significantly between the time of query and the time of deposit or withdrawal. Do not present APY or yield figures to end users as fixed or guaranteed rates.
+</Warning>
 
 ### Paging through the catalog
 
@@ -33,19 +37,21 @@ Results are cursor-paginated via `paginationOptions` (`limit` defaults to 10, ma
 
 ## List your enabled vaults
 
-[`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) is the management view of every wrapper your organization has deployed, with on-chain totals and the fee breakdown. Optional filters narrow by provider or CAIP-19 asset.
+[`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) is the management view of every wrapper your organization has deployed, with onchain totals and the fee breakdown. Optional filters narrow by provider or CAIP-19 asset.
 
 Key fields:
 
 - `wrapperAddress` is the deposit target to pass to [`earn_deposit`](/features/transaction-management/earn/deposit); `vaultAddress` is the underlying vault it wraps.
-- `apyPct` is the gross APY; `netApyPct` is what depositors earn after both performance fees: `netApy = grossApy × (1 - totalFeeBps / 10000)`.
-- `clientFeeBps` is your performance fee for the wrapper, and `totalDeposited` is the wrapper's TVL in raw units of the underlying asset.
+- `apyPct` is the gross APY; `netApyPct` is what depositors earn after both fees: `netApy = grossApy × (1 - totalFeeBps / 10000)`.
+- `clientFeeBps` is your fee for the wrapper, and `totalDeposited` is the wrapper's TVL in raw units of the underlying asset.
 - `depositsDisabled: true` means deposits to the wrapper are currently paused via [`earn_set_wrapper_state`](/api-reference/activities/set-earn-wrapper-state); withdrawals are unaffected.
-- `claimableClientFee` is your accrued performance fee that is releasable right now, claimable with [`claim_earn_fees`](/api-reference/activities/claim-earn-fees). It is only returned when the parent organization queries; sub-organizations don't see it.
+- `claimableClientFee` is your accrued fee that is releasable right now, claimable with [`claim_earn_fees`](/api-reference/activities/claim-earn-fees). It is only returned when the parent organization queries; sub-organizations don't see it.
 
 ## Providers
 
 Morpho vaults are available today. Aave support is upcoming; the API shape is identical, so no integration changes will be needed. See the [chain support table](/features/transaction-management/earn#supported-protocols-and-chains).
+
+**Important:** The vaults accessible through Earn are operated by independent third-party protocols. These providers are not subcontractors, agents, or affiliates of Turnkey. Turnkey does not manage, audit, or guarantee any vault, its strategy, its curator, or its returns. Turnkey's role is limited to providing the API infrastructure that enables wallet-level interaction with these protocols.
 
 ## Next steps
 

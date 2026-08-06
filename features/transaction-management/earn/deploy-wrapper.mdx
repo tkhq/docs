@@ -1,15 +1,15 @@
 ---
 title: "Deploy a vault wrapper"
 description: "Enable a yield vault for your organization by deploying its fee wrapper, a one-time setup step that also sets your fee."
-sidebarTitle: "Deploy wrapper"
-mode: wide
+sidebarTitle: "Deploy a vault wrapper"
+mode: "wide"
 ---
 
-import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
 
-Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into. It routes funds to the underlying vault and takes the performance fees out of its share price. Deploying it is a one-time activity per vault, and Turnkey pays the gas.
-
-<EarnBetaNote />
+Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into.  It routes funds to the underlying vault and collects the applicable fees out of the yield, by minting fee shares to a payment splitter as interest accrues.. Deploying it is a one-time activity per vault, with gas sponsored by Turnkey.
 
 ## When to deploy
 
@@ -19,15 +19,11 @@ Deploy once per vault you want to offer, per fee configuration. Deposits into a 
 
 The deploy intent carries your fee:
 
-- `clientFeeBps`: your performance fee on gross yield, in basis points (`"2000"` = 20%). Combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected.
-- `clientFeeWallet`: the address that receives your fee payouts on-chain. It must be a wallet account owned by your organization; addresses outside your org are rejected.
+- `clientFeeBps`: your fee on gross yield, in basis points (`"2000"` = 20%). Combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected.
+- `clientFeeWallet`: the address that receives your fee payouts onchain. It must be a wallet account owned by your organization; addresses outside your org are rejected.
 
 <Warning>
-  The fee configuration is bound into the wrapper's deterministic (CREATE2)
-  address. Deploying the same vault with a different `clientFeeBps` or
-  `clientFeeWallet` produces a new wrapper at a new address. Positions in the
-  old wrapper remain fully withdrawable; new deposits should target the new
-  wrapper. To change your fee, redeploy and point deposits at the new address.
+  The fee configuration is bound into the wrapper's deterministic (CREATE2) address. Deploying the same vault with a different `clientFeeBps` or `clientFeeWallet` produces a new wrapper at a new address. Positions in the old wrapper remain fully withdrawable; new deposits should target the new wrapper. To change your fee, redeploy and point deposits at the new address.
 </Warning>
 
 ## Submit the activity
@@ -47,19 +43,8 @@ The activity completes when the deployment transaction is broadcast, not when it
 ## Gas and idempotency
 
 <Note>
-  Turnkey pays the wrapper deployment gas (roughly 7.1M gas per deployment),
-  not you or your users. Deployments are also idempotent: resubmitting the
-  activity with identical parameters re-derives the same wrapper and splitter
-  addresses and skips the broadcast if the contracts already exist, so
-  retries are safe.
+  Wrapper deployment gas costs (roughly 7.1M gas per deployment) are currently covered by Turnkey’s infrastructure and are not charged to you or your users. Deployments are also idempotent: resubmitting the activity with identical parameters re-derives the same wrapper and splitter addresses and skips the broadcast if the contracts already exist, so retries are safe.
 </Note>
-
-## Manage a deployed wrapper
-
-Two more activities cover the wrapper's lifecycle after deployment:
-
-- **Pause deposits**: [`earn_set_wrapper_state`](/api-reference/activities/set-earn-wrapper-state) toggles `depositsDisabled` on a wrapper. While disabled, new deposits are rejected but withdrawals always remain available, so you can wind a wrapper down (for example, after replacing it with a new fee configuration) without trapping funds. The current state is returned by [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults).
-- **Claim your fees**: [`claim_earn_fees`](/api-reference/activities/claim-earn-fees) releases your accrued performance fees for a wrapper to your `clientFeeWallet`. Check the claimable amount in `claimableClientFee` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults); both are only available to the parent organization.
 
 ## Next steps
 

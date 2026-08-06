@@ -1,38 +1,36 @@
 ---
 title: "Track positions"
-description: "Query a wallet's active Earn positions: current value, lifetime deposits and withdrawals, and the yield earned."
-mode: wide
+description: "Query a wallet’s active Earn positions: current value, lifetime deposits and withdrawals, and the yield earned."
+mode: "wide"
 ---
 
-import EarnBetaNote from "/snippets/shared/earn-beta-note.mdx";
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
 
-[`list_earn_positions`](/api-reference/queries/get-earn-positions) returns the active positions for a single wallet address, one entry per wrapper the wallet holds shares in, with live on-chain values. It takes your `organizationId` (or the sub-organization that owns the wallet) and the `walletAddress` to return positions for; positions are scoped per wallet, not org-wide. See [Get Earn positions](/api-reference/queries/get-earn-positions) in the API reference for the full request/response schema and cURL example.
-
-<EarnBetaNote />
+[`list_earn_positions`](/api-reference/queries/get-earn-positions) returns the active positions for a single wallet address, one entry per wrapper the wallet holds shares in, with live onchain values. It takes your `organizationId` (or the sub-organization that owns the wallet) and the `walletAddress` to return positions for; positions are scoped per wallet, not org-wide. See [Get Earn positions](/api-reference/queries/get-earn-positions) in the API reference for the full request/response schema and cURL example.
 
 ## Understanding the fields
 
 | Field | Units | Meaning |
-| :--- | :--- | :--- |
-| `currentValue` | raw on-chain units of the underlying asset | Live value of the position, already net of the wrapper's performance fees. This is what a full withdrawal would return right now |
-| `totalDeposited` | raw on-chain units | Lifetime amount deposited into this position since it was opened (or since the last full `MAX` exit) |
-| `totalWithdrawn` | raw on-chain units | Lifetime amount withdrawn over the same window |
+| :-- | :-- | :-- |
+| `currentValue` | raw onchain units of the underlying asset | Live value of the position, already net of the wrapper's fees. This is what a full withdrawal would return right now |
+| `totalDeposited` | raw onchain units | Lifetime amount deposited into this position since it was opened (or since the last full `MAX` exit) |
+| `totalWithdrawn` | raw onchain units | Lifetime amount withdrawn over the same window |
 | `display.*` | formatted strings | USD and asset-denominated renderings for UI display only |
 | `depositsDisabled` | boolean | When `true`, new deposits to this wrapper are currently [paused](/features/transaction-management/earn/deploy-wrapper#manage-a-deployed-wrapper); withdrawals are unaffected |
 
 Raw fields are exact base-10 integers in the asset's smallest unit (e.g. `"100512340"` = 100.51234 USDC at 6 decimals). The totals accumulate from your deposit and withdrawal amounts; a [`MAX` withdrawal](/features/transaction-management/earn/withdraw#full-exit-with-max) closes the position and resets both totals to zero.
 
 <Warning>
-  Don't do arithmetic with `display` values; they are formatted, rounded
-  strings for presentation. Compute with the raw fields using `BigInt` (or
-  your language's arbitrary-precision integers) rather than floats.
+  Don't do arithmetic with `display` values; they are formatted, rounded strings for presentation. Compute with the raw fields using `BigInt` (or your language's arbitrary-precision integers) rather than floats.
 </Warning>
 
 ## Computing yield
 
 Yield earned to date is:
 
-```
+```text
 yield = currentValue - totalDeposited + totalWithdrawn
 ```
 
