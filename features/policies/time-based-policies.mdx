@@ -6,12 +6,16 @@ sidebarTitle: "Time-based policies"
 
 ## Gating when a policy is active
 
-Turnkey policies support a top-level `time` field alongside `consensus` and `condition` which answers the question **When** is this policy active.
+Turnkey policies support a top-level `time` field alongside `consensus` and `condition`. While
+`consensus` defines **who** and `condition` defines **what**, the `time` field defines **when** a
+policy is active.
 
 Like the `consensus` and `condition` fields, the `time` field must evaluate to a `bool`. It is evaluated by comparing the particular policy's `time` field against
 **trusted server time** to see whether the trusted server timestamp falls within the window considered active (an evaluation of true) or not. 
 
-NOTE: the **trusted server time** is NOT a client-supplied timestamp and cannot be spoofed by the caller.
+<Note>
+  The **trusted server time** is NOT a client-supplied timestamp and cannot be spoofed by the caller.
+</Note>
 
 The `time` field (like the `condition` and `consensus` fields) is optional. When it is absent or an empty string, the policy is always active with
 respect to time. When it evaluates to `true`, the policy is active and participates in evaluation as
@@ -54,8 +58,11 @@ start and end timestamps. The convention is start-inclusive, end-exclusive:
 This policy becomes active at `2025-01-01T00:00:00Z`, becomes inactive at `2025-02-01T00:00:00Z`,
 and is skipped before and after. 
 
-NOTE: Given that this pattern involves comparing each activity's timestamp (denoted by `time.now`) to specific timestamps, 
-you can define a policy's active time in ways beyond a single start time and a single end time (like allow after timestamp, allow before timestamp, multiple specific time windows etc)
+<Note>
+  Because this pattern simply compares `time.now` against specific timestamps, you can express a
+  policy's active time in ways beyond a single start and end — for example allow after a timestamp,
+  allow before a timestamp, or allow across multiple separate windows.
+</Note>
 
 Use this pattern for one-off grants: a temporary elevated
 permission, a scheduled migration window, or an expiring approval.
@@ -89,7 +96,9 @@ and `*` are supported. The following are **not** supported: step values (`*/n`),
 less**.
 
 The `<tz>` argument determines when fires occur and makes windows daylight-saving aware, so a
-schedule pinned to local business hours stays correct across DST transitions.
+schedule pinned to local business hours stays correct across DST transitions. It accepts any IANA
+time zone name — see the [IANA time zone list](https://timeapi.io/documentation/iana-timezones) for
+the full set of names.
 
 ### Business hours, done correctly
 
@@ -108,10 +117,10 @@ weekdays and hold each window open for 8 hours:
 
 <Note>
   Author business hours as a **single fire plus a duration**, not as an hour range.
-  `CronSpan('0 9 * * 1-5', '8h', 'America/New_York')` opens one 8-hour window per weekday. Do **not**
-  use an hour-range expression like `0 9-17 * * 1-5` to mean "9 to 5": under the fire-plus-duration
-  model each fire opens its own window, so an hour range produces a separate window every hour rather
-  than one continuous span, and will not behave the way you expect.
+  `CronSpan('0 9 * * 1-5', '8h', 'America/New_York')` fires once at 9:00 AM and holds the window open
+  for 8 hours, producing a single continuous 9-to-5 span. An expression like `0 9-17 * * 1-5` fires
+  separately at 9:00, 10:00, 11:00, and so on, each opening its own 8-hour window, which is not the
+  same thing.
 </Note>
 
 ### Overnight windows (crossing midnight)

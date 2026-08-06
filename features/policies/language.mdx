@@ -69,6 +69,9 @@ The optional top-level `time` field gates when a policy is active. See [Time-bas
 policies](/features/policies/time-based-policies) for the authoring guide, and [Time
 expressions](#time-expressions) below for the `Timestamp` and `CronSpan` reference.
 
+The `<tz>` argument of `CronSpan` is an IANA time zone name (e.g. `America/New_York`) — see the
+[IANA time zone list](https://timeapi.io/documentation/iana-timezones) for the full set of names.
+
 ## Types
 
 The language is strongly typed which makes policies easy to author and maintain.
@@ -83,7 +86,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **string**    | 'a'                                     | only single quotes are supported                  |
 | **list\<T\>** | [1, 2, 3]                               | a list of type T                                  |
 | **struct**    | \{ id: 'abc' \}                         | a key-value map of \{ field: T \} (defined below) |
-| **timestamp** | Timestamp('2025-01-01T00:00:00Z')       | a point in time; construct with `Timestamp('<rfc3339>')`, UTC only (see [Time](#time)) |
+| **timestamp** | Timestamp('2025-01-01T00:00:00Z')       | a point in time; construct with `Timestamp('<rfc3339>')`, UTC only (see [Time expressions](#time-expressions)) |
 
 ### Struct
 
@@ -245,6 +248,59 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                                 | input                   | string                                | The raw call data as a hex string (supports slicing, e.g. `tempo.tx.calls[0].input[34..74]`)                                                                                                                                                               |
 |                                 | function_signature      | string                                | The 4-byte function selector derived from the call input (e.g. `0xa9059cbb` for ERC-20 `transfer`). Empty string when input is absent or too short                                                                                                         |
 
+
+## Time expressions
+
+Two functions are available when authoring the top-level `time` field. Both are described in detail
+in the [Time-based policies](/features/policies/time-based-policies) guide; this section is the
+reference for their signatures and arguments.
+
+| Function                                | Signature                                | Description                                                                     |
+| --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `Timestamp(<rfc3339>)`                  | (string) -> timestamp                    | Constructs a `timestamp` from an RFC 3339 string.                               |
+| `CronSpan(<cron>, <duration>, <tz>)`    | (string, string, string) -> bool         | Returns `true` when the trusted server time falls inside a scheduled window.    |
+
+### Timestamp
+
+`Timestamp('<rfc3339>')` constructs a `timestamp` from an RFC 3339 string. Timestamps must be
+**UTC**: the string must end in `Z`. Non-zero offsets (e.g. `-05:00`) are rejected.
+
+`timestamp` values support the comparison operators (`<`, `>`, `<=`, `>=`, `==`, `!=`), so they can
+be compared against [`time.now`](#time) to bound when a policy is active:
+
+```
+time.now >= Timestamp('2025-01-01T00:00:00Z') && time.now < Timestamp('2025-02-01T00:00:00Z')
+```
+
+### CronSpan
+
+`CronSpan('<cron>', '<duration>', '<tz>')` models a schedule as a series of **fires** plus a
+**duration**. Each time the cron expression fires at instant `f`, it opens an active window
+`[f, f + duration)`. The function returns `true` when `time.now` falls inside **any** such window;
+the union of all windows defines when the policy is active.
+
+| Argument     | Type   | Description                                                                                              |
+| ------------ | ------ | -------------------------------------------------------------------------------------------------------- |
+| `<cron>`     | string | A 5-field cron expression (`minute hour day-of-month month day-of-week`) marking when each window opens.  |
+| `<duration>` | string | How long each window stays open, as a Go-style duration.                                                 |
+| `<tz>`       | string | An IANA time zone name (e.g. `America/New_York`) that the cron fires are interpreted in.                  |
+
+**Cron expressions** use a strict 5-field subset. Numeric fields, ranges (`1-5`), lists (`1,3,5`),
+and `*` are supported. The following are **not** supported: step values (`*/n`), macros (`@daily`,
+`@hourly`), month and day names (`JAN`, `MON`), and a seconds field.
+
+**Durations** are Go-style, composed of days, hours, and minutes (`d`, `h`, `m`) — for example `8h`,
+`90m`, or `1d12h`. A seconds component is not allowed, and the total duration must be **7 days or
+less**.
+
+The `<tz>` argument determines when fires occur and makes windows daylight-saving aware, so a
+schedule pinned to local business hours stays correct across DST transitions. It accepts any IANA
+time zone name — see the [IANA time zone
+list](https://timeapi.io/documentation/iana-timezones) for the full set of names.
+
+```
+CronSpan('0 9 * * 1-5', '8h', 'America/New_York')
+```
 
 ## Activity breakdown
 
