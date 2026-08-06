@@ -28,6 +28,11 @@ operations:
 | function   | x.contains(\<value>)         | "\[1,2,3].contains(1)"       | (list\<T>) -> bool       |
 | function   | x.count()                    | "\[1,2,3].count()"           | (list\<T>) -> int        |
 | function   | x.filter(item, \<predicate>) | "\[1,2,3].filter(x, x == 1)" | (list\<T>) -> (list\<T>) |
+| function   | CaseInsensitiveString(x)     | "CaseInsensitiveString('A')" | (string) -> string       |
+
+String comparisons are case-sensitive unless stated otherwise. `CaseInsensitiveString` opts a
+comparison out of that; see [Case sensitivity](#case-sensitivity) for details and for which fields
+are already compared case-insensitively.
 
 ## Keywords
 
@@ -95,7 +100,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | imported                 | bool                                      | Boolean indicating whether or not this wallet has been imported                                                                                                                                                                                                                                                                                                      |
 |                          | exported                 | bool                                      | Boolean indicating whether or not this wallet has been exported                                                                                                                                                                                                                                                                                                      |
 |                          | label                    | string                                    | The label of this wallet                                                                                                                                                                                                                                                                                                                                             |
-| **Wallet Account**       | address                  | string                                    | The wallet account address                                                                                                                                                                                                                                                                                                                                           |
+| **Wallet Account**       | address                  | string                                    | The wallet account address. Compared exactly, including case (uppercase and lowercase are not interchangeable) — see [Case sensitivity](#case-sensitivity)                                                                                                                                                                                                           |
 | **PrivateKey**           | id                       | string                                    | The identifier of the private key                                                                                                                                                                                                                                                                                                                                    |
 |                          | tags                     | list\<string\>                            | The collection of tags for the private key                                                                                                                                                                                                                                                                                                                           |
 |                          | imported                 | bool                                      | Boolean indicating whether or not this private key has been imported                                                                                                                                                                                                                                                                                                 |
@@ -158,6 +163,12 @@ The language is strongly typed which makes policies easy to author and maintain.
   indicating this type could be any one of the string, number, array or struct types listed in our
   Primitives section.{" "}
 </Note>
+
+<Warning>
+  `wallet_account.address` is matched **exactly, including case**, while `eth.tx.to` and
+  `eth.tx.from` are matched case-insensitively. Substitute the address exactly as the API returns it
+  rather than normalizing its casing yourself. See [Case sensitivity](#case-sensitivity).
+</Warning>
 
 #### Nested structs
 
@@ -499,6 +510,82 @@ wallet clause will fail (because a wallet isn't being passed into the policy eva
 Conversely, if you're trying to sign with a wallet, the private key clause will fail for the same
 reason.
 
+### Case sensitivity
+
+String comparisons in the policy language are case-sensitive by default. The complete set of fields
+compared case-insensitively is:
+
+- `eth.tx.to` and `eth.tx.from`
+- `eth.eip_712.domain.verifying_contract`, and every string value within `eth.eip_712.message`
+- `tempo.tx.from` and `tempo.tx.fee_token`
+- `tempo.tx.calls[i].to` and `tempo.tx.calls[i].input`
+- `address_type` on `bitcoin.tx.outputs` entries — the output's address derivation type, not an
+  address
+
+A literal compared against one of those fields matches in any casing. Every other string field is
+compared exactly, including case.
+
+`wallet_account.address` is one of those exact-match fields: it is compared against the address as
+Turnkey stores it. For EVM accounts Turnkey stores the
+[EIP-55](https://eips.ethereum.org/EIPS/eip-55) checksummed (mixed-case) form, so a condition
+written with an all-lowercase EVM address does not match.
+
+<Warning>
+  `wallet_account.address` is matched **exactly, including case**, while `eth.tx.to` and
+  `eth.tx.from` are matched case-insensitively. This asymmetry matters: a `wallet_account.address`
+  literal whose casing does not match the stored address simply evaluates to `false`, which changes
+  what the policy does without producing an error. On an `EFFECT_ALLOW` policy the clause stops
+  granting access; on an `EFFECT_DENY` policy it stops blocking. Copy the address exactly as the API
+  returns it — for example the `address` field from
+  [List wallets accounts](/api-reference/queries/list-wallets-accounts) — instead of normalizing the
+  casing by hand.
+</Warning>
+
+For most non-EVM formats, exact matching is required for correctness rather than being a convention:
+base58 (Solana, Tron, Dogecoin, XRP, and Bitcoin P2PKH/P2SH) and base64url (TON) use
+case-significant alphabets, so two strings that differ only in case are two different addresses. As
+the list above shows, no base58 or base64url address field is compared case-insensitively anywhere
+in the policy engine, which is the correct behavior for those encodings.
+
+The casing Turnkey stores for each address format:
+
+| Address format                                      | Stored casing                   | Notes                       |
+| --------------------------------------------------- | ------------------------------- | --------------------------- |
+| Ethereum / EVM                                      | Mixed case (EIP-55 checksummed) | Do not lowercase            |
+| Solana, Tron, Dogecoin, XRP, Bitcoin P2PKH and P2SH | Mixed case (base58)             | Case is part of the address |
+| TON                                                 | Mixed case (base64url)          | Case is part of the address |
+| Sui, Aptos                                          | Lowercase (hex)                 |                             |
+| Cosmos, Sei, Spark, Bitcoin P2WPKH, P2WSH and P2TR  | Lowercase (bech32 / bech32m)    |                             |
+| XLM                                                 | Uppercase (base32)              |                             |
+
+#### CaseInsensitiveString
+
+`CaseInsensitiveString(<value>)` lowercases a string value. Wrap **both sides** of a comparison with
+it to match two strings regardless of casing:
+
+```json
+{
+  "policyName": "Allow signing with a specific wallet account",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.action == 'SIGN' && CaseInsensitiveString(wallet_account.address) == CaseInsensitiveString('0x40f008f4c17075efca092ae650655f6693aeced0')"
+}
+```
+
+Written this way, the clause matches whichever casing you supply for the address literal. Without
+the wrappers, the same condition has to spell the address in exactly its stored EIP-55 form,
+`'0x40f008f4c17075EFcA092aE650655f6693AECEd0'`, for the clause to match.
+
+`CaseInsensitiveString` is intended for case-sensitive string fields such as
+`wallet_account.address`. `eth.tx.to` and `eth.tx.from` do not need it, because they are already
+matched case-insensitively.
+
+<Note>
+  Prefer `CaseInsensitiveString` for hex-based formats such as EVM addresses, where casing encodes a
+  checksum rather than a different address. Avoid it for base58 and base64url formats (Solana, Tron,
+  Dogecoin, XRP, Bitcoin P2PKH/P2SH, TON), where it would treat addresses that differ only in case
+  as equal even though they are distinct addresses.
+</Note>
+
 ### Activity parameters
 
 The `activity.params` field exposes specific request parameters based on the activity type. An
@@ -597,11 +684,18 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
 
 #### EIP-712
 
-Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When defining
-policies for EIP-712 messages, please ensure that all hex-encoded strings (e.g. addresses, function
-selectors, bytes) are **lowercase**. The policy engine expects lowercase hex strings to conform to
-Ethereum's standard convention. Using uppercase hex strings may result in errors or policy
-rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
+Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When writing
+conditions over `eth.eip_712` fields, please ensure that all hex-encoded strings you compare against
+(e.g. addresses, function selectors, bytes) are **lowercase**. The policy engine expects lowercase
+hex strings in these fields to conform to Ethereum's standard convention. Using uppercase hex
+strings may result in errors or policy rejection. Note that EIP-712 messages passed in as
+transactions will be normalized to lowercase.
+
+<Warning>
+  This lowercase convention is scoped to `eth.eip_712` and `eth.tx` fields. It does **not** apply to
+  `wallet_account.address`, which is compared exactly as stored: lowercasing an EVM address there
+  produces a clause that never matches. See [Case sensitivity](#case-sensitivity).
+</Warning>
 
 ### Solana
 
