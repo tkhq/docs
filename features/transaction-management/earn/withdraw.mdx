@@ -1,0 +1,61 @@
+---
+title: "Withdraw from a vault"
+description: "Withdraw a partial amount or the entire position from an enabled yield vault."
+mode: "wide"
+---
+
+When a user initiates a withdrawal, you pass through their intents via our API where we then form and broadcast the transaction to move those assets out of your organization's fee wrapper and back to the user's wallet. Amounts are specified in the underlying asset (vault shares are not exposed in the API), or pass `"MAX"` to exit the position entirely.
+
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## Prerequisites
+
+- The `signWith` wallet holds a position in the wrapper you are withdrawing from. Get its `wrapperAddress` from [`list_earn_positions`](/api-reference/queries/get-earn-positions).
+- The withdrawal amount is at most the position's `currentValue`, or the literal `"MAX"` for a full exit.
+- For non-sponsored withdrawals, the `signWith` wallet needs the chain's native token for gas.
+
+<Note>
+  Withdrawals are never blocked by a [paused](/features/transaction-management/earn/manage-wrappers#pause-or-resume-deposits) wrapper, and sub-organization wallets can withdraw from wrappers deployed by their parent organization. The wrapper configuration lives on the parent, the sub-org wallet signs, and no per-sub-org deployment is needed.
+</Note>
+
+## Submit the withdrawal
+
+Submit an [`ACTIVITY_TYPE_EARN_WITHDRAW`](/api-reference/activities/withdraw-from-earn-vault) activity with:
+
+- the `wrapperAddress` holding the position, from [`list_earn_positions`](/api-reference/queries/get-earn-positions)
+- the `signWith` wallet account to withdraw to and sign with
+- the `amountValue` in raw onchain units of the underlying asset (e.g. `"500000"` for 0.50 USDC), or the literal `"MAX"` to withdraw the entire position
+- the CAIP-2 chain in `chainCaip2`, and optionally `sponsor` for gas sponsorship
+
+See [Withdraw from Earn vault](/api-reference/activities/withdraw-from-earn-vault) in the API reference for the full request/response schema and cURL example. The activity result contains only a poll handle, `withdrawRequestId`.
+
+## Full exit with MAX
+
+`"amountValue": "MAX"` redeems the wallet's exact live share balance in the wrapper, so the position closes completely without leaving dust.
+
+<Note>
+  A `MAX` withdrawal resets the position's lifetime accounting: after it confirms, `totalDeposited` and `totalWithdrawn` in [`list_earn_positions`](/features/transaction-management/earn/positions) start again from zero for that wrapper.
+</Note>
+
+Positions in wrappers you have since replaced (after a [fee change](/features/transaction-management/earn/manage-wrappers#change-or-tier-your-fee)) remain withdrawable. Target the old wrapper's address.
+
+## Gas: sponsored vs self-funded
+
+With `sponsor: true`, network fees are covered through Turnkey’s Gas Station and the withdrawal executes as an EIP-7702 sponsored transaction. The `signWith` wallet does not need a gas token.
+
+With `sponsor: false`, the `signWith` wallet pays gas itself, and the user initiating the withdrawal will need the relevant chain’s gas token.
+
+## Poll withdrawal status (required)
+
+<Warning>
+  A `COMPLETED` activity means the transaction was enqueued for broadcast, not that it landed onchain. A transaction that later fails is invisible in the activity result. Poll [`get_earn_withdraw_status`](/api-reference/queries/get-earn-withdraw-status) until it reports `COMPLETED` (included onchain) or `FAILED`.
+</Warning>
+
+Poll with the `withdrawRequestId` from the activity result. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `withdrawTxHash`, and on `FAILED` it includes an `error` field with the reason. See [Submissions](/api-reference/activities/overview) for general activity semantics.
+
+## Next steps
+
+- [Track positions](/features/transaction-management/earn/positions) to verify the position after withdrawing
+- [Deposit into a vault](/features/transaction-management/earn/deposit) to grow a position
