@@ -1,0 +1,84 @@
+---
+title: "Withdraw from a vault"
+description: "Withdraw any amount, just the yield, or the entire position from an enabled yield vault."
+mode: "wide"
+---
+
+A withdrawal moves assets from your organization's fee wrapper back to the user's wallet. Amounts are specified in the underlying asset (vault shares are not exposed in the API), or pass `"MAX"` to exit the position entirely.
+
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## Submit the withdrawal
+
+Submit an [`ACTIVITY_TYPE_EARN_WITHDRAW`](/api-reference/activities/withdraw-from-earn-vault) activity with:
+
+- the `wrapperAddress` holding the position, from [`list_earn_positions`](/api-reference/queries/get-earn-positions)
+- the `signWith` wallet account to withdraw to and sign with
+- the `amountValue` in raw onchain units of the underlying asset (e.g. `"500000"` for 0.50 USDC), or the literal `"MAX"` to withdraw the entire position
+- the CAIP-2 chain in `chainCaip2`, and optionally `sponsor` for gas sponsorship
+
+See [Withdraw from Earn vault](/api-reference/activities/withdraw-from-earn-vault) in the API reference for the full request/response schema and cURL example. The activity result contains only a poll handle, `withdrawRequestId`.
+
+Withdrawals always work, even when deposits to the wrapper are [paused](/features/transaction-management/earn/manage-wrappers#pause-or-resume-deposits).
+
+## Full exit with MAX
+
+`"amountValue": "MAX"` redeems the wallet's exact live share balance in the wrapper, so the position closes completely without leaving dust.
+
+<Note>
+  A `MAX` withdrawal resets the position's lifetime accounting: after it confirms, `totalDeposited` and `totalWithdrawn` in [`list_earn_positions`](/features/transaction-management/earn/positions) start again from zero for that wrapper.
+</Note>
+
+Positions in wrappers you have since replaced (after a [fee change](/features/transaction-management/earn/manage-wrappers#change-or-tier-your-fee)) remain withdrawable. Target the old wrapper's address.
+
+## Claiming yield only
+
+To pay out yield without touching principal, withdraw exactly the yield amount. Compute it from the position's raw fields:
+
+```javascript title="JavaScript"
+const { positions } = await client.request(
+  "/public/v1/query/list_earn_positions",
+  {
+    organizationId: "<ORGANIZATION_ID>",
+    walletAddress: "<WALLET_ADDRESS>",
+  },
+);
+
+const p = positions.find((p) => p.wrapperAddress === "<WRAPPER_ADDRESS>");
+
+// These are raw onchain unit strings, so use BigInt rather than floats.
+const yieldEarned =
+  BigInt(p.currentValue) - BigInt(p.totalDeposited) + BigInt(p.totalWithdrawn);
+
+// Withdraw the yield, leave the principal earning.
+await client.request("/public/v1/submit/earn_withdraw", {
+  type: "ACTIVITY_TYPE_EARN_WITHDRAW",
+  timestampMs: String(Date.now()),
+  organizationId: "<ORGANIZATION_ID>",
+  parameters: {
+    wrapperAddress: "<WRAPPER_ADDRESS>",
+    signWith: "<WALLET_ADDRESS>",
+    amountValue: yieldEarned.toString(),
+    chainCaip2: "eip155:8453",
+    sponsor: false,
+  },
+});
+```
+
+## Poll withdrawal status (required)
+
+<Warning>
+  As with deposits, a `COMPLETED` activity means the transaction was enqueued for broadcast, not that it confirmed. Poll [`get_earn_withdraw_status`](/api-reference/queries/get-earn-withdraw-status) until it reports `COMPLETED` (included onchain) or `FAILED`.
+</Warning>
+
+Poll with the `withdrawRequestId` from the activity result. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `withdrawTxHash`, and on `FAILED` it includes an `error` field with the reason.
+
+## Gas
+
+Identical to deposits: with `sponsor: true`, network fees are covered through Turnkey's Gas Station; otherwise the `signWith` wallet pays gas itself and needs the chain's gas token. See [Gas: sponsored vs self-funded](/features/transaction-management/earn/deposit#gas-sponsored-vs-self-funded).
+
+## Next steps
+
+- [Track positions](/features/transaction-management/earn/positions) to verify the position after withdrawing
