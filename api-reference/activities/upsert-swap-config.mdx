@@ -1,6 +1,6 @@
 ---
-title: "Set organization feature"
-description: "Set an organization feature. This activity must be approved by the current root quorum."
+title: "Upsert swap config"
+description: "Enable or disable swap configuration for an organization."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="set_organization_feature" />
+<EndpointPath type="submit" path="upsert_swap_config" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`
+Enum options: `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,12 +32,16 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="name" type="enum<string>" required={true} default="">
-    Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
+    <NestedParam parentKey="parameters" childKey="feeReceiverWalletAddress" type="string" required={false} default="">
+    feeReceiverWalletAddress field
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="value" type="string" required={true} default="">
-    Optional value for the feature. Will override existing values if feature is already set.
+    <NestedParam parentKey="parameters" childKey="feeBps" type="string" required={false} default="">
+    Client fee in basis points applied to swaps; used for all pairs unless stable_fee_bps is set.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="stableFeeBps" type="string" required={false} default="">
+    Optional Enterprise-only override applied when both swap assets are stablecoins; falls back to fee_bps when unset. Non-Enterprise orgs may only set fee_bps.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -68,17 +72,17 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="setOrganizationFeatureIntent" type="object" required={true}>
-      The setOrganizationFeatureIntent object
-      <Expandable title="setOrganizationFeatureIntent details">
-        <NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="name" type="enum" required={true}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.intent" childKey="upsertSwapConfigIntent" type="object" required={true}>
+      The upsertSwapConfigIntent object
+      <Expandable title="upsertSwapConfigIntent details">
+        <NestedParam parentKey="activity.intent.upsertSwapConfigIntent" childKey="feeReceiverWalletAddress" type="string" required={false}>
+feeReceiverWalletAddress field
 </NestedParam>
-<NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="value" type="string" required={true}>
-Optional value for the feature. Will override existing values if feature is already set.
+<NestedParam parentKey="activity.intent.upsertSwapConfigIntent" childKey="feeBps" type="string" required={false}>
+Client fee in basis points applied to swaps; used for all pairs unless stable_fee_bps is set.
+</NestedParam>
+<NestedParam parentKey="activity.intent.upsertSwapConfigIntent" childKey="stableFeeBps" type="string" required={false}>
+Optional Enterprise-only override applied when both swap assets are stablecoins; falls back to fee_bps when unset. Non-Enterprise orgs may only set fee_bps.
 </NestedParam>
 
       </Expandable>
@@ -89,24 +93,18 @@ Optional value for the feature. Will override existing values if feature is alre
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="setOrganizationFeatureResult" type="object" required={true}>
-      The setOrganizationFeatureResult object
-      <Expandable title="setOrganizationFeatureResult details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult" childKey="features" type="array" required={true}>
-      Resulting list of organization features.
-      <Expandable title="features details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="name" type="enum" required={false}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.result" childKey="upsertSwapConfigResult" type="object" required={true}>
+      The upsertSwapConfigResult object
+      <Expandable title="upsertSwapConfigResult details">
+        <NestedParam parentKey="activity.result.upsertSwapConfigResult" childKey="feeReceiverWalletAddress" type="string" required={false}>
+feeReceiverWalletAddress field
 </NestedParam>
-<NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="value" type="string" required={false}>
-value field
+<NestedParam parentKey="activity.result.upsertSwapConfigResult" childKey="feeBps" type="string" required={false}>
+feeBps field
 </NestedParam>
-
-      </Expandable>
-    </NestedParam>
+<NestedParam parentKey="activity.result.upsertSwapConfigResult" childKey="stableFeeBps" type="string" required={false}>
+stableFeeBps field
+</NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -139,17 +137,18 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/set_organization_feature \
+  --url https://api.turnkey.com/public/v1/submit/upsert_swap_config \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-        "value": "<string>"
+        "feeReceiverWalletAddress": "<string>",
+        "feeBps": "<string>",
+        "stableFeeBps": "<string>"
     }
 }'
 ```
@@ -164,9 +163,10 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().setOrganizationFeature({
-  name: "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>" // name field,
-  value: "<string> (Optional value for the feature. Will override existing values if feature is already set.)"
+const response = await turnkeyClient.apiClient().upsertSwapConfig({
+  feeReceiverWalletAddress: "<string> (feeReceiverWalletAddress field)",
+  feeBps: "<string> (Client fee in basis points applied to swaps; used for all pairs unless stable_fee_bps is set.)",
+  stableFeeBps: "<string> (Optional Enterprise-only override applied when both swap assets are stablecoins; falls back to fee_bps when unset. Non-Enterprise orgs may only set fee_bps.)"
 });
 ```
 
@@ -179,7 +179,7 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -189,19 +189,17 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "setOrganizationFeatureIntent": {
-            "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-            "value": "<string>"
+          "upsertSwapConfigIntent": {
+            "feeReceiverWalletAddress": "<string>",
+            "feeBps": "<string>",
+            "stableFeeBps": "<string>"
           }
         },
         "result": {
-          "setOrganizationFeatureResult": {
-            "features": [
-              {
-                "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-                "value": "<string>"
-              }
-            ]
+          "upsertSwapConfigResult": {
+            "feeReceiverWalletAddress": "<string>",
+            "feeBps": "<string>",
+            "stableFeeBps": "<string>"
           }
         },
         "votes": "<array>",

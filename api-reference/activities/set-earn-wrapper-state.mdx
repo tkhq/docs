@@ -1,6 +1,6 @@
 ---
-title: "Set organization feature"
-description: "Set an organization feature. This activity must be approved by the current root quorum."
+title: "Set Earn wrapper state"
+description: "Enable or disable deposits to a deployed Earn wrapper. Withdrawals are always allowed."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="set_organization_feature" />
+<EndpointPath type="submit" path="earn_set_wrapper_state" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`
+Enum options: `ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,12 +32,12 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="name" type="enum<string>" required={true} default="">
-    Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
+    <NestedParam parentKey="parameters" childKey="wrapperAddress" type="string" required={true} default="">
+    Address of the deployed Earn wrapper to update, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="value" type="string" required={true} default="">
-    Optional value for the feature. Will override existing values if feature is already set.
+    <NestedParam parentKey="parameters" childKey="depositsDisabled" type="boolean" required={true} default="">
+    When true, deposits to this wrapper are rejected; withdrawals are unaffected. Set to false to re-enable deposits.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -68,17 +68,14 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="setOrganizationFeatureIntent" type="object" required={true}>
-      The setOrganizationFeatureIntent object
-      <Expandable title="setOrganizationFeatureIntent details">
-        <NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="name" type="enum" required={true}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.intent" childKey="earnSetWrapperStateIntent" type="object" required={true}>
+      The earnSetWrapperStateIntent object
+      <Expandable title="earnSetWrapperStateIntent details">
+        <NestedParam parentKey="activity.intent.earnSetWrapperStateIntent" childKey="wrapperAddress" type="string" required={true}>
+Address of the deployed Earn wrapper to update, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.
 </NestedParam>
-<NestedParam parentKey="activity.intent.setOrganizationFeatureIntent" childKey="value" type="string" required={true}>
-Optional value for the feature. Will override existing values if feature is already set.
+<NestedParam parentKey="activity.intent.earnSetWrapperStateIntent" childKey="depositsDisabled" type="boolean" required={true}>
+When true, deposits to this wrapper are rejected; withdrawals are unaffected. Set to false to re-enable deposits.
 </NestedParam>
 
       </Expandable>
@@ -89,24 +86,15 @@ Optional value for the feature. Will override existing values if feature is alre
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="setOrganizationFeatureResult" type="object" required={true}>
-      The setOrganizationFeatureResult object
-      <Expandable title="setOrganizationFeatureResult details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult" childKey="features" type="array" required={true}>
-      Resulting list of organization features.
-      <Expandable title="features details">
-        <NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="name" type="enum" required={false}>
-name field
-  
-Enum options: `FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY`, `FEATURE_NAME_WEBAUTHN_ORIGINS`, `FEATURE_NAME_EMAIL_AUTH`, `FEATURE_NAME_EMAIL_RECOVERY`, `FEATURE_NAME_WEBHOOK`, `FEATURE_NAME_SMS_AUTH`, `FEATURE_NAME_OTP_EMAIL_AUTH`, `FEATURE_NAME_AUTH_PROXY`, `FEATURE_NAME_SOLANA_RENT_PREFUND_ENABLED`, `FEATURE_NAME_SWAP_CONFIG`, `FEATURE_NAME_EARN_CONFIG`
-
+        <NestedParam parentKey="activity.result" childKey="earnSetWrapperStateResult" type="object" required={true}>
+      The earnSetWrapperStateResult object
+      <Expandable title="earnSetWrapperStateResult details">
+        <NestedParam parentKey="activity.result.earnSetWrapperStateResult" childKey="wrapperAddress" type="string" required={true}>
+Address of the updated Earn wrapper.
 </NestedParam>
-<NestedParam parentKey="activity.result.setOrganizationFeatureResult.features" childKey="value" type="string" required={false}>
-value field
+<NestedParam parentKey="activity.result.earnSetWrapperStateResult" childKey="depositsDisabled" type="boolean" required={true}>
+The wrapper's deposit state after this activity.
 </NestedParam>
-
-      </Expandable>
-    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -139,17 +127,17 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/set_organization_feature \
+  --url https://api.turnkey.com/public/v1/submit/earn_set_wrapper_state \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-        "value": "<string>"
+        "wrapperAddress": "<string>",
+        "depositsDisabled": "<boolean>"
     }
 }'
 ```
@@ -164,9 +152,9 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().setOrganizationFeature({
-  name: "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>" // name field,
-  value: "<string> (Optional value for the feature. Will override existing values if feature is already set.)"
+const response = await turnkeyClient.apiClient().earnSetWrapperState({
+  wrapperAddress: "<string> (Address of the deployed Earn wrapper to update, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.)",
+  depositsDisabled: true // When true, deposits to this wrapper are rejected; withdrawals are unaffected. Set to false to re-enable deposits.
 });
 ```
 
@@ -179,7 +167,7 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
+    "type": "ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -189,19 +177,15 @@ const response = await turnkeyClient.apiClient().setOrganizationFeature({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "setOrganizationFeatureIntent": {
-            "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-            "value": "<string>"
+          "earnSetWrapperStateIntent": {
+            "wrapperAddress": "<string>",
+            "depositsDisabled": "<boolean>"
           }
         },
         "result": {
-          "setOrganizationFeatureResult": {
-            "features": [
-              {
-                "name": "<FEATURE_NAME_ROOT_USER_EMAIL_RECOVERY>",
-                "value": "<string>"
-              }
-            ]
+          "earnSetWrapperStateResult": {
+            "wrapperAddress": "<string>",
+            "depositsDisabled": "<boolean>"
           }
         },
         "votes": "<array>",

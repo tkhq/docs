@@ -1,0 +1,175 @@
+---
+title: "Get Earn enabled vaults"
+description: "Get the organization's deployed wrappers with on-chain total deposited and live APY. The management view, distinct from per-wallet positions."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="list_earn_enabled_vaults" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="provider" type="enum<string>" required={false}>
+
+Enum options: `EARN_PROVIDER_MORPHO`, `EARN_PROVIDER_AAVE`
+</ParamField>
+
+<ParamField body="caip19" type="string" required={false}>
+
+Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 asset ID (e.g. 'eip155:8453/erc20:0x833589...'). The chain is taken from the CAIP-19 identifier.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="enabledVaults" type="array" required={false}>
+  The organization's deployed wrappers.
+  <Expandable title="enabledVaults details">
+    <NestedParam parentKey="enabledVaults" childKey="vaultAddress" type="string" required={false}>
+Address of the underlying yield vault.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="wrapperAddress" type="string" required={false}>
+Address of the deployed fee wrapper (the deposit target).
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="provider" type="enum" required={false}>
+provider field
+  
+Enum options: `EARN_PROVIDER_MORPHO`, `EARN_PROVIDER_AAVE`
+
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="caip19" type="string" required={false}>
+CAIP-19 asset ID of the vault's underlying asset (e.g. 'eip155:8453/erc20:0x833589...'); the chain is encoded in the identifier.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="apyPct" type="string" required={false}>
+Gross annual percentage yield, expressed as a decimal fraction (before fees).
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="totalDeposited" type="string" required={false}>
+Total deposited through this wrapper (wrapper TVL), in raw on-chain units of the underlying asset.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="display" type="object" required={false}>
+      display field
+      <Expandable title="display details">
+        <NestedParam parentKey="enabledVaults.display" childKey="usd" type="string" required={false}>
+USD value, for display only.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.display" childKey="crypto" type="string" required={false}>
+Normalized amount in the asset's own units, for display only.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="netApyPct" type="string" required={false}>
+Annual percentage yield net of fees, expressed as a decimal fraction.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="clientFeeBps" type="string" required={false}>
+Client fee taken on yield, in basis points.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="depositsDisabled" type="boolean" required={false}>
+When true, deposits to this wrapper are rejected; withdrawals are unaffected. Toggled via EarnSetWrapperState.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="name" type="string" required={false}>
+Human-readable vault name from the provider (e.g. 'Steakhouse Prime USDC' for Morpho; the reserve symbol for Aave).
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="curator" type="string" required={false}>
+Vault curator name(s), comma-separated when a vault has multiple. Empty for providers without curators (e.g. Aave).
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="claimableClientFee" type="string" required={false}>
+The client's claimable fee (releasable now), in raw on-chain units of the underlying asset (the caip19 asset). Turnkey's fee is excluded. Only returned to the parent org; unset when a sub-org queries.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="claimableClientFeeDisplay" type="object" required={false}>
+      claimableClientFeeDisplay field
+      <Expandable title="claimableClientFeeDisplay details">
+        <NestedParam parentKey="enabledVaults.claimableClientFeeDisplay" childKey="usd" type="string" required={false}>
+USD value, for display only.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.claimableClientFeeDisplay" childKey="crypto" type="string" required={false}>
+Normalized amount in the asset's own units, for display only.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="clientFeeWallet" type="string" required={false}>
+The wallet address that receives the client's fee payouts on-chain. Unset when a sub-org queries.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/list_earn_enabled_vaults \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "provider": "<EARN_PROVIDER_MORPHO>",
+    "caip19": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().listEarnEnabledVaults({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  provider: "<EARN_PROVIDER_MORPHO>" // provider field,
+  caip19: "<string> (Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 asset ID (e.g. 'eip155:8453/erc20:0x833589...'). The chain is taken from the CAIP-19 identifier.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "enabledVaults": [
+    {
+      "vaultAddress": "<string>",
+      "wrapperAddress": "<string>",
+      "provider": "<EARN_PROVIDER_MORPHO>",
+      "caip19": "<string>",
+      "apyPct": "<string>",
+      "totalDeposited": "<string>",
+      "display": {
+        "usd": "<string>",
+        "crypto": "<string>"
+      },
+      "netApyPct": "<string>",
+      "clientFeeBps": "<string>",
+      "depositsDisabled": "<boolean>",
+      "name": "<string>",
+      "curator": "<string>",
+      "claimableClientFee": "<string>",
+      "claimableClientFeeDisplay": {
+        "usd": "<string>",
+        "crypto": "<string>"
+      },
+      "clientFeeWallet": "<string>"
+    }
+  ]
+}
+```
+
+</ResponseExample>
