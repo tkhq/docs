@@ -30,9 +30,9 @@ operations:
 | function   | x.filter(item, \<predicate>) | "\[1,2,3].filter(x, x == 1)" | (list\<T>) -> (list\<T>) |
 | function   | CaseInsensitiveString(x)     | "CaseInsensitiveString('A')" | (string) -> string       |
 
-String comparisons are case-sensitive unless stated otherwise. `CaseInsensitiveString` opts a
-comparison out of that; see [Case sensitivity](#case-sensitivity) for details and for which fields
-are already compared case-insensitively.
+String comparisons are case-sensitive unless stated otherwise. Apply `CaseInsensitiveString` to
+both operands to compare their lowercase forms. See [Case sensitivity](#case-sensitivity) for
+details and for values that are already compared case-insensitively.
 
 ## Keywords
 
@@ -512,18 +512,23 @@ reason.
 
 ### Case sensitivity
 
-String comparisons in the policy language are case-sensitive by default. The complete set of fields
-compared case-insensitively is:
+String comparisons in the policy language are case-sensitive by default. The policy engine compares
+the following values case-insensitively:
 
 - `eth.tx.to` and `eth.tx.from`
-- `eth.eip_712.domain.verifying_contract`, and every string value within `eth.eip_712.message`
+- String values in `eth.tx.contract_call_args` that parse as Ethereum addresses, including values
+  nested in lists and structs
+- `eth.eip_712.domain.verifying_contract`
+- Values in `eth.eip_712.message` whose declared Solidity type is `address`, `bytes`, or
+  `bytes1` through `bytes32`, including values nested in arrays and structs
 - `tempo.tx.from` and `tempo.tx.fee_token`
 - `tempo.tx.calls[i].to` and `tempo.tx.calls[i].input`
 - `address_type` on `bitcoin.tx.outputs` entries — the output's address derivation type, not an
   address
 
-A literal compared against one of those fields matches in any casing. Every other string field is
-compared exactly, including case.
+A literal compared against one of those values matches in any casing. Every other string value is
+compared exactly, including case. In particular, a Solidity `string` within `eth.eip_712.message`
+remains case-sensitive, even when its contents look like a hexadecimal value.
 
 `wallet_account.address` is one of those exact-match fields: it is compared against the address as
 Turnkey stores it. For EVM accounts Turnkey stores the
@@ -685,16 +690,21 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
 #### EIP-712
 
 Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When writing
-conditions over `eth.eip_712` fields, please ensure that all hex-encoded strings you compare against
-(e.g. addresses, function selectors, bytes) are **lowercase**. The policy engine expects lowercase
-hex strings in these fields to conform to Ethereum's standard convention. Using uppercase hex
-strings may result in errors or policy rejection. Note that EIP-712 messages passed in as
-transactions will be normalized to lowercase.
+conditions over `eth.eip_712.message`, comparison semantics follow the Solidity type declared in
+the typed-data schema:
+
+- `address`, `bytes`, and `bytes1` through `bytes32` values compare case-insensitively, including
+  values nested in arrays and structs.
+- `string` values compare exactly, including case. The policy engine does not normalize all EIP-712
+  message strings to lowercase.
+
+`eth.eip_712.domain.verifying_contract` also compares case-insensitively. Literals for these
+case-insensitive fields can use uppercase, lowercase, or checksummed hexadecimal characters.
 
 <Warning>
-  This lowercase convention is scoped to `eth.eip_712` and `eth.tx` fields. It does **not** apply to
-  `wallet_account.address`, which is compared exactly as stored: lowercasing an EVM address there
-  produces a clause that never matches. See [Case sensitivity](#case-sensitivity).
+  These EIP-712 rules do **not** apply to `wallet_account.address`, which is compared exactly as
+  stored. Lowercasing an EVM address there produces a clause that never matches. See
+  [Case sensitivity](#case-sensitivity).
 </Warning>
 
 ### Solana
