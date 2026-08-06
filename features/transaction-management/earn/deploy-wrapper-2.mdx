@@ -25,7 +25,7 @@ Management operations are parent-organization only; sub-organization wallets can
 
 Pausing gates deposits submitted through the Turnkey API; it is not an onchain lock. The wrapper remains a permissionless ERC-4626 contract that anyone can interact with directly onchain.
 
-Read the current state from `depositsDisabled` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults), or on each row of [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) so your UI can hide the deposit button for paused wrappers.
+Read the current state from `depositsDisabled` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults), or on each row of [`list_earn_positions`](/api-reference/queries/get-earn-positions) so your UI can hide the deposit button for paused wrappers.
 
 Common uses: stopping new deposits into a vault that looks compromised while users exit at their own pace, and winding down a wrapper after replacing it with a new fee configuration.
 
@@ -36,6 +36,14 @@ Fees accrue onchain as wrapper shares held by the wrapper's payment splitter. Th
 1. Check the claimable amount. `claimableClientFee` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) is the releasable fee for that wrapper, denominated in the underlying asset with USD and asset display values. This field and `clientFeeWallet` are only returned to parent-organization callers.
 2. Submit [`claim_earn_fees`](/api-reference/activities/claim-earn-fees) with the `wrapperAddress`. One transaction releases your fee shares from the splitter to your `clientFeeWallet` and redeems them into the underlying asset, so the payout arrives as the asset (for example USDC), not as vault shares.
 3. Poll [`get_claim_earn_fees_status`](/api-reference/queries/get-claim-earn-fees-status) with the returned `claimRequestId`. As with every Earn transaction, `COMPLETED` on the activity means submitted, not confirmed onchain.
+
+Details:
+
+- The claim releases exactly what is claimable. If your fee wallet also holds a deposit position in the same wrapper, the claim never touches that principal.
+- The claim signs from your `clientFeeWallet`, so your organization's policies apply to it.
+- Claim transactions require gas sponsorship. Gas is covered at transaction time and billed on your next invoice.
+- Claiming with nothing accrued fails with an explicit error.
+- Fees are per wrapper. If you run more than one wrapper for a vault, each has its own splitter and claimable balance; iterate over every wrapper in [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults).
 
 ## Change or tier your fee
 
