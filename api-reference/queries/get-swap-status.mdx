@@ -1,0 +1,349 @@
+---
+title: "Get swap status"
+description: "Poll the status of a swap by its swap_request_id. Covers same-chain and cross-chain swaps."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="get_swap_status" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="swapRequestId" type="string" required={true}>
+
+The swap_request_id returned by ExecuteSwap.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="status" type="string" required={true}>Normalized swap status. One of PENDING, COMPLETED, FAILED.</ResponseField>
+<ResponseField name="swapKind" type="string" required={true}>SAME_CHAIN or CROSS_CHAIN.</ResponseField>
+<ResponseField name="provider" type="string" required={true}>Swap provider that executed the swap.</ResponseField>
+<ResponseField name="inputToken" type="string" required={true}>CAIP-19 asset ID for the input asset.</ResponseField>
+<ResponseField name="outputToken" type="string" required={true}>CAIP-19 asset ID for the output asset.</ResponseField>
+<ResponseField name="inputAmount" type="string" required={true}>Base-unit amount of the input asset.</ResponseField>
+<ResponseField name="originTxHash" type="string" required={false}>Final included origin-chain transaction hash, when known.</ResponseField>
+<ResponseField name="destinationTxHashes" type="array" required={false}>
+  Provider-reported destination-chain transaction hashes; cross-chain COMPLETED only.
+  <Expandable title="destinationTxHashes details">
+    <NestedParam parentKey="destinationTxHashes" childKey="item" type="string" required={true}>
+item field
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+<ResponseField name="outputAmount" type="string" required={false}>Actual base-unit output amount on COMPLETED, when known. Unset on FAILED.</ResponseField>
+<ResponseField name="refund" type="object" required={false}>
+  refund field
+  <Expandable title="refund details">
+    <NestedParam parentKey="refund" childKey="asset" type="string" required={true}>
+CAIP-19 asset returned to the user after a failed swap.
+</NestedParam>
+<NestedParam parentKey="refund" childKey="amount" type="string" required={true}>
+Base-unit amount of the refunded asset.
+</NestedParam>
+<NestedParam parentKey="refund" childKey="txHash" type="string" required={false}>
+Transaction that delivered the refunded funds, when applicable.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+<ResponseField name="updatedAt" type="string" required={true}>Timestamp of the last swap status change, as millisecond epoch string.</ResponseField>
+<ResponseField name="error" type="object" required={false}>
+  error field
+  <Expandable title="error details">
+    <NestedParam parentKey="error" childKey="reason" type="string" required={true}>
+Stable machine-readable failure reason. One of ORIGIN_TRANSACTION_FAILED or PROVIDER_FILL_FAILED.
+</NestedParam>
+<NestedParam parentKey="error" childKey="message" type="string" required={true}>
+Human-readable description of the swap failure.
+</NestedParam>
+<NestedParam parentKey="error" childKey="originTxError" type="object" required={false}>
+      originTxError field
+      <Expandable title="originTxError details">
+        <NestedParam parentKey="error.originTxError" childKey="message" type="string" required={false}>
+Human-readable error message describing what went wrong.
+</NestedParam>
+<NestedParam parentKey="error.originTxError" childKey="revertChain" type="array" required={false}>
+      Chain of revert errors from nested contract calls, ordered from outermost to innermost.
+      <Expandable title="revertChain details">
+        <NestedParam parentKey="error.originTxError.revertChain" childKey="address" type="string" required={false}>
+The contract address where the revert occurred.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain" childKey="errorType" type="string" required={false}>
+Type of error: 'unknown', 'native', or 'custom'.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain" childKey="displayMessage" type="string" required={false}>
+Human-readable message describing this revert.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain" childKey="unknown" type="object" required={false}>
+      unknown field
+      <Expandable title="unknown details">
+        <NestedParam parentKey="error.originTxError.revertChain.unknown" childKey="selector" type="string" required={false}>
+The 4-byte error selector, if available.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain.unknown" childKey="data" type="string" required={false}>
+The raw error data, hex-encoded.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain" childKey="native" type="object" required={false}>
+      native field
+      <Expandable title="native details">
+        <NestedParam parentKey="error.originTxError.revertChain.native" childKey="nativeType" type="string" required={false}>
+The type of native error: 'error_string', 'panic', or 'execution_reverted'.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain.native" childKey="message" type="string" required={false}>
+The error message for Error(string) reverts.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain.native" childKey="panicCode" type="string" required={false}>
+The panic code for Panic(uint256) reverts.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain" childKey="custom" type="object" required={false}>
+      custom field
+      <Expandable title="custom details">
+        <NestedParam parentKey="error.originTxError.revertChain.custom" childKey="errorName" type="string" required={false}>
+The name of the custom error.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.revertChain.custom" childKey="paramsJson" type="string" required={false}>
+The decoded parameters as a JSON object.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError" childKey="solana" type="object" required={false}>
+      solana field
+      <Expandable title="solana details">
+        <NestedParam parentKey="error.originTxError.solana" childKey="source" type="string" required={false}>
+Where the Solana failure occurred, such as simulation or preflight.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.solana" childKey="rpcCode" type="number" required={false}>
+The Solana JSON-RPC error code, if available.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.solana" childKey="rpcMessage" type="string" required={false}>
+The Solana JSON-RPC error message, if available.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.solana" childKey="transactionErrorJson" type="string" required={false}>
+The raw Solana transaction error object serialized as JSON, if available.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.solana" childKey="logs" type="array" required={false}>
+      Program logs returned by Solana simulation or preflight, if available.
+      <Expandable title="logs details">
+        <NestedParam parentKey="error.originTxError.solana.logs" childKey="item" type="string" required={true}>
+item field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError.solana" childKey="unitsConsumed" type="string" required={false}>
+Compute units consumed during simulation or preflight, if available.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.solana" childKey="innerInstructionsJson" type="string" required={false}>
+The raw Solana inner instructions payload serialized as JSON, if available.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError" childKey="eth" type="object" required={false}>
+      eth field
+      <Expandable title="eth details">
+        <NestedParam parentKey="error.originTxError.eth" childKey="revertChain" type="array" required={false}>
+      Ethereum revert chain, ordered from outermost to innermost.
+      <Expandable title="revertChain details">
+        <NestedParam parentKey="error.originTxError.eth.revertChain" childKey="address" type="string" required={false}>
+The contract address where the revert occurred.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain" childKey="errorType" type="string" required={false}>
+Type of error: 'unknown', 'native', or 'custom'.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain" childKey="displayMessage" type="string" required={false}>
+Human-readable message describing this revert.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain" childKey="unknown" type="object" required={false}>
+      unknown field
+      <Expandable title="unknown details">
+        <NestedParam parentKey="error.originTxError.eth.revertChain.unknown" childKey="selector" type="string" required={false}>
+The 4-byte error selector, if available.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain.unknown" childKey="data" type="string" required={false}>
+The raw error data, hex-encoded.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain" childKey="native" type="object" required={false}>
+      native field
+      <Expandable title="native details">
+        <NestedParam parentKey="error.originTxError.eth.revertChain.native" childKey="nativeType" type="string" required={false}>
+The type of native error: 'error_string', 'panic', or 'execution_reverted'.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain.native" childKey="message" type="string" required={false}>
+The error message for Error(string) reverts.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain.native" childKey="panicCode" type="string" required={false}>
+The panic code for Panic(uint256) reverts.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain" childKey="custom" type="object" required={false}>
+      custom field
+      <Expandable title="custom details">
+        <NestedParam parentKey="error.originTxError.eth.revertChain.custom" childKey="errorName" type="string" required={false}>
+The name of the custom error.
+</NestedParam>
+<NestedParam parentKey="error.originTxError.eth.revertChain.custom" childKey="paramsJson" type="string" required={false}>
+The decoded parameters as a JSON object.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_swap_status \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "swapRequestId": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().getSwapStatus({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  swapRequestId: "<string> (The swap_request_id returned by ExecuteSwap.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "status": "<string>",
+  "swapKind": "<string>",
+  "provider": "<string>",
+  "inputToken": "<string>",
+  "outputToken": "<string>",
+  "inputAmount": "<string>",
+  "originTxHash": "<string>",
+  "destinationTxHashes": [
+    "<string>"
+  ],
+  "outputAmount": "<string>",
+  "refund": {
+    "asset": "<string>",
+    "amount": "<string>",
+    "txHash": "<string>"
+  },
+  "updatedAt": "<string>",
+  "error": {
+    "reason": "<string>",
+    "message": "<string>",
+    "originTxError": {
+      "message": "<string>",
+      "revertChain": [
+        {
+          "address": "<string>",
+          "errorType": "<string>",
+          "displayMessage": "<string>",
+          "unknown": {
+            "selector": "<string>",
+            "data": "<string>"
+          },
+          "native": {
+            "nativeType": "<string>",
+            "message": "<string>",
+            "panicCode": "<string>"
+          },
+          "custom": {
+            "errorName": "<string>",
+            "paramsJson": "<string>"
+          }
+        }
+      ],
+      "solana": {
+        "source": "<string>",
+        "rpcCode": "<number>",
+        "rpcMessage": "<string>",
+        "transactionErrorJson": "<string>",
+        "logs": [
+          "<string>"
+        ],
+        "unitsConsumed": "<string>",
+        "innerInstructionsJson": "<string>"
+      },
+      "eth": {
+        "revertChain": [
+          {
+            "address": "<string>",
+            "errorType": "<string>",
+            "displayMessage": "<string>",
+            "unknown": {
+              "selector": "<string>",
+              "data": "<string>"
+            },
+            "native": {
+              "nativeType": "<string>",
+              "message": "<string>",
+              "panicCode": "<string>"
+            },
+            "custom": {
+              "errorName": "<string>",
+              "paramsJson": "<string>"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>

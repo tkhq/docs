@@ -1,6 +1,6 @@
 ---
-title: "Create policy"
-description: "Create a new policy."
+title: "Claim swap fees"
+description: "Claim swap fees through the activity pipeline."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="create_policy" />
+<EndpointPath type="submit" path="claim_swap_fees" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_CREATE_POLICY_V3`
+Enum options: `ACTIVITY_TYPE_CLAIM_SWAP_FEES`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -29,34 +29,11 @@ Timestamp (in milliseconds) of the request, used to verify liveness of user requ
 Unique identifier for a given Organization.
 </ParamField>
 
-<ParamField body="parameters" type="object" required={true} path="parameters">
-  <p>The parameters object containing the specific intent data for this activity.</p>
-  <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="policyName" type="string" required={true} default="">
-    Human-readable name for a Policy.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="effect" type="enum<string>" required={true} default="">
-    Enum options: `EFFECT_ALLOW`, `EFFECT_DENY`
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="condition" type="string" required={false} default="">
-    The condition expression that triggers the Effect
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="consensus" type="string" required={false} default="">
-    The consensus expression that triggers the Effect
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="notes" type="string" required={true} default="">
-    Notes for a Policy.
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="time" type="string" required={false} default="">
-    The time expression that triggers the Effect
-    </NestedParam>
-  </Expandable>
+<ParamField body="parameters" type="object" required={true}>
+
+The parameters object containing the specific intent data for this activity.
 </ParamField>
+
 <ParamField body="generateAppProofs" type="boolean" required={false}>
 
 Enable to have your activity generate and return App Proofs, enabling verifiability.
@@ -84,44 +61,20 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="createPolicyIntentV3" type="object" required={true}>
-      The createPolicyIntentV3 object
-      <Expandable title="createPolicyIntentV3 details">
-        <NestedParam parentKey="activity.intent.createPolicyIntentV3" childKey="policyName" type="string" required={true}>
-Human-readable name for a Policy.
+        <NestedParam parentKey="activity.intent" childKey="claimSwapFeesIntent" type="object" required={true}>
+The claimSwapFeesIntent object
 </NestedParam>
-<NestedParam parentKey="activity.intent.createPolicyIntentV3" childKey="effect" type="enum" required={true}>
-effect field
-  
-Enum options: `EFFECT_ALLOW`, `EFFECT_DENY`
-
-</NestedParam>
-<NestedParam parentKey="activity.intent.createPolicyIntentV3" childKey="condition" type="string" required={false}>
-The condition expression that triggers the Effect
-</NestedParam>
-<NestedParam parentKey="activity.intent.createPolicyIntentV3" childKey="consensus" type="string" required={false}>
-The consensus expression that triggers the Effect
-</NestedParam>
-<NestedParam parentKey="activity.intent.createPolicyIntentV3" childKey="notes" type="string" required={true}>
-Notes for a Policy.
-</NestedParam>
-<NestedParam parentKey="activity.intent.createPolicyIntentV3" childKey="time" type="string" required={false}>
-The time expression that triggers the Effect
-</NestedParam>
-
-      </Expandable>
-    </NestedParam>
 
       </Expandable>
     </NestedParam>
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="createPolicyResult" type="object" required={true}>
-      The createPolicyResult object
-      <Expandable title="createPolicyResult details">
-        <NestedParam parentKey="activity.result.createPolicyResult" childKey="policyId" type="string" required={true}>
-Unique identifier for a given Policy.
+        <NestedParam parentKey="activity.result" childKey="claimSwapFeesResult" type="object" required={true}>
+      The claimSwapFeesResult object
+      <Expandable title="claimSwapFeesResult details">
+        <NestedParam parentKey="activity.result.claimSwapFeesResult" childKey="requestId" type="string" required={true}>
+Relay claim request ID submitted through the permit endpoint.
 </NestedParam>
 
       </Expandable>
@@ -155,22 +108,15 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/create_policy \
+  --url https://api.turnkey.com/public/v1/submit/claim_swap_fees \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_POLICY_V3",
+    "type": "ACTIVITY_TYPE_CLAIM_SWAP_FEES",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
-    "parameters": {
-        "policyName": "<string>",
-        "effect": "<EFFECT_ALLOW>",
-        "condition": "<string>",
-        "consensus": "<string>",
-        "notes": "<string>",
-        "time": "<string>"
-    }
+    "parameters": {}
 }'
 ```
 
@@ -184,14 +130,7 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().createPolicy({
-  policyName: "<string> (Human-readable name for a Policy.)",
-  effect: "<EFFECT_ALLOW>" // effect field,
-  condition: "<string> (The condition expression that triggers the Effect)",
-  consensus: "<string> (The consensus expression that triggers the Effect)",
-  notes: "<string> (Notes for a Policy.)",
-  time: "<string> (The time expression that triggers the Effect)"
-});
+const response = await turnkeyClient.apiClient().claimSwapFees({});
 ```
 
 </RequestExample>
@@ -203,7 +142,7 @@ const response = await turnkeyClient.apiClient().createPolicy({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_POLICY_V3",
+    "type": "ACTIVITY_TYPE_CLAIM_SWAP_FEES",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -213,18 +152,11 @@ const response = await turnkeyClient.apiClient().createPolicy({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "createPolicyIntentV3": {
-            "policyName": "<string>",
-            "effect": "<EFFECT_ALLOW>",
-            "condition": "<string>",
-            "consensus": "<string>",
-            "notes": "<string>",
-            "time": "<string>"
-          }
+          "claimSwapFeesIntent": {}
         },
         "result": {
-          "createPolicyResult": {
-            "policyId": "<string>"
+          "claimSwapFeesResult": {
+            "requestId": "<string>"
           }
         },
         "votes": "<array>",
