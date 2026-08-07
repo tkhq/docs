@@ -2,7 +2,7 @@
 title: "Time-based policies"
 description: "This page provides an overview of the Policy Engine's top-level `time` field, which gates when a policy is active — one-shot windows bounded by explicit timestamps, and recurring active spans"
 sidebarTitle: "Time-based policies"
-tag: "Beta"
+tag: "Early Access"
 ---
 
 import { TimeBasedPoliciesBetaCallout } from "/snippets/time-based-policies-beta-callout.mdx";
@@ -11,46 +11,30 @@ import { TimeBasedPoliciesBetaCallout } from "/snippets/time-based-policies-beta
 
 ## Gating when a policy is active
 
-Turnkey policies support a top-level `time` field alongside `consensus` and `condition`. While
-`consensus` defines **who** and `condition` defines **what**, the `time` field defines **when** a
-policy is active.
+Turnkey policies support a top-level `time` field alongside `consensus` and `condition`. While `consensus` defines **who** and `condition` defines **what**, the `time` field defines **when** a policy is active.
 
-Like the `consensus` and `condition` fields, the `time` field must evaluate to a `bool`. It is evaluated by comparing the particular policy's `time` field against
-**trusted server time** to see whether the trusted server timestamp falls within the window considered active (an evaluation of true) or not. 
+Like the `consensus` and `condition` fields, the `time` field must evaluate to a `bool`. It is evaluated by comparing the particular policy's `time` field against **trusted server time** to see whether the trusted server timestamp falls within the window considered active (an evaluation of true) or not.
 
 <Note>
   The **trusted server time** is NOT a client-supplied timestamp and cannot be spoofed by the caller.
 </Note>
 
-The `time` field (like the `condition` and `consensus` fields) is optional. When it is absent or an empty string, the policy is always active with
-respect to time. When it evaluates to `true`, the policy is active and participates in evaluation as
-usual. When it evaluates to `false`, the policy is skipped entirely for that request: it neither
-allows nor denies, and does not participate in the outcome. Such a policy is reported with the
-`OUTCOME_TIME_INACTIVE` policy-evaluation outcome.
+The `time` field (like the `condition` and `consensus` fields) is optional. When it is absent or an empty string, the policy is always active with respect to time. When it evaluates to `true`, the policy is active and participates in evaluation as usual. When it evaluates to `false`, the policy is skipped entirely for that request: it neither allows nor denies, and does not participate in the outcome. Such a policy is reported with the `OUTCOME_TIME_INACTIVE` policy-evaluation outcome.
 
 <Note>
-  A `false` `time` result removes the policy from consideration for that request — this is not the
-  same as an `EFFECT_DENY`. A time-gated `EFFECT_DENY` only denies while its `time` expression is
-  `true`; outside that window the deny does not apply.
+  A `false` `time` result removes the policy from consideration for that request — this is not the same as an `EFFECT_DENY`. A time-gated `EFFECT_DENY` only denies while its `time` expression is `true`; outside that window the deny does not apply.
 </Note>
 
 Two building blocks are available when authoring the field:
 
-- **`time.now`** — a keyword of type `timestamp` holding the trusted server time for the request. A
-  single value is used for the entire request, so every comparison within a policy sees a consistent
-  instant.
-- **`Timestamp('<rfc3339>')`** — constructs a `timestamp` from an RFC 3339 string. Timestamps must
-  have a **zero UTC offset**: the evaluator parses RFC 3339 and accepts any literal whose offset is
-  zero — `Z`, `z`, `+00:00`, or `-00:00`. Non-zero offsets (e.g. `-05:00`) are rejected.
+- **`time.now`** — a keyword of type `timestamp` holding the trusted server time for the request. A single value is used for the entire request, so every comparison within a policy sees a consistent instant.
+- **`Timestamp('<rfc3339>')`** — constructs a `timestamp` from an RFC 3339 string. Timestamps must have a **zero UTC offset**: the evaluator parses RFC 3339 and accepts any literal whose offset is zero — `Z`, `z`, `+00:00`, or `-00:00`. Non-zero offsets (e.g. `-05:00`) are rejected.
 
-`timestamp` values support the comparison operators (`<`, `>`, `<=`, `>=`, `==`, `!=`), which is what
-makes time-bounding possible. For the full function signatures and constraints, see [Time
-expressions](/features/policies/language#time-expressions) in the language reference.
+`timestamp` values support the comparison operators (`<`, `>`, `<=`, `>=`, `==`, `!=`), which is what makes time-bounding possible. For the full function signatures and constraints, see [Time expressions](/features/policies/language#time-expressions) in the language reference.
 
 ## Time-bound policies (one-shot)
 
-To make a policy active only during a fixed, one-time window, compare `time.now` against explicit
-start and end timestamps. The convention is start-inclusive, end-exclusive:
+To make a policy active only during a fixed, one-time window, compare `time.now` against explicit start and end timestamps. The convention is start-inclusive, end-exclusive:
 
 ```json
 {
@@ -62,66 +46,43 @@ start and end timestamps. The convention is start-inclusive, end-exclusive:
 }
 ```
 
-This policy becomes active at `2026-03-01T00:00:00Z`, becomes inactive at `2026-04-01T00:00:00Z`,
-and is skipped before and after. 
+This policy becomes active at `2026-03-01T00:00:00Z`, becomes inactive at `2026-04-01T00:00:00Z`, and is skipped before and after.
 
 <Note>
-  Because this pattern simply compares `time.now` against specific timestamps, you can express a
-  policy's active time in ways beyond a single start and end — for example allow after a timestamp,
-  allow before a timestamp, or allow across multiple separate windows.
+  Because this pattern simply compares `time.now` against specific timestamps, you can express a policy's active time in ways beyond a single start and end — for example allow after a timestamp, allow before a timestamp, or allow across multiple separate windows.
 </Note>
 
-Use this pattern for one-off grants: a temporary elevated
-permission, a scheduled migration window, or an expiring approval.
+Use this pattern for one-off grants: a temporary elevated permission, a scheduled migration window, or an expiring approval.
 
 ## Active time spans (recurring)
 
-For policies that should be active on a repeating schedule — every weekday morning, the first of
-every month, and so on — use the `CronSpan` function:
+For policies that should be active on a repeating schedule — every weekday morning, the first of every month, and so on — use the `CronSpan` function:
 
 `CronSpan('<cron>', '<duration>', '<tz>') -> bool`
 
-`CronSpan` models a schedule as a series of **fires** plus a **duration**. Each time the cron
-expression fires at instant `f`, it opens an active window `[f, f + duration)`. The duration is
-**elapsed time** added to the fire instant, so every window is exactly that long in real time. The
-function returns `true` when `time.now` falls inside **any** such window; the union of all windows
-defines when the policy is active.
+`CronSpan` models a schedule as a series of **fires** plus a **duration**. Each time the cron expression fires at instant `f`, it opens an active window `[f, f + duration)`. The duration is **elapsed time** added to the fire instant, so every window is exactly that long in real time. The function returns `true` when `time.now` falls inside **any** such window; the union of all windows defines when the policy is active.
 
 Its three arguments are:
 
-| Argument     | Type   | Description                                                                                              |
-| ------------ | ------ | -------------------------------------------------------------------------------------------------------- |
-| `<cron>`     | string | A 5-field cron expression (`minute hour day-of-month month day-of-week`, with day-of-week `0-6` where `0` is Sunday) marking when each window opens. |
-| `<duration>` | string | How long each window stays open, as a whole-number `d`/`h`/`m` duration.                                  |
-| `<tz>`       | string | An IANA time zone name (e.g. `America/New_York`) that the cron fires are interpreted in.                  |
+| Argument | Type | Description |
+| --- | --- | --- |
+| `<cron>` | string | A 5-field cron expression (`minute hour day-of-month month day-of-week`, with day-of-week `0-6` where `0` is Sunday) marking when each window opens. |
+| `<duration>` | string | How long each window stays open, as a whole-number `d`/`h`/`m` duration. |
+| `<tz>` | string | An IANA time zone name (e.g. `America/New_York`) that the cron fires are interpreted in. |
 
-**Cron expressions** use a strict 5-field subset: `minute hour day-of-month month day-of-week`, where
-day-of-week is numeric `0-6` and `0` is Sunday. Numeric fields, ranges (`1-5`), lists (`1,3,5`), and
-`*` are supported. The following are **not** supported: step values (`*/n`), macros (`@daily`,
-`@hourly`), month and day names (`JAN`, `MON`), and a seconds field.
+**Cron expressions** use a strict 5-field subset: `minute hour day-of-month month day-of-week`, where day-of-week is numeric `0-6` and `0` is Sunday. Numeric fields, ranges (`1-5`), lists (`1,3,5`), and `*` are supported. The following are **not** supported: step values (`*/n`), macros (`@daily`, `@hourly`), month and day names (`JAN`, `MON`), and a seconds field.
 
 <Note>
-  **Day-of-month and day-of-week are OR'd, not AND'd.** When both fields are restricted (neither is
-  `*`), the cron fires when **either** matches. For example, `0 9 1 * 1` fires at 9:00 AM on every
-  1st of the month **and** every Monday — not only when the 1st happens to be a Monday. This subset
-  supports no modifier to force AND semantics, so "the 1st, but only if it's a Monday" cannot be
-  expressed in a single cron expression. Keep this in mind when authoring policies: an OR match
-  broadens the window in which the policy is active.
+  **Day-of-month and day-of-week are OR'd, not AND'd.** When both fields are restricted (neither is `*`), the cron fires when **either** matches. For example, `0 9 1 * 1` fires at 9:00 AM on every 1st of the month **and** every Monday — not only when the 1st happens to be a Monday. This subset supports no modifier to force AND semantics, so "the 1st, but only if it's a Monday" cannot be expressed in a single cron expression. Keep this in mind when authoring policies: an OR match broadens the window in which the policy is active.
 </Note>
 
-**Durations** use a custom whole-number format composed of days, hours, and minutes (`d`, `h`, `m`) —
-for example `8h`, `90m`, or `1d12h`. Fractional values and a seconds component are not allowed, and
-the total duration must be **greater than zero and no more than 7 days**.
+**Durations** use a custom whole-number format composed of days, hours, and minutes (`d`, `h`, `m`) — for example `8h`, `90m`, or `1d12h`. Fractional values and a seconds component are not allowed, and the total duration must be **greater than zero and no more than 7 days**.
 
-The `<tz>` argument determines when fires occur and makes them daylight-saving aware, so a schedule
-pinned to local business hours keeps firing at the intended local time across DST transitions. It
-accepts any IANA time zone name — see the [IANA time zone
-list](https://timeapi.io/documentation/iana-timezones) for the full set of names.
+The `<tz>` argument determines when fires occur and makes them daylight-saving aware, so a schedule pinned to local business hours keeps firing at the intended local time across DST transitions. It accepts any IANA time zone name — see the [IANA time zone list](https://timeapi.io/documentation/iana-timezones) for the full set of names.
 
 ### Business hours, done correctly
 
-To keep a policy active Monday–Friday from 9:00 AM to 5:00 PM Eastern, fire once at 9:00 AM on
-weekdays and hold each window open for 8 hours:
+To keep a policy active Monday–Friday from 9:00 AM to 5:00 PM Eastern, fire once at 9:00 AM on weekdays and hold each window open for 8 hours:
 
 ```json
 {
@@ -134,17 +95,12 @@ weekdays and hold each window open for 8 hours:
 ```
 
 <Note>
-  Author business hours as a **single fire plus a duration**, not as an hour range.
-  `CronSpan('0 9 * * 1-5', '8h', 'America/New_York')` fires once at 9:00 AM and holds the window open
-  for 8 hours, producing a single continuous 9-to-5 span. An expression like `0 9-17 * * 1-5` fires
-  separately at 9:00, 10:00, 11:00, and so on, each opening its own 8-hour window, which is not the
-  same thing.
+  Author business hours as a **single fire plus a duration**, not as an hour range. `CronSpan('0 9 * * 1-5', '8h', 'America/New_York')` fires once at 9:00 AM and holds the window open for 8 hours, producing a single continuous 9-to-5 span. An expression like `0 9-17 * * 1-5` fires separately at 9:00, 10:00, 11:00, and so on, each opening its own 8-hour window, which is not the same thing.
 </Note>
 
 ### Overnight windows (crossing midnight)
 
-Because a window is simply `[fire, fire + duration)`, spans that cross midnight need no special
-handling — fire in the evening and give a duration that runs into the next day:
+Because a window is simply `[fire, fire + duration)`, spans that cross midnight need no special handling — fire in the evening and give a duration that runs into the next day:
 
 ```json
 {
@@ -156,29 +112,21 @@ handling — fire in the evening and give a duration that runs into the next day
 }
 ```
 
-This opens a window every night at 10:00 PM Eastern that stays active for 8 hours of elapsed time —
-until 6:00 AM the next morning on ordinary nights.
+This opens a window every night at 10:00 PM Eastern that stays active for 8 hours of elapsed time — until 6:00 AM the next morning on ordinary nights.
 
 <Note>
-  Because the duration is elapsed time added to the fire instant, the local end time shifts on
-  daylight-saving transition nights. For this exact expression in `America/New_York`, the window ends
-  at **7:00 AM** after spring-forward and **5:00 AM** after fall-back.
+  Because the duration is elapsed time added to the fire instant, the local end time shifts on daylight-saving transition nights. For this exact expression in `America/New_York`, the window ends at **7:00 AM** after spring-forward and **5:00 AM** after fall-back.
 </Note>
 
 ## Composability
 
-The `time` field is an ordinary boolean expression, so you can combine multiple spans and windows
-with the logical operators `&&`, `||`, and `!`:
+The `time` field is an ordinary boolean expression, so you can combine multiple spans and windows with the logical operators `&&`, `||`, and `!`:
 
-- **Union** (`||`) — active if any span matches. Useful for "business hours **or** the monthly close
-  window."
-- **Intersection** (`&&`) — active only if all sub-expressions match. Useful for bounding a recurring
-  span to a fixed date range.
-- **Negation** (`!`) — active outside a span. Useful for "any time **except** the nightly maintenance
-  window."
+- **Union** (`||`) — active if any span matches. Useful for "business hours **or** the monthly close window."
+- **Intersection** (`&&`) — active only if all sub-expressions match. Useful for bounding a recurring span to a fixed date range.
+- **Negation** (`!`) — active outside a span. Useful for "any time **except** the nightly maintenance window."
 
-This policy grants business-hours signing, but only through the end of 2025; afterward the `&&`
-makes the whole expression `false`.
+This policy grants business-hours signing, but only through the end of 2025; afterward the `&&` makes the whole expression `false`.
 
 ```json
 {
@@ -192,9 +140,7 @@ makes the whole expression `false`.
 
 ## Combining time with consensus and condition
 
-The `time` field composes with the other two fields at the policy level: a policy applies only when
-its `consensus`, `condition`, **and** `time` all hold. This lets you express rules like "members of
-the ops team may sign transactions to the treasury address, but only during business hours":
+The `time` field composes with the other two fields at the policy level: a policy applies only when its `consensus`, `condition`, **and** `time` all hold. This lets you express rules like "members of the ops team may sign transactions to the treasury address, but only during business hours":
 
 ```json
 {
@@ -206,5 +152,4 @@ the ops team may sign transactions to the treasury address, but only during busi
 }
 ```
 
-Outside the business-hours window the `time` field evaluates to `false` and the policy is skipped, so
-the same signing request is no longer allowed by this policy.
+Outside the business-hours window the `time` field evaluates to `false` and the policy is skipped, so the same signing request is no longer allowed by this policy.
