@@ -25,7 +25,8 @@ Like the `consensus` and `condition` fields, the `time` field must evaluate to a
 The `time` field (like the `condition` and `consensus` fields) is optional. When it is absent or an empty string, the policy is always active with
 respect to time. When it evaluates to `true`, the policy is active and participates in evaluation as
 usual. When it evaluates to `false`, the policy is skipped entirely for that request: it neither
-allows nor denies, and does not participate in the outcome.
+allows nor denies, and does not participate in the outcome. Such a policy is reported with the
+`OUTCOME_TIME_INACTIVE` policy-evaluation outcome.
 
 <Note>
   A `false` `time` result removes the policy from consideration for that request — this is not the
@@ -53,15 +54,15 @@ start and end timestamps. The convention is start-inclusive, end-exclusive:
 
 ```json
 {
-  "policyName": "Allow user <USER_ID> to sign transactions during January 2025",
+  "policyName": "Allow user <USER_ID> to sign transactions during March 2026",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "activity.kind == 'SIGN_TRANSACTION'",
-  "time": "time.now >= Timestamp('2025-01-01T00:00:00Z') && time.now < Timestamp('2025-02-01T00:00:00Z')"
+  "time": "time.now >= Timestamp('2026-03-01T00:00:00Z') && time.now < Timestamp('2026-04-01T00:00:00Z')"
 }
 ```
 
-This policy becomes active at `2025-01-01T00:00:00Z`, becomes inactive at `2025-02-01T00:00:00Z`,
+This policy becomes active at `2026-03-01T00:00:00Z`, becomes inactive at `2026-04-01T00:00:00Z`,
 and is skipped before and after. 
 
 <Note>
@@ -110,7 +111,7 @@ day-of-week is numeric `0-6` and `0` is Sunday. Numeric fields, ranges (`1-5`), 
 
 **Durations** use a custom whole-number format composed of days, hours, and minutes (`d`, `h`, `m`) —
 for example `8h`, `90m`, or `1d12h`. Fractional values and a seconds component are not allowed, and
-the total duration must be **7 days or less**.
+the total duration must be **greater than zero and no more than 7 days**.
 
 The `<tz>` argument determines when fires occur and makes them daylight-saving aware, so a schedule
 pinned to local business hours keeps firing at the intended local time across DST transitions. It
