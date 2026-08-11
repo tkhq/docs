@@ -217,15 +217,20 @@ export function generateResponseFieldMdxRecursive(
 
     // Top-level Primitive: Use <ResponseField>
     if (!parentKey) {
-      mdx += `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>${description.trim()}${
-        isEnum
-          ? `
-  ${generateEnumOptionsMdx(options)}`
-          : ""
-      }</ResponseField>
-`; // Removed newline before closing tag
+      // An enum body spans multiple paragraphs, so the opening tag goes on its
+      // own line. That makes it flow JSX, where blank lines between child
+      // paragraphs are valid. A plain description is a single paragraph, so it
+      // stays inline on the tag line.
+      mdx += isEnum
+        ? `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>\n${description.trim()}\n${generateEnumOptionsMdx(
+            options
+          )}\n</ResponseField>\n`
+        : `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>${description.trim()}</ResponseField>\n`;
     } else {
       // ANY NESTED Primitive: Use <NestedParam>
+      // NB: the trailing whitespace on the blank line below is load-bearing only
+      // in the sense that removing it reflows every existing nested enum field.
+      // The tag is already flow JSX, so the blank line is harmless. Leave as-is.
       mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>\n${description.trim()}${
         isEnum
           ? `
