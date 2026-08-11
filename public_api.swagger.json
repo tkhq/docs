@@ -1368,6 +1368,32 @@
         "tags": ["Private Keys"]
       }
     },
+    "/public/v1/query/list_secrets": {
+      "post": {
+        "summary": "List secrets",
+        "description": "List secret metadata for an organization.",
+        "operationId": "ListSecrets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ListSecretsResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ListSecretsRequest"
+            }
+          }
+        ],
+        "tags": ["Secrets"]
+      }
+    },
     "/public/v1/query/list_smart_contract_interfaces": {
       "post": {
         "summary": "List smart contract interfaces",
@@ -1760,8 +1786,8 @@
     },
     "/public/v1/submit/claim_earn_fees": {
       "post": {
-        "summary": "Claim Earn fees",
-        "description": "Claim Earn fees through the activity pipeline.",
+        "summary": "Claim earn fees",
+        "description": "Claim earn fees through the activity pipeline.",
         "operationId": "ClaimEarnFees",
         "responses": {
           "200": {
@@ -2224,6 +2250,32 @@
           }
         ],
         "tags": ["Organizations"]
+      }
+    },
+    "/public/v1/submit/create_swap_quote": {
+      "post": {
+        "summary": "Get swap quote",
+        "description": "Get a swap quote. Asset chains are derived from CAIP-19 asset IDs; cross-chain quotes are supported.",
+        "operationId": "CreateSwapQuote",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateSwapQuoteRequest"
+            }
+          }
+        ],
+        "tags": ["Swaps"]
       }
     },
     "/public/v1/submit/create_tvc_app": {
@@ -3136,6 +3188,32 @@
         "tags": ["Broadcasting"]
       }
     },
+    "/public/v1/submit/execute_swap": {
+      "post": {
+        "summary": "Execute swap",
+        "description": "Execute the exact provider quote identified by quote_id through the activity pipeline and Turnkey broadcasting. Requests must use ACTIVITY_TYPE_EXECUTE_SWAP_V2.",
+        "operationId": "ExecuteSwap",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ExecuteSwapRequest"
+            }
+          }
+        ],
+        "tags": ["Swaps"]
+      }
+    },
     "/public/v1/submit/export_private_key": {
       "post": {
         "summary": "Export private key",
@@ -3160,6 +3238,32 @@
           }
         ],
         "tags": ["Private Keys"]
+      }
+    },
+    "/public/v1/submit/export_secrets": {
+      "post": {
+        "summary": "Export secrets",
+        "description": "Export secrets encrypted to client-provided target public keys.",
+        "operationId": "ExportSecrets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ExportSecretsRequest"
+            }
+          }
+        ],
+        "tags": ["Secrets"]
       }
     },
     "/public/v1/submit/export_wallet": {
@@ -4793,7 +4897,8 @@
         "ACTIVITY_TYPE_ETH_UNDELEGATE_7702",
         "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
         "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
-        "ACTIVITY_TYPE_IMPORT_SECRETS"
+        "ACTIVITY_TYPE_IMPORT_SECRETS",
+        "ACTIVITY_TYPE_EXPORT_SECRETS"
       ]
     },
     "AddressFormat": {
@@ -7202,6 +7307,31 @@
         }
       },
       "required": ["signWith", "inputToken", "outputToken", "inputAmount"]
+    },
+    "CreateSwapQuoteRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_CREATE_SWAP_QUOTE"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/CreateSwapQuoteIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
     "CreateSwapQuoteResult": {
       "type": "object",
@@ -10445,6 +10575,31 @@
         "sponsor"
       ]
     },
+    "ExecuteSwapRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_EXECUTE_SWAP_V2"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/ExecuteSwapIntentV2"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
     "ExecuteSwapResult": {
       "type": "object",
       "properties": {
@@ -10517,6 +10672,72 @@
         }
       },
       "required": ["privateKeyId", "exportBundle"]
+    },
+    "ExportSecretParams": {
+      "type": "object",
+      "properties": {
+        "secretId": {
+          "type": "string",
+          "description": "Unique identifier for the secret to export."
+        },
+        "targetPublicKey": {
+          "type": "string",
+          "description": "Client-side public key generated by the user, to which the exported secret will be encrypted."
+        },
+        "encryptionSuite": {
+          "$ref": "#/definitions/TransportEncryptionSuite",
+          "description": "Transport encryption suite used for the exported secret."
+        }
+      },
+      "required": ["secretId", "targetPublicKey", "encryptionSuite"]
+    },
+    "ExportSecretsIntent": {
+      "type": "object",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ExportSecretParams"
+          },
+          "description": "A list of secrets to export."
+        }
+      },
+      "required": ["secrets"]
+    },
+    "ExportSecretsRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_EXPORT_SECRETS"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/ExportSecretsIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "ExportSecretsResult": {
+      "type": "object",
+      "properties": {
+        "secretPayloads": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Encryption suite specific payload containing each secret ciphertext, in the order the params were specified. For enclave encrypt v1 each entry is a JSON-encoded ServerSendMsg."
+        }
+      },
+      "required": ["secretPayloads"]
     },
     "ExportWalletAccountIntent": {
       "type": "object",
@@ -11834,7 +12055,7 @@
         "refund": {
           "$ref": "#/definitions/SwapRefund",
           "x-nullable": true,
-          "description": "Asset and amount returned to the user after a failed swap, when recoverable. Present only on FAILED."
+          "description": "Funds returned by the provider after a successful origin transfer and failed cross-chain fill. Omitted for origin transaction failures and same-chain swaps."
         },
         "updatedAt": {
           "type": "string",
@@ -12769,7 +12990,7 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Enum to specify whether to send OTP via SMS or email"
+          "description": "Enum to specify whether to send OTP via SMS, email, or WhatsApp"
         },
         "contact": {
           "type": "string",
@@ -12813,7 +13034,7 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Enum to specify whether to send OTP via SMS or email"
+          "description": "Enum to specify whether to send OTP via SMS, email, or WhatsApp"
         },
         "contact": {
           "type": "string",
@@ -12868,7 +13089,7 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL"
+          "description": "Whether to send OTP via SMS, email, or WhatsApp. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL, OTP_TYPE_WHATSAPP"
         },
         "contact": {
           "type": "string",
@@ -12977,7 +13198,7 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL"
+          "description": "Whether to send OTP via SMS, email, or WhatsApp. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL, OTP_TYPE_WHATSAPP"
         },
         "contact": {
           "type": "string",
@@ -13037,7 +13258,7 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL"
+          "description": "Whether to send OTP via SMS, email, or WhatsApp. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL, OTP_TYPE_WHATSAPP"
         },
         "contact": {
           "type": "string",
@@ -13101,7 +13322,7 @@
       "properties": {
         "otpType": {
           "type": "string",
-          "description": "Whether to send OTP via SMS or email. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL"
+          "description": "Whether to send OTP via SMS, email, or WhatsApp. Possible values: OTP_TYPE_SMS, OTP_TYPE_EMAIL, OTP_TYPE_WHATSAPP"
         },
         "contact": {
           "type": "string",
@@ -13806,6 +14027,9 @@
         },
         "importSecretsIntent": {
           "$ref": "#/definitions/ImportSecretsIntent"
+        },
+        "exportSecretsIntent": {
+          "$ref": "#/definitions/ExportSecretsIntent"
         }
       }
     },
@@ -14178,6 +14402,34 @@
         }
       },
       "required": ["privateKeyTags"]
+    },
+    "ListSecretsRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for the organization or sub-organization whose secrets are listed."
+        },
+        "paginationOptions": {
+          "$ref": "#/definitions/Pagination",
+          "description": "Parameters used for cursor-based pagination."
+        }
+      },
+      "required": ["organizationId"]
+    },
+    "ListSecretsResponse": {
+      "type": "object",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SecretMetadata"
+          },
+          "description": "Metadata for each secret in the organization, ordered by most recently created first."
+        }
+      },
+      "required": ["secrets"]
     },
     "ListSolTransactionHistoryRequest": {
       "type": "object",
@@ -16026,6 +16278,9 @@
         },
         "importSecretsResult": {
           "$ref": "#/definitions/ImportSecretsResult"
+        },
+        "exportSecretsResult": {
+          "$ref": "#/definitions/ExportSecretsResult"
         }
       }
     },
@@ -16254,6 +16509,34 @@
         }
       },
       "required": ["userName", "apiKeys", "authenticators", "oauthProviders"]
+    },
+    "SecretMetadata": {
+      "type": "object",
+      "properties": {
+        "secretId": {
+          "type": "string",
+          "description": "Unique identifier for the secret."
+        },
+        "name": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Optional human-readable name for the secret."
+        },
+        "staticProperties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/KeyValue"
+          },
+          "description": "Policy visible static properties bound to the secret at creation time."
+        },
+        "createdAtUnixMs": {
+          "type": "string",
+          "format": "uint64",
+          "description": "Unix timestamp in milliseconds for when the secret was created."
+        }
+      },
+      "required": ["secretId", "staticProperties", "createdAtUnixMs"]
     },
     "Selector": {
       "type": "object",
@@ -17728,6 +18011,11 @@
           "$ref": "#/definitions/TxError",
           "x-nullable": true,
           "description": "Origin-chain transaction failure details, present when reason is ORIGIN_TRANSACTION_FAILED and details are available."
+        },
+        "providerReason": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Optional detail from the swap provider about why the fill did not complete, when available."
         }
       },
       "required": ["reason", "message"]
@@ -17758,7 +18046,7 @@
         "slippageBps": {
           "type": "string",
           "x-nullable": true,
-          "description": "Provider-neutral maximum allowed slippage in basis points, echoed from the quote request when set."
+          "description": "Effective total slippage tolerance in basis points for this quote, taken from the provider response when present. When the request omits input slippage_bps, the provider may calculate this value."
         },
         "clientFeeBps": {
           "type": "string",
@@ -17784,16 +18072,16 @@
       "properties": {
         "asset": {
           "type": "string",
-          "description": "CAIP-19 asset returned to the user after a failed swap."
+          "description": "CAIP-19 asset returned by the swap provider after a failed cross-chain fill."
         },
         "amount": {
           "type": "string",
-          "description": "Base-unit amount of the refunded asset."
+          "description": "Base-unit amount returned by the swap provider."
         },
         "txHash": {
           "type": "string",
           "x-nullable": true,
-          "description": "Transaction that delivered the refunded funds, when applicable."
+          "description": "Transaction that delivered the provider refund, when applicable."
         }
       },
       "required": ["asset", "amount"]
@@ -20099,6 +20387,11 @@
           "type": "string",
           "x-nullable": true,
           "description": "Human-readable name for this Wallet Account, unique within the organization."
+        },
+        "caip2Prefix": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The CAIP-2 namespace shared by the chains supported by this account (for example, 'eip155' or 'solana')."
         }
       },
       "required": [
