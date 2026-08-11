@@ -1,0 +1,51 @@
+---
+title: "Deposit into a vault"
+description: "Move assets from a Turnkey wallet into an enabled yield vault in one atomic transaction, optionally gas-sponsored."
+mode: "wide"
+---
+
+When a user initiates a deposit into a vault, you pass through their intents via our API where we then form and broadcast the transaction to deposit those assets into your organization's fee wrapper for a given vault. The token approval and the vault deposit execute as a single atomic batch transaction, so there is no separate approval step to manage.
+
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## Prerequisites
+
+- Your organization has [deployed a wrapper](/features/transaction-management/earn/deploy-wrapper) for the vault, and its deployment status is `COMPLETED`. Deposits targeting an address with no deployed wrapper fail with `EARN_SETUP_REQUIRED`.
+- Deposits to the wrapper are not [paused](/features/transaction-management/earn/manage-wrappers#pause-or-resume-deposits): check `depositsDisabled` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults).
+- The `signWith` wallet holds enough of the vault's underlying asset. For non-sponsored deposits it also needs the chain's native token for gas.
+
+<Note>
+  Sub-organization wallets can deposit into (and withdraw from) wrappers deployed by their parent organization. The wrapper configuration lives on the parent, the sub-org wallet signs, and no per-sub-org deployment is needed.
+</Note>
+
+## Submit the deposit
+
+Submit an [`ACTIVITY_TYPE_EARN_DEPOSIT`](/api-reference/activities/deposit-into-earn-vault) activity with:
+
+- the `wrapperAddress` to deposit into, from [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults)
+- the `signWith` wallet account to deposit from and sign with
+- the amount in `assets`, in raw onchain units of the underlying asset (e.g. `"1000000"` for 1 USDC at 6 decimals)
+- the CAIP-2 chain in `chainCaip2`, and optionally `sponsor` for gas sponsorship
+
+See [Deposit into Earn vault](/api-reference/activities/deposit-into-earn-vault) in the API reference for the full request/response schema and cURL example. The activity result contains only a poll handle, `depositRequestId`.
+
+## Gas: sponsored vs self-funded
+
+With `sponsor: true`, network fees are covered through Turnkey’s Gas Station and the batch executes as an EIP-7702 sponsored transaction. The `signWith` wallet does not need a gas token.
+
+With `sponsor: false`, the `signWith` wallet pays gas itself, and the user initiating the deposit will need the relevant chain’s gas token.
+
+## Poll deposit status (required)
+
+<Warning>
+  A `COMPLETED` activity means the transaction was enqueued for broadcast, not that it landed onchain. A transaction that later fails (for example, from an insufficient token balance) is invisible in the activity result. Poll [`get_earn_deposit_status`](/api-reference/queries/get-earn-deposit-status) until it reports `COMPLETED` (included onchain) or `FAILED`.
+</Warning>
+
+Poll with the `depositRequestId` from the activity result. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `depositTxHash`, and on `FAILED` it includes an `error` field with the reason. See [Submissions](/api-reference/activities/overview) for general activity semantics.
+
+## Next steps
+
+- [Track positions](/features/transaction-management/earn/positions) once the deposit is `COMPLETED`
+- [Withdraw from a vault](/features/transaction-management/earn/withdraw)

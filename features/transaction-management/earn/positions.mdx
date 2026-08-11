@@ -1,0 +1,47 @@
+---
+title: "Track positions"
+description: "Query a wallet’s active Earn positions: current value, lifetime deposits and withdrawals, and the yield earned."
+mode: "wide"
+---
+
+[`list_earn_positions`](/api-reference/queries/get-earn-positions) returns the active positions for a single wallet address, one entry per wrapper the wallet holds shares in, with live onchain values. It takes your `organizationId` (or the sub-organization that owns the wallet) and the `walletAddress` to return positions for; positions are scoped per wallet, not org-wide. See [Get Earn positions](/api-reference/queries/get-earn-positions) in the API reference for the full request/response schema and cURL example.
+
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## Understanding the fields
+
+| Field | Units | Meaning |
+| :-- | :-- | :-- |
+| `currentValue` | raw onchain units of the underlying asset | Live value of the position, already net of the wrapper's fees. This is what a full withdrawal would return right now |
+| `totalDeposited` | raw onchain units | Lifetime amount deposited into this position since it was opened (or since the last full `MAX` exit) |
+| `totalWithdrawn` | raw onchain units | Lifetime amount withdrawn over the same window |
+| `display.*` | formatted strings | USD and asset-denominated renderings for UI display only |
+| `depositsDisabled` | boolean | When `true`, new deposits to this wrapper are currently [paused](/features/transaction-management/earn/manage-wrappers#pause-or-resume-deposits); withdrawals are unaffected |
+
+Raw fields are exact base-10 integers in the asset's smallest unit (e.g. `"100512340"` = 100.51234 USDC at 6 decimals). The totals accumulate from your deposit and withdrawal amounts; a [`MAX` withdrawal](/features/transaction-management/earn/withdraw#full-exit-with-max) closes the position and resets both totals to zero.
+
+<Warning>
+  Don't do arithmetic with `display` values; they are formatted, rounded strings for presentation. Compute with the raw fields using `BigInt` (or your language's arbitrary-precision integers) rather than floats.
+</Warning>
+
+## Computing yield
+
+Yield earned to date is:
+
+```text
+yield = currentValue - totalDeposited + totalWithdrawn
+```
+
+For example, a position with `totalDeposited = "100000000"` (100 USDC), `totalWithdrawn = "0"`, and `currentValue = "100512340"` has earned `512340` raw units (0.51234 USDC), net of all fees.
+
+## Access notes
+
+- Positions are per wallet address: deposits made by a sub-organization wallet appear under that wallet's address, queried with the sub-organization's ID.
+- Some Earn management reads are restricted to the parent organization; position queries work for both parent and sub-organizations.
+
+## Next steps
+
+- [Withdraw from a vault](/features/transaction-management/earn/withdraw) for a partial or `MAX` exit
+- [Deposit into a vault](/features/transaction-management/earn/deposit) to grow a position

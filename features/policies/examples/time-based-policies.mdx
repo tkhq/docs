@@ -1,0 +1,115 @@
+---
+title: "Time-based policies"
+description: "This page provides examples of policies that use the top-level `time` field to control when a policy is active."
+sidebarTitle: "Time-based policies"
+tag: "Beta"
+---
+
+import { TimeBasedPoliciesBetaCallout } from "/snippets/time-based-policies-beta-callout.mdx";
+
+<TimeBasedPoliciesBetaCallout />
+
+The optional top-level `time` field controls when a policy is active. Like `consensus` and
+`condition`, it is written in the policy language and must evaluate to a `bool`. When `time` is not
+specified, the policy is always active. When the current time falls within the defined window, the
+expression evaluates to `true` and the policy participates in evaluation as usual. When it falls
+outside the window, the expression evaluates to `false`, the policy is skipped for that request, and
+it is reported with the `OUTCOME_TIME_INACTIVE` policy-evaluation outcome.
+See [Time-based policies](/features/policies/time-based-policies) for full details on `time.now`,
+`Timestamp(...)`, and `CronSpan(...)`.
+
+#### Grant a user temporary access for a fixed window (one-shot)
+
+This policy allows the user to sign transactions only during March 2026 (UTC). The window is
+start-inclusive and end-exclusive, so it becomes active at `2026-03-01T00:00:00Z` and inactive at
+`2026-04-01T00:00:00Z`. Outside the window the `time` field evaluates to `false` and the policy is
+skipped.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign transactions during March 2026",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "time.now >= Timestamp('2026-03-01T00:00:00Z') && time.now < Timestamp('2026-04-01T00:00:00Z')"
+}
+```
+
+#### Allow signing only during business hours
+
+`CronSpan` fires once at 9:00 AM Eastern on weekdays and holds each window open for 8 hours, covering
+9:00 AM–5:00 PM Monday through Friday. Because the time zone is IANA-based, the 9:00 AM fire follows
+daylight saving automatically.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign during business hours",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "CronSpan('0 9 * * 1-5', '8h', 'America/New_York')"
+}
+```
+
+<Note>
+  Model business hours as one fire plus a duration, not as an hour range.
+  `CronSpan('0 9 * * 1-5', '8h', 'America/New_York')` fires once at 9:00 AM and holds the window open
+  for 8 hours, producing a single continuous 9-to-5 span. An expression like `0 9-17 * * 1-5` fires
+  separately at 9:00, 10:00, 11:00, and so on, each opening its own 8-hour window, which is not the
+  same thing.
+</Note>
+
+#### Allow signing during an overnight window (crossing midnight)
+
+A window that crosses midnight needs no special handling: fire in the evening and give it a duration
+that runs into the next morning. The duration is elapsed time added to the fire instant, so this
+opens a window every night at 10:00 PM Eastern that stays active for 8 hours — until 6:00 AM on
+ordinary nights.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign overnight",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "CronSpan('0 22 * * *', '8h', 'America/New_York')"
+}
+```
+
+<Note>
+  Because the duration is elapsed time added to the fire instant, the local end time shifts on
+  daylight-saving transition nights. For this exact expression in `America/New_York`, the window ends
+  at **7:00 AM** after spring-forward and **5:00 AM** after fall-back.
+</Note>
+
+#### Bound a recurring window to a fixed date range (composed)
+
+Because `time` is a boolean expression, you can intersect a recurring span with a one-shot bound.
+This grants business-hours signing, but only through the end of 2025; afterward the `&&` makes the
+whole expression `false`.
+
+```json
+{
+  "policyName": "Allow user <USER_ID> to sign during business hours through 2025",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'SIGN_TRANSACTION'",
+  "time": "CronSpan('0 9 * * 1-5', '8h', 'America/New_York') && time.now < Timestamp('2026-01-01T00:00:00Z')"
+}
+```
+
+#### Full policy combining consensus, condition, and time
+
+The `time` field composes with the other policy fields: this policy applies only when the approver,
+the request, and the current time all match. Here, members of the ops team may sign transactions to
+the treasury address, but only during business hours.
+
+```json
+{
+  "policyName": "Ops may sign to treasury during business hours",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<OPS_TAG_ID>'))",
+  "condition": "activity.kind == 'SIGN_TRANSACTION' && eth.tx.to == '<TREASURY_ADDRESS>'",
+  "time": "CronSpan('0 9 * * 1-5', '8h', 'America/New_York')"
+}
+```

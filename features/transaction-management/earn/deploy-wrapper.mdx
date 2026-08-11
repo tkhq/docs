@@ -1,0 +1,53 @@
+---
+title: "Deploy a vault wrapper"
+description: "Enable a yield vault for your organization by deploying its fee wrapper, a one-time setup step that also sets your fee."
+sidebarTitle: "Deploy a vault wrapper"
+mode: "wide"
+---
+
+Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into.  It routes funds to the underlying vault and collects the applicable fees out of the yield, by minting fee shares to a payment splitter as interest accrues.. Deploying it is a one-time activity per vault, with gas sponsored by Turnkey.
+
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## When to deploy
+
+Deploy once per vault you want to offer, per fee configuration. Deposits into a vault with no deployed wrapper fail with `EARN_SETUP_REQUIRED` (see [Deposit into a vault](/features/transaction-management/earn/deposit#prerequisites)). Pick vaults from the [vault catalog](/features/transaction-management/earn/vault-catalog); the catalog's `enabled` flag tells you which vaults your organization has already enabled.
+
+## Choose your fee configuration
+
+The deploy intent carries your fee:
+
+- `clientFeeBps`: your fee on gross yield, in basis points (`"2000"` = 20%). Combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected.
+- `clientFeeWallet`: the address that receives your fee payouts onchain. It must be a wallet account owned by your organization; addresses outside your org are rejected.
+
+<Warning>
+  The fee configuration is bound into the wrapper's deterministic (CREATE2) address. Deploying the same vault with a different `clientFeeBps` or `clientFeeWallet` produces a new wrapper at a new address. Positions in the old wrapper remain fully withdrawable; new deposits should target the new wrapper. To change your fee, redeploy and point deposits at the new address.
+</Warning>
+
+## Submit the activity
+
+Submit an [`ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`](/api-reference/activities/deploy-earn-wrapper) activity with the vault's address (from the catalog), its CAIP-2 chain, and your fee configuration. See [Deploy Earn wrapper](/api-reference/activities/deploy-earn-wrapper) in the API reference for the full request/response schema and cURL example.
+
+The activity result returns the deployed addresses immediately; they are derived deterministically before the transaction confirms:
+
+- `wrapperAddress`: the deposit target for this vault.
+- `splitterAddress`: the payment splitter that distributes fees between you and Turnkey.
+- `deployRequestId`: poll handle for the deployment transaction.
+
+## Poll deployment status
+
+The activity completes when the deployment transaction is broadcast, not when it confirms. Poll [`get_earn_deploy_status`](/api-reference/queries/get-earn-deploy-status) with the `deployRequestId` until it reports `COMPLETED` before accepting deposits. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `deployTxHash`, and on `FAILED` it includes an `error` field with the reason.
+
+## Gas and idempotency
+
+<Note>
+  Wrapper deployment gas costs (roughly 7.1M gas per deployment) are currently covered by Turnkey’s infrastructure and are not charged to you or your users. Deployments are also idempotent: resubmitting the activity with identical parameters re-derives the same wrapper and splitter addresses and skips the broadcast if the contracts already exist, so retries are safe.
+</Note>
+
+## Next steps
+
+- [Browse the vault catalog](/features/transaction-management/earn/vault-catalog) to pick vaults to enable
+- [Deposit into a vault](/features/transaction-management/earn/deposit) once the deployment is `COMPLETED`
+- Review the [fee model](/features/transaction-management/earn#fees)

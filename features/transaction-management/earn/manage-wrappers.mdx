@@ -1,0 +1,66 @@
+---
+title: "Manage wrappers"
+description: "Pause deposits, claim your accrued fees, and change or tier your fee by deploying additional wrappers."
+sidebarTitle: "Manage wrappers"
+mode: "wide"
+---
+
+A deployed wrapper is immutable. It points at the same underlying vault, its fee configuration cannot change, and the deploy abdicates the contract's deposit, withdrawal, and transfer gates, so no one, including Turnkey, can ever restrict user access to funds.
+
+What you control after deployment:
+
+- whether new deposits are accepted
+- when you claim accrued fees
+- which wrapper each user deposits into.
+
+Management operations are parent-organization only; sub-organization wallets can deposit and withdraw but cannot manage wrappers.
+
+<Note>
+  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## Pause or resume deposits
+
+[`earn_set_wrapper_state`](/api-reference/activities/set-earn-wrapper-state) sets `depositsDisabled` on a wrapper. While true, earn\_deposit against that wrapper is rejected. Withdrawals, position queries, and fee claims are unaffected, so a paused wrapper can never trap funds. Set it back to false to resume deposits.
+
+Pausing gates deposits submitted through the Turnkey API; it is not an onchain lock. The wrapper remains a permissionless ERC-4626 contract that anyone can interact with directly onchain.
+
+Read the current state from `depositsDisabled` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults), or on each row of [`list_earn_positions`](/api-reference/queries/get-earn-positions) so your UI can hide the deposit button for paused wrappers.
+
+Common uses: stopping new deposits into a vault that looks compromised while users exit at their own pace, and winding down a wrapper after replacing it with a new fee configuration.
+
+## Claim your fees
+
+Fees accrue onchain as wrapper shares held by the wrapper's payment splitter. They accumulate without any action from you and never expire. Claiming converts them into the underlying asset.
+
+1. Check the claimable amount. `claimableClientFee` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) is the releasable fee for that wrapper, denominated in the underlying asset with USD and asset display values. This field and `clientFeeWallet` are only returned to parent-organization callers.
+2. Submit [`claim_earn_fees`](/api-reference/activities/claim-earn-fees) with the `wrapperAddress`. One transaction releases your fee shares from the splitter to your `clientFeeWallet` and redeems them into the underlying asset, so the payout arrives as the asset (for example USDC), not as vault shares.
+3. Poll [`get_claim_earn_fees_status`](/api-reference/queries/get-earn-claim-fees-status) with the returned `claimRequestId`. As with every Earn transaction, `COMPLETED` on the activity means submitted, not confirmed onchain.
+
+Details:
+
+- The claim releases exactly what is claimable. If your fee wallet also holds a deposit position in the same wrapper, the claim never touches that principal.
+- The claim signs from your `clientFeeWallet`, so your organization's policies apply to it.
+- Claim transactions require gas sponsorship. Gas is covered at transaction time and billed on your next invoice.
+- Claiming with nothing accrued fails with an explicit error.
+- Fees are per wrapper. If you run more than one wrapper for a vault, each has its own splitter and claimable balance; iterate over every wrapper in [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults).
+
+## Change or tier your fee
+
+A wrapper is unique to its vault and fee configuration (`clientFeeBps` and `clientFeeWallet`). To change your fee or payout wallet, or tier fees for the same underlying vault, deploy a new wrapper for the same vault. The two wrappers coexist permanently: neither invalidates the other, each has its own configuration and claimable balance, and each is an independent depositor in the underlying vault. This one mechanic covers both replacing your fee and offering different rates to different audiences.
+
+To replace your fee:
+
+1. Deploy the new wrapper with the new `clientFeeBps` and/or `clientFeeWallet`. You get a new `wrapperAddress` and `splitterAddress`, and Turnkey pays the gas as with the first deployment.
+2. Point new deposits at the new `wrapperAddress`. Deposits are addressed by wrapper, not by vault.
+3. Pause the old wrapper so nothing else lands in it. Withdrawals stay open.
+4. Optionally migrate existing positions. There is no in-place migration: [`earn_withdraw`](/features/transaction-management/earn/withdraw) the full position (`MAX`) from the old wrapper, then [`earn_deposit`](/features/transaction-management/earn/deposit) the proceeds into the new one, per wallet. Both legs can be gas-sponsored.
+5. Keep claiming from the old wrapper. Balances left behind keep accruing fees at the old rate to the old `clientFeeWallet`.
+
+Things to keep in mind:
+
+- Fee changes are forward-only. Yield already accrued settles at the old rate, and a position keeps paying its wrapper's rate until it is migrated.
+- Position history is per wrapper. [`list_earn_positions`](/features/transaction-management/earn/positions) returns one row per wrapper, so a wallet with balances in two wrappers for the same vault shows two rows; aggregate by `vaultAddress` if your UI shows a single balance. A `MAX` exit zeroes a row's totals, and the row disappears once the share balance is zero.
+- The catalog's `enabled` flag is per vault, not per wrapper. It is true once any wrapper exists and won't tell you which is current. Use `wrapperAddress` from [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) or your own stored mapping as the source of truth.
+- The fee caps apply to every deployment.
+- Redeploying with identical parameters is idempotent: it re-derives the same addresses and skips the broadcast, so retries never create duplicates.

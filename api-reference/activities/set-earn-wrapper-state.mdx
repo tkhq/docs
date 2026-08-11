@@ -1,0 +1,203 @@
+---
+title: "Set Earn wrapper state"
+description: "Enable or disable deposits to a deployed Earn wrapper. Withdrawals are always allowed."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="submit" path="earn_set_wrapper_state" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}>
+
+Enum options: `ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required={true}>
+
+Timestamp (in milliseconds) of the request, used to verify liveness of user requests.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="parameters" type="object" required={true} path="parameters">
+  <p>The parameters object containing the specific intent data for this activity.</p>
+  <Expandable title="details">
+    <NestedParam parentKey="parameters" childKey="wrapperAddress" type="string" required={true} default="">
+    Address of the deployed Earn wrapper to update, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="depositsDisabled" type="boolean" required={true} default="">
+    When true, deposits to this wrapper are rejected; withdrawals are unaffected. Set to false to re-enable deposits.
+    </NestedParam>
+  </Expandable>
+</ParamField>
+<ParamField body="generateAppProofs" type="boolean" required={false}>
+
+Enable to have your activity generate and return App Proofs, enabling verifiability.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="activity" type="object" required={true}>
+  The activity object containing type, intent, and result
+  <Expandable title="activity details">
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+The activity type
+</NestedParam>
+<NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
+      The intent of the activity
+      <Expandable title="intent details">
+        <NestedParam parentKey="activity.intent" childKey="earnSetWrapperStateIntent" type="object" required={true}>
+      The earnSetWrapperStateIntent object
+      <Expandable title="earnSetWrapperStateIntent details">
+        <NestedParam parentKey="activity.intent.earnSetWrapperStateIntent" childKey="wrapperAddress" type="string" required={true}>
+Address of the deployed Earn wrapper to update, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.
+</NestedParam>
+<NestedParam parentKey="activity.intent.earnSetWrapperStateIntent" childKey="depositsDisabled" type="boolean" required={true}>
+When true, deposits to this wrapper are rejected; withdrawals are unaffected. Set to false to re-enable deposits.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="result" type="object" required={true}>
+      The result of the activity
+      <Expandable title="result details">
+        <NestedParam parentKey="activity.result" childKey="earnSetWrapperStateResult" type="object" required={true}>
+      The earnSetWrapperStateResult object
+      <Expandable title="earnSetWrapperStateResult details">
+        <NestedParam parentKey="activity.result.earnSetWrapperStateResult" childKey="wrapperAddress" type="string" required={true}>
+Address of the updated Earn wrapper.
+</NestedParam>
+<NestedParam parentKey="activity.result.earnSetWrapperStateResult" childKey="depositsDisabled" type="boolean" required={true}>
+The wrapper's deposit state after this activity.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/earn_set_wrapper_state \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE",
+    "timestampMs": "<string> (e.g. 1746736509954)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "wrapperAddress": "<string>",
+        "depositsDisabled": "<boolean>"
+    }
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().earnSetWrapperState({
+  wrapperAddress: "<string> (Address of the deployed Earn wrapper to update, from ListEarnVaults/ListEarnPositions. Must be one of the org's deployed wrappers.)",
+  depositsDisabled: true // When true, deposits to this wrapper are rejected; withdrawals are unaffected. Set to false to re-enable deposits.
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g. 1746736509954)",
+    "result": {
+      "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
+        "type": "<string>",
+        "intent": {
+          "earnSetWrapperStateIntent": {
+            "wrapperAddress": "<string>",
+            "depositsDisabled": "<boolean>"
+          }
+        },
+        "result": {
+          "earnSetWrapperStateResult": {
+            "wrapperAddress": "<string>",
+            "depositsDisabled": "<boolean>"
+          }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>

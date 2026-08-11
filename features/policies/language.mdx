@@ -4,7 +4,10 @@ description:
   "This page provides an overview of how to author policies using our policy language. To begin,
   we'll need to get familiar with the language's grammar, keywords, and types."
 sidebarTitle: "Language"
+mode: "wide"
 ---
+
+import { TimeBasedPoliciesBetaCallout } from "/snippets/time-based-policies-beta-callout.mdx";
 
 ## Grammar
 
@@ -27,6 +30,8 @@ operations:
 | function   | x.contains(\<value>)         | "\[1,2,3].contains(1)"       | (list\<T>) -> bool       |
 | function   | x.count()                    | "\[1,2,3].count()"           | (list\<T>) -> int        |
 | function   | x.filter(item, \<predicate>) | "\[1,2,3].filter(x, x == 1)" | (list\<T>) -> (list\<T>) |
+| function   | Timestamp(\<rfc3339>)        | "Timestamp('2025-01-01T00:00:00Z')" | (string) -> timestamp |
+| function   | CronSpan(\<cron>, \<duration>, \<tz>) | "CronSpan('0 9 \* \* 1-5', '8h', 'America/New_York')" | (string, string, string) -> bool |
 
 ## Keywords
 
@@ -57,6 +62,21 @@ Each field supports a different set of keywords.
 | **private_key**                | PrivateKey           | The target private key used in sign + export requests                       |
 | **wallet_account**             | WalletAccount        | The target wallet account used in sign + export requests                    |
 
+### Time
+
+<TimeBasedPoliciesBetaCallout />
+
+| Keyword      | Type      | Description                                                                                       |
+| ------------ | --------- | ------------------------------------------------------------------------------------------------ |
+| **time.now** | timestamp | The trusted server time at which the request is evaluated. A single value is used per request. |
+
+The optional top-level `time` field gates when a policy is active. See [Time-based
+policies](/features/policies/time-based-policies) for the authoring guide, and [Time
+expressions](#time-expressions) below for the `Timestamp` and `CronSpan` reference.
+
+The `<tz>` argument of `CronSpan` is an IANA time zone name (e.g. `America/New_York`) — see the
+[IANA time zone list](https://timeapi.io/documentation/iana-timezones) for the full set of names.
+
 ## Types
 
 The language is strongly typed which makes policies easy to author and maintain.
@@ -71,6 +91,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | **string**    | 'a'                                     | only single quotes are supported                  |
 | **list\<T\>** | [1, 2, 3]                               | a list of type T                                  |
 | **struct**    | \{ id: 'abc' \}                         | a key-value map of \{ field: T \} (defined below) |
+| **timestamp** | Timestamp('2025-01-01T00:00:00Z')       | a point in time; construct with `Timestamp('<rfc3339>')`, zero UTC offset only (see [Time expressions](#time-expressions)) |
 
 ### Struct
 
@@ -153,9 +174,9 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 <Note>
   {" "}
-  The `ContractArgument` type, used in documentation for ABI and IDL arguments
-  represents an enum indicating this type could be any one of the string,
-  number, array or struct types listed in our Primitives section.{" "}
+  The `ContractArgument` type, used in documentation for ABI and IDL arguments represents an enum
+  indicating this type could be any one of the string, number, array or struct types listed in our
+  Primitives section.{" "}
 </Note>
 
 #### Nested structs
@@ -232,6 +253,67 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                                 | input                   | string                                | The raw call data as a hex string (supports slicing, e.g. `tempo.tx.calls[0].input[34..74]`)                                                                                                                                                               |
 |                                 | function_signature      | string                                | The 4-byte function selector derived from the call input (e.g. `0xa9059cbb` for ERC-20 `transfer`). Empty string when input is absent or too short                                                                                                         |
 
+
+## Time expressions
+
+<TimeBasedPoliciesBetaCallout />
+
+Two functions are available when authoring the top-level `time` field. This section is the reference
+for their signatures and constraints; see [Time-based
+policies](/features/policies/time-based-policies) for the model behind them and worked examples.
+
+| Function                                | Signature                                | Description                                                                     |
+| --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `Timestamp(<rfc3339>)`                  | (string) -> timestamp                    | Constructs a `timestamp` from an RFC 3339 string.                               |
+| `CronSpan(<cron>, <duration>, <tz>)`    | (string, string, string) -> bool         | Returns `true` when the trusted server time falls inside a scheduled window.    |
+
+### Timestamp
+
+`Timestamp('<rfc3339>')` constructs a `timestamp` from an RFC 3339 string. Timestamps must have a
+**zero UTC offset**: the evaluator parses RFC 3339 and accepts any literal whose offset is zero —
+`Z`, `z`, `+00:00`, or `-00:00`. Non-zero offsets (e.g. `-05:00`) are rejected.
+
+`timestamp` values support the comparison operators (`<`, `>`, `<=`, `>=`, `==`, `!=`), so they can
+be compared against [`time.now`](#time) to bound when a policy is active:
+
+```
+time.now >= Timestamp('2025-01-01T00:00:00Z') && time.now < Timestamp('2025-02-01T00:00:00Z')
+```
+
+### CronSpan
+
+`CronSpan('<cron>', '<duration>', '<tz>')` returns `true` when `time.now` falls inside any window
+opened by the schedule. See [Active time
+spans](/features/policies/time-based-policies#active-time-spans-recurring) for the fire-plus-duration
+model and its daylight-saving behavior.
+
+| Argument     | Type   | Description                                                                                              |
+| ------------ | ------ | -------------------------------------------------------------------------------------------------------- |
+| `<cron>`     | string | A 5-field cron expression (`minute hour day-of-month month day-of-week`, with day-of-week `0-6` where `0` is Sunday) marking when each window opens. |
+| `<duration>` | string | How long each window stays open, as a whole-number `d`/`h`/`m` duration.                                  |
+| `<tz>`       | string | An IANA time zone name (e.g. `America/New_York`) that the cron fires are interpreted in.                  |
+
+**Cron expressions** use a strict 5-field subset: `minute hour day-of-month month day-of-week`, where
+day-of-week is numeric `0-6` and `0` is Sunday. Numeric fields, ranges (`1-5`), lists (`1,3,5`), and
+`*` are supported. The following are **not** supported: step values (`*/n`), macros (`@daily`,
+`@hourly`), month and day names (`JAN`, `MON`), and a seconds field.
+
+Day-of-month and day-of-week are **OR'd, not AND'd**: when both fields are restricted, the cron fires
+when either matches, and this subset has no modifier to force AND semantics. This can broaden the
+window in which a policy is active — see [Active time
+spans](/features/policies/time-based-policies#active-time-spans-recurring) for details.
+
+**Durations** use a custom whole-number format composed of days, hours, and minutes (`d`, `h`, `m`) —
+for example `8h`, `90m`, or `1d12h`. Fractional values and a seconds component are not allowed, and
+the total duration must be **greater than zero and no more than 7 days**.
+
+The `<tz>` argument accepts any IANA time zone name — see the [IANA time zone
+list](https://timeapi.io/documentation/iana-timezones) for the full set of names.
+
+```
+CronSpan('0 9 * * 1-5', '8h', 'America/New_York')
+```
+
 ## Activity breakdown
 
 ### Activity resources and actions
@@ -247,110 +329,110 @@ Valid `activity.action` values are `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT
 
 ### Activity types by resource and action
 
-| Resource Type                | Action |                                 Activity Type |
-| ---------------------------- | ------ | --------------------------------------------: |
-| **ORGANIZATION**             | CREATE |      ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8 |
-|                              | DELETE |             ACTIVITY_TYPE_DELETE_ORGANIZATION |
-|                              | DELETE |         ACTIVITY_TYPE_DELETE_SUB_ORGANIZATION |
-| **INVITATION**               | CREATE |              ACTIVITY_TYPE_CREATE_INVITATIONS |
-|                              | DELETE |               ACTIVITY_TYPE_DELETE_INVITATION |
-| **POLICY**                   | CREATE |                ACTIVITY_TYPE_CREATE_POLICY_V3 |
-|                              | CREATE |                 ACTIVITY_TYPE_CREATE_POLICIES |
-|                              | UPDATE |                ACTIVITY_TYPE_UPDATE_POLICY_V2 |
-|                              | DELETE |                   ACTIVITY_TYPE_DELETE_POLICY |
-|                              | DELETE |                 ACTIVITY_TYPE_DELETE_POLICIES |
-| **SMART_CONTRACT_INTERFACE** | CREATE | ACTIVITY_TYPE_CREATE_SMART_CONTRACT_INTERFACE |
-|                              | DELETE | ACTIVITY_TYPE_DELETE_SMART_CONTRACT_INTERFACE |
-| **WALLET**                   | CREATE |                   ACTIVITY_TYPE_CREATE_WALLET |
-|                              | CREATE |          ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS |
-|                              | EXPORT |                   ACTIVITY_TYPE_EXPORT_WALLET |
-|                              | EXPORT |           ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT |
-|                              | IMPORT |              ACTIVITY_TYPE_INIT_IMPORT_WALLET |
-|                              | IMPORT |                   ACTIVITY_TYPE_IMPORT_WALLET |
-|                              | DELETE |                  ACTIVITY_TYPE_DELETE_WALLETS |
-|                              | UPDATE |                   ACTIVITY_TYPE_UPDATE_WALLET |
-|                              | DELETE |          ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS |
-| **PRIVATE_KEY**              | CREATE |          ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2 |
-|                              | CREATE |          ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG |
-|                              | UPDATE |          ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG |
-|                              | DELETE |             ACTIVITY_TYPE_DISABLE_PRIVATE_KEY |
-|                              | DELETE |         ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS |
-|                              | DELETE |             ACTIVITY_TYPE_DELETE_PRIVATE_KEYS |
-|                              | EXPORT |              ACTIVITY_TYPE_EXPORT_PRIVATE_KEY |
-|                              | IMPORT |         ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY |
-|                              | IMPORT |              ACTIVITY_TYPE_IMPORT_PRIVATE_KEY |
-|                              | SIGN   |             ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2 |
-|                              | SIGN   |               ACTIVITY_TYPE_SIGN_RAW_PAYLOADS |
-|                              | SIGN   |             ACTIVITY_TYPE_SIGN_TRANSACTION_V2 |
-|                              | SIGN   |            ACTIVITY_TYPE_ETH_SEND_TRANSACTION |
-|                              | SIGN   |            ACTIVITY_TYPE_SOL_SEND_TRANSACTION |
-| **USER**                     | CREATE |                 ACTIVITY_TYPE_CREATE_USERS_V4 |
-|                              | CREATE |                 ACTIVITY_TYPE_CREATE_USER_TAG |
-|                              | CREATE |           ACTIVITY_TYPE_CREATE_API_ONLY_USERS |
-|                              | UPDATE |                     ACTIVITY_TYPE_UPDATE_USER |
-|                              | UPDATE |                ACTIVITY_TYPE_UPDATE_USER_NAME |
-|                              | UPDATE |               ACTIVITY_TYPE_UPDATE_USER_EMAIL |
-|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_USER_PHONE_NUMBER |
-|                              | UPDATE |                 ACTIVITY_TYPE_UPDATE_USER_TAG |
-|                              | DELETE |                    ACTIVITY_TYPE_DELETE_USERS |
-|                              | DELETE |                ACTIVITY_TYPE_DELETE_USER_TAGS |
-| **CREDENTIAL**               | CREATE |              ACTIVITY_TYPE_CREATE_API_KEYS_V2 |
-|                              | CREATE |        ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2 |
-|                              | DELETE |                 ACTIVITY_TYPE_DELETE_API_KEYS |
-|                              | DELETE |           ACTIVITY_TYPE_DELETE_AUTHENTICATORS |
-|                              | CREATE |       ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS_V2 |
-|                              | DELETE |          ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS |
-| **PAYMENT_METHOD**           | UPDATE |           ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2 |
-|                              | DELETE |           ACTIVITY_TYPE_DELETE_PAYMENT_METHOD |
-| **SUBSCRIPTION**             | CREATE |           ACTIVITY_TYPE_ACTIVATE_BILLING_TIER |
-| **CONFIG**                   | UPDATE |          ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS |
-| \***\*RECOVERY**             | CREATE |     ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2 |
-| **AUTH**                     | CREATE |                   ACTIVITY_TYPE_EMAIL_AUTH_V3 |
-|                              | CREATE |                ACTIVITY_TYPE_INIT_OTP_AUTH_V3 |
-|                              | CREATE |                        ACTIVITY_TYPE_OTP_AUTH |
-|                              | CREATE |                           ACTIVITY_TYPE_OAUTH |
-|                              | CREATE |                     ACTIVITY_TYPE_OAUTH_LOGIN |
-|                              | CREATE |                    ACTIVITY_TYPE_OTP_LOGIN_V2 |
-|                              | CREATE |                     ACTIVITY_TYPE_STAMP_LOGIN |
-|                              | CREATE |    ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2 |
-|                              | CREATE |        ACTIVITY_TYPE_CREATE_OAUTH2_CREDENTIAL |
-|                              | DELETE |        ACTIVITY_TYPE_DELETE_OAUTH2_CREDENTIAL |
-|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL |
-|                              | CREATE |             ACTIVITY_TYPE_OAUTH2_AUTHENTICATE |
-| **OTP**                      | CREATE |                     ACTIVITY_TYPE_INIT_OTP_V3 |
-|                              | VERIFY |                   ACTIVITY_TYPE_VERIFY_OTP_V2 |
-| **AUTH_PROXY**               | CREATE |               ACTIVITY_TYPE_ENABLE_AUTH_PROXY |
-|                              | DELETE |              ACTIVITY_TYPE_DISABLE_AUTH_PROXY |
-|                              | UPDATE |        ACTIVITY_TYPE_UPDATE_AUTH_PROXY_CONFIG |
-| **WEBHOOK_ENDPOINT**         | CREATE |         ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT |
-|                              | UPDATE |         ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT |
-|                              | DELETE |         ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT |
-| **TVC_APP**                  | CREATE |                   ACTIVITY_TYPE_CREATE_TVC_APP |
-|                              | UPDATE |  ACTIVITY_TYPE_UPDATE_TVC_APP_LIVE_DEPLOYMENT |
-|                              | DELETE |  ACTIVITY_TYPE_DELETE_TVC_APP_AND_DEPLOYMENTS |
-| **TVC_DEPLOYMENT**           | CREATE |            ACTIVITY_TYPE_CREATE_TVC_DEPLOYMENT |
-|                              | UPDATE |   ACTIVITY_TYPE_CREATE_TVC_MANIFEST_APPROVALS |
-|                              | UPDATE |          ACTIVITY_TYPE_RESTORE_TVC_DEPLOYMENT |
-|                              | UPDATE |        ACTIVITY_TYPE_POST_TVC_QUORUM_KEY_SHARE |
-|                              | DELETE |            ACTIVITY_TYPE_DELETE_TVC_DEPLOYMENT |
-| **TVC_OPERATOR**             | CREATE |              ACTIVITY_TYPE_CREATE_TVC_OPERATOR |
-| **TVC_QUORUM_KEY**           | CREATE |            ACTIVITY_TYPE_CREATE_TVC_QUORUM_KEY |
+| Resource Type                | Action  |                                 Activity Type |
+| ---------------------------- | ------- | --------------------------------------------: |
+| **ORGANIZATION**             | CREATE  |      ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8 |
+|                              | DELETE  |             ACTIVITY_TYPE_DELETE_ORGANIZATION |
+|                              | DELETE  |         ACTIVITY_TYPE_DELETE_SUB_ORGANIZATION |
+| **INVITATION**               | CREATE  |              ACTIVITY_TYPE_CREATE_INVITATIONS |
+|                              | DELETE  |               ACTIVITY_TYPE_DELETE_INVITATION |
+| **POLICY**                   | CREATE  |                ACTIVITY_TYPE_CREATE_POLICY_V3 |
+|                              | CREATE  |                 ACTIVITY_TYPE_CREATE_POLICIES |
+|                              | UPDATE  |                ACTIVITY_TYPE_UPDATE_POLICY_V2 |
+|                              | DELETE  |                   ACTIVITY_TYPE_DELETE_POLICY |
+|                              | DELETE  |                 ACTIVITY_TYPE_DELETE_POLICIES |
+| **SMART_CONTRACT_INTERFACE** | CREATE  | ACTIVITY_TYPE_CREATE_SMART_CONTRACT_INTERFACE |
+|                              | DELETE  | ACTIVITY_TYPE_DELETE_SMART_CONTRACT_INTERFACE |
+| **WALLET**                   | CREATE  |                   ACTIVITY_TYPE_CREATE_WALLET |
+|                              | CREATE  |          ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS |
+|                              | EXPORT  |                   ACTIVITY_TYPE_EXPORT_WALLET |
+|                              | EXPORT  |           ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT |
+|                              | IMPORT  |              ACTIVITY_TYPE_INIT_IMPORT_WALLET |
+|                              | IMPORT  |                   ACTIVITY_TYPE_IMPORT_WALLET |
+|                              | DELETE  |                  ACTIVITY_TYPE_DELETE_WALLETS |
+|                              | UPDATE  |                   ACTIVITY_TYPE_UPDATE_WALLET |
+|                              | DELETE  |          ACTIVITY_TYPE_DELETE_WALLET_ACCOUNTS |
+| **PRIVATE_KEY**              | CREATE  |          ACTIVITY_TYPE_CREATE_PRIVATE_KEYS_V2 |
+|                              | CREATE  |          ACTIVITY_TYPE_CREATE_PRIVATE_KEY_TAG |
+|                              | UPDATE  |          ACTIVITY_TYPE_UPDATE_PRIVATE_KEY_TAG |
+|                              | DELETE  |             ACTIVITY_TYPE_DISABLE_PRIVATE_KEY |
+|                              | DELETE  |         ACTIVITY_TYPE_DELETE_PRIVATE_KEY_TAGS |
+|                              | DELETE  |             ACTIVITY_TYPE_DELETE_PRIVATE_KEYS |
+|                              | EXPORT  |              ACTIVITY_TYPE_EXPORT_PRIVATE_KEY |
+|                              | IMPORT  |         ACTIVITY_TYPE_INIT_IMPORT_PRIVATE_KEY |
+|                              | IMPORT  |              ACTIVITY_TYPE_IMPORT_PRIVATE_KEY |
+|                              | SIGN    |             ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2 |
+|                              | SIGN    |               ACTIVITY_TYPE_SIGN_RAW_PAYLOADS |
+|                              | SIGN    |             ACTIVITY_TYPE_SIGN_TRANSACTION_V2 |
+|                              | SIGN    |            ACTIVITY_TYPE_ETH_SEND_TRANSACTION |
+|                              | SIGN    |            ACTIVITY_TYPE_SOL_SEND_TRANSACTION |
+| **USER**                     | CREATE  |                 ACTIVITY_TYPE_CREATE_USERS_V4 |
+|                              | CREATE  |                 ACTIVITY_TYPE_CREATE_USER_TAG |
+|                              | CREATE  |           ACTIVITY_TYPE_CREATE_API_ONLY_USERS |
+|                              | UPDATE  |                     ACTIVITY_TYPE_UPDATE_USER |
+|                              | UPDATE  |                ACTIVITY_TYPE_UPDATE_USER_NAME |
+|                              | UPDATE  |               ACTIVITY_TYPE_UPDATE_USER_EMAIL |
+|                              | UPDATE  |        ACTIVITY_TYPE_UPDATE_USER_PHONE_NUMBER |
+|                              | UPDATE  |                 ACTIVITY_TYPE_UPDATE_USER_TAG |
+|                              | DELETE  |                    ACTIVITY_TYPE_DELETE_USERS |
+|                              | DELETE  |                ACTIVITY_TYPE_DELETE_USER_TAGS |
+| **CREDENTIAL**               | CREATE  |              ACTIVITY_TYPE_CREATE_API_KEYS_V2 |
+|                              | CREATE  |        ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2 |
+|                              | DELETE  |                 ACTIVITY_TYPE_DELETE_API_KEYS |
+|                              | DELETE  |           ACTIVITY_TYPE_DELETE_AUTHENTICATORS |
+|                              | CREATE  |       ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS_V2 |
+|                              | DELETE  |          ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS |
+| **PAYMENT_METHOD**           | UPDATE  |           ACTIVITY_TYPE_SET_PAYMENT_METHOD_V2 |
+|                              | DELETE  |           ACTIVITY_TYPE_DELETE_PAYMENT_METHOD |
+| **SUBSCRIPTION**             | CREATE  |           ACTIVITY_TYPE_ACTIVATE_BILLING_TIER |
+| **CONFIG**                   | UPDATE  |          ACTIVITY_TYPE_UPDATE_ALLOWED_ORIGINS |
+| \***\*RECOVERY**             | CREATE  |     ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2 |
+| **AUTH**                     | CREATE  |                   ACTIVITY_TYPE_EMAIL_AUTH_V3 |
+|                              | CREATE  |                ACTIVITY_TYPE_INIT_OTP_AUTH_V3 |
+|                              | CREATE  |                        ACTIVITY_TYPE_OTP_AUTH |
+|                              | CREATE  |                           ACTIVITY_TYPE_OAUTH |
+|                              | CREATE  |                     ACTIVITY_TYPE_OAUTH_LOGIN |
+|                              | CREATE  |                    ACTIVITY_TYPE_OTP_LOGIN_V2 |
+|                              | CREATE  |                     ACTIVITY_TYPE_STAMP_LOGIN |
+|                              | CREATE  |    ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2 |
+|                              | CREATE  |        ACTIVITY_TYPE_CREATE_OAUTH2_CREDENTIAL |
+|                              | DELETE  |        ACTIVITY_TYPE_DELETE_OAUTH2_CREDENTIAL |
+|                              | UPDATE  |        ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL |
+|                              | CREATE  |             ACTIVITY_TYPE_OAUTH2_AUTHENTICATE |
+| **OTP**                      | CREATE  |                     ACTIVITY_TYPE_INIT_OTP_V3 |
+|                              | VERIFY  |                   ACTIVITY_TYPE_VERIFY_OTP_V2 |
+| **AUTH_PROXY**               | CREATE  |               ACTIVITY_TYPE_ENABLE_AUTH_PROXY |
+|                              | DELETE  |              ACTIVITY_TYPE_DISABLE_AUTH_PROXY |
+|                              | UPDATE  |        ACTIVITY_TYPE_UPDATE_AUTH_PROXY_CONFIG |
+| **WEBHOOK_ENDPOINT**         | CREATE  |         ACTIVITY_TYPE_CREATE_WEBHOOK_ENDPOINT |
+|                              | UPDATE  |         ACTIVITY_TYPE_UPDATE_WEBHOOK_ENDPOINT |
+|                              | DELETE  |         ACTIVITY_TYPE_DELETE_WEBHOOK_ENDPOINT |
+| **TVC_APP**                  | CREATE  |                  ACTIVITY_TYPE_CREATE_TVC_APP |
+|                              | UPDATE  |  ACTIVITY_TYPE_UPDATE_TVC_APP_LIVE_DEPLOYMENT |
+|                              | DELETE  |  ACTIVITY_TYPE_DELETE_TVC_APP_AND_DEPLOYMENTS |
+| **TVC_DEPLOYMENT**           | CREATE  |           ACTIVITY_TYPE_CREATE_TVC_DEPLOYMENT |
+|                              | UPDATE  |   ACTIVITY_TYPE_CREATE_TVC_MANIFEST_APPROVALS |
+|                              | UPDATE  |          ACTIVITY_TYPE_RESTORE_TVC_DEPLOYMENT |
+|                              | UPDATE  |       ACTIVITY_TYPE_POST_TVC_QUORUM_KEY_SHARE |
+|                              | DELETE  |           ACTIVITY_TYPE_DELETE_TVC_DEPLOYMENT |
+| **TVC_OPERATOR**             | CREATE  |             ACTIVITY_TYPE_CREATE_TVC_OPERATOR |
+| **TVC_QUORUM_KEY**           | CREATE  |           ACTIVITY_TYPE_CREATE_TVC_QUORUM_KEY |
 |                              | ENCRYPT | ACTIVITY_TYPE_RE_ENCRYPT_TVC_QUORUM_KEY_SHARE |
 
 <Note>
-  ** In the Activity breakdown table above, `**` marks legacy features
-  deprecated in the latest SDKs. This note applies only to that table.
+  ** In the Activity breakdown table above, `**` marks legacy features deprecated in the latest
+  SDKs. This note applies only to that table.
 </Note>
 
 ### Activity kinds
 
-`activity.kind` groups all versions of an activity under one version-agnostic value. The table
-below lists each kind and the activity types it matches.
+`activity.kind` groups all versions of an activity under one version-agnostic value. The table below
+lists each kind and the activity types it matches.
 
 <Note>
-  This table covers policy-governed activities only. Activities governed by the
-  root quorum (see [Root quorum activities](#root-quorum-activities)) are not
-  policy-governed and have no `activity.kind`.
+  This table covers policy-governed activities only. Activities governed by the root quorum (see
+  [Root quorum activities](#root-quorum-activities)) are not policy-governed and have no
+  `activity.kind`.
 </Note>
 
 | Kind                            | Matches Activity Types                                                                                                                                                                                                                                                                                                                      |
@@ -459,9 +541,9 @@ below lists each kind and the activity types it matches.
 | CREATE_SESSION_PROFILE          | ACTIVITY_TYPE_CREATE_SESSION_PROFILE                                                                                                                                                                                                                                                                                                        |
 
 <Note>
-  Prefer `activity.kind` over `activity.type` when you want a policy to apply
-  across all versions of an activity. `activity.type` targets one exact version
-  and will not match newer versions introduced later.
+  Prefer `activity.kind` over `activity.type` when you want a policy to apply across all versions of
+  an activity. `activity.type` targets one exact version and will not match newer versions
+  introduced later.
 </Note>
 
 ### Choosing between `type`, `kind`, and `resource` + `action`
@@ -476,10 +558,9 @@ the match to be:
 | `activity.resource` + `activity.action` | A **group** of activities sharing a resource and action (e.g. all `CREATE` on `CREDENTIAL`) | You want a coarse, category-level rule spanning many activities at once.                                                                                       |
 
 <Note>
-  Rule of thumb: use `activity.kind` to target a single activity
-  (version-agnostic), and `activity.resource` + `activity.action` to target a
-  broad category. Reach for `activity.type` only when you deliberately need one
-  exact version.
+  Rule of thumb: use `activity.kind` to target a single activity (version-agnostic), and
+  `activity.resource` + `activity.action` to target a broad category. Reach for `activity.type` only
+  when you deliberately need one exact version.
 </Note>
 
 ## Appendix
@@ -590,9 +671,9 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
 
 <Note>
   {" "}
-  The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart
-  contracts support signed integers up to 256 bits (`int256`), but values
-  exceeding the 128-bit signed range cannot be used in policy conditions.{" "}
+  The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart contracts support
+  signed integers up to 256 bits (`int256`), but values exceeding the 128-bit signed range cannot be
+  used in policy conditions.{" "}
 </Note>
 
 #### EIP-712
@@ -697,16 +778,17 @@ Spark-specific activities expose their request data through `activity.params`. T
 [activity parameter table](#activity-parameters) lists the top-level fields for all four Spark
 activities, and the structs below describe the nested values available to policies.
 
-Spark optional string fields evaluate to an empty string when omitted. `SparkKeyDerivation`
-supports five variants: `identity`, `signing_leaf`, `deposit`, `static_deposit`, and
-`htlc_preimage`. Only `signing_leaf` and `static_deposit` have variant-specific data, so those are
-the only variants with nested fields (see table below).
+Spark optional string fields evaluate to an empty string when omitted. `SparkKeyDerivation` supports
+five variants: `identity`, `signing_leaf`, `deposit`, `static_deposit`, and `htlc_preimage`. Only
+`signing_leaf` and `static_deposit` have variant-specific data, so those are the only variants with
+nested fields (see table below).
 
-At policy runtime, inactive variant fields evaluate to their type defaults rather than producing an evaluation error. For example,
-by default `signing_leaf.leaf_id` would an empty string, and `static_deposit.index` would return `0`. These
-defaults do *not* indicate that the variant is active. We'd recommend checking `SparkKeyDerivation.type` *before*
-targeting a variant-specific field. Note: the `type` field is an empty string when unset, and `0` is a valid
-static deposit index.
+At policy runtime, inactive variant fields evaluate to their type defaults rather than producing an
+evaluation error. For example, by default `signing_leaf.leaf_id` would an empty string, and
+`static_deposit.index` would return `0`. These defaults do _not_ indicate that the variant is
+active. We'd recommend checking `SparkKeyDerivation.type` _before_ targeting a variant-specific
+field. Note: the `type` field is an empty string when unset, and `0` is a valid static deposit
+index.
 
 | Struct                       | Field                               | Type                           | Description                                                                                                       |
 | ---------------------------- | ----------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |

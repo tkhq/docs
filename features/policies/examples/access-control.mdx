@@ -37,6 +37,21 @@ sidebarTitle: "Access control"
 }
 ```
 
+The filter can match multiple tags: `user.tags.contains('<TAG_A>') || user.tags.contains('<TAG_B>')` would require two approvers in total from either tag, in any combination. This counts a **total**; see below for enforcing a separate minimum per tag.
+
+#### Require multiple approvers across tags, with per-tag minimums
+
+This policy requires **at least 1** approver tagged `<SECURITY_TAG_ID>` and **at least 2** approvers tagged `<OPS_TAG_ID>` to create, update, or delete policies. A user carrying both tags counts toward both minimums.
+
+```json
+{
+  "policyName": "Require 1 security + 2 ops approvers for policy changes",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<SECURITY_TAG_ID>') || user.tags.contains('<OPS_TAG_ID>')) && (approvers.filter(user, user.tags.contains('<SECURITY_TAG_ID>')).count() >= 1 && approvers.filter(user, user.tags.contains('<OPS_TAG_ID>')).count() >= 2)",
+  "condition": "activity.resource == 'POLICY' && (activity.action == 'CREATE' || activity.action == 'UPDATE' || activity.action == 'DELETE')"
+}
+```
+
 #### Deny all delete actions for users with a specific tag
 
 ```json
