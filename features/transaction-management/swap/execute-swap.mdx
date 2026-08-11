@@ -5,7 +5,11 @@ mode: "wide"
 noindex: true
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP` is the signing activity that runs a swap end-to-end. The caller signs a swap intent. Turnkey fetches a fresh executable quote from the provider, constructs the transaction (batching any required ERC-20 approvals via Permit2), signs it with the wallet in the intent, and broadcasts. Policy engines evaluate the derived transaction, so existing wallet policies apply to the resulting on-chain transfer.
+`ACTIVITY_TYPE_EXECUTE_SWAP` is the signing activity that runs a swap end-to-end. The caller signs a swap intent. Turnkey’s infrastructure fetches a fresh executable quote from the provider, constructs the transaction (batching any required ERC-20 approvals via Permit2), which is then signed using the wallet specified in the intent within Turnkey's secure enclave, and broadcast. Policy engines evaluate the derived transaction, so existing wallet policies apply to the resulting onchain transfer.
+
+<Note>
+  Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
 
 ## Prerequisites
 
@@ -44,19 +48,19 @@ noindex: true
 </ParamField>
 
 <ParamField body="parameters.minOutputAmount" type="string" required>
-  The minimum output amount to accept, in raw on-chain units. This is the hard floor enforced at settlement — if the swap would return less, it fails. Typically set to the `minOutputAmount` returned by [`get_swap_quote`](/features/transaction-management/swap/get-swap-quote).
+  The minimum output amount to accept, in raw onchain units. This is the hard floor enforced at settlement — if the swap would return less, it fails. Typically set to the `minOutputAmount` returned by [`get_swap_quote`](/features/transaction-management/swap/get-swap-quote).
 </ParamField>
 
 <ParamField body="parameters.slippage" type="string">
-  Optional. Slippage tolerance in basis points, expressed as a stringified integer. Used when fetching the executable quote. `minOutputAmount` is the enforced floor at settlement _(To Confirm — exact interaction between `slippage` and `minOutputAmount`)_.
+  Optional. Slippage tolerance in basis points, expressed as a stringified integer. Used when fetching the executable quote. `minOutputAmount` is the enforced floor at settlement.
 </ParamField>
 
 <ParamField body="parameters.sponsor" type="boolean">
-  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`. Requires a Pro plan or higher when set to `true` _(To Confirm: plan gating)_.
+  Whether to sponsor the transaction's gas via Gas Station. Defaults to `false`. Requires a Pro plan or higher when set to `true`.
 </ParamField>
 
 <ParamField body="parameters.provider" type="string">
-  Optional. The DEX aggregator provider. Omit in V1 — `0x` is the only supported provider and is used by default.
+  Optional. The DEX aggregator provider. Omit in V1 — `Relay` is the only supported provider and is used by default.
 </ParamField>
 
 ```bash title="cURL"
@@ -132,7 +136,7 @@ The activity result returns a poll handle:
 
 ## Gas: sponsored vs. self-funded
 
-With `sponsor: true`, Gas Station pays the gas and the batch executes as an EIP-7702 sponsored transaction. The `walletAccount` needs no native token at all. This requires a Pro plan or higher. _(To Confirm.)_
+With `sponsor: true`, Gas Station pays the gas and the batch executes as an EIP-7702 sponsored transaction. The `walletAccount` needs no native token at all. This requires an Enterprise plan or higher.
 
 With `sponsor: false`, the `walletAccount` pays gas itself. Fund it with the origin chain's native token before executing.
 
@@ -172,7 +176,7 @@ See [Track swap status](/features/transaction-management/swap/track-swap-status)
 ## Poll swap status (required)
 
 <Warning>
-  `ACTIVITY_STATUS_COMPLETED` on the execute response means the activity was accepted and enqueued for broadcast. It does not mean the transaction landed on-chain. Poll the appropriate status endpoint until it reports a terminal state.
+  `ACTIVITY_STATUS_COMPLETED` on the execute response means the activity was accepted and enqueued for broadcast. It does not mean the transaction landed onchain. Poll the appropriate status endpoint until it reports a terminal state.
 </Warning>
 
 For same-chain, poll `get_send_transaction_status`. For cross-chain, poll `get_swap_status`. Full lifecycle semantics on [Track swap status](/features/transaction-management/swap/track-swap-status).

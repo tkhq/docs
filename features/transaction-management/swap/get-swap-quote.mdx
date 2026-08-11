@@ -1,18 +1,29 @@
 ---
-title: "Getting a Quote"
-description: "Fetch a fee-aware indicative quote for a token pair. Displays expected output and the minimum output the caller should accept."
+title: "Get a Swap Quote"
+description: "Request executable quotes for a token pair from a Turnkey wallet, priced net of all fees, with the minimum output enforced at execution."
 mode: "wide"
 noindex: true
 ---
 
-- The parent organization has [configured swaps](/features/transaction-management/swap/enable-swap) with a valid `feeReceiverWalletAddress` and `feeBps`. Quote requests against orgs with no swap configuration set are rejected.
+**Prerequisites:**
+
+- Your parent organization has enabled Swaps via [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap) with a valid `feeReceiverWalletAddress` and `feeBps`. Quote requests against organizations with no swap configuration will fail. See [`Enable Swaps`](/features/transaction-management/swap/enable-swap).
+- The signing address (`signWith`) is a wallet account in the organization submitting the activity. Parent organization wallets and sub-organization wallets can both swap: the activity belongs to the organization that owns the wallet. In a delegated access setup, a delegate can submit the activity to the wallet owner's organization or act as the second signer on an activity submitted by the wallet owner.
+
+<Note>
+  Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
 
 ## Call get\_swap\_quote
 
-`get_swap_quote` is a **query**, not an activity — it returns synchronously and is not stamped into an activity envelope. Send the request fields at the top level (there is no `parameters` object, `type`, or `timestampMs`).
+Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
 
 <ParamField body="organizationId" type="string" required>
-  Unique identifier of the sub-organization requesting the quote. The parent organization's active `FEATURE_NAME_SWAP_CONFIG` is applied server-side.
+  The organization that owns the swapping wallet. Parent organizations and sub-organizations can both swap; the parent's swap configuration applies in either case.
+</ParamField>
+
+<ParamField body="signsWith" type="string" required>
+  The wallet account address that will sign and fund the swap. Quotes are computed against this address, so balances and allowances are reflected accurately.
 </ParamField>
 
 <ParamField body="inputToken" type="string" required>
@@ -20,19 +31,15 @@ noindex: true
 </ParamField>
 
 <ParamField body="outputToken" type="string" required>
-  CAIP-19 identifier for the token being bought. Example: `eip155:8453/erc20:0x4200000000000000000000000000000000000006` (WETH on Base). Same-chain if the CAIP-2 prefix matches `inputToken`. Otherwise a cross-chain route.
+  CAIP-19 identifier for the asset being bought. If its CAIP-2 prefix matches `inputToken`, the swap is same-chain; otherwise it's a cross-chain route. Native assets use `slip44:`, e.g. `eip155:137/slip44:966` (POL).
 </ParamField>
 
 <ParamField body="inputAmount" type="string" required>
-  Amount of the input token, in raw on-chain units. For example, `"1000000"` for 1 USDC at 6 decimals.
+  In raw onchain units of the input asset, e.g. `1000000` for 1 USDC at 6 decimals.
 </ParamField>
 
-<ParamField body="walletAccount" type="string" required>
-  The address of the wallet account that will perform the swap. Used to compute an accurate quote (balances and allowances) _(To Confirm — exact format: on-chain address vs. wallet-account identifier)_.
-</ParamField>
-
-<ParamField body="slippage" type="string">
-  Optional. Slippage tolerance in basis points, expressed as a stringified integer. For example, `"50"` = 0.5%. Applied to `minOutputAmount` computation _(To Confirm — server default when omitted)_.
+<ParamField body="slippageBps" type="string">
+  Slippage tolerance in basis points as a stringified integer, e.g. `50` for 0.5%. Used to compute each quote's `minOutputAmount`.
 </ParamField>
 
 ```bash title="cURL"
@@ -96,35 +103,54 @@ Response:
 
 ### Response fields
 
-The top-level `inputToken`, `outputToken`, and `inputAmount` are echoed from the request. Quotes are returned in a `quotes` array — in V1 this contains a single option; multiple options are on the roadmap.
+The result contains a quotes array. Each quote is executable as-is:
 
-Each entry in `quotes` contains:
+- `quoteId` — identifies this quote. Pass it to ACTIVITY\_TYPE\_EXECUTE\_SWAP\_V2 to execute against this quote's pricing; execution is pinned to the quote it references.
+- `provider` — the provider that produced the quote and will execute the swap.
+- `outputAmount` — expected output in raw onchain units, net of all fees. This is what the recipient receives if the swap fills at the quoted price.
+- `minOutputAmount` — the floor enforced at execution, derived from outputAmount and your slippage tolerance. If the swap cannot deliver at least this amount, it fails rather than filling worse.
+- `slippageBps` — the slippage tolerance this quote was priced with, echoed from the request.
+- `clientFeeBps` — your organization's configured fee, for display or audit. Turnkey's fee is baked into the quoted amounts and is not itemized. See Fees.
+- `estimatedTimeSeconds` — estimated time to settlement.
+- `expiresAt` — millisecond epoch after which the quote can no longer be executed.
 
-- `quoteId`: opaque identifier for the quote. Informational only — `execute_swap` does not accept a `quoteId`, so it cannot be replayed. Useful for logging and correlation.
-- `provider`: the DEX aggregator that produced this quote (`0x` in V1).
-- `outputAmount`: expected output amount, fee-adjusted, in raw on-chain units.
-- `minOutputAmount`: minimum output the caller should accept at execute time, given the requested slippage. Derived from `outputAmount` and the caller's slippage tolerance.
+## Execution price semantics
 
-## Quotes are indicative
+Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
 
-Quote outputs may differ from execution outputs. When you call `execute_swap`, Turnkey fetches fresh executable transaction data from the provider (not the quote's payload) and settles at market rates within the caller's slippage tolerance. Two implications:
+Within those bounds, the actual fill can move:
 
-- Quote `outputAmount` is a hint. Actual receive amount at execute time can be higher or lower, bounded on the low side by the slippage-derived floor.
-- Quotes are not persisted. Turnkey does not maintain a mapping from `quoteId` to executable data. The `quoteId` is opaque and cannot be replayed.
+- `minOutputAmount` is the enforced floor. If the swap cannot deliver at least this amount, it will fail — the user never receives less than the floor they signed.
+- `outputAmount` is the expected fill, not a guarantee. The settled amount can be higher or lower than quoted, bounded on the low side by `minOutputAmount`. The actual amount is reported as `outputAmount` in swap status on `COMPLETED`.
+- Quotes expire. A quote can only be executed before its expiresAt; after that, request a new quote. Quotes may still be technically valid while the route the quote describes is no longer available in the market due to price movements. In that situation, if the quote cannot be executed with the economic parameters, it will fail at execution time.
 
-If you display quote amounts to end users, refresh the quote near the moment of execution to keep the displayed value close to the settled value.
+**Important:** Neither Turnkey nor the underlying DEX aggregator guarantees execution at any quoted price. Users bear the risk of adverse price movement between the time of quote and the time of execution.
+
+## Slippage
+
+Slippage is the difference between the price reflected in a quote and the price at which the swap actually executes onchain. It occurs because prices can move between quoting and execution. Low-liquidity pairs, large trade sizes, and periods of high network activity can increase slippage.
+
+You set your tolerance at quote time via `slippageBps`, in basis points (e.g. `50` for 0.5%). Each quote derives its `minOutputAmount` from the quoted `outputAmount` and your tolerance, and the signed execute intent carries that floor. If the swap would return less than `minOutputAmount`, it fails rather than filling worse.
+
+Choosing a tolerance is a tradeoff worth surfacing to your users:
+
+- A tighter slippage tolerance reduces the risk of an unfavorable fill but increases the chance the swap fails if the market moves.
+- A wider tolerance makes execution more likely but exposes the user to a worse price, down to the floor.
+- A swap that fails on the floor still incurs gas for the reverted origin transaction. If the swap is sponsored, that cost falls on your organization, not the user — slippage-driven reverts are a gas cost to budget for in sponsored flows.
+
+Quotes expire at `expiresAt`; if a quote has expired before the user confirms, request a new one rather than executing stale economics. Quotes are more likely to succeed the closer they are generated to execution time
 
 ## How fees are applied
 
-Each quote's `outputAmount` already reflects your organization's `feeBps` from `FEATURE_NAME_SWAP_CONFIG`. There is no separate fee amount to add or subtract on the client. The end user's displayed receive amount is a quote's `outputAmount` (or the actual settled amount at execute time).
+Every quote's `outputAmount` and `minOutputAmount` already reflect all fees — Turnkey's and yours. There is no fee math to do on your side: the amount you display to the user is the quote's `outputAmount`, and the amount they receive is the settled `outputAmount` from swap status.
 
-Fee configuration is snapshotted server-side per activity. If your fee configuration changes between quote and execute, the execute settles at the fee configuration active when it runs, not when the quote was fetched.
+Your fee configuration is applied when the quote is created. The fee baked into a quote travels with it: executing a quote settles at that quote's economics, even if you change your fee configuration in between. Fee changes take effect for new quotes.
 
 ## Same-chain vs. cross-chain quotes
 
-Quote shape is identical for same-chain and cross-chain routes. The provider selects the route based on the `inputToken` and `outputToken` CAIP-19 identifiers.
+Quote shape is identical for same-chain and cross-chain routes. Whether a swap is same-chain or cross-chain is determined by the CAIP-2 prefixes of `inputToken` and `outputToken`; the provider selects the route within that. Cross-chain routes are EVM ↔ EVM with EVM ↔  SVM coming soon.
 
-Cross-chain quotes are subject to the same freshness and slippage semantics as same-chain quotes, but cross-chain execution has a longer post-broadcast lifecycle. See [Track swap status](/features/transaction-management/swap/track-swap-status) for the two lifecycle models.
+Cross-chain quotes are subject to the same freshness and slippage semantics as same-chain quotes, but cross-chain execution has a longer post-broadcast lifecycle. — the swap stays `PENDING` until the destination leg settles or funds are refunded. See [Track swap status](/features/transaction-management/swap/track-swap-status) for the two lifecycle models.
 
 ## Next steps
 
