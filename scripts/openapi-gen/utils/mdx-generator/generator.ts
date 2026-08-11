@@ -228,9 +228,9 @@ export function generateResponseFieldMdxRecursive(
         : `<ResponseField name="${fieldName}" type="${fieldType}" required={${required}}>${description.trim()}</ResponseField>\n`;
     } else {
       // ANY NESTED Primitive: Use <NestedParam>
-      // NB: the trailing whitespace on the blank line below is load-bearing only
-      // in the sense that removing it reflows every existing nested enum field.
-      // The tag is already flow JSX, so the blank line is harmless. Leave as-is.
+      // Note: keep the trailing whitespace on the blank line below. The tag is
+      // already on its own line, so the blank line parses fine, and stripping
+      // the whitespace would reflow every nested enum field in api-reference/.
       mdx += `<NestedParam parentKey="${parentKey}" childKey="${fieldName}" type="${fieldType}" required={${required}}>\n${description.trim()}${
         isEnum
           ? `
