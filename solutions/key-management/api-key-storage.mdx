@@ -1,18 +1,17 @@
 ---
-title: "High Security API Key Storage"
+title: "API key storage"
 description: "Programmatically store and gate access to your most sensitive API keys."
 tag: "Beta"
 ---
 
 import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SecretsBetaCallout } from '/snippets/secrets-beta-callout.mdx'
 
-<Info>
-  **Closed beta**: the Secrets API is currently in closed beta. [Contact us](https://www.turnkey.com/contact-us) to get onboarded.
-</Info>
+<SecretsBetaCallout />
 
 An exchange API key that can place orders, cancel orders, or move funds is a direct line to your balance sheet. It usually sits in an environment variable, a config file, or a vault that decrypts inside the infrastructure you are trying to protect. An attacker who compromises that infrastructure gets the key too.
 
-Turnkey removes the plaintext from your infrastructure entirely. The credential lives encrypted inside a [secure enclave](/security/secure-enclaves), and every retrieval is evaluated by the [policy engine](/features/policies/overview) before the enclave releases anything. You decide which service identities can retrieve which keys, under what conditions, and with how many approvals. This solution builds on [Secret Storage](/features/secrets).
+Turnkey removes the plaintext from your infrastructure entirely. The credential lives encrypted inside a [secure enclave](/security/secure-enclaves), and every retrieval is evaluated by the [policy engine](/features/policies/overview) before the enclave releases anything. You decide which service identities can retrieve which keys, under what conditions, and with how many approvals. This solution builds on [Secret storage](/features/secrets).
 
 Typical credentials this pattern protects:
 
@@ -31,14 +30,18 @@ Typical credentials this pattern protects:
 | Who can read a released secret | Anyone who sees the response | Only the holder of the ephemeral key the payload is encrypted to, which approvers cannot read |
 | Audit trail | Vault logs you maintain | Every retrieval and approval is a signed, attributable Turnkey activity |
 
+<Note>
+  Exporting a secret necessarily places plaintext on the authorized recipient while the credential is in use. For symmetric credentials (HMAC keys, bearer tokens, OAuth secrets) this is unavoidable: the service must present the secret itself. For asymmetric API credentials whose operation is signing, you can avoid the export step entirely: store the credential as a Turnkey [private key](/features/wallets#private-keys) and sign each request inside the enclave with [sign_raw_payload](/api-reference/activities/sign-raw-payload), so the recipient never receives plaintext private-key material.
+</Note>
+
 ## Key implementation decisions
 
 | Decision | What to consider | Learn more |
 | :--- | :--- | :--- |
-| **Key classification** | Bind static properties at import time (`exchange`, `permissions`, `environment`, ...) so policies target classes of keys, such as all withdrawal-capable keys, instead of individual IDs. | [Secret Storage](/features/secrets) |
+| **Key classification** | Bind static properties at import time (`exchange`, `permissions`, `environment`, ...) so policies target classes of keys, such as all withdrawal-capable keys, instead of individual IDs. | [Secret storage](/features/secrets) |
 | **Service identity** | Model each trading service or environment as a Turnkey user with its own API key or session keys, so retrieval permission is scoped per service. | [Sessions](/features/authentication/sessions) |
 | **Approval requirements** | Trade-only keys can allow unilateral retrieval by the trading service. Withdrawal-capable or production keys can require human or multi-party approval. | [Policy Engine](/features/policies/overview) |
-| **Recipient control** | The export payload is encrypted to a single ephemeral public key, so only the service that generated it can read the credential, even when other parties approve. | |
+| **Recipient control** | The export payload is encrypted to a single ephemeral public key, so only the service that generated it can read the credential, even when other parties approve. | [Enclave secure channels](/security/enclave-secure-channels) |
 | **Rotation and revocation** | Rotate by importing the new key and deleting the old one. Revoke a service's access instantly by updating policy or removing its credentials. | |
 
 ## Example: exchange trading key for a trading firm
@@ -59,7 +62,7 @@ A trading firm holds a long-lived JWT for an execution management system that au
   "policyName": "Trading service can retrieve trade-only exchange keys",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(u, u.id == '<TRADING_SERVICE_USER_ID>')",
-  "condition": "activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS' && secret.static_properties['kind'] == 'exchangeApiKey' && secret.static_properties['permissions'] == 'trade'"
+  "condition": "secret.static_properties['kind'] == 'exchangeApiKey' && secret.static_properties['permissions'] == 'trade' && activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS'"
 }
 ```
 
@@ -104,7 +107,7 @@ A trading firm holds a long-lived JWT for an execution management system that au
       "policyName": "Withdrawal-capable keys require a human approver",
       "effect": "EFFECT_ALLOW",
       "consensus": "approvers.any(u, u.id == '<TRADING_SERVICE_USER_ID>') && approvers.any(u, u.tags.contains('risk-admin'))",
-      "condition": "activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS' && secret.static_properties['kind'] == 'exchangeApiKey' && secret.static_properties['permissions'] == 'withdraw'"
+      "condition": "secret.static_properties['kind'] == 'exchangeApiKey' && secret.static_properties['permissions'] == 'withdraw' && activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS'"
     }
     ```
 
@@ -119,6 +122,6 @@ A trading firm holds a long-lived JWT for an execution management system that au
 ## Next steps
 
 <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
-  <FeatureCard title="Secret Storage" icon="lock-01" href="/features/secrets" description="The encryption model behind imports and exports." />
+  <FeatureCard title="Secret storage" icon="lock-01" href="/features/secrets" description="The encryption model behind imports and exports." />
   <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/overview" description="Consensus expressions, conditions, and tag-based approvals." />
 </div>
