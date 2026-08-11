@@ -11,7 +11,7 @@ import { SecretsBetaCallout } from '/snippets/secrets-beta-callout.mdx'
 
 An exchange API key that can place orders, cancel orders, or move funds is a direct line to your balance sheet. It usually sits in an environment variable, a config file, or a vault that decrypts inside the infrastructure you are trying to protect. An attacker who compromises that infrastructure gets the key too.
 
-Turnkey removes the plaintext from your infrastructure entirely. The credential lives encrypted inside a [secure enclave](/security/secure-enclaves), and every retrieval is evaluated by the [policy engine](/features/policies/overview) before the enclave releases anything. You decide which service identities can retrieve which keys, under what conditions, and with how many approvals. This solution builds on [Secret storage](/features/secrets).
+Turnkey keeps plaintext credentials out of your persistent storage and infrastructure intermediaries. The credential lives encrypted inside a [secure enclave](/security/secure-enclaves), and every retrieval is evaluated by the [policy engine](/features/policies/overview) before the enclave releases anything to an authorized recipient. You decide which service identities can retrieve which keys, under what conditions, and with how many approvals. This solution builds on [Secret storage](/features/secrets).
 
 Typical credentials this pattern protects:
 
@@ -24,7 +24,7 @@ Typical credentials this pattern protects:
 
 | | Vault in your infrastructure | Turnkey |
 | :--- | :--- | :--- |
-| Where plaintext exists | Decrypted inside your infrastructure, where a vault admin or a compromised host can read it | Only inside the enclave and on the single authorized recipient |
+| Where plaintext exists | Decrypted inside your infrastructure, where a vault admin or a compromised host can read it | Inside the enclave and transiently in the authorized recipient's memory after export |
 | Access control | Enforced by software you operate | Enforced by the policy engine inside the enclave, independent of your infrastructure |
 | Multi-party approval | Bolted on, if available | Native consensus: require m-of-n approvals before a key is released |
 | Who can read a released secret | Anyone who sees the response | Only the holder of the ephemeral key the payload is encrypted to, which approvers cannot read |
@@ -46,11 +46,11 @@ Typical credentials this pattern protects:
 
 ## Example: exchange trading key for a trading firm
 
-A trading firm holds a long-lived JWT for an execution management system that authorizes placing and canceling orders on crypto exchanges. The plaintext should never exist in the firm's own infrastructure.
+A trading firm holds a long-lived JWT for an execution management system that authorizes placing and canceling orders on crypto exchanges. The plaintext should not be stored at rest in the firm's infrastructure or exposed to intermediaries; after export, it exists transiently in the authorized trading service's memory while in use.
 
 | Need | How Turnkey solves it |
 | :--- | :--- |
-| Plaintext never lives in the firm's infrastructure | The firm imports the JWT once over an end-to-end encrypted channel, and it stays inside the enclave. Retrieval re-encrypts it to a single ephemeral key |
+| No plaintext at rest or in intermediaries | The firm imports the JWT once over an end-to-end encrypted channel. Retrieval re-encrypts it to the authorized trading service's ephemeral key |
 | Only the trading service can retrieve it | Policy scopes retrieval of `kind == 'exchangeApiKey'` secrets to the trading service user |
 | High-risk keys need oversight | A consensus policy requires human approval before any withdrawal-capable key is released |
 | Every access is attributable | Each retrieval and approval is a signed activity, logged and queryable |
@@ -84,11 +84,11 @@ A trading firm holds a long-lived JWT for an execution management system that au
     });
     ```
 
-    You can now delete the plaintext from wherever it existed before.
+    You can now delete any persisted plaintext copy from wherever it existed before.
   </Step>
 
   <Step title="Retrieve at runtime">
-    The trading service authenticates with its own credentials and retrieves the key when it boots or opens a session. `exportSecret` generates the ephemeral keypair, submits the export activity, decrypts the result, and zeroizes the key:
+    The trading service authenticates with its own credentials and retrieves the key when it boots or opens a session. `exportSecret` generates the ephemeral keypair, submits the export activity, and decrypts the result into the authorized service's memory. Symmetric, bearer, HMAC, and OAuth credentials necessarily exist there transiently while in use:
 
     ```typescript
     const emsJwt = await turnkey.apiClient().exportSecret({
