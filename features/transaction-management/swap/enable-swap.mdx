@@ -5,47 +5,29 @@ mode: "wide"
 noindex: true
 ---
 
+Configure Swaps once on your parent organization: set your fee and the wallet account that collects it.
+
+`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` is a parent-organization activity that writes your swap configuration — your fee rates and the wallet account that receives fees. Submitting this activity is required to charge and claim an integrator fee; quotes and swaps work without it, with a client fee of 0.
+
 <Note>
   Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
 </Note>
 
-`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` is a parent-organization configuration activity that writes `FEATURE_NAME_SWAP_CONFIG` — the source of truth for your integrator fee configuration and the wallet that receives fees. This config must be set before any sub-organization can call `get_swap_quote` or `execute_swap`.
-
 ## Prerequisites
 
-- The activity is submitted **against the parent organization**. Sub-organization requests are rejected.
-- You control a wallet that will receive integrator fees. It must be a valid address for the target route and provider _(To Confirm — likely any EVM address in V1)_.
-- You've decided on your fee rate in basis points. See [Choose your fee configuration](#choose-your-fee-configuration).
+- You submit the activity **against the parent organization**. Submissions from sub-organizations will fail.
+- You have an EVM wallet account in the parent organization to receive fees. Fees are paid in USDC on Base regardless of which chains your swaps occur on, so a single receiving account covers all swap volume.
+- You've decided your fee rate in basis points. See [Choose your fee configuration](#choose-your-fee-configuration).
 
-## Submit upsert\_swap\_config
+## Submit the configuration
 
-<ParamField body="type" type="enum<string>" required>
-  `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`
-</ParamField>
+Submit an [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/api-reference/activities/upsert-swap-config) activity with:
 
-<ParamField body="timestampMs" type="string" required>
-  Timestamp (in milliseconds) of the request, used to verify liveness.
-</ParamField>
+- `feeReceiverWalletAddress` — an EVM address owned by your parent organization, including private key accounts. Optional: if `feeBps` is set and this is omitted, Turnkey auto-generates a parent HD wallet to receive fees
+- `feeBps` — your fee in basis points, as a stringified integer (e.g. `"50"` for 0.5%). Must be between 0% and 5%; values above the cap will fail.
+- `stableFeeBps` — optional; Enterprise plans only. A separate fee applied when both assets carry the `stable` flag in [`list_supported_assets`](/api-reference/queries/list-supported-assets). Omit to charge `feeBps` on every swap.
 
-<ParamField body="organizationId" type="string" required>
-  Unique identifier of the **parent** organization. Requests from sub-organizations are rejected.
-</ParamField>
-
-<ParamField body="parameters.feeReceiverWalletAddress" type="string" required>
-  The wallet address that receives integrator fees on-chain. Must be valid for the route and provider _(To Confirm — likely any EVM address in V1)_.
-</ParamField>
-
-<ParamField body="parameters.feeBps" type="string" required>
-  Your integrator fee in basis points, expressed as a stringified integer. For example, `"50"` = 0.5%. Must be non-negative and no greater than the Turnkey-defined maximum.
-</ParamField>
-
-<ParamField body="parameters.stableFeeBps" type="string">
-  Optional. A separate integrator fee in basis points applied to stablecoin-to-stablecoin swaps _(To Confirm — verify this is the exact scope)_.
-</ParamField>
-
-<ParamField body="parameters.provider" type="string">
-  Optional. The DEX aggregator provider. Omit in V1 — `0x` is the only supported provider and is used by default.
-</ParamField>
+Example request (cURL):
 
 ```bash title="cURL"
 curl --request POST \
@@ -63,6 +45,8 @@ curl --request POST \
     }
   }'
 ```
+
+Example request (JavaScript):
 
 ```javascript title="JavaScript"
 import { TurnkeyClient } from "@turnkey/http";
@@ -85,7 +69,7 @@ const { activity } = await client.request("/public/v1/submit/upsert_swap_config"
 });
 ```
 
-`upsert_swap_config` completes inline. The activity result echoes the applied configuration:
+Response:
 
 ```json
 {
@@ -104,28 +88,28 @@ const { activity } = await client.request("/public/v1/submit/upsert_swap_config"
 }
 ```
 
-_(Response shape `To Confirm` — assumes `enableSwapResult.config` echoes the applied configuration for confirmation.)_
+<Note>
+  The result echoes the applied configuration as `upsertSwapConfigResult`. If no `feeReceiverWalletAddress` was provided and one was auto-generated, the result will reflect the generated address.
+</Note>
 
 ## Choose your fee configuration
 
-Your `feeBps` applies to every swap submitted under any sub-organization of your parent org. Two constraints to keep in mind:
+Your fee applies to every swap under your parent organization — submitted by the parent or any sub-organization. Sub-organizations cannot override it.
 
-- **Cap**: Turnkey enforces a maximum `feeBps`. Requests above the cap are rejected. The current maximum is documented in the API reference and may be adjusted over time _(To Confirm — current cap value)_.
-- **Fee currency**: fees accrue on-chain to `feeReceiverWalletAddress` in the token that the swap route settles the fee in _(To Confirm — 0x currently collects the integrator fee in the sell token; document once verified)_.
+When choosing your rates:
 
-Pick a `feeBps` that reflects your intended margin and confirm the receiver wallet is one you actively control. Fees paid to a wallet you don't control cannot be recovered by Turnkey.
+- **Cap.** `feeBps` and `stableFeeBps` must not exceed 500 bps; values above the cap will fail.
+- **Your fee stacks on Turnkey's.** Turnkey's fee is baked into every quote (see [Fees](/features/transaction-management/swap#fees)), so the spread your user experiences is Turnkey's rate plus yours. Quotes always show the net result — `outputAmount` reflects both.
+- **Stablepairs are rate-sensitive.** Stable-to-stable swaps are economically tight; a fee that's reasonable on a volatile pair can exceed the entire spread on a stablepair. If you're on an Enterprise plan, you're able to configure lower fees for stablepair trades if that makes sense in the context of your app.
+- **Fee currency and destination.** All of your fees accrue in USDC on Base to your configured `feeReceiverWalletAddress`, regardless of swap chains or assets — one receiving account, one asset, no in-kind fee management.
+
+Fee changes apply to new quotes only; in-flight quotes settle at the fee baked into them.
 
 ## Change your fee configuration
 
-Configuration changes go through the same `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` activity — submit again with the updated `feeBps`, `feeReceiverWalletAddress`, or `stableFeeBps`. There is no separate update activity.
+Configuration changes go through the same `ACTIVITY_TYPE_UPSERT_SWAP_CONFIG` activity — submit again with the updated `feeBps`, `feeReceiverWalletAddress`, or `stableFeeBps`. There is no separate update activity; each submission replaces the active configuration.
 
-Quote and execute activities submitted **after** the change immediately use the new configuration. Because executable provider data is fetched fresh during `execute_swap`, an in-flight quote followed by an execute will settle at the fee configuration active at execute time, not at quote time _(To Confirm)_.
-
-To disable swaps entirely, submit `enable_swap` with `enabled: false`.
-
-<Warning>
-  Disabling swaps rejects all subsequent `get_swap_quote` and `execute_swap` requests until re-enabled. Wallets are unaffected — nothing on-chain changes.
-</Warning>
+Quotes requested after the change use the new configuration immediately. Executing a quote settles at the fee baked into that quote, so an in-flight quote followed by an execute settles at quote-time economics — fee changes never alter what a user has already signed.
 
 ## Next steps
 

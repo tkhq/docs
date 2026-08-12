@@ -1,11 +1,11 @@
 ---
 title: "Track Swap Status"
-description: "Poll swap lifecycle from broadcast to settlement using get_swap_status. Same-chain and cross-chain operations normalize to a single PENDING/COMPLETED/FAILED model."
+description: "Poll a swap from execute acceptance to settlement with get_swap_status. Same-chain and cross-chain swaps normalize to a single PENDING / COMPLETED / FAILED model."
 mode: "wide"
 noindex: true
 ---
 
-`execute_swap` returns a poll handle. Query `get_swap_status` with that handle to observe the full lifecycle. Same-chain and cross-chain swaps share the same endpoint and the same response shape. The endpoint normalizes provider-specific state machines to three states: `PENDING`, `COMPLETED`, `FAILED`.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V2` returns a `swapRequestId`. Query `get_swap_status` with it to observe the full lifecycle — including failures that occur before broadcast, such as pre-flight simulation failures. Same-chain and cross-chain swaps share the same query and the same response shape; provider-specific state machines are normalized to three states: `PENDING`, `COMPLETED`, `FAILED`.
 
 <Note>
   Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
@@ -23,13 +23,17 @@ Intermediate provider states (`bridge_pending`, `delayed`, `submitted`, and so o
 
 ## Query get\_swap\_status
 
+Query [`get_swap_status`](/api-reference/queries/get-swap-status) with:
+
 <ParamField body="organizationId" type="string" required>
-  Unique identifier of the sub-organization that executed the swap.
+  The organization that executed the swap: the same organization the execute activity was submitted against, parent or sub-organization.
 </ParamField>
 
-<ParamField body="sendTransactionStatusId" type="string" required>
-  The poll handle returned from `execute_swap`.
+<ParamField body="swapRequestId" type="string" required>
+  The handle returned by [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap), e.g. `sha256:9a80031c2def...`.
 </ParamField>
+
+cURL:
 
 ```bash title="cURL"
 curl --request POST \
@@ -38,15 +42,17 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "organizationId": "<SUB_ORGANIZATION_ID>",
-    "sendTransactionStatusId": "<SEND_TRANSACTION_STATUS_ID>"
+    "organizationId": "<ORGANIZATION_ID>",
+    "swapRequestId": "<SWAP_REQUEST_ID>"
   }'
 ```
 
+JavaScript:
+
 ```javascript title="JavaScript"
 const status = await client.request("/public/v1/query/get_swap_status", {
-  organizationId: "<SUB_ORGANIZATION_ID>",
-  sendTransactionStatusId: "<SEND_TRANSACTION_STATUS_ID>",
+  organizationId: "<ORGANIZATION_ID>",
+  swapRequestId: "<SWAP_REQUEST_ID>",
 });
 ```
 
@@ -61,12 +67,24 @@ Response:
   "outputToken": "<CAIP-19>",
   "inputAmount": "<RAW_AMOUNT>",
   "originTxHash": "<ORIGIN_TX_HASH>",
-  "destinationTxHash": "<TX_HASH_ON_COMPLETED_CROSS_CHAIN_ONLY>",
+  "destinationTxHashes": ["<TX_HASH_ON_COMPLETED_CROSS_CHAIN_ONLY>"],
   "outputAmount": "<ACTUAL_OUTPUT_ON_COMPLETED>",
-  "settledAsset": "<CAIP-19_ON_FAILED>",
-  "settledAmount": "<RAW_AMOUNT_ON_FAILED>",
-  "settlementTxHash": "<TX_HASH_ON_FAILED>",
-  "providerStatus": "<RAW_PROVIDER_STATUS_CROSS_CHAIN_ONLY>",
+  "refund": {
+    "asset": "<CAIP-19_ON_FAILED>",
+    "amount": "<RAW_AMOUNT_ON_FAILED>",
+    "txHash": "<TX_HASH_ON_FAILED>"
+  },
+  "error": {
+    "reason": "<ORIGIN_TRANSACTION_FAILED | PROVIDER_FILL_FAILED>",
+    "message": "<HUMAN_READABLE_DETAIL>",
+    "originTxError": {
+      "message": "<REVERT_MESSAGE>",
+      "revertChain": [],
+      "eth": {},
+      "solana": {}
+    },
+    "providerReason": "<PROVIDER_SPECIFIC_REASON>"
+  },
   "updatedAt": "<UNIX_MS_TIMESTAMP>"
 }
 ```
@@ -78,45 +96,47 @@ Response:
 - `provider`: the provider that executed the swap. Present when known.
 - `inputToken`, `outputToken`, `inputAmount`: echoed from the execute intent.
 - `originTxHash`: origin-chain transaction hash. Present once the swap is broadcast, for both same-chain and cross-chain routes.
-- `destinationTxHash`: destination-chain transaction on `COMPLETED`. Cross-chain only.
+- `destinationTxHashes`: array of destination-chain transaction hashes on `COMPLETED`. Cross-chain only.
 - `outputAmount`: actual amount received, on `COMPLETED`. May lag the `status` transition by seconds while the monitor fetches the final settled amount.
-- `settledAsset`, `settledAmount`, `settlementTxHash`: on `FAILED`. See [What FAILED means](#what-failed-means).
-- `providerStatus`: raw provider status passthrough for UI use. Cross-chain only. Not normative.
+- `refund`: present on `FAILED` when funds moved and came back. Contains `asset` (CAIP-19), `amount` (raw onchain units), and `txHash`. See [What FAILED means](#what-failed-means).
+- `error`: present on `FAILED`. Contains `reason` (`ORIGIN_TRANSACTION_FAILED` or `PROVIDER_FILL_FAILED`), `message` (human-readable detail), `originTxError` (decoded revert detail, origin failures only), and `providerReason` (provider-specific detail, fill failures only). See [What FAILED means](#what-failed-means).
 - `updatedAt`: last observed state change, as a Unix timestamp in milliseconds (stringified).
 
 ## Same-chain vs. cross-chain differences
 
-The response shape is identical. Only two behaviors differ in practice:
+The response shape is identical. Two behaviors differ in practice:
 
-- **Timing.** Same-chain reaches a terminal state within one block time. Cross-chain can take tens of seconds to several minutes depending on the route and bridge.
-- **Field population.** `destinationTxHash` and `providerStatus` are cross-chain only. On same-chain `FAILED`, the settled triple derives directly from the origin transaction: `settledAsset = inputToken`, `settledAmount = inputAmount`, `settlementTxHash = <revert hash>` (nothing moved onchain in a swap sense).
+- **Timing.** Same-chain swaps reach a terminal state within roughly one block time of the origin chain. Cross-chain swaps can take tens of seconds to several minutes depending on the route. Each quote's `estimatedTimeSeconds` is the per-swap estimate.
+- **Field population.** `destinationTxHashes` is populated only for cross-chain `COMPLETED` swaps. Same-chain outcomes are fully described by `originTxHash`: on `COMPLETED`, that transaction delivered the output; on `FAILED`, either the transaction reverted or — if `originTxHash` is absent — the swap failed before broadcast and nothing moved onchain.
 
-Use `swapKind` in the response to branch client-side handling only when it matters.
+`swapKind` (`SAME_CHAIN` or `CROSS_CHAIN`) tells you which model applies. Branch on it client-side only where the difference matters — for example, showing a bridge-progress state for cross-chain `PENDING` — and otherwise treat both kinds uniformly through the three-state model.
 
 ## What FAILED means
 
-`FAILED` is reported only when Turnkey knows what the user holds. A bridge failure with a refund still in flight stays `PENDING` until the refund lands (or is confirmed impossible).
+`FAILED` is set as soon as Relay reports a failure. Refund details (`asset`, `amount`, `txHash`) are populated in a subsequent enrichment pass and may be absent when `FAILED` first appears. Keep polling if you need the refund details. `PENDING` means the destination leg may still fill — it does not indicate a refund is in flight.
 
-On `FAILED`, three fields describe the outcome:
+On `FAILED`, two fields together describe the outcome:
 
-- `settledAsset` (CAIP-19): the asset the user ended up with.
-- `settledAmount`: raw onchain amount of that asset.
-- `settlementTxHash`: the onchain transaction that settled the funds.
+- `error.reason` — why it failed: `ORIGIN_TRANSACTION_FAILED` (the origin transaction failed pre-flight simulation or reverted onchain) or `PROVIDER_FILL_FAILED` (the origin transaction succeeded but the provider could not fill). `error.message` and, for origin failures, `error.originTxError` carry the decoded detail, including the full revert chain.
+- `refund` — present when funds moved and came back: `refund.asset` (CAIP-19), `refund.amount` (raw onchain units), and `refund.txHash`. The refunded asset can differ from the original input if the route included an origin-side swap, and it lands on the origin chain.
 
-Provider-specific recovery scenarios normalize to this triple:
+Reading the user's position from the response:
 
-- **Provider refunded on the origin chain**: `settledAsset` is the origin-chain refund token. It may differ from the original input token if the route included an origin-side swap.
-- **Funds never left the user** (e.g., origin transaction reverted): `settledAsset` equals `inputToken`, `settledAmount` equals `inputAmount`, `settlementTxHash` is the origin transaction hash.
-- **Nothing was recoverable**: `settledAsset` is `null`. Internal alerts fire on this state.
+| `error.reason` | `originTxHash` | `refund` | The user holds |
+| :-- | :-- | :-- | :-- |
+| `ORIGIN_TRANSACTION_FAILED` | absent | absent | The full input — the swap failed simulation and never broadcast. |
+| `ORIGIN_TRANSACTION_FAILED` | present | absent | The full input — the transaction reverted onchain. Gas was spent (yours, if sponsored). |
+| `PROVIDER_FILL_FAILED` | present | present | `refund.amount` of `refund.asset`, on the origin chain. |
+| `PROVIDER_FILL_FAILED` | present | absent | Unknown — refund is still being enriched, or Relay reported failure with no automated return. Keep polling. |
 
-If `settledAsset` is non-null, you can call [`execute_swap`](/features/transaction-management/swap/execute-swap) again with the settled asset as the new input to re-attempt. Caveats worth surfacing to end users:
+If the user still wants the swap, re-quote — with the refunded asset as the new input where a refund occurred. Caveats worth surfacing to end users:
 
-- The refunded amount is reduced by refund gas and any origin-side swap losses.
-- A re-swap pays its own fees and slippage.
-- If the refund landed on the origin chain and the original destination was on a different chain, the re-swap is again cross-chain.
+- A refund is reduced by refund gas and any origin-side swap losses; it will not equal the original input.
+- A re-swap is a new swap: new quote, new fees, new slippage.
+- If the original destination was another chain, the re-swap is again cross-chain.
 
 <Warning>
-  `FAILED` with `settledAsset: null` means Turnkey could not recover funds through the provider's automated flows. Contact support if you encounter this state.
+  `FAILED` with error reason `PROVIDER_FILL_FAILED` and no `refund` object means Turnkey could not recover funds through the provider's automated flows. Contact support if you encounter this state.
 </Warning>
 
 ## Polling cadence

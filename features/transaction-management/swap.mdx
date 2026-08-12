@@ -1,11 +1,11 @@
 ---
-title: "Swaps (Overview)"
+title: "Overview"
 description: "Execute token swaps from Turnkey wallets through a unified DEX aggregator abstraction, and take your own fee on every swap, paid onchain."
 mode: "wide"
 noindex: true
 ---
 
-Swaps allow wallets in your organization to exchange tokens through DEX aggregators via a single Turnkey activity, with the usual audit trail and policy controls. Same-chain and EVM ↔ EVM cross-chain routes are supported. You can charge your own fee on every swap, collected onchain to a wallet you control.
+Swaps allow wallets in your organization to exchange tokens through DEX aggregators via a single Turnkey activity, with the usual audit trail and policy controls. Same-chain EVM and Solana routes are supported, as well as EVM ↔ EVM cross-chain. You can charge your own fee on every swap, collected onchain to a wallet you control.
 
 <Note>
   Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
@@ -15,7 +15,7 @@ Swaps allow wallets in your organization to exchange tokens through DEX aggregat
 
 Swaps connect Turnkey wallets to DEX aggregators and liquidity providers through a single interface. Relay is supported today with more options coming soon.
 
-A swap is two steps: you request a quote, then execute it. Execution is a signed intent carrying the full trade parameters — input and output assets, input amount, quoted and minimum output amounts, and the quote it executes against. From that intent, Turnkey constructs the transaction (including ERC-20 approvals via Permit2) and submits it for broadcast. You never handle provider quote payloads, transaction calldata, or approval data. Your signed intent is the sole source of trade parameters. Turnkey exercises no discretion over token selection, amounts, or order routing.
+A swap is two steps: you request a quote, then execute it. Execution is a signed intent carrying the full trade parameters — input and output assets, input amount, quoted and minimum output amounts, and the quote it executes against. From that intent, Turnkey constructs the transaction (we handle ERC-20 token approvals for you as part of this) and submits it for broadcast. You never handle provider quote payloads, transaction calldata, or approval data. Your signed intent is the sole source of trade parameters. Turnkey exercises no discretion over token selection, amounts, or order routing.
 
 Enabling Swaps is a one-time setup step per parent organization. After that, every swap is a quote, a signed intent, and a poll.
 
@@ -25,23 +25,24 @@ Enabling Swaps is a one-time setup step per parent organization. After that, eve
 
 ## How it works
 
-1. **Enable Swaps once on your parent organization.** Submit [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap) with your fee (`feeBps`) and a fee-receiver address. The fee receiver must be an EVM wallet account in your parent organization; all fees are paid in USDC on Base, regardless of which chains the swaps occur on. The address is validated at upsert; an address that isn't a parent-organization EVM wallet account will fail. Enterprise organizations can also set a separate stablepair fee (`stableFeeBps`), applied when both assets in a trade are stablecoins.
+1. **Swaps are enabled once per parent organization.** Once enabled, submit [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap) to configure your fee. `feeBps` sets your rate; `feeReceiverWalletAddress` sets the receiving address, which must be an EVM wallet account in your parent organization. If `feeBps` is set and no receiver is provided, Turnkey auto-generates one in your parent organization — solely controlled by your parent org — to receive fees. Setting `feeBps` to 0 with no receiver is valid if you don't want to charge a fee. Enterprise organizations can also set a separate stablepair fee (`stableFeeBps`), applied when both assets in a trade are stablecoins.
 2. **Request a quote.** Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote) with the signing address, asset pair, input amount, and slippage tolerance. Each quote returns the output amount net of all fees, a minimum output amount, an expiry, and a quoteId. Quotes reflect your active fee configuration.
-3. **Execute the swap.** Submit [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap) from the sub-organization whose wallet is swapping, referencing the `quoteId` and restating the trade parameters. Turnkey constructs the transaction, handles ERC-20 approvals via Permit2, and broadcasts it. For cross-chain routes, this broadcasts the origin-chain transaction, with the cross chain swap provider (Relay) broadcasting the destination-chain transaction.
+3. **Execute the swap.** Submit [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap) from the sub-organization whose wallet is swapping, referencing the `quoteId` and restating the trade parameters. Turnkey constructs the transaction, handles ERC-20 approvals, and broadcasts it. For cross-chain routes, this broadcasts the origin-chain transaction, with the cross chain swap provider (Relay) broadcasting the destination-chain transaction.
 4. **Poll swap status until settlement.** Query [`get_swap_status`](/api-reference/queries/get-swap-status) with the returned `swapRequestId` until a terminal state. Same-chain swaps are `COMPLETED` on origin-chain inclusion; cross-chain swaps stay `PENDING` until the destination leg settles or funds are refunded. See [Track swap status](/features/transaction-management/swap/track-swap-status).
 
 ## Supported providers, chains, and routes
 
 | Provider | Chains (V1) |
 | :-- | :-- |
-| Relay | Ethereum (`eip155:1`), Base (`eip155:8453`), Arbitrum (`eip155:42161`), Polygon (`eip155:137`), BNB Chain (`eip155:56`) |
+| Relay | Ethereum (`eip155:1`), Base (`eip155:8453`), Optimism (`eip155:10`), Arbitrum (`eip155:42161`), Polygon (`eip155:137`), BNB Chain (`eip155:56`), Monad (`eip155:143`), Tempo (`eip155:4217`), Solana (`solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`) |
 
 **Route support in V1:**
 
 - **Same-chain EVM ↔ EVM** — e.g., USDC → USDT on Base.
 - **Cross-chain EVM ↔ EVM** — e.g., Arbitrum USDC → Base USDC, where supported by the provider.
+- **Same-chain Solana ↔ Solana** — e.g., SOL → USDC on Solana.
 
-**On the roadmap:** Solana ↔ Solana, EVM ↔ SVM (e.g., Ethereum ↔ Solana), additional providers, provider selection, and multiple quote options.
+**On the roadmap:** EVM ↔ SVM (e.g., Ethereum ↔ Solana), additional providers, provider selection, and multiple quote options.
 
 **Important:** Swaps are routed through independent third-party DEX aggregators (currently Relay). These providers are not subcontractors, agents, or affiliates of Turnkey. Turnkey does not control order routing, execution pricing, or liquidity on any protocol. Turnkey's role is limited to providing the API infrastructure that prepares, signs, and broadcasts swap transactions on behalf of the calling wallet.
 
@@ -49,18 +50,20 @@ Enabling Swaps is a one-time setup step per parent organization. After that, eve
 
 Two fees apply to a swap: Turnkey's fee and, optionally, your own. Both are deducted from the swap output — quoted and minimum output amounts are always net of all fees, so the quote's `outputAmount` is what the recipient receives. Your fee is the only one surfaced in the quote, as `clientFeeBps`; Turnkey's fee is baked into the quoted amounts and does not appear as a separate field.
 
-Onchain, how fees appear depends on the provider executing the swap: fees may settle as two distinct transfers or as one aggregate transfer. With Relay, they appear as two distinct fees. Regardless of how a provider settles them onchain, the quoted amounts you receive from Turnkey are always net of both.
+Turnkey's fee and your fee are settled as separate claim payouts — they do not appear in the user's swap transaction itself. With Relay, these are two distinct payouts, one for each party. Regardless of how a provider settles them onchain, the quoted amounts you receive from Turnkey are always net of both.
 
-Turnkey's fee
+#### Turnkey's fee
 
 | Plan | Standard swaps | Stablepair swaps |
 | :-- | :-- | :-- |
-| Pay-as-you-go and Pro | 20 bps | N/A |
+| Pay-as-you-go and Pro | 20 bps | 20 bps |
 | Enterprise | 20 bps | 10 bps |
 
-A stablepair swap is one where both assets carry the `stable` flag in [`list_supported_assets`](/api-reference/queries/list-supported-assets). Enterprise rates are negotiable — contact sales for custom pricing.
+A stablepair swap is one where both assets carry the `stable` flag in [`list_supported_assets`](/api-reference/queries/list-supported-assets). These are Turnkey's current default fee rates and may be revised on notice in accordance with the Terms. Enterprise rates shown are defaults; where an Order Form sets Turnkey Fee rates, the Order Form controls.
 
-**Your fee**: You can charge your own fee on every swap, expressed in basis points. Your fee options mirror your plan's rate structure: Pay-as-you-go and Pro organizations set a single `feeBps` applied to every swap; Enterprise organizations can additionally set `stableFeeBps`, applied to stablepair swaps.
+#### Your fee
+
+You can charge your own fee on every swap, expressed in basis points. Your fee options mirror your plan's rate structure: Pay-as-you-go and Pro organizations set a single `feeBps` applied to every swap; Enterprise organizations can additionally set `stableFeeBps`, applied to stablepair swaps.
 
 Set your fee and fee receiver via [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap):
 
@@ -72,33 +75,33 @@ Your fees are paid in USDC on Base, regardless of which chains your swaps occur 
 Fees are configured on the parent organization and apply to every swap submitted by any sub-organization under it. Sub-organizations cannot override the parent's configuration.
 
 <Warning>
-  To change your fee configuration, submit `upsert_swap_config` again with the new values. Quote and execute activities submitted after the change immediately use the new fee configuration.
+  To change your fee configuration, submit `upsert_swap_config` again with the new values. New quotes requested after the change immediately use the new configuration. Executing an existing quote always settles at the fees baked into that quote — execute does not re-read your fee configuration.
 </Warning>
 
 ## API surface
 
-Swaps add three activities:
+Swaps add four activities:
 
 | Activity | Endpoint | Purpose |
 | :-- | :-- | :-- |
 | [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/api-reference/activities/upsert-swap-config) | `POST /public/v1/submit/upsert_swap_config` | Enable swaps on your parent organization and set your fee configuration |
-| [`ACTIVITY_TYPE_EXECUTE_SWAP`](/api-reference/activities/execute-swap) | `POST /public/v1/submit/execute_swap` | Sign, broadcast, and settle a swap from a sub-org wallet |
 | [`ACTIVITY_TYPE_CLAIM_SWAP_FEES`](/api-reference/activities/claim-swap-fees) | `POST /public/v1/submit/claim_swap_fees` | Claim accrued integrator fees to your fee-receiver wallet |
+| [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/api-reference/activities/get-swap-quote) | `POST /public/v1/submit/create_swap_quote` | Request an executable quote for a token pair |
+| [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/api-reference/activities/execute-swap) | `POST /public/v1/submit/execute_swap` | Execute the quoted swap identified by `quote_id` |
 
-and two queries:
+and one query:
 
 | Query | Endpoint | Purpose |
 | :-- | :-- | :-- |
-| [`Swap quote`](/api-reference/activities/get-swap-quote) | `POST /public/v1/query/get_swap_quote` | Indicative fee-aware quote for an input token / amount pair |
 | [`Swap status`](/api-reference/queries/get-swap-status) | `POST /public/v1/query/get_swap_status` | Poll the full swap lifecycle. Handles same-chain and cross-chain with a unified response shape. |
 
 <Note>
-  Swap requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). There are no Swap-specific SDK methods during the early access period, so the examples on these pages use cURL and the generic `request` method of [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`.
+  Swap requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). The examples on these pages use cURL and [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`, but generated SDK methods are available: `createSwapQuote`, `executeSwap`, `executeSwapV2`, `getSwapStatus`, `upsertSwapConfig`, and `claimSwapFees`.
 </Note>
 
 ## Trust boundary
 
-Swaps never expose executable provider data to you or your users. Provider quote payloads, transaction calldata, Permit2 signatures, and approval payloads are constructed and handled entirely server-side — they are never accepted from callers, so they cannot be tampered with before signing.
+Swaps never expose executable provider data to you or your users. Provider quote payloads, transaction calldata, and approval payloads are constructed and handled entirely server-side — they are never accepted from callers, so they cannot be tampered with before signing.
 
 What the user signs is the execute intent, and it is the sole source of trade parameters: the input and output assets, input amount, quoted and minimum output amounts, sponsorship, and the `quoteId` it executes against. Turnkey constructs the transaction deterministically from that intent. This is why execute restates parameters the quote already carries; the signed intent must be self-contained, so a quote cannot be substituted or its economics altered after signing.
 
