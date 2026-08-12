@@ -104,13 +104,34 @@ Turnkey supports every Spark wallet operation. For a runnable walkthrough of eac
 | Operation              | Direction                                                                                                                                | Turnkey activities used                                                                                                                |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Deposit                | Bitcoin L1 → Spark (single-use address; also produces the [pre-signed exit transactions](#pre-signed-exit-transactions-must-be-secured)) | `SIGN_TRANSACTION`, `SPARK_SIGN_FROST`                                                                                                 |
-| Cooperative withdrawal | Spark → Bitcoin L1 (fast path; requires SO co-signing; falls back to unilateral exit below if SOs are unavailable)                       | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER`                                                                                           |
+| Cooperative withdrawal | Spark → Bitcoin L1 (fast path; requires SO co-signing; falls back to unilateral exit below if SOs are unavailable)                       | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER`, `SIGN_RAW_PAYLOAD`                                                                       |
 | Unilateral exit        | Spark → Bitcoin L1 (emergency path; no SO cooperation needed)                                                                            | none at exit time; broadcasts the [pre-signed exit transactions](#pre-signed-exit-transactions-must-be-secured) created during deposit |
-| Transfer               | Spark → Spark                                                                                                                            | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER` (sender); `SPARK_SIGN_FROST`, `SPARK_CLAIM_TRANSFER` (receiver)                           |
+| Transfer               | Spark → Spark                                                                                                                            | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER` (sender); `SPARK_SIGN_FROST`, `SPARK_CLAIM_TRANSFER`, `SIGN_RAW_PAYLOAD` (receiver)       |
 | Lightning receive      | Lightning → Spark                                                                                                                        | `SPARK_PREPARE_LIGHTNING_RECEIVE`                                                                                                      |
 | Lightning send         | Spark → Lightning                                                                                                                        | `SPARK_SIGN_FROST`, `SPARK_PREPARE_TRANSFER`                                                                                           |
 | Static deposit         | Bitcoin L1 → Spark (reusable address)                                                                                                    | `CREATE_WALLET_ACCOUNTS`, `EXPORT_WALLET_ACCOUNT`, `SIGN_TRANSACTION`                                                                  |
 | Token transfer         | Spark token operations (mint, transfer)                                                                                                  | `SIGN_RAW_PAYLOAD`                                                                                                                     |
+
+<Note>
+  Spark operations can use multiple billable Turnkey signing requests:
+
+- Send: 2
+- Claim or cooperative withdrawal: 3
+- Leaf swap: 5 additional requests per batch
+
+These base counts assume valid Operator and SSP sessions. One FROST request
+covers all selected leaves in a batch.
+
+The SDK calls the Spark Operators. The Turnkey enclave handles signing and
+package construction.
+
+Creating or renewing an Operator or SSP session requires an identity-key
+signing request. The SDK reuses the session token for later reads. Keep the
+same wallet instance alive to preserve its SSP session and balance cache.
+For sats, use balance events with `getCachedBalance()` instead of polling
+`getBalance()`.
+
+</Note>
 
 ## Security model
 
