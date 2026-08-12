@@ -10,23 +10,11 @@ import { SecretsBetaCallout } from '/snippets/secrets-beta-callout.mdx'
 
 <SecretsBetaCallout />
 
-Regulated custodians and institutions that sign with MPC systems distribute keyshares across parties, and typically rely on an independent backup or recovery provider so that losing one party's share does not mean losing funds. Turnkey Secrets can serve as that independent recovery store: an MPC party's keyshare bundle is imported as an opaque secret, held inside a [secure enclave](/security/secure-enclaves), and released only through a [policy-gated](/features/policies/overview) export encrypted to a designated recovery participant. You can use it instead of, or in addition to, another recovery store. For example, a custodian running an MPC-CMP based signing stack such as Fireblocks might store a party's keyshare bundle in Turnkey Secrets alongside, or instead of, a dedicated recovery service such as Coincover (illustrative ecosystem examples, not partnerships or product commitments). This solution builds on [Secret storage](/features/secrets).
+Regulated custodians and institutions that sign with MPC systems distribute keyshares across parties, and typically rely on an independent backup or recovery provider so that losing one party's share does not mean losing funds. Turnkey Secrets can serve as that independent recovery store. An MPC party's keyshare bundle is imported as an opaque secret, held inside a [secure enclave](/security/secure-enclaves), and released only through a [policy-gated](/features/policies/overview) export encrypted to a designated recovery participant. You can use it instead of, or in addition to, another recovery store. This solution builds on [Secret storage](/features/secrets).
 
 ## Opaque by design
 
 Turnkey treats every keyshare as an opaque byte blob. Turnkey never parses, validates, interprets, or derives anything from the bundle's contents, and makes no assumptions about curve, seed format, or addresses. Whatever bytes your MPC provider exports are the bytes Turnkey stores and returns.
-
-This is also why storing a share with Turnkey does not change your signing trust model: an MPC shard is not a standalone private key. A single Fireblocks keyshare, for example, is useless by itself for signing; producing a signature still requires the MPC protocol and its signing quorum. Turnkey does not participate in MPC signing, and never validates or reconstructs key material.
-
-## What a keyshare bundle contains
-
-Bundle formats and versions vary across providers and protocol versions, so treat the following as indicative rather than guaranteed:
-
-- **ECDSA/secp256k1 (e.g. MPC-CMP)**: a party's bundle can include an additive scalar share, Paillier secret material, ring-Pedersen/Damgard-Fujisaki auxiliary parameters, a chain code, and per-party public metadata. Operational bundles are commonly single-digit kilobytes, dominated by the auxiliary material and the party count and modulus choices.
-- **EdDSA/Ed25519**: bundles are substantially smaller, typically an additive or expanded scalar share, a chain code, and per-party public shares, without Paillier or ring-Pedersen material. An expanded Ed25519 scalar share has no corresponding seed and must not be forced into seed-based key formats.
-- **Recovery material**: backup artifacts may be sub-kilobyte when they include only scalar shares plus chain code, but actual exported artifact sizes and formats vary by provider and version.
-
-Because the storage layer is opaque, none of this variation matters to Turnkey: bundles of any of these shapes are stored and returned byte-for-byte.
 
 ## What Turnkey contributes
 
@@ -47,7 +35,6 @@ const secretId = await turnkey.apiClient().importSecret({
   name: "treasury-signer-party-2-keyshare",
   staticProperties: {
     kind: "mpcKeyshare",
-    provider: "fireblocks",
     curve: "secp256k1",
     environment: "production",
     recoveryRole: "backupParty",
