@@ -191,7 +191,22 @@ The language is strongly typed which makes policies easy to author and maintain.
   `m/44'/60'/0'/0/0` cannot be matched as strings. This is why the Wallet Account derivation path
   is exposed structurally via `path_indexes` and `path_hardened` in addition to `path`. The
   `path`, `path_indexes`, `path_hardened`, `wallet_id`, `curve`, and `address_format` fields are
-  currently populated only for `EXPORT_WALLET_ACCOUNT` activities; other activities will follow.{" "}
+  currently populated only for `EXPORT_WALLET_ACCOUNT` activities; other activities will follow.
+  On any other activity, a condition referencing these fields produces a `MissingField` evaluation
+  error — the policy's outcome is an error rather than a match against empty values (see
+  [Policy evaluation](#policy-evaluation) in the appendix), so an `EFFECT_ALLOW` policy that
+  references them does not grant access outside of exports.{" "}
+</Note>
+
+<Note>
+  {" "}
+  During a rollout window in which some Turnkey components have not yet been updated with these
+  fields (version skew), a condition referencing them can produce an evaluation error even on
+  `EXPORT_WALLET_ACCOUNT` activities. An erroring `EFFECT_ALLOW` policy fails closed (the export
+  is denied), but an erroring `EFFECT_DENY` policy is skipped — so pairing a broad allow (e.g.
+  "allow all exports") with a path-based deny can fail open during the skew window. Prefer narrow
+  allow policies that match only the derivation paths you intend to permit over broad-allow plus
+  path-deny combinations.{" "}
 </Note>
 
 #### Nested structs

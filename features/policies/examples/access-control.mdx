@@ -196,3 +196,10 @@ policies match the literal stored path; on ed25519, soft and hardened spellings 
   "condition": "activity.kind == 'EXPORT_WALLET_ACCOUNT' && wallet_account.path_indexes.count() == 4 && wallet_account.path_indexes[0] == 8797555 && wallet_account.path_indexes[2] == 3 && wallet_account.path_hardened.all(h, h == true)"
 }
 ```
+
+The derivation-path fields are populated only for `EXPORT_WALLET_ACCOUNT` activities: on any other
+activity, a condition referencing them produces an evaluation error (the policy's outcome is an
+error, not a match against empty values). Prefer narrow allow policies like this one over combining
+a broad allow with a path-based `EFFECT_DENY`: during rollout windows where some Turnkey components
+do not yet know these fields, an erroring deny is skipped while a broad allow still matches (failing
+open), whereas a narrow allow that errors fails closed.
