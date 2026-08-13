@@ -1,0 +1,186 @@
+---
+title: "Execute a Swap"
+description: "Execute a quoted token swap from a Turnkey wallet in one signed activity, with ERC-20 approvals handled for you and optional gas sponsorship."
+mode: "wide"
+noindex: true
+---
+
+`ACTIVITY_TYPE_EXECUTE_SWAP_V2` runs a swap end-to-end against a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE`. You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, and minimum output. From that intent, Turnkey constructs the transaction, batching any required ERC-20 approvals into the same transaction, signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
+
+<Note>
+  Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+## Prerequisites
+
+- Your parent organization has enabled Swaps. Execute activities against organizations with no swap configuration fail with `<ERROR_CODE>`. See [Enable Swaps](/features/transaction-management/swap/enable-swap).
+- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote).
+- The wallet account the quote was created for holds enough of the input asset to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native asset for gas; if `sponsor: true`, your organization can sponsor the gas for the user's trade. To use the sponsored path gas sponsorship must be enabled for your organization.
+- For cross-chain routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
+
+## Submit the swap
+
+<ParamField body="parameters.quoteId" type="string" required>
+  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
+</ParamField>
+
+<ParamField body="parameters.inputToken / parameters.outputToken" type="string" required>
+  CAIP-19 identifiers for the assets being sold and bought, matching the quoted pair. The origin chain derives from `inputToken`; a differing CAIP-2 prefix on `outputToken` makes the route cross-chain.
+</ParamField>
+
+<ParamField body="parameters.inputAmount" type="string" required>
+  In raw onchain units, matching the quoted amount.
+</ParamField>
+
+<ParamField body="parameters.quotedOutputAmount" type="string" required>
+  The quote's expected output, in raw onchain units. Informational in settlement but part of the signed intent: the user signs the economics they were shown.
+</ParamField>
+
+<ParamField body="parameters.minOutputAmount" type="string" required>
+  The quote's floor, in raw onchain units. Enforced at execution time — if the swap would return less, it fails rather than filling worse.
+</ParamField>
+
+<ParamField body="parameters.sponsor" type="boolean" required>
+  Required. When `true`, your organization sponsors gas for the transaction; requires gas sponsorship to be enabled for your organization. Set to `false` to have the swapping wallet pay its own gas.
+</ParamField>
+
+cURL:
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/execute_swap \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<ORGANIZATION_ID>",
+    "parameters": {
+      "quoteId": "<QUOTE_ID>",
+      "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+      "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+      "inputAmount": "1000000",
+      "quotedOutputAmount": "<EXPECTED_OUTPUT>",
+      "minOutputAmount": "<MINIMUM_OUTPUT>",
+      "sponsor": false
+    }
+  }'
+```
+
+JavaScript:
+
+```javascript title="JavaScript"
+import { TurnkeyClient } from "@turnkey/http";
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+const client = new TurnkeyClient(
+  { baseUrl: "https://api.turnkey.com" },
+  new ApiKeyStamper({
+    apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+    apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+  }),
+);
+
+const { activity } = await client.request("/public/v1/submit/execute_swap", {
+  type: "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+  timestampMs: String(Date.now()),
+  organizationId: "<ORGANIZATION_ID>",
+  parameters: {
+    quoteId: "<QUOTE_ID>",
+    inputToken: "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+    outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+    inputAmount: "1000000",
+    quotedOutputAmount: "<EXPECTED_OUTPUT>",
+    minOutputAmount: "<MINIMUM_OUTPUT>",
+    sponsor: false,
+  },
+});
+```
+
+The activity result returns a poll handle:
+
+```json
+{
+  "activity": {
+    "id": "<ACTIVITY_ID>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+    "result": {
+      "executeSwapResult": {
+        "swapRequestId": "sha256:9a80031c2def40d9294900fb99be914999cea3dbe9a4dd4841a8e52ee29f09f5",
+        "provider": "relay",
+        "quoteId": "<QUOTE_ID>"
+      }
+    }
+  }
+}
+```
+
+`ExecuteSwapResult` returns `swapRequestId` (used to poll status), plus optional `provider` and `quoteId`.
+
+## Gas: sponsored vs. self-funded
+
+With `sponsor: true`, Gas Station pays the gas and the swapping wallet account needs no native asset at all — approvals and the swap execute in one sponsored batch. Gas sponsorship must be enabled for your organization; sponsored gas accrues to your monthly gas bill and counts toward your spend limits.
+
+With `sponsor: false`, the wallet account performing the swap pays its own gas. The wallet account must be funded with a sufficient amount of the origin chain's gas asset before executing.
+
+<Note>
+  Gas Sponsorship is available on Enterprise plans. Enterprise: Unlimited spend, with configurable time windows. Pay-as-you-go and Pro customers can still access transaction construction, signing, and broadcast. If you'd like to leverage gas sponsorship, please [reach out](https://www.turnkey.com/contact-us)!
+</Note>
+
+## What is abstracted away
+
+The signed intent carries only the swap parameters listed above. Everything else is handled by Turnkey:
+
+- Provider quote payloads
+- Transaction calldata and serialized transactions
+- Token approval signatures and payloads
+- Fee configuration — `feeReceiverWalletAddress` and fee rates are loaded from your parent organization; they cannot be overridden per swap
+
+Execute only accepts the bound quote terms. You do not pass provider payloads, calldata, or fee overrides. Because none of these inputs exist in the V2 intent, none of them can be tampered with before signing. See [Trust boundary](/features/transaction-management/swap#trust-boundary) for the full model.
+
+## Approvals
+
+For ERC-20 inputs, Turnkey batches any required token approval into the swap transaction — there is no separate approval activity to run, no standing allowance to manage, and no second signature from your user. Approvals are handled automatically as part of execution.
+
+Native token swaps (e.g., ETH as `inputToken`) do not require an approval step.
+
+<Note>
+  Some non-standard ERC-20 tokens may not be compatible with the batched approval flow. If a swap fails with an approval-related error, verify the token supports standard ERC-20 approval mechanics before retrying.
+</Note>
+
+## Same-chain vs. cross-chain execution
+
+The execute activity is identical for same-chain and cross-chain routes — the route is fixed by the quote you reference, which derives it from the CAIP-19 pair. The difference is in the lifecycle after broadcast:
+
+- **Same-chain swaps** reach a terminal status on origin-chain inclusion: `COMPLETED` with the settled `outputAmount`, or `FAILED` with a structured error.
+- **Cross-chain swaps** stay `PENDING` past origin inclusion until the destination leg settles (`COMPLETED`, with `destinationTxHashes`) or funds are refunded (`FAILED`, with the `refund` object).
+
+In both cases, poll [`get_swap_status`](/api-reference/queries/get-swap-status) with the `swapRequestId` returned by the execute activity. See [Track swap status](/features/transaction-management/swap/track-swap-status) for terminal states and error handling.
+
+## Poll swap status
+
+A successful execute activity returns an ID which you will use to track the status of the swap:
+
+```json
+{
+  "provider": "relay",
+  "quoteId": "sq_v1_d47bcb2192150649280454baa8a48f1cf4b1e5270997901436c2d907eecca6ac",
+  "swapRequestId": "sha256:9a80031c2def40d9294900fb99be914999cea3dbe9a4dd4841a8e52ee29f09f5"
+}
+```
+
+- `swapRequestId` — the handle for polling. Pass it to [`get_swap_status`](/api-reference/queries/get-swap-status).
+- `quoteId` / `provider` — echoed for correlation with the quote you executed.
+
+<Warning>
+  `ACTIVITY_STATUS_COMPLETED` on the execute activity means the swap was accepted and enqueued for broadcast. It does not mean the transaction landed onchain, and it does not mean the swap filled. Settlement — including the actual `outputAmount` received — is only knowable through swap status.
+</Warning>
+
+Poll `get_swap_status` with the `swapRequestId` until it reports a terminal state: `COMPLETED` with the settled amounts, or `FAILED` with a structured error and any refund. This applies to same-chain and cross-chain swaps alike; cross-chain swaps simply remain `PENDING` longer, until the destination leg settles. Full lifecycle semantics on [Track swap status](/features/transaction-management/swap/track-swap-status).
+
+## Next steps
+
+- [Track swap status](/features/transaction-management/swap/track-swap-status): same-chain vs. cross-chain polling.
+- [End-to-end example](/features/transaction-management/swap/end-to-end-example): full flow from enable to confirmation.
