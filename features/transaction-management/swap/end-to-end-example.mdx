@@ -1,0 +1,268 @@
+---
+title: "End-to-end example: Swap on Base"
+description: "Configure your fee, quote a USDC → WETH swap, execute it from a Turnkey wallet, and poll to settlement: the full Swaps lifecycle."
+sidebarTitle: "End-to-end example: Swap on Base"
+mode: "wide"
+noindex: true
+---
+
+This walkthrough runs the complete Swaps lifecycle against Base mainnet: set your fee once, quote 100 USDC into WETH, execute the quote from a Turnkey wallet, and poll until the swap settles onchain.
+
+<Note>
+  Swaps is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
+</Note>
+
+**Prerequisites**
+
+- Swaps Early Access enabled for your organization
+- A Turnkey API key pair
+- A wallet account holding USDC on Base, plus ETH on Base for gas if you don't sponsor
+- An EVM wallet account in your parent organization to receive your fee payouts
+
+<Steps>
+  <Step title="Initialize the client">
+    All requests go through the generic `request` method of `TurnkeyClient`, stamped by your API key. Execution confirms asynchronously, so define a polling helper here as well.
+
+    ```javascript
+    import { TurnkeyClient } from "@turnkey/http";
+    import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+
+    const organizationId = "<ORGANIZATION_ID>";
+
+    const client = new TurnkeyClient(
+      { baseUrl: "https://api.turnkey.com" },
+      new ApiKeyStamper({
+        apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
+        apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
+      }),
+    );
+
+    // Poll swap status until the swap reaches a terminal state.
+    async function pollSwapStatus(swapRequestId, intervalMs = 1000, timeoutMs = 120000) {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < timeoutMs) {
+        const res = await client.request("/public/v1/query/get_swap_status", {
+          organizationId,
+          swapRequestId,
+        });
+        if (res.status !== "PENDING") return res;
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+      throw new Error(`Swap status polling timed out after ${timeoutMs}ms`);
+    }
+    ```
+  </Step>
+  <Step title="Configure your fee">
+    One-time setup on your **parent** organization: your rate in basis points and the wallet account that collects it. The configuration applies to every swap under the parent organization, and quotes reflect it from this point on; without one, quotes carry a client fee of 0.
+
+    <CodeGroup>
+
+    ```javascript title="JavaScript"
+    await client.request("/public/v1/submit/upsert_swap_config", {
+      type: "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
+      timestampMs: String(Date.now()),
+      organizationId: "<PARENT_ORGANIZATION_ID>",
+      parameters: {
+        feeReceiverWalletAddress: "<FEE_RECEIVER_ADDRESS>",
+        feeBps: "50", // 0.5%
+      },
+    });
+    ```
+
+    ```bash title="cURL"
+    curl --request POST \
+      --url https://api.turnkey.com/public/v1/submit/upsert_swap_config \
+      --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' \
+      --header "X-Stamp: <string> (see Stamps)" \
+      --data '{
+        "type": "ACTIVITY_TYPE_UPSERT_SWAP_CONFIG",
+        "timestampMs": "<string> (e.g. 1745474677453)",
+        "organizationId": "<PARENT_ORGANIZATION_ID>",
+        "parameters": {
+          "feeReceiverWalletAddress": "<FEE_RECEIVER_ADDRESS>",
+          "feeBps": "50"
+        }
+      }'
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Request a quote">
+    USDC has 6 decimals, so 100 USDC is `"100000000"` raw units. Both chains derive from the CAIP-19 identifiers — matching prefixes here (`eip155:8453`) make this a same-chain swap.
+
+    <CodeGroup>
+
+    ```javascript title="JavaScript"
+    const inputToken = "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913"; // USDC
+    const outputToken = "eip155:8453/erc20:0x4200000000000000000000000000000000000006"; // WETH
+    const inputAmount = "100000000"; // 100 USDC
+
+    const { activity: quoteActivity } = await client.request(
+      "/public/v1/submit/create_swap_quote",
+      {
+        type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+        timestampMs: String(Date.now()),
+        organizationId,
+        parameters: {
+          signWith: "<WALLET_ACCOUNT_ADDRESS>",
+          inputToken,
+          outputToken,
+          inputAmount,
+          slippageBps: "50", // 0.5%
+        },
+      },
+    );
+
+    const { quotes } = quoteActivity.result.createSwapQuoteResult;
+    const quote = quotes[0];
+    ```
+
+    ```bash title="cURL"
+    curl --request POST \
+      --url https://api.turnkey.com/public/v1/submit/create_swap_quote \
+      --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' \
+      --header "X-Stamp: <string> (see Stamps)" \
+      --data '{
+        "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+        "timestampMs": "<string> (e.g. 1745474677453)",
+        "organizationId": "<ORGANIZATION_ID>",
+        "parameters": {
+          "signWith": "<WALLET_ACCOUNT_ADDRESS>",
+          "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+          "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+          "inputAmount": "100000000",
+          "slippageBps": "50"
+        }
+      }'
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Show the user the quote">
+    Quoted amounts are already net of all fees — Turnkey's and yours — so `outputAmount` is what the recipient receives. Check `expiresAt` before executing; an expired quote fails, and a fresh quote is more likely to fill.
+
+    ```javascript
+    console.log(`you receive:  ${quote.outputAmount} raw WETH`);
+    console.log(`at minimum:   ${quote.minOutputAmount}`);
+    console.log(`your fee:     ${quote.clientFeeBps} bps`);
+
+    if (Number(quote.expiresAt) <= Date.now()) {
+      throw new Error("Quote expired — request a new one.");
+    }
+
+    // Without a floor there is no price protection at execution.
+    if (!quote.minOutputAmount) {
+      throw new Error("Quote is missing minOutputAmount — do not execute.");
+    }
+    ```
+  </Step>
+  <Step title="Execute the swap">
+    Execution is pinned to the quote: pass its `quoteId` and restate the economics the user was shown. Turnkey constructs the transaction, batches any required ERC-20 approval into it, signs with the wallet derived from the quote, and broadcasts. The signer is **not** resupplied here — it comes from the bound quote.
+
+    With `sponsor: false`, the wallet pays its own gas. Set it to `true` to have Gas Station cover it (requires gas sponsorship enabled for your organization).
+
+    <CodeGroup>
+
+    ```javascript title="JavaScript"
+    const { activity: execActivity } = await client.request(
+      "/public/v1/submit/execute_swap",
+      {
+        type: "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+        timestampMs: String(Date.now()),
+        organizationId,
+        parameters: {
+          quoteId: quote.quoteId,
+          inputToken,
+          outputToken,
+          inputAmount,
+          quotedOutputAmount: quote.outputAmount,
+          minOutputAmount: quote.minOutputAmount,
+          sponsor: false,
+        },
+      },
+    );
+
+    const { swapRequestId } = execActivity.result.executeSwapResult;
+    ```
+
+    ```bash title="cURL"
+    curl --request POST \
+      --url https://api.turnkey.com/public/v1/submit/execute_swap \
+      --header 'Accept: application/json' \
+      --header 'Content-Type: application/json' \
+      --header "X-Stamp: <string> (see Stamps)" \
+      --data '{
+        "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+        "timestampMs": "<string> (e.g. 1745474677453)",
+        "organizationId": "<ORGANIZATION_ID>",
+        "parameters": {
+          "quoteId": "<QUOTE_ID>",
+          "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+          "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+          "inputAmount": "100000000",
+          "quotedOutputAmount": "<EXPECTED_OUTPUT>",
+          "minOutputAmount": "<MINIMUM_OUTPUT>",
+          "sponsor": false
+        }
+      }'
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Poll to settlement">
+    `ACTIVITY_STATUS_COMPLETED` on the execute activity only means the swap was accepted and enqueued. Poll `get_swap_status` with the `swapRequestId` until it reports a terminal state — that's the only place the actual settled amount appears.
+
+    ```javascript
+    const result = await pollSwapStatus(swapRequestId);
+
+    if (result.status === "COMPLETED") {
+      // outputAmount can lag the status flip by a few seconds.
+      console.log("received:", result.outputAmount ?? "(not yet available)");
+      console.log("origin tx:", result.originTxHash);
+    } else {
+      // FAILED — read what the user is left holding.
+      console.error(result.error.reason, result.error.message);
+      if (result.refund) {
+        console.log(`refunded ${result.refund.amount} of ${result.refund.asset}`);
+      }
+    }
+    ```
+
+    On `FAILED`, `error.reason` is either `ORIGIN_TRANSACTION_FAILED` (never broadcast, or reverted onchain) or `PROVIDER_FILL_FAILED` (origin succeeded, provider could not fill). Refund details are enriched shortly after the status flips, so they may be absent on the first `FAILED` response. See [What FAILED means](/features/transaction-management/swap/track-swap-status#what-failed-means).
+  </Step>
+</Steps>
+
+## Going cross-chain
+
+The same code runs a cross-chain swap — only the `outputToken` changes. Give it a different CAIP-2 prefix — say USDC on Arbitrum, `eip155:42161/erc20:<USDC_ON_ARBITRUM>` — and the provider routes it across chains where it supports the pair. Asset identifiers come from [`list_supported_assets`](/api-reference/queries/list-supported-assets).
+
+Two things differ after broadcast:
+
+- The swap stays `PENDING` past origin-chain inclusion until the destination leg settles, so poll every 5–10 seconds rather than every second.
+- On `COMPLETED`, `destinationTxHashes` carries the destination-chain transactions. `swapKind` in the response tells you which model applied.
+
+## Dive deeper
+
+<CardGroup cols={2}>
+  <Card title="Swaps overview" href="/features/transaction-management/swap">
+    — Fee model, chains, routes, and the full API surface.
+  </Card>
+
+  <Card title="Enable swaps" href="/features/transaction-management/swap/enable-swap">
+    — Fee configuration and the fee receiver.
+  </Card>
+
+  <Card title="Get a quote" href="/features/transaction-management/swap/get-swap-quote">
+    — Quote fields, expiry, and slippage.
+  </Card>
+
+  <Card title="Execute a swap" href="/features/transaction-management/swap/execute-swap">
+    — Gas sponsorship, approvals, and the trust boundary.
+  </Card>
+
+  <Card title="Track swap status" href="/features/transaction-management/swap/track-swap-status">
+    — Lifecycle states, failures, and refunds.
+  </Card>
+</CardGroup>
