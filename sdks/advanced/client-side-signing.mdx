@@ -13,6 +13,23 @@ Client-side signing allows you to:
 - Maintain multiple keys simultaneously for signing operations
 - Keep private keys isolated from your application's JavaScript context
 
+### Chains and formats
+
+| Chain          | Address format            | Key format for injection            | Message signing            | Transaction signing                                                |
+| -------------- | ------------------------- | ----------------------------------- | -------------------------- | ------------------------------------------------------------------ |
+| Solana         | `ADDRESS_FORMAT_SOLANA`   | `Hexadecimal` or `Solana`           | Yes → bare hex signature   | Hex-encoded serialized `VersionedTransaction` in, hex signed tx out |
+| Ethereum / EVM | `ADDRESS_FORMAT_ETHEREUM` | `Hexadecimal` **only**              | Yes (EIP-191) → `0x` sig   | `0x` serialized unsigned tx in, `0x` broadcast-ready signed tx out  |
+
+Transaction signing works the same way on both chains: serialized **unsigned** transaction in, serialized **signed** transaction out, ready to broadcast.
+
+<Note>
+  Turnkey reuses `ADDRESS_FORMAT_ETHEREUM` (secp256k1) for all EVM chains, so one exported key can sign for any EVM network — the chain is determined by the `chainId` in the transaction you serialize, not by the key.
+</Note>
+
+<Warning>
+  EVM signing requires keys injected as `KeyFormat.Hexadecimal`. If you inject a key as `KeyFormat.Solana` and then request an Ethereum signing operation, the iframe rejects it with `cannot sign Ethereum payload with key format "SOLANA"; expected "HEXADECIMAL"`. Since Solana signing works with either format, `KeyFormat.Hexadecimal` is the safe default for both chains — use `KeyFormat.Solana` only when you need the base58 representation.
+</Warning>
+
 ### Architecture
 
 ```mermaid
@@ -47,8 +64,8 @@ flowchart TB
 
 - Node.js v20+
 - A Turnkey organization with API credentials
-- Wallet accounts to export (Solana addresses for signing support)
-- `@turnkey/iframe-stamper >= 2.7.0`
+- Wallet accounts to export — see [Chains and formats](#chains-and-formats) for supported address formats
+- `@turnkey/iframe-stamper >= 2.8.0`
 
 ## Installation
 
@@ -73,6 +90,26 @@ API_PRIVATE_KEY=<your-api-private-key>
 ## Sample implementation
 
 Note: the following is for a NextJS application with a separate frontend and backend. The foundations should be applicable for other configurations.
+
+The snippets below work for both Solana and EVM accounts. Derive the payload types once from the account's address format, and reuse them everywhere you sign:
+
+```typescript
+import { MessageType, TransactionType } from "@turnkey/iframe-stamper";
+import type { TurnkeyApiTypes } from "@turnkey/sdk-server";
+
+// `addressFormat` comes from the wallet account you're signing with,
+// e.g. via getWalletAccounts()
+function signingTypesFor(addressFormat: TurnkeyApiTypes["v1AddressFormat"]) {
+  const isEthereum = addressFormat === "ADDRESS_FORMAT_ETHEREUM";
+
+  return {
+    messageType: isEthereum ? MessageType.Ethereum : MessageType.Solana,
+    transactionType: isEthereum
+      ? TransactionType.Ethereum
+      : TransactionType.Solana,
+  };
+}
+```
 
 ### Step 1: initialize the IframeStamper
 
@@ -113,7 +150,7 @@ function SigningComponent() {
 }
 ```
 
-For an example in context, we highly recommend taking a look at the [wallet-export-sign example app](https://github.com/tkhq/sdk/blob/325fdedf2c647c9a93f28aa7355b1ff0053689f9/examples/key-management/wallet-export-sign/src/components/Export.tsx#L62-L107).
+For an example in context, we highly recommend taking a look at the [wallet-export-sign example app](https://github.com/tkhq/sdk/tree/main/examples/key-management/wallet-export-sign), which covers both Solana and EVM signing.
 
 ### Step 2: create the export caller (backend or client-side)
 
@@ -177,7 +214,7 @@ async function exportKeyToIframe(
   const injected = await iframeStamper.injectKeyExportBundle(
     response.data.exportBundle,
     organizationId,
-    KeyFormat.Hexadecimal, // or KeyFormat.Solana for Solana-formatted keys
+    KeyFormat.Hexadecimal, // required for EVM signing; also works for Solana
     walletAccountAddress // Required for multi-key support
   );
 
@@ -193,46 +230,57 @@ async function exportKeyToIframe(
 ### Step 4: sign messages
 
 ```typescript
-import { MessageType } from "@turnkey/iframe-stamper";
-
 async function signMessage(
   iframeStamper: IframeStamper,
   message: string,
-  walletAccountAddress: string
+  walletAccountAddress: string,
+  addressFormat: TurnkeyApiTypes["v1AddressFormat"]
 ): Promise<string> {
-  const signature = await iframeStamper.signMessage(
+  const { messageType } = signingTypesFor(addressFormat);
+
+  return await iframeStamper.signMessage(
     {
       message,
-      type: MessageType.Solana,
+      type: messageType,
     },
     walletAccountAddress // Required when multiple keys are loaded
   );
-
-  return signature; // Returns hex-encoded signature
 }
 ```
+
+Signature return formats differ by chain: Solana returns a **bare hex** 64-byte ed25519 signature, while Ethereum returns a **`0x`-prefixed** 65-byte secp256k1 signature produced with the EIP-191 `personal_sign` prefix (so it verifies with standard tooling such as viem's `verifyMessage`). Normalize in your application if you handle both.
 
 ### Step 5: sign transactions
 
-```typescript
-import { TransactionType } from "@turnkey/iframe-stamper";
+Pass the serialized **unsigned** transaction and you get back the serialized **signed** transaction, ready to broadcast.
 
+```typescript
 async function signTransaction(
   iframeStamper: IframeStamper,
-  serializedTransaction: string, // Hex-encoded transaction bytes
-  walletAccountAddress: string
+  serializedUnsignedTransaction: string,
+  walletAccountAddress: string,
+  addressFormat: TurnkeyApiTypes["v1AddressFormat"]
 ): Promise<string> {
-  const signedTransaction = await iframeStamper.signTransaction(
+  const { transactionType } = signingTypesFor(addressFormat);
+
+  return await iframeStamper.signTransaction(
     {
-      transaction: serializedTransaction,
-      type: TransactionType.Solana,
+      transaction: serializedUnsignedTransaction,
+      type: transactionType,
     },
     walletAccountAddress
   );
-
-  return signedTransaction; // Returns hex-encoded signed transaction
 }
 ```
+
+How you build the input differs by chain:
+
+- **Solana**: hex-encoded serialized `VersionedTransaction`. The fee payer must be the injected account, since the iframe only holds that account's key.
+- **Ethereum/EVM**: `0x`-prefixed serialized unsigned transaction — build it with any library, e.g. viem's `serializeTransaction`. The result is broadcast-ready; pass it straight to `sendRawTransaction`.
+
+<Warning>
+  For **legacy** (non-typed) EVM transactions, the serialized unsigned transaction must include the `chainId` so the resulting signature carries EIP-155 replay protection. Typed transactions (EIP-1559 and EIP-2930) always encode the `chainId`, so prefer `type: "eip1559"` unless you have a specific reason not to.
+</Warning>
 
 ## Multi-key support
 
@@ -272,17 +320,19 @@ async function loadMultipleKeys(
 
 ### Signing with different keys
 
+Keys for different chains can be loaded side by side. The `type` you pass must match the chain of the address you sign with:
+
 ```typescript
-// Sign with the first address
-const sig1 = await iframeStamper.signMessage(
+// Sign with a Solana address
+const solanaSig = await iframeStamper.signMessage(
   { message: "Hello", type: MessageType.Solana },
-  "address1..."
+  "5x...solanaAddress"
 );
 
-// Sign with the second address
-const sig2 = await iframeStamper.signMessage(
-  { message: "World", type: MessageType.Solana },
-  "address2..."
+// Sign with an EVM address
+const evmSig = await iframeStamper.signMessage(
+  { message: "World", type: MessageType.Ethereum },
+  "0x...evmAddress"
 );
 ```
 
@@ -321,14 +371,14 @@ Understanding the key lifecycle is important for building reliable applications.
 async function ensureKeyLoaded(
   iframeStamper: IframeStamper,
   address: string,
-  organizationId: string
+  organizationId: string,
+  addressFormat: TurnkeyApiTypes["v1AddressFormat"]
 ) {
+  const { messageType } = signingTypesFor(addressFormat);
+
   try {
     // Attempt to sign a test message
-    await iframeStamper.signMessage(
-      { message: "test", type: MessageType.Solana },
-      address
-    );
+    await iframeStamper.signMessage({ message: "test", type: messageType }, address);
   } catch (error) {
     // Key not found or expired - re-export
     await exportKeyToIframe(iframeStamper, address, organizationId);
@@ -338,14 +388,16 @@ async function ensureKeyLoaded(
 
 ## Key formats
 
-| Format                  | Description                                      | Use Case                       |
-| ----------------------- | ------------------------------------------------ | ------------------------------ |
-| `KeyFormat.Solana`      | Base58-encoded 64-byte format (private + public) | Phantom, Solflare, Solana keys |
-| `KeyFormat.Hexadecimal` | 64 hexadecimal digits (32 bytes)                 | Non-Solana                     |
+| Format                  | Description                                      | Use Case                                                     |
+| ----------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| `KeyFormat.Hexadecimal` | 64 hexadecimal digits (32 bytes), `0x`-prefixed  | **Required for EVM signing**; also works for Solana signing  |
+| `KeyFormat.Solana`      | Base58-encoded 64-byte format (private + public) | Solana signing, and base58 wallet imports (Phantom, Solflare) |
+
+Unless you specifically need the base58 representation, use `KeyFormat.Hexadecimal` for every account you intend to sign with — see [Chains and formats](#chains-and-formats).
 
 ## Complete example
 
-Here's a complete React component demonstrating the full flow:
+Here's a complete React component demonstrating the full flow, for both Solana and EVM accounts:
 
 ```typescript
 import {
@@ -354,21 +406,38 @@ import {
   MessageType,
   TransactionType,
 } from "@turnkey/iframe-stamper";
+import type { TurnkeyApiTypes } from "@turnkey/sdk-server";
 import { useEffect, useState } from "react";
 import axios from "axios";
 
 const IFRAME_CONTAINER_ID = "turnkey-iframe-container";
 const IFRAME_ELEMENT_ID = "turnkey-iframe";
 
+// Turnkey reuses ADDRESS_FORMAT_ETHEREUM (secp256k1) for all EVM chains
+function signingTypesFor(addressFormat: TurnkeyApiTypes["v1AddressFormat"]) {
+  const isEthereum = addressFormat === "ADDRESS_FORMAT_ETHEREUM";
+
+  return {
+    messageType: isEthereum ? MessageType.Ethereum : MessageType.Solana,
+    transactionType: isEthereum
+      ? TransactionType.Ethereum
+      : TransactionType.Solana,
+  };
+}
+
 interface Props {
   organizationId: string;
   walletAccountAddress: string;
+  addressFormat: TurnkeyApiTypes["v1AddressFormat"];
 }
 
 export function ClientSideSigner({
   organizationId,
   walletAccountAddress,
+  addressFormat,
 }: Props) {
+  const { messageType, transactionType } = signingTypesFor(addressFormat);
+
   const [iframeStamper, setIframeStamper] = useState<IframeStamper | null>(
     null
   );
@@ -406,6 +475,7 @@ export function ClientSideSigner({
       targetPublicKey: embeddedKey,
     });
 
+    // Hexadecimal is required for EVM and works for Solana too
     await iframeStamper.injectKeyExportBundle(
       response.data.exportBundle,
       organizationId,
@@ -421,11 +491,21 @@ export function ClientSideSigner({
     if (!iframeStamper || !isKeyLoaded) return;
 
     const sig = await iframeStamper.signMessage(
-      { message, type: MessageType.Solana },
+      { message, type: messageType },
       walletAccountAddress
     );
 
     setSignature(sig);
+  };
+
+  // Sign a serialized unsigned transaction
+  const handleSignTransaction = async (serializedUnsignedTx: string) => {
+    if (!iframeStamper || !isKeyLoaded) return;
+
+    return await iframeStamper.signTransaction(
+      { transaction: serializedUnsignedTx, type: transactionType },
+      walletAccountAddress
+    );
   };
 
   return (
@@ -480,7 +560,9 @@ The bundle was created for a different organization. Ensure your backend uses th
 2. **Reuse the embedded key**: The embedded key persists across bundle injections, so you can export multiple keys without re-initializing
 3. **Handle page reloads**: Implement re-export logic since in-memory keys are lost on reload (the embedded key survives in localStorage)
 4. **Monitor key expiration**: Track when keys will expire - embedded key (48h), in-memory keys (24h)
-5. **Use appropriate key formats**: Use `KeyFormat.Solana` for Solana keys
+5. **Default to `KeyFormat.Hexadecimal`**: It is required for EVM signing and works for Solana signing as well
+6. **Match the payload type to the key's chain**: Derive `MessageType`/`TransactionType` from the account's address format rather than hardcoding it
+7. **Prefer typed EVM transactions**: EIP-1559 transactions always encode the `chainId`, avoiding EIP-155 replay-protection mistakes
 
 ## Reference
 
@@ -500,10 +582,7 @@ The bundle was created for a different organization. Ensure your backend uses th
 
 ### Supported operations
 
-| Operation           | Solana | Ethereum |
-| ------------------- | ------ | -------- |
-| Message signing     | Yes    | Planned  |
-| Transaction signing | Yes    | Planned  |
+Message signing and transaction signing are both supported on Solana and Ethereum/EVM. See [Chains and formats](#chains-and-formats) for the per-chain payload and key format requirements.
 
 ## Additional resources
 
