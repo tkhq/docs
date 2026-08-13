@@ -30,10 +30,6 @@ Typical credentials this pattern protects:
 | Who can read a released secret | Anyone who sees the response | Only the holder of the ephemeral key the payload is encrypted to, which approvers cannot read |
 | Audit trail | Vault logs you maintain | Every retrieval and approval is a signed, attributable Turnkey activity |
 
-<Note>
-  Exporting a secret necessarily places plaintext on the authorized recipient while the credential is in use. For symmetric credentials (HMAC keys, bearer tokens, OAuth secrets) this is unavoidable: the service must present the secret itself. For asymmetric API credentials whose operation is signing, you can avoid the export step entirely. Store the credential as a Turnkey [private key](/features/wallets#private-keys) and sign each request inside the enclave with [sign_raw_payload](/api-reference/activities/sign-raw-payload), so the recipient never receives plaintext private-key material.
-</Note>
-
 ## Key implementation decisions
 
 | Decision | What to consider | Learn more |
@@ -118,6 +114,12 @@ A trading firm holds a long-lived JWT for an execution management system that au
     Rotate by importing the replacement key and deleting the old secret. Revoke a service by invalidating its session keys or removing its user. Policy changes take effect immediately, with no re-encryption or re-import of the stored keys.
   </Step>
 </Steps>
+
+### Variant: trading on behalf of your users
+
+Some firms run trading strategies on behalf of other people rather than on their own exchange accounts. The same pattern supports a non-custodial setup: each end user gets their own [sub-organization](/features/sub-organizations) and imports their exchange API key into it directly, so the plaintext never passes through your infrastructure on the way in. A [delegated access](/features/policies/delegated-access/overview) user you control, scoped by policy to retrieving that key and nothing else, lets your trading strategy pull the credential at runtime while the end user retains control of their sub-organization.
+
+For a trust-minimized deployment, run the trading strategy itself inside [Turnkey Verifiable Cloud](/features/verifiable-cloud/overview). The strategy executes in a verifiable secure enclave, so end users can verify exactly what code receives their API key, and the plaintext exists only inside that enclave while the strategy runs, keeping the arrangement non-custodial end to end.
 
 ## Next steps
 
