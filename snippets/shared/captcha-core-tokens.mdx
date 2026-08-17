@@ -1,0 +1,128 @@
+## Step 3: Consume and pass tokens
+
+Each token is single-use. After a request consumes one, clear your stored token and reset the widget so a fresh token is ready for the next request:
+
+<CodeGroup>
+
+```ts Vanilla JS
+function consumeToken() {
+  const token = captchaToken;
+  captchaToken = null;
+  turnstile.reset("#turnstile-container");
+  return token ? { captchaToken: token } : {};
+}
+```
+
+```ts React
+const consumeToken = () => {
+  const token = captchaToken;
+  setCaptchaToken(null);
+  turnstileRef.current?.reset();
+  return token ? { captchaToken: token } : {};
+};
+```
+
+```ts React Native
+const consumeToken = () => {
+  const token = captchaToken;
+  setCaptchaToken(null);
+  resetTurnstile(resetRef);
+  return token ? { captchaToken: token } : {};
+};
+```
+
+</CodeGroup>
+
+Returning an object (`{ captchaToken }` or `{}`) lets you spread the result into SDK params, so the field is simply absent when captcha is disabled or no token is available.
+
+Because a token may not have arrived yet at the moment the user taps, the React wallet kit polls for up to 5 seconds before giving up and sending the request without one. If you'd rather not wait, disable your auth buttons until a token exists and re-enable them from the widget's success callback.
+
+### Passing tokens to SDK methods
+
+<CodeGroup>
+
+```ts Email OTP
+import { TurnkeyClient, OtpType } from "@turnkey/core";
+
+const client = new TurnkeyClient({
+  organizationId: "YOUR_ORG_ID",
+  authProxyConfigId: "YOUR_AUTH_PROXY_CONFIG_ID",
+});
+await client.init();
+
+// Captcha is required here, since this sends the code
+const otpId = await client.initOtp({
+  otpType: OtpType.Email,
+  contact: "user@example.com",
+  ...consumeToken(),
+});
+
+// ...user enters the code...
+
+// No captcha token needed: completeOtp carries the verification token
+// issued by verifyOtp, which the backend accepts in place of a challenge
+const session = await client.completeOtp({
+  otpId,
+  otpCode: "123456",
+  contact: "user@example.com",
+  otpType: OtpType.Email,
+});
+```
+
+```ts Passkey signup
+const session = await client.signUpWithPasskey({
+  ...consumeToken(),
+});
+```
+
+```ts Wallet
+// Consumes the token only if this turns out to be a signup
+const session = await client.loginOrSignupWithWallet({
+  walletProvider,
+  ...consumeToken(),
+});
+```
+
+```ts OAuth
+const session = await client.completeOauth({
+  oidcToken,
+  publicKey,
+  providerName: "Google",
+  ...consumeToken(),
+});
+```
+
+</CodeGroup>
+
+### Methods that accept `captchaToken`
+
+| Method | Notes |
+| --- | --- |
+| `initOtp` | Always sends the token; this is the OTP-send challenge |
+| `signUpWithPasskey` | Forwarded to signup |
+| `signUpWithOtp` | Forwarded to signup |
+| `signUpWithOauth` | Forwarded to signup |
+| `completeOauth` | Forwarded only when the flow resolves to a signup |
+| `completeOtp` | Forwarded only when the flow resolves to a signup; not needed in practice, see below |
+| `loginOrSignupWithWallet` | Forwarded only when the flow resolves to a signup |
+
+Login-only methods (`verifyOtp`, `loginWithOtp`, `loginWithPasskey`, `loginWithOauth`, and `loginWithWallet`) take no captcha token at all.
+
+<Note>
+  `completeOtp` accepts a `captchaToken`, but you don't need to supply one. Email and phone signups that carry a verification token (which `completeOtp` obtains from `verifyOtp`) are exempt from the challenge, because the user already passed captcha when the code was sent. `@turnkey/react-wallet-kit` does not send a token here.
+</Note>
+
+<Warning>
+  `signUpWithWallet` exposes a `captchaToken` parameter but does not forward it, so the request will be rejected when captcha is enabled. Use `loginOrSignupWithWallet` for wallet signup flows.
+</Warning>
+
+## OAuth redirects
+
+OAuth signups are challenged, but the token is generated *before* the user leaves your app for the provider. Encode the captcha token into the OAuth `state` parameter along with your other state (public key, session key, nonce), then read it back on return and pass it to `completeOauth`. This is what `@turnkey/react-wallet-kit` does for both its popup and redirect flows.
+
+## Important considerations
+
+- **One challenge per OTP flow.** Only `initOtp` needs a token. Resending a code is another `initOtp` call, so it needs a fresh one too.
+- **Deploy first, enable second.** With no `turnstileSiteKey` returned from `getClientParams`, the widget stays dormant and `consumeToken()` returns `{}`, so it's safe to ship ahead of the Dashboard toggle.
+- **Reset after every use.** Tokens are single-use; always reset the widget so the next one is pre-warmed.
+- **Handle expiration.** Turnstile tokens expire after about five minutes. Clear your stored token on the expiry and error callbacks so you never submit a stale one.

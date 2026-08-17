@@ -1,0 +1,52 @@
+---
+title: "Captcha"
+description: "Cloudflare Turnstile captcha protection in @turnkey/react-wallet-kit, handled automatically once enabled in the Dashboard."
+sidebarTitle: "Captcha"
+tag: "Early Access"
+---
+
+## Overview
+
+<Warning>
+  Captcha support requires `@turnkey/react-wallet-kit` version **2.3.0** or later and `@turnkey/core` version **2.4.0** or later. Earlier versions have no way to render the Turnstile widget or attach a captcha token to a request.
+</Warning>
+
+[Captcha protection](/features/authentication/captcha) is enabled once, at the organization level, in the Turnkey Dashboard. Once it's on, **every signup and every OTP send** must carry a Cloudflare Turnstile token or the Auth Proxy rejects it.
+
+`@turnkey/react-wallet-kit` renders the Turnstile widget and attaches tokens for you, so there is no integration work to do. Enable the toggle in the Dashboard and your existing auth code keeps working.
+
+```tsx
+// No changes needed: Captcha is handled automatically by the SDK
+import { useTurnkey } from "@turnkey/react-wallet-kit";
+
+function LoginButton() {
+  const { handleLogin } = useTurnkey();
+  return <button onClick={handleLogin}>Login / Sign Up</button>;
+}
+```
+
+## How it works
+
+1. When a user initiates a protected flow (sending an OTP or signing up for a new account), the Turnstile widget renders inside the auth UI.
+2. Turnstile performs its challenge in the background. For most legitimate users, this is invisible or requires a single click.
+3. On success, Turnstile issues a token that is passed along with the request to Turnkey's backend for verification.
+4. Requests that fail the Captcha challenge are rejected before any auth activity is created.
+
+The widget runs in Cloudflare's **Managed** mode with `appearance: "interaction-only"`, so it stays hidden for the overwhelming majority of users and only appears when Cloudflare asks for interaction. A short "Let us know you're human" prompt is shown just before that happens.
+
+Because a token may not have arrived yet at the moment the user submits, the wallet kit polls for up to 5 seconds before giving up and sending the request without one.
+
+<Note>
+  OAuth signups are challenged before the user leaves your app for the provider. The wallet kit encodes the captcha token into the OAuth `state` parameter and reads it back on return, for both its popup and redirect flows.
+</Note>
+
+## Building your own UI
+
+If you're building auth screens directly on `@turnkey/core` rather than using the wallet kit's UI, you render the widget and attach tokens yourself. See [Captcha with `@turnkey/core`](/solutions/embedded-wallets/integration-guide/typescript/captcha).
+
+## Related
+
+- [Captcha protection](/features/authentication/captcha)
+- [Authentication](/solutions/embedded-wallets/integration-guide/react/auth)
+- [Captcha with `@turnkey/core`](/solutions/embedded-wallets/integration-guide/typescript/captcha)
+- [Auth Proxy](/features/authentication/auth-proxy)
