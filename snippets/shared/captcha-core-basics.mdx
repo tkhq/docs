@@ -1,0 +1,61 @@
+<Warning>
+  Captcha support requires `@turnkey/core` version **2.4.0** or later. Earlier versions have no way to attach a captcha token to a request.
+</Warning>
+
+There are three things to do: fetch your site key, render the Turnstile widget, and pass the token it produces into the SDK methods that sign up users or send OTPs.
+
+<Warning>
+  As soon as captcha is enabled in the Dashboard, unprotected clients start failing. Ship your integration first, since it stays dormant until Turnkey returns a site key, then enable the Dashboard toggle afterward for a clean cutover.
+</Warning>
+
+## Which requests are protected
+
+Turnkey's Auth Proxy enforces captcha on two endpoints (and their `_v2` variants), and the token travels as an `X-Captcha-Token` header:
+
+| Endpoint | Triggered by |
+| --- | --- |
+| `/v1/otp_init`, `/v1/otp_init_v2` | Sending an email or SMS OTP |
+| `/v1/signup`, `/v1/signup_v2` | Creating a new sub-organization |
+
+Everything else, including OTP verification and logins for accounts that already exist, is unprotected, so those calls never need a token.
+
+Signup requests that already carry a verification token are exempt even on a protected endpoint, because the user passed captcha when the OTP was sent and the verification token is single-use.
+
+### Failure modes
+
+| Situation | Result |
+| --- | --- |
+| Captcha enabled, no token sent | Request rejected: `X-Captcha-Token header is required when captcha is enabled` |
+| Token rejected by Turnstile | Request rejected: `captcha verification failed` |
+| Turnstile unreachable or erroring | Request proceeds; verification fails open so a Cloudflare outage can't lock users out |
+
+## Step 1: Fetch your site key
+
+Turnkey provisions the Turnstile widget for you, so the site key comes from the Auth Proxy rather than your own Cloudflare account:
+
+```ts
+import { getClientParams } from "@turnkey/core";
+
+const clientParams = await getClientParams(
+  "YOUR_AUTH_PROXY_CONFIG_ID",
+  // Optional: custom auth proxy URL (defaults to https://authproxy.turnkey.com)
+);
+
+const turnstileSiteKey = clientParams.turnstileSiteKey;
+```
+
+`turnstileSiteKey` is present only when captcha is both enabled for your organization and released to it. When it's `undefined`, skip the widget entirely and omit `captchaToken` everywhere. Requests behave exactly as before.
+
+<Note>
+  Call `getClientParams` once during app initialization, alongside `client.init()`, and cache the result. There's no need to re-fetch it per auth attempt.
+</Note>
+
+<Note>
+  Captcha is in Early Access and is additionally gated per organization. If you've flipped the Dashboard toggle on but `getClientParams` still returns no site key, your organization hasn't been enabled for the feature yet, so reach out to Turnkey. The Auth Proxy won't enforce captcha in this state either, so your auth flows keep working.
+</Note>
+
+## Step 2: Render the widget
+
+Turnkey configures the widget in Cloudflare's **Managed** mode, so Turnstile decides per visitor whether an interactive challenge is needed. Render it with `appearance: "interaction-only"` so it stays hidden for the overwhelming majority of users and only appears when Cloudflare asks for interaction. This is what the React wallet kit does. Use the `onBeforeInteractive` callback to reveal a short prompt ("Let us know you're human") just before it appears, so the widget doesn't materialize unexplained.
+
+Mount the widget when your auth screen opens rather than when the user submits. Turnstile then solves in the background and a token is usually waiting by the time you need one.

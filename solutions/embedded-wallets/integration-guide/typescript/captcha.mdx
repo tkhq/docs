@@ -1,0 +1,126 @@
+---
+title: "Captcha"
+description: "Add Cloudflare Turnstile captcha protection to your auth flows when building your own UI with @turnkey/core."
+sidebarTitle: "Captcha"
+tag: "Early Access"
+---
+
+import CaptchaCoreBasics from "/snippets/shared/captcha-core-basics.mdx";
+import CaptchaCoreTokens from "/snippets/shared/captcha-core-tokens.mdx";
+
+## Overview
+
+[Captcha protection](/features/authentication/captcha) is enabled once, at the organization level, in the Turnkey Dashboard. Once it's on, **every signup and every OTP send** must carry a Cloudflare Turnstile token or the Auth Proxy rejects it.
+
+[`@turnkey/react-wallet-kit`](/solutions/embedded-wallets/integration-guide/react/captcha) renders the widget and attaches tokens for you, so React web apps using it need no integration work. This page is for you if you're building your own auth UI with `@turnkey/core`:
+
+- Plain JavaScript or TypeScript web apps
+- React web apps built directly on `@turnkey/core`
+- Vue, Svelte, Angular, and other frameworks
+
+React Native and Expo apps follow the same three steps, with a WebView-based widget. See [Captcha (React Native)](/solutions/embedded-wallets/integration-guide/react-native/authentication/captcha) for that walkthrough.
+
+<CaptchaCoreBasics />
+
+### Vanilla JavaScript
+
+Add the Turnstile script:
+
+```html
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+```
+
+Then render it and hold onto the token:
+
+```html
+<div id="turnstile-container"></div>
+
+<script>
+  let captchaToken = null;
+
+  // Render once the Turnstile script has loaded and you have a site key
+  turnstile.render("#turnstile-container", {
+    sitekey: turnstileSiteKey, // From getClientParams()
+    appearance: "interaction-only",
+    size: "flexible",
+    callback: (token) => {
+      captchaToken = token;
+    },
+    "error-callback": () => {
+      captchaToken = null;
+    },
+    "expired-callback": () => {
+      captchaToken = null;
+    },
+  });
+</script>
+```
+
+### React (web)
+
+`@turnkey/react-wallet-kit` uses [`@marsidev/react-turnstile`](https://github.com/marsidev/react-turnstile) internally, so it's the wrapper we recommend for React apps built on core:
+
+```bash
+npm install @marsidev/react-turnstile
+```
+
+```tsx
+import { useEffect, useRef, useState } from "react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { getClientParams } from "@turnkey/core";
+
+// Cached at module scope so it persists across mounts and components — fetched once per session
+let cachedSiteKey: Promise<string | null> | undefined;
+
+function getSiteKey(authProxyConfigId: string): Promise<string | null> {
+  cachedSiteKey ??= getClientParams(authProxyConfigId).then(
+    (params) => params.turnstileSiteKey ?? null,
+  );
+  return cachedSiteKey;
+}
+
+function CaptchaWidget({ authProxyConfigId }: { authProxyConfigId: string }) {
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  useEffect(() => {
+    getSiteKey(authProxyConfigId).then(setSiteKey);
+  }, [authProxyConfigId]);
+
+  // Captcha is not enabled for this organization, so render nothing
+  if (!siteKey) return null;
+
+  return (
+    <>
+      {showPrompt && <p>Let us know you're human</p>}
+      <Turnstile
+        ref={turnstileRef}
+        siteKey={siteKey}
+        onSuccess={(token) => setCaptchaToken(token)}
+        onError={() => setCaptchaToken(null)}
+        onExpire={() => setCaptchaToken(null)}
+        onBeforeInteractive={() => setShowPrompt(true)}
+        options={{
+          appearance: "interaction-only",
+          size: "flexible",
+        }}
+      />
+    </>
+  );
+}
+```
+
+<Tip>
+  The site key is stable, so fetch it once and cache it rather than on every auth attempt.
+</Tip>
+
+<CaptchaCoreTokens />
+
+## Related
+
+- [Captcha protection](/features/authentication/captcha)
+- [Captcha (React Native)](/solutions/embedded-wallets/integration-guide/react-native/authentication/captcha)
+- [Authentication](/solutions/embedded-wallets/integration-guide/typescript/auth)
+- [Auth Proxy](/features/authentication/auth-proxy)

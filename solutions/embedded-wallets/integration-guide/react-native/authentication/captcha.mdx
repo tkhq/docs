@@ -1,0 +1,135 @@
+---
+title: "Captcha"
+description: "Add Cloudflare Turnstile captcha protection to your React Native and Expo auth flows."
+sidebarTitle: "Captcha"
+tag: "Early Access"
+---
+
+import CaptchaCoreBasics from "/snippets/shared/captcha-core-basics.mdx";
+import CaptchaCoreTokens from "/snippets/shared/captcha-core-tokens.mdx";
+
+## Overview
+
+[Captcha protection](/features/authentication/captcha) is enabled once, at the organization level, in the Turnkey Dashboard. Once it's on, **every signup and every OTP send** must carry a Cloudflare Turnstile token or the Auth Proxy rejects it.
+
+React Native and Expo apps render the widget and attach tokens themselves. `@turnkey/react-native-wallet-kit` does not render Turnstile for you, but its `useTurnkey()` methods forward their params straight to `@turnkey/core`, so you pass `captchaToken` to them exactly as the examples below pass it to a core client.
+
+<Warning>
+  Captcha support requires `@turnkey/core` version **2.4.0** or later. Earlier versions have no way to attach a captcha token to a request.
+</Warning>
+
+<CaptchaCoreBasics />
+
+Turnstile is a browser widget with no native mobile SDK, so a React Native integration has to render it inside a WebView. [`react-native-turnstile`](https://www.npmjs.com/package/react-native-turnstile) wraps that for you:
+
+```bash
+npm install react-native-turnstile react-native-webview
+```
+
+```bash Expo
+npx expo install react-native-webview
+npm install react-native-turnstile
+```
+
+<Warning>
+  `react-native-turnstile` loads the widget from a relay domain hosted by the package author (`turnstile.1337707.xyz`), because Turnstile's cookies are incompatible with `react-native-webview` directly. That domain must be permitted on the Turnstile widget, and Turnkey owns that configuration, not you. Contact Turnkey before relying on this package in production. If you'd rather not route challenges through a third-party domain, host an equivalent page on a domain you control and point a `react-native-webview` at it instead.
+</Warning>
+
+```tsx
+import { useEffect, useRef, useState } from "react";
+import { Text, View } from "react-native";
+import ReactNativeTurnstile, { resetTurnstile } from "react-native-turnstile";
+import { getClientParams } from "@turnkey/core";
+
+// Cached at module scope so it persists across mounts and components — fetched once per session
+let cachedSiteKey: Promise<string | null> | undefined;
+
+function getSiteKey(authProxyConfigId: string): Promise<string | null> {
+  cachedSiteKey ??= getClientParams(authProxyConfigId).then(
+    (params) => params.turnstileSiteKey ?? null,
+  );
+  return cachedSiteKey;
+}
+
+export function useCaptcha(authProxyConfigId: string) {
+  const resetRef = useRef<() => void>(() => {});
+  const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  useEffect(() => {
+    getSiteKey(authProxyConfigId).then(setSiteKey);
+  }, [authProxyConfigId]);
+
+  // Spread the result into any SDK call that needs a token
+  const consumeToken = () => {
+    const token = captchaToken;
+    setCaptchaToken(null);
+    resetTurnstile(resetRef);
+    return token ? { captchaToken: token } : {};
+  };
+
+  // Renders nothing when captcha is not enabled for this organization
+  const widget = siteKey ? (
+    <View>
+      {showPrompt && <Text>Let us know you're human</Text>}
+      <ReactNativeTurnstile
+        sitekey={siteKey}
+        resetRef={resetRef}
+        appearance="interaction-only"
+        size="normal"
+        onVerify={(token) => setCaptchaToken(token)}
+        onError={() => setCaptchaToken(null)}
+        onExpire={() => setCaptchaToken(null)}
+        onBeforeInteractive={() => setShowPrompt(true)}
+      />
+    </View>
+  ) : null;
+
+  return { widget, consumeToken };
+}
+```
+
+<Tip>
+  The site key is stable, so fetch it once and cache it rather than on every auth attempt.
+</Tip>
+
+Then mount the widget on your auth screen and consume tokens from the same hook:
+
+```tsx
+import { Button, View } from "react-native";
+import { OtpType } from "@turnkey/core";
+
+function LoginScreen({ client }) {
+  const { widget, consumeToken } = useCaptcha("YOUR_AUTH_PROXY_CONFIG_ID");
+
+  const sendCode = async () => {
+    const otpId = await client.initOtp({
+      otpType: OtpType.Email,
+      contact: "user@example.com",
+      ...consumeToken(),
+    });
+    // ...navigate to your OTP entry screen with otpId...
+  };
+
+  return (
+    <View>
+      <Button title="Send code" onPress={sendCode} />
+      {widget}
+    </View>
+  );
+}
+```
+
+<Note>
+  Two React Native differences from the web wrapper: `size` accepts only `"normal"` or `"compact"` (there's no `"flexible"`), and you reset via the `resetTurnstile(resetRef)` helper rather than a method on the widget ref.
+</Note>
+
+<CaptchaCoreTokens />
+
+## Related
+
+- [Captcha protection](/features/authentication/captcha)
+- [Email and SMS OTP authentication](/solutions/embedded-wallets/integration-guide/react-native/authentication/email-sms)
+- [Captcha with `@turnkey/core`](/solutions/embedded-wallets/integration-guide/typescript/captcha)
+- [Auth Proxy](/features/authentication/auth-proxy)
