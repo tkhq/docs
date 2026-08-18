@@ -1,0 +1,95 @@
+---
+title: "Transaction history"
+description: "List EVM and Solana transaction history for any wallet account associated with your organization or one of its suborgs."
+sidebarTitle: "Transaction history"
+mode: "wide"
+---
+
+Two queries return onchain transaction history for wallet accounts in your organization: [`list_eth_transaction_history`](/api-reference/queries/list-eth-transaction-history) for EVM chains and [`list_sol_transaction_history`](/api-reference/queries/list-sol-transaction-history) for Solana. Full request/response schemas, cURL examples, and SDK snippets can be found in the [API reference](/api-reference/queries/overview).
+
+## Prerequisites
+
+- The queried `address` must belong to a **Turnkey wallet account**. Standalone private-key addresses are not supported.
+- Pass the network as a CAIP-2 identifier (`caip2`). For Solana, human-readable aliases such as `solana:mainnet` and `solana:devnet` are accepted and normalized to canonical CAIP-2 values by the API.
+
+## EVM transaction history
+
+[`list_eth_transaction_history`](/api-reference/queries/list-eth-transaction-history) takes an organization ID, wallet account address, and EVM `caip2` chain ID (for example `eip155:1` for Ethereum mainnet or `eip155:8453` for Base). Supported chains are listed in the API reference.
+
+Each item in `transactions` is ordered **newest first** and includes:
+
+- `transactionHash`, `block` (number, hash, RFC 3339 timestamp), and `status` (`CONFIRMED` or `FINALIZED`)
+- `from`, optional `to`, and `origin` (for example `TURNKEY` for Turnkey-submitted transactions)
+- `fee` with atomic `amount` and `caip19` asset identifier
+- `transfers[]` with `direction` (`IN` / `OUT` relative to the queried address), `asset`, atomic `amount`, `counterparty`, and optional `display` strings for UI
+- Optional `turnkey` metadata when Turnkey submitted the transaction: `sponsored`, `activityFingerprint`, and `submittedAt`
+
+Use `transfers[]` for value movement; `to` reflects the transaction destination (such as a called contract) and may differ from transfer counterparties.
+
+## Solana transaction history
+
+[`list_sol_transaction_history`](/api-reference/queries/list-sol-transaction-history) uses the same request shape: organization ID, wallet account address, and Solana `caip2` (canonical mainnet/devnet IDs or `solana:mainnet` / `solana:devnet` aliases).
+
+Solana responses mirror EVM items where applicable, with chain-specific fields:
+
+- `signature` instead of `transactionHash`
+- `feePayer` — the account that paid the transaction fee (first signer in the message)
+- `signers[]` — each signer's `address` and whether the account was `writable` in the message
+
+`transfers`, `fee`, and `turnkey` follow the same semantics as EVM history.
+
+## Pagination
+
+Results are cursor-paginated via optional `paginationOptions` (`limit` between 1 and 100, default 10). Each response includes a `pageInfo` block:
+
+- `hasNextPage` / `hasPreviousPage` indicate whether more results exist in either direction.
+- Pass `pageInfo.endCursor` as the next request's `paginationOptions.after` to fetch **older** transactions (continue paging down the newest-first list).
+- Pass `pageInfo.startCursor` as `paginationOptions.before` to fetch **newer** transactions.
+- Cursors are opaque and valid only for the same `address` and `caip2` query. Do not construct or modify them.
+
+Example pagination loop with `@turnkey/sdk-server`:
+
+```typescript
+import { Turnkey } from "@turnkey/sdk-server";
+
+const client = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+}).apiClient();
+
+let after: string | undefined;
+
+for (;;) {
+  const { transactions, pageInfo } =
+    await client.listEthTransactionHistory({
+      organizationId: process.env.ORGANIZATION_ID!,
+      address: "<wallet-account-address>",
+      caip2: "eip155:1",
+      paginationOptions: {
+        limit: "25",
+        ...(after ? { after } : {}),
+      },
+    });
+
+  if (!transactions.length) break;
+
+  // process transactions...
+
+  if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
+  after = pageInfo.endCursor;
+}
+```
+
+For Solana, call `listSolTransactionHistory` with the same pagination pattern.
+
+## SDK example
+
+See the [`with-transaction-history`](https://github.com/tkhq/sdk/tree/main/examples/transaction-management/with-transaction-history) example in the SDK repo for runnable EVM and Solana scripts with interactive prompts and multi-page fetching.
+
+## Next steps
+
+- [List Eth transaction history](/api-reference/queries/list-eth-transaction-history) and [List Sol transaction history](/api-reference/queries/list-sol-transaction-history) in the API reference
+- [Balances](/features/transaction-management/balances) for current asset balances on supported chains
+- [Broadcasting transactions](/features/transaction-management/broadcasting) for submitting new transactions through Turnkey
