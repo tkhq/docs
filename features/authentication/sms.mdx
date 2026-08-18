@@ -4,48 +4,6 @@ description: "SMS authentication enables users to authenticate their Turnkey acc
 sidebarTitle: "SMS"
 ---
 
-import { priceDataJson } from "/snippets/sms-price-data.mdx";
-
-import { SmsPriceLookup } from "/snippets/sms-price-lookup.mdx";
-
-## Access and pricing
-
-SMS authentication is available to all Enterprise customers. To enable this feature, please reach out to the Turnkey team ([help@turnkey.com](mailto:help@turnkey.com)).
-
-SMS pricing is usage-based and varies depending on the country of the destination phone number and the carrier. Prices are shown in U.S. cents per outbound SMS message segment. Taxes/surcharges separate.
-
-<SmsPriceLookup priceDataJson={priceDataJson} />
-
-For a list view of all supported countries and their prices, you may download the [CSV here.](/assets/files/sms-prices.csv)
-
-## Prerequisites
-
-Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate OTP and create sub-organizations. Check out our [Quickstart guide](/get-started/quickstart) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
-
-```json
-{
-  "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
-  "condition": "(activity.resource == 'AUTH' && activity.action == 'CREATE') || (activity.resource == 'OTP' && activity.action == 'CREATE') || (activity.resource == 'OTP' && activity.action == 'VERIFY') || (activity.resource == 'ORGANIZATION' && activity.action == 'CREATE')"
-}
-```
-
-## How it works
-
-SMS authentication uses three activities:
-
-1. `INIT_OTP_V3` —  initiates a secure OTP flow and sends a 6–9 digit or alphanumeric OTP to the specified phone number. The response includes an `otpEncryptionTargetBundle` which is used in OTP verification.
-2. `VERIFY_OTP_V2` — securely verifies the code and returns a signed verificationToken JWT
-3. `OTP_LOGIN_V2` — validates the verificationToken and returns a session (signed with the verification token key)
-
-<Note>
-  Upgrading a legacy OTP integration, SDK Browser/Server/React from before 6.0, SDK React Native from before 1.5.21, or Wallet Kit/Core from before 2.0? Follow the [OTP migration guide](/features/authentication/otp-migration-guide) to update activity versions, encrypted bundles, client signatures, and policies.
-</Note>
-
-## Implementation
-
-### Initiating SMS authentication
-
 The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP_V3` using the parent organization id with these parameters:
 
 - `otpType`: specify `"OTP_TYPE_SMS"`
