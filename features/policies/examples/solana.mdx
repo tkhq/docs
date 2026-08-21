@@ -47,15 +47,19 @@ See [here](../../../concepts/policies/smart-contract-interfaces) for more inform
 }
 ```
 
-#### Allow Solana transactions that only use the Solana System Program
+#### Allow Solana transactions whose top-level instructions only use the Solana System Program
 
 ```json
 {
   "policyName": "Enable transactions that only use the system program",
   "effect": "EFFECT_ALLOW",
-  "condition": "solana.tx.program_keys.all(p, p == '11111111111111111111111111111111')"
+  "condition": "solana.tx.top_level_program_keys.all(p, p == '11111111111111111111111111111111')"
 }
 ```
+
+This condition checks only program IDs serialized as top-level instructions. It does not restrict
+programs invoked later through CPI. To bound CPI reachability, use one of the account-reference
+allowlist patterns below.
 
 #### Deny all Solana transactions transferring to an undesired address
 
@@ -94,6 +98,33 @@ See [here](../../../concepts/policies/smart-contract-interfaces) for more inform
   "policyName": "Deny Solana transactions that use address table lookups",
   "effect": "EFFECT_DENY",
   "condition": "solana.tx.address_table_lookups.count() > 0"
+}
+```
+
+#### Allow only vetted static accounts and reject address table lookups
+
+This pattern is a conservative CPI reachability allowlist. Include every expected signer, program,
+and other account in the list.
+
+```json
+{
+  "policyName": "Allow only vetted static Solana accounts",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.address_table_lookups.count() == 0 && solana.tx.static_account_keys.all(k, k in ['<ALLOWED_ACCOUNT_1>', '<ALLOWED_ACCOUNT_2>', '<ALLOWED_PROGRAM>'])"
+}
+```
+
+#### Allow vetted static accounts and exact address table references
+
+Turnkey does not resolve these references to public keys during policy evaluation. Use this pattern
+only after independently verifying each existing table/index mapping. Do not pre-approve an index
+whose account mapping is unknown.
+
+```json
+{
+  "policyName": "Allow only vetted Solana account references",
+  "effect": "EFFECT_ALLOW",
+  "condition": "solana.tx.static_account_keys.all(k, k in ['<ALLOWED_ACCOUNT_1>', '<ALLOWED_PROGRAM>']) && solana.tx.address_table_lookup_references.all(r, r.address_table_key == '<ALLOWED_TABLE>' && ((r.index == <WRITABLE_INDEX> && r.writable) || (r.index == <READONLY_INDEX> && !r.writable)))"
 }
 ```
 
