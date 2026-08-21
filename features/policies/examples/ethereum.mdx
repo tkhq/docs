@@ -159,7 +159,7 @@ allowing policies to inspect and enforce conditions across typed data contents, 
 - Array length: `eth.eip_712.message['arrayField'].count()`
 
 
-**Example: Restrict Permit2 batch token approvals by token address**
+**Example: Restrict Permit2 batch token approvals by domain, spender, and token**
 
 Uniswap's [Permit2](https://github.com/Uniswap/permit2) `PermitBatchTransferFrom` type lets users sign a single message authorizing
 multiple token transfers. The message contains a `permitted` array of `TokenPermissions` structs,
@@ -167,37 +167,60 @@ each with a `token` address and an `amount`.
 
 ```json
 {
+  "types": {
+    "EIP712Domain": [
+      { "name": "name", "type": "string" },
+      { "name": "chainId", "type": "uint256" },
+      { "name": "verifyingContract", "type": "address" }
+    ],
+    "TokenPermissions": [
+      { "name": "token", "type": "address" },
+      { "name": "amount", "type": "uint256" }
+    ],
+    "PermitBatchTransferFrom": [
+      { "name": "permitted", "type": "TokenPermissions[]" },
+      { "name": "spender", "type": "address" },
+      { "name": "nonce", "type": "uint256" },
+      { "name": "deadline", "type": "uint256" }
+    ]
+  },
   "primaryType": "PermitBatchTransferFrom",
   "domain": { "name": "Permit2", "chainId": 1, "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3" },
   "message": {
     "permitted": [
       { "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "amount": "1000000000" }
     ],
-    "spender": "0x<SPENDER_ADDRESS>",
-    "nonce": 0,
-    "deadline": 1234567890
+    "spender": "0x2222222222222222222222222222222222222222",
+    "nonce": "0",
+    "deadline": "1992689033"
   }
 }
 ```
 
-To allow signing only when the first permitted token is USDC:
+The following policy pins the complete Permit2 domain, allows one token permission, and restricts
+that permission to mainnet USDC and a known spender:
 
 ```json
 {
-  "policyName": "Allow Permit2 batch only if first token is USDC",
+  "policyName": "Allow one mainnet USDC Permit2 permission for a known spender",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].count() == 1 && eth.eip_712.message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'"
 }
 ```
 
 <Note>
-  Array elements can be accessed by index (`[0]`, `[1]`, etc.). The condition `message['permitted'][0]['token'] == '0xA0b8...'`
-  checks the first entry. You can also check specific positions explicitly
-  (for example, `message['permitted'][0]['token'] == '0xA0b8...' && message['permitted'][1]['token'] == '0xA0b8...'`).
-  Use `.all()` when you want to apply the same token check across the entire `permitted` array. A `.all()` example is included below.
+  Array elements can be accessed by index (`[0]`, `[1]`, etc.). When a policy checks only a
+  specific index, also constrain the array length or validate every element with `.all()`.
 </Note>
 
 #### Iterating over array fields
+
+<Warning>
+  Each `EFFECT_ALLOW` policy is evaluated independently. The token-only example below does not cap
+  the amount or batch length, and the batch-length example does not cap individual amounts. In
+  production, combine every required domain, spender, token, amount, and count constraint in the
+  same condition.
+</Warning>
 
 **Whitelist a specific token across all approvals with .all():**
 
@@ -205,33 +228,41 @@ To allow signing only when the first permitted token is USDC:
 {
   "policyName": "Allow Permit2 batch only for USDC",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')"
 }
 ```
 
-**Allow Permit2 batches with two or fewer token permissions:**
+**Allow Permit2 batches with two or fewer USDC token permissions:**
 
 ```json
 {
-  "policyName": "Allow Permit2 batches with <= 2 token permissions",
+  "policyName": "Allow Permit2 batches with <= 2 USDC token permissions",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].count() <= 2 && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')"
 }
 ```
 
-**Allow token permissions below 100 USDC:**
+**Allow one token permission for exactly 100 USDC:**
 
 ```json
 {
-  "policyName": "Allow USDC token permissions below 100 USDC",
+  "policyName": "Allow one exact 100 USDC Permit2 permission",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'Permit2' && eth.eip_712.domain.version == '' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['spender'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['permitted'].count() == 1 && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] == '100000000')"
 }
 ```
 
 <Note>
-`in` works for integer fields. For string fields such as token addresses, use `||` instead.
+  Ethers and bigint-based Viem payloads serialize EIP-712 integers as decimal strings. Compare
+  those values to quoted strings, as in `p['amount'] == '100000000'`. Numeric range comparisons
+  require the submitted typed-data JSON to contain JSON numbers instead.
 </Note>
+
+<Warning>
+  `PermitTransferFrom` and `PermitBatchTransferFrom` sign the permitted token amounts and spender,
+  but not the eventual transfer recipient. To constrain the recipient, use a Permit2 witness type
+  that commits to it or enforce the recipient when the signed permit is executed.
+</Warning>
 
 ### Deny signing of `NO_OP` keccak256 payloads
 
@@ -245,13 +276,27 @@ To allow signing only when the first permitted token is USDC:
 
 #### Allow signing of EIP-712 payloads for EIP-3009 transfers
 
+This policy allows a Turnkey key to sign an EIP-3009 `TransferWithAuthorization` for exactly one
+mainnet USDC to a known recipient. It pins the complete domain so that a contract with the same
+domain name cannot reuse the policy.
+
 ```json
 {
-  "policyName": "Allow signing of EIP-712 payloads for EIP-3009 Transfers for USD Coin",
+  "policyName": "Allow one mainnet USDC via EIP-3009 to a known recipient",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'TransferWithAuthorization' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP712' && eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.domain.version == '2' && eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && eth.eip_712.primary_type == 'TransferWithAuthorization' && eth.eip_712.message['from'] == '0x1111111111111111111111111111111111111111' && eth.eip_712.message['to'] == '0x2222222222222222222222222222222222222222' && eth.eip_712.message['value'] == '1000000'"
 }
 ```
+
+Replace the `from` address with the address controlled by the Turnkey key and the `to` address with
+the allowed recipient. The example uses USDC's six decimals, so `1000000` is one USDC.
+
+<Note>
+  `validAfter`, `validBefore`, and `nonce` are also available under `eth.eip_712.message`. You can
+  constrain a single authorization by comparing them to exact quoted values. Policies do not track
+  previously used nonces or compare a validity field to the current time; replay protection and
+  expiration are enforced by the token contract.
+</Note>
 
 #### Allow signing of EIP-712 payloads for EIP-2612 permits for USD Coin
 
