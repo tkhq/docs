@@ -65,6 +65,10 @@ A trading firm holds a long-lived JWT for an execution management system that au
 
 ### Implementation steps
 
+<Note>
+  For a working end-to-end implementation, see the [api-key-storage example](https://github.com/tkhq/sdk/tree/main/examples/key-management/api-key-storage) — it imports the credential with static properties, creates the retrieval policy, lists the organization's secrets, and exports the plaintext as the trading service user.
+</Note>
+
 <Steps>
   <Step title="Import the API key">
     Import the credential once, with static properties the policies above target. The client encrypts the plaintext to the enclave. Turnkey's API and database only ever see ciphertext:
@@ -94,6 +98,8 @@ A trading firm holds a long-lived JWT for an execution management system that au
 
     // Use the JWT for REST or WebSocket calls, keep it in memory only
     ```
+
+    To find the secret ID at runtime rather than hard-coding it, list the organization's secrets with `getSecrets()` and match on the static properties you bound at import time. That path returns metadata only.
   </Step>
 
   <Step title="Require approval for high-risk keys">
@@ -108,7 +114,32 @@ A trading firm holds a long-lived JWT for an execution management system that au
     }
     ```
 
-    The export stays in `ACTIVITY_STATUS_CONSENSUS_NEEDED` until a risk admin approves it from the dashboard or via [approve_activity](/api-reference/activities/approve-activity), and the released payload is still readable only by the trading service.
+    `exportSecret` cannot be used for these keys: it fails fast with `EXPORT_SECRET_CONSENSUS_NEEDED` rather than waiting on approvals, because the ephemeral private key it generates internally would be lost by the time they arrive. Use the proposal helpers instead, which keep the decryption key in the trading service's hands across the approval window:
+
+    ```typescript
+    import { generateP256KeyPair } from "@turnkey/crypto";
+
+    // The export activity requires a 65-byte uncompressed target key.
+    const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
+
+    const proposal = tradingService.createExportSecretsProposal({
+      secrets: [{ secretId }],
+      targetPublicKey: publicKeyUncompressed,
+      timestampMs: String(Date.now()),
+    });
+
+    const submission = await tradingService.submitExportSecrets(proposal);
+
+    // Blocks until the risk admin approves, then decrypts locally.
+    const [withdrawalKey] = await tradingService.awaitExportedSecrets({
+      proposal,
+      embeddedPrivateKey: privateKey,
+      activityId: submission.activityId,
+      timeoutMs: 15 * 60 * 1000,
+    });
+    ```
+
+    The export stays in `ACTIVITY_STATUS_CONSENSUS_NEEDED` until a risk admin approves it from the dashboard or via [approve_activity](/api-reference/activities/approve-activity), and the released payload is still readable only by the trading service. See [Programmable credential access](/solutions/key-management/programmable-credential-access) for the full multi-party flow.
   </Step>
 
   <Step title="Rotate and revoke">
