@@ -97,13 +97,26 @@ The policy above restricts which contract the agent can interact with. To contro
 With gas sponsorship enabled, the agent doesn't need to hold ETH to pay for transaction fees. Turnkey covers gas so the agent can transact using only its USDC balance:
 
 ```ts
-const sendTransactionStatusId = await agentClient.ethSendErc20Transfer({
-  transfer: {
+import { encodeFunctionData, erc20Abi } from "viem";
+
+const recipient = "0xRecipientAddress";
+const usdcAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC on Base
+const amount = 1_000_000n; // 1 USDC (6 decimals)
+
+// Encode the ERC-20 transfer(address,uint256) calldata
+const data = encodeFunctionData({
+  abi: erc20Abi,
+  functionName: "transfer",
+  args: [recipient, amount],
+});
+
+const sendTransactionStatusId = await agentClient.ethSendTransaction({
+  transaction: {
     from: process.env.AGENT_WALLET_ADDRESS!,
-    to: "0xRecipientAddress",
-    tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
-    amount: "1000000", // 1 USDC (6 decimals)
+    to: usdcAddress, // send the tx to the token contract, not the recipient
     caip2: "eip155:8453",
+    data,
+    value: "0",
     sponsor: true,
   },
 });
