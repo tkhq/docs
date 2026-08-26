@@ -3,13 +3,23 @@ import path from "path";
 import { ApiEndpoint, ApiField, EnumOption } from "../endpoint-parser/types";
 
 // --- Helper: Escape HTML Chars ---
+// Angle braces must be escaped in prose so MDX doesn't parse them as JSX, but
+// NOT inside inline code spans: entities aren't decoded there, so `&lt;x&gt;`
+// renders literally. Split on code spans and escape only the prose between them.
 export function escapeHtmlChars(text: string): string {
   if (!text) return "";
   return text
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/{/g, "\\{")
-    .replace(/}/g, "\\}");
+    .split(/(`[^`]*`)/g)
+    .map((segment) =>
+      segment.startsWith("`") && segment.endsWith("`") && segment.length > 1
+        ? segment
+        : segment
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/{/g, "\\{")
+            .replace(/}/g, "\\}"),
+    )
+    .join("");
 }
 
 // --- Helper: Get Enum Details ---

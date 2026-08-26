@@ -1195,6 +1195,38 @@
         }
       }
     },
+    "/public/v1/query/get_velocity_control": {
+      "post": {
+        "tags": [
+          "Velocity Controls"
+        ],
+        "summary": "Get velocity control",
+        "description": "Get details about a velocity control.",
+        "operationId": "GetVelocityControl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetVelocityControlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetVelocityControlResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/public/v1/query/get_wallet": {
       "post": {
         "tags": [
@@ -1963,6 +1995,38 @@
         }
       }
     },
+    "/public/v1/query/list_velocity_controls": {
+      "post": {
+        "tags": [
+          "Velocity Controls"
+        ],
+        "summary": "List velocity controls",
+        "description": "List all velocity controls within an organization.",
+        "operationId": "ListVelocityControls",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListVelocityControlsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListVelocityControlsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/public/v1/query/list_verified_suborgs": {
       "post": {
         "tags": [
@@ -2000,7 +2064,7 @@
         "tags": [
           "Wallets"
         ],
-        "summary": "List wallets accounts",
+        "summary": "List wallet accounts",
         "description": "List all accounts within a wallet.",
         "operationId": "GetWalletAccounts",
         "requestBody": {
@@ -2955,6 +3019,38 @@
         }
       }
     },
+    "/public/v1/submit/create_velocity_control": {
+      "post": {
+        "tags": [
+          "Velocity Controls"
+        ],
+        "summary": "Create velocity control",
+        "description": "Create a new velocity control.",
+        "operationId": "CreateVelocityControl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVelocityControlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/public/v1/submit/create_wallet": {
       "post": {
         "tags": [
@@ -3576,6 +3672,38 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/DeleteUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/submit/delete_velocity_control": {
+      "post": {
+        "tags": [
+          "Velocity Controls"
+        ],
+        "summary": "Delete velocity control",
+        "description": "Delete an existing velocity control.",
+        "operationId": "DeleteVelocityControl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteVelocityControlRequest"
               }
             }
           },
@@ -5970,7 +6098,9 @@
           "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
           "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
           "ACTIVITY_TYPE_IMPORT_SECRETS",
-          "ACTIVITY_TYPE_EXPORT_SECRETS"
+          "ACTIVITY_TYPE_EXPORT_SECRETS",
+          "ACTIVITY_TYPE_CREATE_VELOCITY_CONTROL",
+          "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL"
         ]
       },
       "AddressFormat": {
@@ -6313,6 +6443,13 @@
           "stable": {
             "type": "boolean",
             "description": "Whether this asset is on Turnkey's stablecoin list (used for stablepair swap fee pricing)."
+          },
+          "earnProviders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EarnProvider"
+            },
+            "description": "Earn yield providers with vaults denominated in this asset. Empty when the asset is not supported by Earn."
           }
         }
       },
@@ -9284,6 +9421,74 @@
           "userIds"
         ]
       },
+      "CreateVelocityControlIntent": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable name for the Velocity Control."
+          },
+          "dataSource": {
+            "$ref": "#/components/schemas/VelocityControlDataSource"
+          },
+          "aggregation": {
+            "$ref": "#/components/schemas/VelocityControlAggregation"
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Identifier for the Velocity Control. Policies reference it as `controls.<identifier>`. It must be unique within the Organization."
+          }
+        },
+        "required": [
+          "name",
+          "dataSource",
+          "aggregation",
+          "identifier"
+        ]
+      },
+      "CreateVelocityControlRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ACTIVITY_TYPE_CREATE_VELOCITY_CONTROL"
+            ]
+          },
+          "timestampMs": {
+            "type": "string",
+            "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Unique identifier for a given Organization."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/CreateVelocityControlIntent"
+          },
+          "generateAppProofs": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type",
+          "timestampMs",
+          "organizationId",
+          "parameters"
+        ]
+      },
+      "CreateVelocityControlResult": {
+        "type": "object",
+        "properties": {
+          "velocityControlId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "velocityControlId"
+        ]
+      },
       "CreateWalletAccountsIntent": {
         "type": "object",
         "properties": {
@@ -10639,6 +10844,60 @@
           "userIds"
         ]
       },
+      "DeleteVelocityControlIntent": {
+        "type": "object",
+        "properties": {
+          "velocityControlId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "velocityControlId"
+        ]
+      },
+      "DeleteVelocityControlRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL"
+            ]
+          },
+          "timestampMs": {
+            "type": "string",
+            "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Unique identifier for a given Organization."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/DeleteVelocityControlIntent"
+          },
+          "generateAppProofs": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type",
+          "timestampMs",
+          "organizationId",
+          "parameters"
+        ]
+      },
+      "DeleteVelocityControlResult": {
+        "type": "object",
+        "properties": {
+          "velocityControlId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "velocityControlId"
+        ]
+      },
       "DeleteWalletAccountsIntent": {
         "type": "object",
         "properties": {
@@ -11121,6 +11380,20 @@
             "type": "string",
             "description": "The wallet address that receives the client's fee payouts on-chain. Unset when a sub-org queries.",
             "nullable": true
+          },
+          "liquidity": {
+            "type": "string",
+            "description": "Assets currently withdrawable from the underlying vault without a reallocation, in raw on-chain units of the underlying asset. This is the vault's liquidity, not the wrapper's balance. Empty when the provider does not report it."
+          },
+          "liquidityDisplay": {
+            "$ref": "#/components/schemas/EarnValueDisplay"
+          },
+          "exposures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EarnVaultExposure"
+            },
+            "description": "The underlying markets the vault allocates into, ranked by supplied amount descending. Only populated when the request sets include_exposure, and only for providers that expose an allocation breakdown (Morpho)."
           }
         }
       },
@@ -11315,6 +11588,45 @@
           "curator": {
             "type": "string",
             "description": "Vault curator name(s), comma-separated when a vault has multiple. Empty for providers without curators (e.g. Aave)."
+          },
+          "liquidity": {
+            "type": "string",
+            "description": "Assets currently withdrawable from the vault without a reallocation, in raw on-chain units of the underlying asset. Empty when the provider does not report it."
+          },
+          "liquidityDisplay": {
+            "$ref": "#/components/schemas/EarnValueDisplay"
+          }
+        }
+      },
+      "EarnVaultExposure": {
+        "type": "object",
+        "properties": {
+          "marketId": {
+            "type": "string",
+            "description": "Provider-specific identifier for the market (the Morpho Blue market id)."
+          },
+          "collateralSymbol": {
+            "type": "string",
+            "description": "Symbol of the market's collateral asset (e.g. 'cbBTC'). Empty for an idle/uncollateralized market."
+          },
+          "collateralCaip19": {
+            "type": "string",
+            "description": "CAIP-19 asset ID of the market's collateral asset. Empty for an idle/uncollateralized market."
+          },
+          "lltvPct": {
+            "type": "string",
+            "description": "The market's liquidation loan-to-value, expressed as a decimal fraction (e.g. '0.86' for 86%)."
+          },
+          "supplied": {
+            "type": "string",
+            "description": "Assets the vault supplies to this market, in raw on-chain units of the underlying asset."
+          },
+          "display": {
+            "$ref": "#/components/schemas/EarnValueDisplay"
+          },
+          "sharePct": {
+            "type": "string",
+            "description": "This market's share of the vault's supplied assets, as a decimal fraction (e.g. '0.997' for 99.7%)."
           }
         }
       },
@@ -14319,6 +14631,32 @@
           "users"
         ]
       },
+      "GetVelocityControlRequest": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "velocityControlId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "organizationId",
+          "velocityControlId"
+        ]
+      },
+      "GetVelocityControlResponse": {
+        "type": "object",
+        "properties": {
+          "velocityControl": {
+            "$ref": "#/components/schemas/VelocityControl"
+          }
+        },
+        "required": [
+          "velocityControl"
+        ]
+      },
       "GetVerifiedSubOrgIdsRequest": {
         "type": "object",
         "properties": {
@@ -16181,6 +16519,12 @@
           },
           "exportSecretsIntent": {
             "$ref": "#/components/schemas/ExportSecretsIntent"
+          },
+          "createVelocityControlIntent": {
+            "$ref": "#/components/schemas/CreateVelocityControlIntent"
+          },
+          "deleteVelocityControlIntent": {
+            "$ref": "#/components/schemas/DeleteVelocityControlIntent"
           }
         }
       },
@@ -16316,6 +16660,10 @@
             "type": "string",
             "description": "Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 asset ID (e.g. 'eip155:8453/erc20:0x833589...'). The chain is taken from the CAIP-19 identifier.",
             "nullable": true
+          },
+          "includeExposure": {
+            "type": "boolean",
+            "description": "When true, populate each vault's exposures (the underlying markets it allocates into). This costs an extra provider query per vault, so leave it off for list views."
           }
         },
         "required": [
@@ -16729,6 +17077,38 @@
         },
         "required": [
           "userTags"
+        ]
+      },
+      "ListVelocityControlsRequest": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "paginationOptions": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "organizationId"
+        ]
+      },
+      "ListVelocityControlsResponse": {
+        "type": "object",
+        "properties": {
+          "velocityControls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VelocityControl"
+            }
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "velocityControls",
+          "pageInfo"
         ]
       },
       "ListWebhookEndpointsRequest": {
@@ -18605,6 +18985,12 @@
           },
           "exportSecretsResult": {
             "$ref": "#/components/schemas/ExportSecretsResult"
+          },
+          "createVelocityControlResult": {
+            "$ref": "#/components/schemas/CreateVelocityControlResult"
+          },
+          "deleteVelocityControlResult": {
+            "$ref": "#/components/schemas/DeleteVelocityControlResult"
           }
         }
       },
@@ -22850,6 +23236,253 @@
             "type": "string"
           }
         }
+      },
+      "VelocityControl": {
+        "type": "object",
+        "properties": {
+          "velocityControlId": {
+            "type": "string",
+            "description": "Unique identifier for the Velocity Control."
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Identifier of the Organization that owns the Velocity Control."
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name for the Velocity Control."
+          },
+          "dataSource": {
+            "$ref": "#/components/schemas/VelocityControlDataSource"
+          },
+          "aggregation": {
+            "$ref": "#/components/schemas/VelocityControlAggregation"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/external.data.v1.Timestamp"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/external.data.v1.Timestamp"
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Identifier for the Velocity Control. Policies reference it as `controls.<identifier>`. It must be unique within the Organization."
+          }
+        },
+        "required": [
+          "velocityControlId",
+          "organizationId",
+          "name",
+          "dataSource",
+          "aggregation",
+          "createdAt",
+          "updatedAt",
+          "identifier"
+        ]
+      },
+      "VelocityControlAggregation": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/VelocityControlAggregationMethod"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/VelocityControlAggregationOperator"
+          },
+          "threshold": {
+            "type": "string",
+            "description": "Non-negative base-10 decimal string with at most 38 total digits and 18 fractional digits."
+          },
+          "window": {
+            "$ref": "#/components/schemas/VelocityControlAggregationWindow"
+          },
+          "groupBy": {
+            "$ref": "#/components/schemas/VelocityControlAggregationGroupBy"
+          }
+        },
+        "required": [
+          "method",
+          "operator",
+          "threshold",
+          "window",
+          "groupBy"
+        ]
+      },
+      "VelocityControlAggregationGroupBy": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/VelocityControlAggregationGroupByOrganization"
+          },
+          "user": {
+            "$ref": "#/components/schemas/VelocityControlAggregationGroupByUser"
+          },
+          "wallet": {
+            "$ref": "#/components/schemas/VelocityControlAggregationGroupByWallet"
+          }
+        }
+      },
+      "VelocityControlAggregationGroupByOrganization": {
+        "type": "object"
+      },
+      "VelocityControlAggregationGroupByUser": {
+        "type": "object"
+      },
+      "VelocityControlAggregationGroupByWallet": {
+        "type": "object"
+      },
+      "VelocityControlAggregationMethod": {
+        "type": "string",
+        "enum": [
+          "VELOCITY_CONTROL_AGGREGATION_METHOD_SUM",
+          "VELOCITY_CONTROL_AGGREGATION_METHOD_COUNT"
+        ]
+      },
+      "VelocityControlAggregationOperator": {
+        "type": "string",
+        "enum": [
+          "VELOCITY_CONTROL_AGGREGATION_OPERATOR_LESS_THAN",
+          "VELOCITY_CONTROL_AGGREGATION_OPERATOR_LESS_THAN_OR_EQUAL",
+          "VELOCITY_CONTROL_AGGREGATION_OPERATOR_EQUAL",
+          "VELOCITY_CONTROL_AGGREGATION_OPERATOR_GREATER_THAN_OR_EQUAL",
+          "VELOCITY_CONTROL_AGGREGATION_OPERATOR_GREATER_THAN"
+        ]
+      },
+      "VelocityControlAggregationWindow": {
+        "type": "object",
+        "properties": {
+          "rolling": {
+            "$ref": "#/components/schemas/VelocityControlAggregationWindowRolling"
+          },
+          "infinite": {
+            "$ref": "#/components/schemas/VelocityControlAggregationWindowInfinite"
+          }
+        }
+      },
+      "VelocityControlAggregationWindowInfinite": {
+        "type": "object"
+      },
+      "VelocityControlAggregationWindowRolling": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "type": "string",
+            "description": "Duration of the rolling window, in seconds, as a base-10 integer string."
+          }
+        },
+        "required": [
+          "duration"
+        ]
+      },
+      "VelocityControlDataSource": {
+        "type": "object",
+        "properties": {
+          "chainAssetTransfer": {
+            "$ref": "#/components/schemas/VelocityControlDataSourceChainAssetTransfer"
+          },
+          "activityExecution": {
+            "$ref": "#/components/schemas/VelocityControlDataSourceActivityExecution"
+          }
+        }
+      },
+      "VelocityControlDataSourceActivityExecution": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/VelocityControlDataSourceActivityExecutionFilter"
+          }
+        }
+      },
+      "VelocityControlDataSourceActivityExecutionFilter": {
+        "type": "object",
+        "properties": {
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VelocityControlDataSourceFilterActivity"
+            },
+            "description": "Activity types whose executions are included."
+          }
+        }
+      },
+      "VelocityControlDataSourceChainAssetTransfer": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VelocityControlDataSourceChainAssetTransferDefinition"
+            },
+            "description": "Assets whose transfers are included in the data source."
+          },
+          "filter": {
+            "$ref": "#/components/schemas/VelocityControlDataSourceChainAssetTransferFilter"
+          },
+          "phase": {
+            "$ref": "#/components/schemas/VelocityControlDataSourcePhase"
+          }
+        },
+        "required": [
+          "definition"
+        ]
+      },
+      "VelocityControlDataSourceChainAssetTransferDefinition": {
+        "type": "object",
+        "properties": {
+          "caip19": {
+            "type": "string",
+            "description": "CAIP-19 identifier for the asset."
+          },
+          "decimals": {
+            "type": "string",
+            "description": "Base-10 integer string from 0 through 255 that specifies the number of decimal places for the asset."
+          }
+        },
+        "required": [
+          "caip19",
+          "decimals"
+        ]
+      },
+      "VelocityControlDataSourceChainAssetTransferFilter": {
+        "type": "object",
+        "properties": {
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VelocityControlDataSourceFilterActivity"
+            },
+            "description": "Activity types whose asset transfers are included."
+          }
+        }
+      },
+      "VelocityControlDataSourceFilterActivity": {
+        "type": "object",
+        "properties": {
+          "activityType": {
+            "type": "string",
+            "description": "Name of an activity type to include, such as `ACTIVITY_TYPE_SOL_SEND_TRANSACTION`."
+          }
+        },
+        "required": [
+          "activityType"
+        ]
+      },
+      "VelocityControlDataSourcePhase": {
+        "type": "object",
+        "properties": {
+          "signature": {
+            "$ref": "#/components/schemas/VelocityControlDataSourcePhaseSignature"
+          },
+          "submission": {
+            "$ref": "#/components/schemas/VelocityControlDataSourcePhaseSubmission"
+          }
+        }
+      },
+      "VelocityControlDataSourcePhaseSignature": {
+        "type": "object"
+      },
+      "VelocityControlDataSourcePhaseSubmission": {
+        "type": "object"
       },
       "VerifyOtpIntent": {
         "type": "object",
