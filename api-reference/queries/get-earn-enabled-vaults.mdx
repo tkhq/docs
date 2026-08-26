@@ -29,6 +29,11 @@ Enum options: `EARN_PROVIDER_MORPHO`, `EARN_PROVIDER_AAVE`
 Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 asset ID (e.g. 'eip155:8453/erc20:0x833589...'). The chain is taken from the CAIP-19 identifier.
 </ParamField>
 
+<ParamField body="includeExposure" type="boolean" required={false}>
+
+When true, populate each vault's exposures (the underlying markets it allocates into). This costs an extra provider query per vault, so leave it off for list views.
+</ParamField>
+
 
 <H3Bordered text="Response" />
 A successful response returns the following fields:
@@ -102,6 +107,57 @@ Normalized amount in the asset's own units, for display only.
 <NestedParam parentKey="enabledVaults" childKey="clientFeeWallet" type="string" required={false}>
 The wallet address that receives the client's fee payouts on-chain. Unset when a sub-org queries.
 </NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="liquidity" type="string" required={false}>
+Assets currently withdrawable from the underlying vault without a reallocation, in raw on-chain units of the underlying asset. This is the vault's liquidity, not the wrapper's balance. Empty when the provider does not report it.
+</NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="liquidityDisplay" type="object" required={false}>
+      liquidityDisplay field
+      <Expandable title="liquidityDisplay details">
+        <NestedParam parentKey="enabledVaults.liquidityDisplay" childKey="usd" type="string" required={false}>
+USD value, for display only.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.liquidityDisplay" childKey="crypto" type="string" required={false}>
+Normalized amount in the asset's own units, for display only.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="enabledVaults" childKey="exposures" type="array" required={false}>
+      The underlying markets the vault allocates into, ranked by supplied amount descending. Only populated when the request sets include_exposure, and only for providers that expose an allocation breakdown (Morpho).
+      <Expandable title="exposures details">
+        <NestedParam parentKey="enabledVaults.exposures" childKey="marketId" type="string" required={false}>
+Provider-specific identifier for the market (the Morpho Blue market id).
+</NestedParam>
+<NestedParam parentKey="enabledVaults.exposures" childKey="collateralSymbol" type="string" required={false}>
+Symbol of the market's collateral asset (e.g. 'cbBTC'). Empty for an idle/uncollateralized market.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.exposures" childKey="collateralCaip19" type="string" required={false}>
+CAIP-19 asset ID of the market's collateral asset. Empty for an idle/uncollateralized market.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.exposures" childKey="lltvPct" type="string" required={false}>
+The market's liquidation loan-to-value, expressed as a decimal fraction (e.g. '0.86' for 86%).
+</NestedParam>
+<NestedParam parentKey="enabledVaults.exposures" childKey="supplied" type="string" required={false}>
+Assets the vault supplies to this market, in raw on-chain units of the underlying asset.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.exposures" childKey="display" type="object" required={false}>
+      display field
+      <Expandable title="display details">
+        <NestedParam parentKey="enabledVaults.exposures.display" childKey="usd" type="string" required={false}>
+USD value, for display only.
+</NestedParam>
+<NestedParam parentKey="enabledVaults.exposures.display" childKey="crypto" type="string" required={false}>
+Normalized amount in the asset's own units, for display only.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="enabledVaults.exposures" childKey="sharePct" type="string" required={false}>
+This market's share of the vault's supplied assets, as a decimal fraction (e.g. '0.997' for 99.7%).
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
 
   </Expandable>
 </ResponseField>
@@ -117,7 +173,8 @@ curl --request POST \
   --data '{
     "organizationId": "<string>",
     "provider": "<EARN_PROVIDER_MORPHO>",
-    "caip19": "<string>"
+    "caip19": "<string>",
+    "includeExposure": "<boolean>"
 }'
 ```
 
@@ -134,7 +191,8 @@ const turnkeyClient = new Turnkey({
 const response = await turnkeyClient.apiClient().listEarnEnabledVaults({
   organizationId: "<string> (Unique identifier for a given Organization.)",
   provider: "<EARN_PROVIDER_MORPHO>" // provider field,
-  caip19: "<string> (Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 asset ID (e.g. 'eip155:8453/erc20:0x833589...'). The chain is taken from the CAIP-19 identifier.)"
+  caip19: "<string> (Optional filter: only return enabled vaults whose underlying asset matches this CAIP-19 asset ID (e.g. 'eip155:8453/erc20:0x833589...'). The chain is taken from the CAIP-19 identifier.)",
+  includeExposure: true // When true, populate each vault's exposures (the underlying markets it allocates into). This costs an extra provider query per vault, so leave it off for list views.
 });
 ```
 
@@ -166,7 +224,26 @@ const response = await turnkeyClient.apiClient().listEarnEnabledVaults({
         "usd": "<string>",
         "crypto": "<string>"
       },
-      "clientFeeWallet": "<string>"
+      "clientFeeWallet": "<string>",
+      "liquidity": "<string>",
+      "liquidityDisplay": {
+        "usd": "<string>",
+        "crypto": "<string>"
+      },
+      "exposures": [
+        {
+          "marketId": "<string>",
+          "collateralSymbol": "<string>",
+          "collateralCaip19": "<string>",
+          "lltvPct": "<string>",
+          "supplied": "<string>",
+          "display": {
+            "usd": "<string>",
+            "crypto": "<string>"
+          },
+          "sharePct": "<string>"
+        }
+      ]
     }
   ]
 }
