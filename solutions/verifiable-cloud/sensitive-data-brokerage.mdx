@@ -1,0 +1,70 @@
+---
+title: "Broker sensitive data and credentials"
+description: "Give a narrow, verifiable workflow access without broadly distributing raw data or reusable credentials"
+tag: "Beta"
+---
+
+import { TvcBetaCallout } from "/snippets/tvc-beta-callout.mdx";
+
+<TvcBetaCallout />
+
+Many exchanges fail before price becomes the issue. A data owner will not hand raw records to a broker that could copy them, and a service owner will not give an autonomous process a reusable credential with broad authority. On the other side, the buyer cannot tell whether a broker ran the promised filtering or quality checks.
+
+Contracts and access logs help with accountability after the fact. They do not prevent the credential from entering the wrong process or let a counterparty verify which processing code actually ran.
+
+TVC can act as the narrow processing boundary, while Turnkey Secrets controls when sensitive material may be released and to which recipient key.
+
+## The workflow
+
+1. Import a credential into [Turnkey Secrets](/features/secrets), or encrypt a dataset locally to a key controlled by the TVC application.
+2. Define Turnkey policies and TVC deployment approvals for the specific broker workflow.
+3. Send only a typed request or encrypted input to the TVC application.
+4. The approved application uses the sensitive material for the allowed operation, returns a filtered result, and signs a purpose-built App Proof.
+5. The consumer verifies the proof and expected application digest before accepting the result.
+
+Examples include using an API credential through a fixed adapter, validating a proposed transaction before a signer acts, or producing approved aggregates from a sensitive dataset.
+
+## Business outcome
+
+- Avoid distributing reusable credentials across agent hosts, plug-ins, and logs.
+- Give data owners a reviewable boundary for how raw inputs are transformed.
+- Give buyers evidence about the processing program instead of another contractual promise.
+- Separate who may approve access from the recipient that can decrypt an exported secret.
+
+## Why TVC and Turnkey fit
+
+| Need | Building block |
+| :--- | :--- |
+| Gate each secret release | Turnkey policies can require specific identities, tags, and approval thresholds before export. |
+| Choose the plaintext recipient | Secret export encrypts the payload to the target public key in the request; approvers do not need the decryption key. |
+| Identify the broker code | TVC Boot Proofs bind an enclave key to the approved QOS manifest and application digest. |
+| Prove a narrow broker result | The application signs a typed result with its per-boot Ephemeral Key. |
+| Protect durable broker state | The Quorum Key can encrypt state that must remain available across approved application upgrades. |
+
+## Two patterns
+
+### Credential capability
+
+Use a service-specific adapter when an agent needs an operation, not the raw credential. The adapter validates a typed request, obtains policy-approved access, calls the intended service, filters the response, and returns only the result the agent needs.
+
+This is application code, not a generic capability included with TVC. The adapter must enforce destination, operation, request, response, retry, and logging rules appropriate to the service.
+
+### Verifiable data processing
+
+Use an encrypted input protocol when a data owner needs a broker to clean, score, aggregate, or transform sensitive records. The application should release only the agreed output and a proof bound to the input commitment and processing version.
+
+TVC does not supply marketplace contracts, source authenticity, consent, licensing rights, or payment settlement. Those remain responsibilities of the brokerage and its participants.
+
+## Proof and confidentiality boundaries
+
+- A valid App Proof establishes that the identified enclave application signed the payload. It does not prove that source data was authentic unless the application verifies a trustworthy source and commits that evidence into its claim.
+- Public ingress is not a guarantee that plaintext is confidential before it reaches the enclave. Encrypt sensitive inputs on the client.
+- Enabling application egress expands what approved application code can transmit. Review egress alongside the code digest and only enable what the workflow requires.
+- Turnkey policy-gated export and TVC code attestation are separate controls. Integrating them into one broker workflow requires application code and a threat model for the intended service.
+- Do not assume generic data lineage, observation tracking, or multi-party request stamping beyond the behavior documented for the Turnkey activity you use.
+
+## Next steps
+
+- Start with [Secret storage](/features/secrets) and [Programmable credential access](/solutions/key-management/programmable-credential-access).
+- Model code and key governance with [Manifest sets and share sets](/features/verifiable-cloud/manifest-sets-and-share-sets).
+- Define the broker's signed result with [Proofs and Verification](/features/verifiable-cloud/proofs-and-verification).

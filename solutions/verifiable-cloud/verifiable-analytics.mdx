@@ -1,0 +1,63 @@
+---
+title: "Verify sensitive analytics"
+description: "Give data owners and result consumers evidence about the program that produced an analytic result"
+tag: "Beta"
+---
+
+import { TvcBetaCallout } from "/snippets/tvc-beta-callout.mdx";
+
+<TvcBetaCallout />
+
+Sensitive analytics create a two-sided trust problem. Data owners hesitate to send raw records to another operator, while buyers, auditors, or partners hesitate to act on a result they cannot reproduce. The usual workarounds are manual exports, broad data-room access, or attestations written by the same operator who ran the pipeline.
+
+TVC lets you replace that operator assertion with a narrower claim: a result was signed by an attested enclave running an identified analytics program and configuration.
+
+## The workflow
+
+1. Agree on the input commitment, analytics program, output fields, and accepted application digest.
+2. Encrypt sensitive inputs in the client using an application-defined format before they reach TVC's public ingress.
+3. The TVC application decrypts and processes the inputs inside the enclave.
+4. The application returns the minimum necessary result and an App Proof committing to the input digest, calculation version, and output.
+5. The relying party verifies the App Proof, linked Boot Proof, and expected application digest before accepting the result.
+
+This pattern fits defined calculations such as eligibility checks, aggregate statistics, data-quality scores, and policy evaluations. It is strongest when the proof payload is small, typed, and tied to a contract the relying party already understands.
+
+## Business outcome
+
+- Share a decision or aggregate without giving every participant raw database access.
+- Shorten disputes over which pipeline version produced a result.
+- Let an external verifier check the execution identity without access to your control plane.
+- Make unauthorized code changes visible because a new binary or configuration produces a different manifest.
+
+## Why TVC fits
+
+| Need | TVC building block |
+| :--- | :--- |
+| Bind a result to application code | An Ephemeral Key signature links the App Proof to a Boot Proof and QOS manifest. |
+| Review which code and configuration may run | Manifest approvals cover the application digest, arguments, and deployment configuration. |
+| Protect state across approved pipeline upgrades | The long-lived Quorum Key can encrypt application state that must survive deployments. |
+| Let third parties verify independently | Public proof APIs and open-source Rust, TypeScript, and Go verifiers expose the verification path. |
+
+## What you build
+
+The analytics logic, encrypted input protocol, proof payload, and acceptance rules are application responsibilities. A useful proof normally commits to:
+
+- a domain-separated proof type and schema version;
+- a digest of the exact input bytes or a documented input manifest;
+- the calculation or policy version;
+- the result and units; and
+- any freshness or request identifier the relying party needs to prevent replay.
+
+Avoid signing an unstructured result string. The verifier should be able to reject an old schema, an unexpected application digest, or a proof that is valid but belongs to a different request.
+
+## Proof boundaries
+
+An App Proof does not establish that the input was truthful, representative, lawfully collected, or complete. It does not provide generic zero-knowledge proofs. TVC's public HTTP ingress also does not, by itself, establish end-to-end input confidentiality; sensitive inputs need client-side encryption to a key that only the intended application can use.
+
+Standard observability traces are useful for debugging, but may be sampled, truncated, or configured to omit payloads. Treat a TVC App Proof as a purpose-built application statement, not as a claim that an entire trace or conversation was captured.
+
+## Next steps
+
+- Define and verify a custom payload with [Proofs and Verification](/features/verifiable-cloud/proofs-and-verification).
+- Review the [TVC architecture and networking model](/features/verifiable-cloud/overview#architecture).
+- Start from the public [`tvc-template`](https://github.com/tkhq/tvc-template) proof route.
