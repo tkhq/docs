@@ -11,7 +11,7 @@ Earn lets wallets in your organization deposit into DeFi yield vaults, query pos
 
 ## What is Earn
 
-Earn connects Turnkey wallets to ERC-4626 yield vaults. The vaults are deployed and operated by independent third-party protocols; Turnkey provides the API infrastructure to interact with them but does not operate, manage, or guarantee them. Morpho vaults are supported today and Aave support is coming soon.
+Earn connects Turnkey wallets to ERC-4626 yield vaults. The vaults are deployed and operated by independent third-party protocols; Turnkey provides the API infrastructure to interact with them but does not operate, manage, or guarantee them. Morpho vaults and Aave v3 reserves are supported today.
 
 Users don't deposit into vaults directly. They deposit into a fee wrapper, a smart contract that holds the position in the underlying vault. A vault may be enabled via either the dashboard or the API. Once  you enable a vault, a wrapper is automatically deployed with your fee parameters. The wrapper collects fees as yield accrues. Fees come out of yield only, never principal, and users never sign a separate fee transaction.
 
@@ -38,12 +38,24 @@ A wrapper is deployed once per vault and fee configuration. After that, deposits
 
 | Chain | CAIP-2 | Providers |
 | :-- | :-- | :-- |
-| Ethereum | `eip155:1` | Morpho (Aave upcoming) |
-| Base | `eip155:8453` | Morpho (Aave upcoming) |
-| Arbitrum | `eip155:42161` | Morpho (Aave upcoming) |
-| Polygon | `eip155:137` | Morpho (Aave upcoming) |
+| Ethereum | `eip155:1` | Morpho, Aave |
+| Base | `eip155:8453` | Morpho, Aave |
+| Arbitrum | `eip155:42161` | Morpho, Aave |
+| Polygon | `eip155:137` | Morpho, Aave |
+| Monad | `eip155:143` | Morpho |
+| BNB Chain | `eip155:56` | Aave |
 
 Earn is EVM-only in V1. The vault catalog only includes vaults with at least \$100k TVL.
+
+Morpho covers every curated vault above the TVL floor. Aave covers a fixed set of reserves per chain:
+
+| Chain | Aave assets |
+| :-- | :-- |
+| Ethereum | USDC, USDT, DAI, USDS, USDe, USDtb, USDG, RLUSD, PYUSD, EURC, WETH, WBTC |
+| Base | USDC, EURC, WETH, cbBTC |
+| Arbitrum | USDC, USDT0, DAI, WETH, WBTC |
+| Polygon | USDC, USDT, DAI, WETH, WBTC |
+| BNB Chain | USDC, USDT, BTCB |
 
 ## Fees
 
@@ -52,7 +64,7 @@ Earn fees are charged only on yield: a percentage of the yield a position earns.
 - **Your fee (the "Client Fee")**: you set it per wrapper at deploy time (`clientFeeBps`), along with the payout wallet (`clientFeeWallet`, a wallet account owned by your organization). Fees accrue onchain and are released to that wallet when you claim them.
 - **Turnkey's fee (The "Turnkey fee")**: resolved automatically when you deploy. The Turnkey Fee is up to 10% of yield (1,000 bps).
 
-Client fees are capped at 4,000 bps (40% of yield). Deployments above this cap are rejected.  Both Client fees and Turnkey’s fee are taken from yield as wrapper shares minted to a payment splitter contract deployed alongside the wrapper, which splits them onchain between you and Turnkey.
+Client fees are capped at 4,000 bps (40% of yield). Deployments above this cap are rejected. Both Client fees and Turnkey’s fee accrue onchain to a fee splitter contract deployed alongside the wrapper, which splits them between you and Turnkey.
 
 The net yield your users earn is  `grossApy × (1 - totalFeeBps / 10000)`. The [`list_earn_enabled_vaults`](/features/transaction-management/earn/vault-catalog#list-your-enabled-vaults) endpoint returns gross APY, net APY, and your fee rate for every wrapper you've deployed, along with `claimableClientFee`: the fee amount accrued to your organization that is actively claimable. Claim it onchain with the [`claim_earn_fees`](/api-reference/activities/claim-earn-fees) activity; the claimed amount is paid out to your fee wallet.
 
