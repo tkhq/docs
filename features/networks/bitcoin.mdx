@@ -71,6 +71,14 @@ Notably, we do not support sighash generation and reinsertion according to wrapp
 
 Note: If you are implementing Bitcoin transaction signing for one of the above use-cases involving signing wrapped inputs like P2SH-P2WPKH or P2SH-P2WSH, or for P2TR script path signing, or with the usage of a non-standard sighash type you can use the `SIGN_RAW_PAYLOAD` endpoint to sign pre-generated sighashes, and use a library like bitcoinjs-lib[https://github.com/bitcoinjs/bitcoinjs-lib] to handle sighash generation and reinsertion as per your use-case. 
 
+<Note>
+  The PSBT input requirements below are validated for EVERY input in the PSBT,
+  not just the inputs signed by the specified Turnkey signing resource. If any
+  input in the PSBT does not meet these requirements (for example, an input
+  belonging to another party in a multi-party transaction), the entire request
+  will be rejected.
+</Note>
+
 For specific technical context on how Turnkey does reinsertion across address types: 
 
 #### P2PKH, P2SH, P2WPKH, P2WSH
@@ -78,7 +86,8 @@ For specific technical context on how Turnkey does reinsertion across address ty
 PSBT Input Requirements for Legacy and Segwit  
 - We assume usage of Sighash Type SIGHASH_TYPE_ALL for all Legacy and Segwit inputs 
 - For Legacy inputs (P2PKH, P2SH), we require that the `non_witness_utxo` field of the corresponding input IS populated, and the `witness_utxo` field IS NOT populated
-- For Segwit inputs (P2WPKH, P2WSH), we require that the `witness_utxo` field of the corresponding input IS populated, and the `non_witness_utxo` field IS NOT populated
+- For Segwit inputs (P2WPKH, P2WSH), we require that BOTH the `witness_utxo` AND `non_witness_utxo` fields of the corresponding input ARE populated. The txid of the `non_witness_utxo` transaction must match the input's outpoint txid, and the `witness_utxo` must exactly match the script and value of the referenced output in `non_witness_utxo`
+- We require `non_witness_utxo` for Segwit inputs to prevent a fee overpayment attack: Segwit v0 signatures only commit to the total amount spent, not individual UTXO amounts, so `witness_utxo` alone could carry a falsified value. The full previous transaction in `non_witness_utxo` is tamper-evident because its hash must match the input's outpoint txid, letting us verify the actual UTXO value
 - For P2SH inputs, we require that the `redeem_script` field of the corresponding input IS populated
 - For P2WSH inputs, we require that the `witness_script` field of the corresponding input IS populated
 
@@ -92,7 +101,7 @@ Context on Sighash types, conventions, and how it affects signing can be found o
 
 PSBT Input Requirements for Taproot
 - We assume usage of Sighash Type SIGHASH_TYPE_DEFAULT for all Taproot inputs
-- For Taproot inputs we require that the `witness_utxo` field of the corresponding input IS populated, and the `non_witness_utxo` field IS NOT populated
+- For Taproot inputs we require that the `witness_utxo` field of the corresponding input IS populated. The `non_witness_utxo` field is optional: Taproot is not affected by the fee overpayment concern described above because Taproot signatures commit directly to all input amounts. If `non_witness_utxo` is provided anyway, it must match the input's outpoint txid and the `witness_utxo` script and value
 - For Taproot inputs we support key path signing, and NOT script path signing and require that the `tap_scripts`, `tap_merkle_root` and `tap_script_sigs` fields ARE NOT populated
 
 Turnkey supports transaction reinsertion Bitcoin transactions with P2TR inputs for Key Path signing ONLY. At the moment we do not support reinsertion for Taproot script path signing. For Taproot Key Path signing, for each input corresponding to the Turnkey signing resource specified in the `SIGN TRANSACTION` call, Turnkey constructs the schnorr signature of the sighash and reinserts it into the Taproot Key Spend Signature field of each relevant input in the PSBT.
