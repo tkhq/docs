@@ -70,11 +70,17 @@ sensitive actions until the user logs in again with the newly recovered passkey.
 
 #### How it works
 
-1. User initiates recovery, providing their email address.
-2. User satisfies a conditional MFA policy: email OTP + SMS OTP (or email OTP + OAuth).
-3. Upon successful MFA, user receives a recovery-scoped session token.
-4. User enrolls a new passkey using the `CREATE_AUTHENTICATORS_V2` activity.
-5. User logs in normally with the new passkey to access their account.
+1. Ahead of time, you create a session profile scoped to authenticator enrollment only, plus a
+   conditional MFA policy that applies to logins targeting that profile.
+2. User initiates recovery, providing their email address.
+3. Your backend begins an OTP login, passing the recovery profile's `sessionProfileId` on the login
+   activity. This is what makes the resulting session scoped.
+4. User satisfies the conditional MFA policy: email OTP + SMS OTP (or email OTP + OAuth).
+5. On success, the login returns a session token bound to that profile. It can enroll a credential
+   and nothing else — it cannot sign, export, or move funds.
+6. User enrolls a new passkey using the `CREATE_AUTHENTICATORS_V2` activity, stamped with the
+   recovery session.
+7. User logs in normally with the new passkey to access their account.
 
 #### Design rationale
 
