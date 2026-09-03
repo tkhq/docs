@@ -16,6 +16,10 @@ Like the `consensus` and `condition` fields, the `time` field must evaluate to a
   The **trusted server time** is NOT a client-supplied timestamp and cannot be spoofed by the caller.
 </Note>
 
+<Note>
+  **Root quorum bypasses time-based policies.** Root quorum approval is checked before policy evaluation, so a request that meets root quorum completes without any `time` field being evaluated. Time windows only gate requests that have not met root quorum. See [Root quorum](/features/users/root-quorum) for the full bypass rules.
+</Note>
+
 The `time` field (like the `condition` and `consensus` fields) is optional. When it is absent or an empty string, the policy is always active with respect to time. When it evaluates to `true`, the policy is active and participates in evaluation as usual. When it evaluates to `false`, the policy is skipped entirely for that request: it neither allows nor denies, and does not participate in the outcome. Such a policy is reported with the `OUTCOME_TIME_INACTIVE` policy-evaluation outcome.
 
 <Note>
@@ -150,3 +154,7 @@ The `time` field composes with the other two fields at the policy level: a polic
 ```
 
 Outside the business-hours window the `time` field evaluates to `false` and the policy is skipped, so the same signing request is no longer allowed by this policy.
+
+<Note>
+  A `time` field does not restrict when a root quorum member can approve. If a request accumulates enough root approvals to meet the root quorum threshold, the activity completes even when those approvals arrive outside the window, and even when a non-root approver voted inside the window as part of the same request. Use non-root users with scoped policies when a time window must actually bound approval.
+</Note>
