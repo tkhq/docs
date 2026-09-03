@@ -1,12 +1,12 @@
 ---
 title: "Embedded Wallet-as-a-Service"
 sidebarTitle: "Wallet-as-a-Service"
-description: "Distribute embedded wallets through your developer platform with co-signing authority, billing gates, and compliance controls."
+description: "Distribute embedded wallets through your developer platform with your own SDK, APIs, or UI components. Turnkey handles key management; your platform owns the developer experience."
 ---
 
 import { FeatureCard } from '/snippets/feature-card.mdx'
 
-With Turnkey, you can build a platform that distributes embedded wallets to your own customers. Your platform abstracts Turnkey behind your own SDK, APIs, or UI components. A 2-of-2 root quorum model gives your platform co-signing authority over every transaction, enabling billing gates, compliance checks, and risk controls at the infrastructure layer, while end users remain non-custodial.
+Your platform sits between Turnkey and your downstream developers: you expose your own SDK or APIs, and Turnkey is invisible to the people integrating with you. Your platform controls onboarding, authentication, transaction approval, and billing, all on top of Turnkey's key management infrastructure.
 
 ## Powered by Turnkey
 
@@ -16,17 +16,23 @@ With Turnkey, you can build a platform that distributes embedded wallets to your
 
 With [consumer wallets](/solutions/embedded-wallets/embedded-consumer-wallet) and [business wallets](/solutions/embedded-wallets/embedded-business-wallets), your application integrates Turnkey directly and manages wallets for end users. With Wallet-as-a-Service, your platform is an intermediary layer: you build wallet infrastructure on top of Turnkey, and your customers integrate with your SDK rather than Turnkey directly.
 
-The defining pattern is the **2-of-2 root quorum**. Both the end user and your platform must approve every fund-moving transaction. The end user authenticates via passkey (or equivalent), then your platform evaluates its own rules (billing status, compliance, risk) before co-signing. If either party withholds approval, the transaction does not execute.
+The defining pattern is **owning the developer surface**. Your platform handles auth, signing flows, and transaction submission on behalf of your downstream integrators. Turnkey processes and secures every signing request, but your customers never interact with Turnkey directly.
 
-No transaction executes without the end user's authentication. End users remain non-custodial because they can always [export their keys](/features/wallets/export-wallets) independently, without platform approval.
+This gives you control over:
+
+- **The developer experience.** Your APIs, your SDK, your branding.
+- **Transaction approval.** Your backend decides which requests go through and when.
+- **Billing and metering.** Gate signing at the infrastructure layer, not the application layer.
+- **Compliance.** Run your own checks before any transaction executes.
 
 ### When to use Wallet-as-a-Service
 
-| Scenario                                                        | Why Wallet-as-a-Service fits                                                                                                           |
-| :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
-| Your customers embed wallets through your SDK, not Turnkey's     | You own the developer experience end-to-end. Downstream integrators never interact with Turnkey directly.                              |
-| You need platform-level co-signing on every transaction          | 2-of-2 root quorum lets your platform enforce billing gates, compliance checks, or risk controls before any fund-moving transaction.   |
-| You want to white-label wallet infrastructure                    | Fork or wrap the Embedded Wallet Kit with your branding and expose your own APIs. Turnkey is invisible to your customers.              |
+| Scenario                                                        | Why Wallet-as-a-Service fits                                                                                                                                       |
+| :-------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Your customers integrate with your SDK, not Turnkey's           | You own the developer experience end-to-end. Downstream integrators never interact with Turnkey directly.                                                          |
+| You want to white-label wallet infrastructure                   | Fork or wrap the Embedded Wallet Kit with your branding and expose your own APIs. Turnkey is invisible to your customers.                                          |
+| You need platform-level approval on every transaction           | Your backend evaluates billing status, compliance checks, or risk rules before any fund-moving transaction executes.                                               |
+| You want per-user key isolation with no shared state            | Each end user maps to a Turnkey sub-organization: isolated wallets, credentials, policies, and activity logs.                                                      |
 
 ## Architecture
 
@@ -35,62 +41,35 @@ Each end user maps to a [Turnkey sub-organization](/features/sub-organizations).
 <Frame>
   <img
     src="/images/embedded-wallets/waas.png"
-    alt="Wallet-as-a-Service provider and end user co-signing model"
+    alt="Wallet-as-a-Service platform and end user sub-organization model"
   />
 </Frame>
 
 ### Transaction authorization flow
 
+In the simplest configuration, your platform holds the sole API key that authorizes transactions. End users authenticate to your platform; your platform validates the request and signs via Turnkey on their behalf.
+
 1. End user initiates a transaction from your embedded wallet UI
-2. End user approves via their authenticator (e.g. passkey). Turnkey records the activity as partially approved
-3. Your platform evaluates on its backend: billing status, risk/compliance rules, and any other checks
-4. Your platform approves via API key and the transaction executes
-5. If the platform withholds approval, the transaction does not execute
+2. End user authenticates to your platform (passkey, OTP, OAuth, or equivalent)
+3. Your platform evaluates its own rules on the backend: billing status, risk controls, compliance checks
+4. Your platform approves via API key and the transaction executes on Turnkey
+5. If your platform withholds approval, the transaction does not execute
 
-<Frame>
-  <img
-    src="/images/embedded-wallets/waas-tx-auth.png"
-    alt="Wallet-as-a-Service transaction authorization with platform co-signing"
-  />
-</Frame>
+This flow keeps Turnkey entirely behind your platform. Downstream developers and end users interact only with your SDK and APIs.
 
-See [Activities and approvals](/get-started/about-turnkey#activities) and [Root quorum](/features/users/root-quorum).
+<Note>
+  This baseline is a custodial arrangement: your platform holds the only credential that can authorize signing. To make end users verifiably non-custodial, add them as a root user and require their approval on every transaction. See [End-user co-signing](#end-user-co-signing-2-of-2-root-quorum) and [Custody models](/solutions/embedded-wallets/overview#custody-models).
+</Note>
+
+See [Core concepts](/get-started/about-turnkey#core-concepts) and [Root quorum](/features/users/root-quorum).
 
 ## Implementation
 
-### Step 1: Define the tenant model
+### Step 1: Create a sub-organization per end user
 
-Map each end user to a [sub-organization](/features/sub-organizations). One sub-org per end user.
+Map each end user to a [sub-organization](/features/sub-organizations), and track the relationship between your platform's user IDs and their Turnkey sub-org IDs in your own database. Your parent organization has read-only access to sub-orgs and can initiate auth and recovery flows, but cannot sign transactions or modify policies within them.
 
-- **Isolated tenants:** Each sub-org is a self-contained data boundary with wallets, policies, authenticators, and activity logs fully isolated from one another.
-- **Scoped parent org permissions:** Your parent organization has read-only access to sub-orgs and can initiate auth and recovery flows, but cannot sign transactions or modify policies within them.
-- **External mapping:** Track the relationship between your platform's user IDs and their corresponding Turnkey sub-org IDs in your own database.
-
-See [Sub-organizations](/features/sub-organizations) and [Root quorum](/features/users/root-quorum).
-
-### Step 2: Design the sub-organization control model
-
-Define what lives inside each sub-org and how control is shared between your platform and the end user.
-
-- **End user (root):** Authenticated via passkey or equivalent user-controlled authenticator.
-- **Platform provider (root):** Authenticated via API key. Used to approve or block transactions based on your service rules.
-- **Delegated access (optional):** For automation or backend-initiated workflows, add a scoped non-root API key via [Delegated Access](/features/policies/delegated-access/overview). This must be tightly policy-scoped and should never have broad signing authority or bypass user consent.
-
-See [Delegated Access](/features/policies/delegated-access/overview) and [Policies](/features/policies/overview).
-
-### Step 3: Create sub-org with wallet and export policy
-
-Specify what gets created in every sub-org by default: wallet structure, supported chains/accounts, and baseline policies.
-
-For the 2-of-2 quorum model, establish the threshold last so your platform can configure policies (including export) with only your platform's approval. Once the 2-of-2 quorum is established, the end user can trigger exports via the export policy without needing your platform's co-signature. This keeps the co-managed model non-custodial: end users can always export their keys and access their funds directly, independent of your platform.
-
-| Step | Action                                        | Quorum State |
-| ---- | --------------------------------------------- | ------------ |
-| 3a   | Create sub-org with both root users + wallet  | 1-of-2       |
-| 3b   | Create export policy for end user             | 1-of-2       |
-| 3c   | Update threshold to 2                         | **2-of-2**   |
-
-**3a. Create sub-org with both root users at 1-of-2 threshold**
+In the baseline model, your platform is the sole root user of each sub-org, authenticated via API key. Decide up front what every sub-org gets by default: wallet structure, supported chains and accounts, and baseline policies.
 
 ```javascript
 const subOrg = await turnkeyClient.createSubOrganization({
@@ -98,14 +77,6 @@ const subOrg = await turnkeyClient.createSubOrganization({
     subOrganizationName: `User Wallet - ${userId}`,
     rootUsers: [
       { userName: "Platform", apiKeys: [{ publicKey: PROVIDER_KEY }] },
-      {
-        userName: "End User",
-        authenticators: [
-          {
-            /* passkey */
-          },
-        ],
-      },
     ],
     rootQuorumThreshold: 1,
     wallet: {
@@ -120,7 +91,12 @@ const subOrg = await turnkeyClient.createSubOrganization({
 });
 ```
 
-**3b. Create export policy (user escape hatch)**
+Two options to layer in at creation time:
+
+- **End-user authenticator.** Add a passkey (or equivalent) as a second root user if you want users to hold their own signing key. See [End-user co-signing](#end-user-co-signing-2-of-2-root-quorum).
+- **Delegated access.** For automation or backend-initiated workflows, add a scoped non-root API key via [Delegated Access](/features/policies/delegated-access/overview). Keep it tightly policy-scoped: it should never have broad signing authority or bypass user consent.
+
+If you want users to be able to export their keys independently, add an export policy:
 
 ```javascript
 await turnkeyClient.createPolicy({
@@ -135,38 +111,117 @@ await turnkeyClient.createPolicy({
 });
 ```
 
-**3c. Raise threshold to 2-of-2**
+See [Sub-organizations](/features/sub-organizations), [Policies](/features/policies/overview), and [Export wallets](/features/wallets/export-wallets).
 
-```javascript
-await turnkeyClient.updateRootQuorum({
-  organizationId: subOrgId,
-  parameters: {
-    threshold: 2,
-    userIds: [providerUserId, endUserId],
-  },
-});
-```
-
-See [Export wallets](/features/wallets/export-wallets) and [Policy examples](/features/policies/examples/access-control).
-
-### Step 4: Build your integration surface
+### Step 2: Build your integration surface
 
 Create the SDK, APIs, or UI components that downstream developers will integrate with. Abstract Turnkey and expose only your platform's intended wallet, auth, and signing flows.
 
-- **Embedded Wallet Kit (EWK):** Fork or wrap [EWK](/solutions/embedded-wallets/integration-guide/react/index) components (authentication, wallet UI, approval prompts) with your branding. Surface "pending platform approval" states in the transaction flow.
-- **Backend service:** Handle platform root approvals (via API key), billing and risk evaluation, and activity monitoring through your backend.
+- **Embedded Wallet Kit (EWK):** Fork or wrap [EWK](/solutions/embedded-wallets/integration-guide/react/index) components (authentication, wallet UI, approval prompts) with your branding.
+- **Backend service:** Handle platform API key approvals, billing and risk evaluation, and activity monitoring through your backend.
 - **SDK abstraction layer:** Wrap Turnkey's SDK calls behind your own interface for full control over the developer experience.
 
 See [Embedded Wallet Kit](/solutions/embedded-wallets/integration-guide/react/index) and [SDK Reference](/sdks/introduction).
 
-### Step 5: Wire the wallet into your platform flow
+### Step 3: Wire the wallet into your platform flow
 
 Integrate the wallet into your onboarding and runtime flows so every downstream integration inherits a working embedded wallet.
 
-- **Onboarding:** Handle Turnkey org setup, auth configuration, and the staged sub-org creation flow as part of user registration. The end user should experience passkey registration as a natural part of sign-up.
+- **Onboarding:** Create the sub-org as part of user registration. The end user should experience this as a natural part of your sign-up flow.
 - **Client initialization:** Initialize the Turnkey client with the user's sub-org context on each session. Use [sessions](/features/authentication/sessions/overview) for batched signing workflows to reduce authentication friction.
-- **Transaction flow:** Surface the approval prompt via EWK components, submit the user's approval to Turnkey, run your backend checks, then co-sign or withhold.
-- **Recovery:** Expose the export flow in your settings UI so users can self-serve wallet recovery. Turnkey's enclave encrypts the mnemonic to a user-generated target key via HPKE. Neither Turnkey nor your platform can view the exported material.
+- **Transaction flow:** Your backend receives the request, runs its checks, then submits the approval to Turnkey via API key.
+- **Recovery:** Expose the export flow in your settings UI so users can self-serve wallet recovery if needed. Turnkey's enclave encrypts the mnemonic to a user-generated target key via HPKE. Neither Turnkey nor your platform can view the exported material.
+
+## Hardening your platform
+
+The setup above gives your platform sole control over transaction approval. Depending on your use case, you can layer additional controls on top.
+
+### End-user co-signing (2-of-2 root quorum)
+
+Add the end user as a second root member and raise the quorum threshold to 2. With this model, every fund-moving transaction requires both the end user's authenticator (passkey or equivalent) and your platform's API key. Neither party can move funds unilaterally.
+
+<Frame>
+  <img
+    src="/images/embedded-wallets/waas-tx-auth.png"
+    alt="Wallet-as-a-Service transaction authorization with platform co-signing"
+  />
+</Frame>
+
+This is the right choice when:
+
+- You want end users to be verifiably non-custodial
+- Your compliance posture requires end-user consent on every transaction
+- You are building a platform where user key sovereignty is a differentiator
+
+To set this up, create the sub-org with both root users at a 1-of-2 threshold, add the export policy so users retain an escape hatch, then raise the threshold to 2-of-2:
+
+```javascript
+// Add end user as second root member at org creation
+rootUsers: [
+  { userName: "Platform", apiKeys: [{ publicKey: PROVIDER_KEY }] },
+  {
+    userName: "End User",
+    authenticators: [
+      {
+        /* passkey */
+      },
+    ],
+  },
+],
+rootQuorumThreshold: 1, // start at 1-of-2 so you can configure policies first
+
+// ... create export policy ...
+
+// Then raise to 2-of-2
+await turnkeyClient.updateRootQuorum({
+  organizationId: subOrgId,
+  parameters: { threshold: 2, userIds: [providerUserId, endUserId] },
+});
+```
+
+The staged setup matters: establish the threshold last so your platform can configure policies (including export) with only your platform's approval. Root quorum actions bypass the policy engine, but an explicit policy can allow an individual root user to act alone for a specific activity. That is what keeps export working: once the 2-of-2 quorum is in place, the end user can still trigger exports via the export policy without your platform's co-signature.
+
+See [Root quorum](/features/users/root-quorum) and [Policy examples](/features/policies/examples/access-control).
+
+### IP allowlisting
+
+Lock your platform's API traffic to specific server IP ranges by defining trusted CIDR blocks. Requests from any other IP are rejected. Configure at the organization level (all requests) or per API key (specific keys for specific environments); the org-level allowlist must be enabled for per-key rules to take effect.
+
+<Warning>
+  IP allowlisting applies to the **parent organization only**. Sub-organizations do not inherit parent allowlist rules and cannot define their own, so requests authenticated against a sub-org (including your platform's transaction approvals) are not evaluated against an allowlist. Enabling an org-level allowlist with no CIDR rules blocks all API traffic, so stage rules with `enabled: false` first.
+</Warning>
+
+Available to Enterprise clients on the Scale tier or higher.
+
+See [IP Allowlist](/features/ip-allowlisting/overview).
+
+### Captcha protection
+
+Enable Cloudflare Turnstile to block bots and credential-stuffing attacks at the two highest-risk entry points: email/SMS OTP requests and new account signups. Configurable per organization in the Turnkey Dashboard.
+
+<Note>
+  Enforcement is automatic only for `@turnkey/react-wallet-kit` (v2.4.0+). If your platform builds its own UI on `@turnkey/core`, you must render the Turnstile widget and pass captcha tokens to the relevant SDK methods yourself.
+</Note>
+
+See [Captcha](/features/authentication/captcha).
+
+### MFA policies
+
+Require additional authentication factors for specific activities: high-value transfers, policy changes, or any condition you can express in [policy language](/features/policies/language). MFA policies are created per user with `CreateMfaPolicy` and enforced at the user level, including root users. Each policy defines an ordered list of required steps, and each step accepts any of passkey, API key, session, email OTP, SMS OTP, or OAuth.
+
+See [Multi-Factor Authentication](/features/authentication/mfa/overview).
+
+### Least-privilege API key scoping
+
+Use separate API-only users for different parts of your platform (onboarding, transaction approval, recovery). Restrict each key to only the activities it needs via policies. If a key is compromised, the blast radius is limited.
+
+See [User best practices](/features/users/best-practices) and [Policies](/features/policies/overview).
+
+### Activity monitoring via webhooks
+
+Subscribe to `ACTIVITY_UPDATES` webhooks to receive real-time, Ed25519-signed notifications for every activity in your parent org and all sub-orgs from a single parent-owned endpoint. Use this to feed your own audit log, fraud detection, or alerting systems.
+
+See [Webhooks](/features/webhooks/overview).
 
 ## Next steps
 
