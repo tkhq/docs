@@ -1,0 +1,75 @@
+---
+title: "Email delivery events"
+description: "Monitor email delivery status, investigate delays, and debug bounces or complaints using the Turnkey Dashboard or API."
+---
+
+Turnkey provides visibility into email delivery events sent from your organization. Use the Dashboard or the [`list_email_events`](/api-reference/queries/list-email-events) API to look up delivery status by recipient, confirm whether an email was delivered, investigate delays, and debug failures such as bounces or complaints.
+
+- Per-recipient lookup by email address
+- Optional filtering by event type
+- Cursor-based pagination for large delivery histories
+
+<Note>
+Email delivery events are stored at the parent organization level. Queries made from a sub-organization will return events for the parent organization.
+</Note>
+
+## Event types
+
+| Event type      | Dashboard label    | Description                                                                                                                                                  |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Send`          | —                  | The email was accepted for sending.                                                                                                                          |
+| `Delivery`      | Delivered          | The email was delivered to the recipient's mail server.                                                                                                      |
+| `DeliveryDelay` | Delayed            | Delivery was delayed and may be retried. Check the recipient address and the mailbox provider's status page.                                                 |
+| `Bounce`        | Bounced            | The recipient's mail server rejected the email. Permanent bounces indicate an invalid or unreachable address. Transient bounces may resolve after retry.     |
+| `Complaint`     | Complaint          | The recipient or mailbox provider reported the email as spam. Typically generated when a recipient marks the message as spam.                                |
+
+## Querying delivery events
+
+<Steps>
+  <Step title="Choose a recipient">
+    Provide the recipient email address you want to inspect.
+  </Step>
+  <Step title="Filter by event type (optional)">
+    Pass an `eventType` to narrow results to sends, deliveries, delays, bounces, or complaints.
+  </Step>
+  <Step title="Page through results">
+    Results are ordered newest first. Use `paginationOptions.limit` to set the page size. For the next page, pass the last event ID as after. For the previous page, pass the first event ID as before.
+  </Step>
+  <Step title="Inspect delivery details">
+    Review fields such as `eventType`, `timestamp`, `fromAddress`, `toAddress`, and `details` to understand what happened to the message.
+  </Step>
+</Steps>
+
+## Code examples
+
+<Tabs>
+  <Tab title="List email events">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/query/list_email_events \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "organizationId": "<your-organization-id>",
+        "email": "user@example.com",
+        "paginationOptions": {
+          "limit": "10"
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Filter by event type">
+    ```shell
+    curl -X POST https://api.turnkey.com/public/v1/query/list_email_events \
+      -H "Content-Type: application/json" \
+      -H "X-Stamp: <your-stamp>" \
+      -d '{
+        "organizationId": "<your-organization-id>",
+        "email": "user@example.com",
+        "eventType": "Bounce",
+        "paginationOptions": {
+          "limit": "10"
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
