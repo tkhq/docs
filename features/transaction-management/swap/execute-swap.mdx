@@ -4,19 +4,20 @@ description: "Execute a quoted token swap from a Turnkey wallet in one signed ac
 mode: "wide"
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP_V2` runs a swap end-to-end against a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE`. You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, and minimum output. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V3` runs a swap end-to-end against a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`. You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, minimum output, and `destinationAddress` when the route is EVM ↔ SVM. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
 
 ## Prerequisites
 
 - A swap configuration is not required; without one, the quote already carries a client fee of 0. See [Enable Swaps](/features/transaction-management/swap/enable-swap).
-- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote).
+- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote).
 - The address the quote was created for holds enough of the input asset to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native asset for gas; if `sponsor: true`, your organization can sponsor the gas for the user's trade. To use the sponsored path gas sponsorship must be enabled for your organization.
-- For cross-chain routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
+- For cross-chain or EVM ↔ SVM routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
+- For EVM ↔ SVM, the quote and execute intents both set `destinationAddress` to the same raw output-protocol address.
 
 ## Submit the swap
 
 <ParamField body="parameters.quoteId" type="string" required>
-  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
+  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
 </ParamField>
 
 <ParamField body="parameters.inputToken / parameters.outputToken" type="string" required>
@@ -39,6 +40,10 @@ mode: "wide"
   Required. When `true`, your organization sponsors gas for the transaction; requires gas sponsorship to be enabled for your organization. Set to `false` to have the swapping wallet pay its own gas.
 </ParamField>
 
+<ParamField body="parameters.destinationAddress" type="string">
+  Required for EVM ↔ SVM. Must match the quote: a raw public address on the output token protocol. Omit it for same-protocol routes. Wallet account IDs, private key IDs, and CAIP identifiers are not accepted.
+</ParamField>
+
 cURL:
 
 ```bash title="cURL"
@@ -48,7 +53,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
@@ -78,7 +83,7 @@ const client = new TurnkeyClient(
 );
 
 const { activity } = await client.request("/public/v1/submit/execute_swap", {
-  type: "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+  type: "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
   timestampMs: String(Date.now()),
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
@@ -100,7 +105,7 @@ The activity result returns a poll handle:
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
     "result": {
       "executeSwapResult": {
         "swapRequestId": "sha256:9a80031c2def40d9294900fb99be914999cea3dbe9a4dd4841a8e52ee29f09f5",
@@ -133,7 +138,7 @@ The signed intent carries only the swap parameters listed above. Everything else
 - Token approval signatures and payloads
 - Fee configuration — rates and the fee receiver are snapshotted into the quote at quote time; execute does not re-read your live configuration, and you cannot override fees per swap
 
-Execute only accepts the bound quote terms. You do not pass provider payloads, calldata, or fee overrides. Because none of these inputs exist in the V2 intent, none of them can be tampered with before signing. Optional replay-protection fields (`evmNonce`, `recentBlockhash`, `gasStationNonce`) can be set on the intent; omit them to auto-fetch. See [Trust boundary](/features/transaction-management/swap#trust-boundary) for the full model.
+Execute only accepts the bound quote terms. You do not pass provider payloads, calldata, or fee overrides. Because none of these inputs exist in the execute intent, none of them can be tampered with before signing. Optional replay-protection fields (`evmNonce`, `recentBlockhash`, `gasStationNonce`) can be set on the intent; omit them to auto-fetch. See [Trust boundary](/features/transaction-management/swap#trust-boundary) for the full model.
 
 ## Approvals
 
@@ -147,7 +152,7 @@ Native token swaps (e.g., ETH as `inputToken`) do not require an approval step.
 
 ## Same-chain vs. cross-chain execution
 
-The execute activity is identical for same-chain and cross-chain routes — the route is fixed by the quote you reference, which derives it from the CAIP-19 pair. The difference is in the lifecycle after broadcast:
+The execute activity is the same for same-chain, cross-chain, and EVM ↔ SVM routes — the route is fixed by the quote you reference. For EVM ↔ SVM, restating `destinationAddress` is required. The difference after broadcast:
 
 - **Same-chain swaps** reach a terminal status from the origin transaction: `COMPLETED` with the settled `outputAmount`, or `FAILED` with `ORIGIN_TRANSACTION_FAILED`. Same-chain status does not return `refund` or `PROVIDER_FILL_FAILED`.
 - **Cross-chain swaps** stay `PENDING` past origin inclusion until the destination leg settles (`COMPLETED`, with `destinationTxHashes`) or the provider reports a fill failure (`FAILED`). The `refund` object can be absent when `FAILED` first appears.

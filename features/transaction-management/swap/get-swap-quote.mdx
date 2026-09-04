@@ -12,7 +12,7 @@ mode: "wide"
 
 ## Call create\_swap\_quote
 
-Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/api-reference/activities/get-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
+Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-reference/activities/get-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
 
 <ParamField body="organizationId" type="string" required>
   The organization that owns the swapping wallet. Parent organizations and sub-organizations can both swap; the parent's swap configuration applies in either case.
@@ -27,7 +27,7 @@ Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/api-refer
 </ParamField>
 
 <ParamField body="parameters.outputToken" type="string" required>
-  CAIP-19 identifier for the asset being bought. If its CAIP-2 prefix matches `inputToken`, the swap is same-chain; otherwise it's a cross-chain route. Native assets use `slip44:`, e.g. `eip155:137/slip44:966` (POL).
+  CAIP-19 identifier for the asset being bought. If its CAIP-2 prefix matches `inputToken`, the swap is same-chain. A different EVM chain is cross-chain. A different protocol (`eip155` vs `solana`) is cross-protocol (EVM ↔ SVM). Native assets use `slip44:`, e.g. `eip155:137/slip44:966` (POL).
 </ParamField>
 
 <ParamField body="parameters.inputAmount" type="string" required>
@@ -36,6 +36,10 @@ Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/api-refer
 
 <ParamField body="parameters.slippageBps" type="string">
   Optional. Slippage tolerance in basis points as a stringified integer, e.g. `"50"` for 0.5%. Used to compute each quote's `minOutputAmount`. If you omit it, the provider applies its default and the quote returns the effective total.
+</ParamField>
+
+<ParamField body="parameters.destinationAddress" type="string">
+  Required for EVM ↔ SVM. Raw public address that receives the output asset. It must match the output token protocol (a Solana address for a Solana output; an EVM address for an EVM output). Omit it for same-protocol routes. Wallet account IDs, private key IDs, and CAIP identifiers are not accepted.
 </ParamField>
 
 cURL:
@@ -47,7 +51,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
@@ -75,7 +79,7 @@ const client = new TurnkeyClient(
 );
 
 const { activity } = await client.request("/public/v1/submit/create_swap_quote", {
-  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
   timestampMs: String(Date.now()),
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
@@ -98,7 +102,7 @@ Response:
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
     "result": {
       "createSwapQuoteResult": {
         "quotes": [
@@ -146,7 +150,7 @@ The result contains a quotes array. Each quote is executable as-is:
 }
 ```
 
-- `quoteId` — identifies this quote. Pass it to `ACTIVITY_TYPE_EXECUTE_SWAP_V2` to execute against this quote's pricing; execution is pinned to the quote it references.
+- `quoteId` — identifies this quote. Pass it to `ACTIVITY_TYPE_EXECUTE_SWAP_V3` to execute against this quote's pricing; execution is pinned to the quote it references.
 - `provider` — the provider that produced the quote and will execute the swap.
 - `outputAmount` — expected output in raw onchain units, net of all fees. This is what the recipient receives if the swap fills at the quoted price.
 - `minOutputAmount` — the floor enforced at execution, derived from `outputAmount` and your slippage tolerance. If the swap cannot deliver at least this amount, it fails rather than filling worse.
@@ -157,7 +161,7 @@ The result contains a quotes array. Each quote is executable as-is:
 
 ## Execution price semantics
 
-Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
+Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V3`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
 
 Within those bounds, the actual fill can move:
 
@@ -189,9 +193,11 @@ Your fee configuration is applied when the quote is created. The fee baked into 
 
 ## Same-chain vs. cross-chain quotes
 
-Quote shape is identical for same-chain and cross-chain routes. Whether a swap is same-chain or cross-chain is determined by the CAIP-2 prefixes of `inputToken` and `outputToken`; the provider selects the route within that. Same-chain routes cover EVM and Solana. Cross-chain routes are EVM ↔ EVM, with EVM ↔ SVM coming soon.
+Quote shape is identical for same-chain, cross-chain, and cross-protocol routes. The CAIP-2 prefixes of `inputToken` and `outputToken` decide the route. Matching prefixes are same-chain. Different EVM chains are cross-chain. `eip155` paired with `solana` is cross-protocol (EVM ↔ SVM).
 
-Cross-chain quotes are subject to the same freshness and slippage semantics as same-chain quotes, but cross-chain execution has a longer post-broadcast lifecycle. The swap stays `PENDING` until the destination leg settles, or it becomes `FAILED`. Refund details on a cross-chain `FAILED` can arrive after the status flip. See [Track swap status](/features/transaction-management/swap/track-swap-status) for the two lifecycle models.
+For EVM ↔ SVM, set `destinationAddress` on the quote. Omit it for same-protocol routes. Same-protocol quotes that include `destinationAddress` fail.
+
+Cross-chain and cross-protocol quotes use the same freshness and slippage rules as same-chain quotes, but execution stays `PENDING` longer after broadcast. The swap stays `PENDING` until the destination leg settles, or it becomes `FAILED`. Refund details on a `FAILED` cross-chain or cross-protocol swap can arrive after the status flip. See [Track swap status](/features/transaction-management/swap/track-swap-status).
 
 ## Next steps
 

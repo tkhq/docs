@@ -96,7 +96,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
     const { activity: quoteActivity } = await client.request(
       "/public/v1/submit/create_swap_quote",
       {
-        type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+        type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
         timestampMs: String(Date.now()),
         organizationId,
         parameters: {
@@ -120,7 +120,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
       --header 'Content-Type: application/json' \
       --header "X-Stamp: <string> (see Stamps)" \
       --data '{
-        "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+        "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
         "timestampMs": "<string> (e.g. 1745474677453)",
         "organizationId": "<ORGANIZATION_ID>",
         "parameters": {
@@ -164,7 +164,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
     const { activity: execActivity } = await client.request(
       "/public/v1/submit/execute_swap",
       {
-        type: "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+        type: "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
         timestampMs: String(Date.now()),
         organizationId,
         parameters: {
@@ -189,7 +189,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
       --header 'Content-Type: application/json' \
       --header "X-Stamp: <string> (see Stamps)" \
       --data '{
-        "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+        "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
         "timestampMs": "<string> (e.g. 1745474677453)",
         "organizationId": "<ORGANIZATION_ID>",
         "parameters": {
@@ -231,9 +231,11 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
 
 ## Going cross-chain
 
-The same code runs a cross-chain swap — only the `outputToken` changes. Give it a different CAIP-2 prefix — say USDC on Arbitrum, `eip155:42161/erc20:<USDC_ON_ARBITRUM>` — and the provider routes it across chains where it supports the pair. Asset identifiers come from [`list_supported_assets`](/api-reference/queries/list-supported-assets).
+The same code runs a cross-chain EVM ↔ EVM swap — only the `outputToken` changes. Give it a different EVM CAIP-2 prefix — say USDC on Arbitrum, `eip155:42161/erc20:<USDC_ON_ARBITRUM>` — and omit `destinationAddress`. Asset identifiers come from [`list_supported_assets`](/api-reference/queries/list-supported-assets).
 
-Two things differ after broadcast:
+For EVM ↔ SVM, change the output protocol as well — say Solana USDC, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` — and set `destinationAddress` on both the quote and the execute to a raw Solana address. Do not pass a wallet account ID, a private key ID, or a CAIP identifier.
+
+After broadcast:
 
 - The swap stays `PENDING` past origin-chain inclusion until the destination leg settles, so poll every 5–10 seconds rather than every second.
 - On `COMPLETED`, `destinationTxHashes` carries the destination-chain transactions. `swapKind` in the response tells you which model applied.

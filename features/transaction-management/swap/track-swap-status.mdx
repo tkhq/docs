@@ -4,7 +4,7 @@ description: "Poll a swap from execute acceptance to settlement with get_swap_st
 mode: "wide"
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP_V2` returns a `swapRequestId`. Query `get_swap_status` with it to observe the full lifecycle — including failures that occur before broadcast, such as pre-flight simulation failures. Same-chain and cross-chain swaps share the same query and the same response shape; provider-specific state machines are normalized to three states: `PENDING`, `COMPLETED`, `FAILED`.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V3` returns a `swapRequestId`. Query `get_swap_status` with it to observe the full lifecycle — including failures that occur before broadcast, such as pre-flight simulation failures. Same-chain, cross-chain, and EVM ↔ SVM swaps share the same query and the same response shape; provider-specific state machines are normalized to three states: `PENDING`, `COMPLETED`, `FAILED`.
 
 ## Lifecycle model
 
@@ -25,7 +25,7 @@ Query [`get_swap_status`](/api-reference/queries/get-swap-status) with:
 </ParamField>
 
 <ParamField body="swapRequestId" type="string" required>
-  The handle returned by [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap), e.g. `sha256:9a80031c2def...`.
+  The handle returned by [`ACTIVITY_TYPE_EXECUTE_SWAP_V3`](/features/transaction-management/swap/execute-swap), e.g. `sha256:9a80031c2def...`.
 </ParamField>
 
 cURL:
@@ -93,7 +93,7 @@ Response:
 - `inputToken`, `outputToken`, `inputAmount`: echoed from the execute intent.
 - `originTxHash`: origin-chain transaction hash. Present once the swap is broadcast, for both same-chain and cross-chain routes.
 - `destinationTxHashes`: array of destination-chain transaction hashes on `COMPLETED`. Cross-chain only.
-- `destinationAddress`: address that receives the output asset. Stored destination when set; otherwise the swapping wallet.
+- `destinationAddress`: address that receives the output asset. For EVM ↔ SVM this is the `destinationAddress` you set on quote and execute. For same-protocol routes it is the swapping wallet.
 - `outputAmount`: actual amount received, on `COMPLETED`. May lag the `status` transition by seconds while the monitor fetches the final settled amount.
 - `refund`: present on cross-chain `FAILED` when funds moved and came back. Contains `asset` (CAIP-19), `amount` (raw onchain units), and optional `txHash`. Omitted for origin failures and same-chain swaps. See [What FAILED means](#what-failed-means).
 - `error`: present on `FAILED`. Contains `reason` (`ORIGIN_TRANSACTION_FAILED` or `PROVIDER_FILL_FAILED`), `message` (human-readable detail), `originTxError` (decoded revert detail, origin failures only), and `providerReason` (provider-specific detail, fill failures only). See [What FAILED means](#what-failed-means).
