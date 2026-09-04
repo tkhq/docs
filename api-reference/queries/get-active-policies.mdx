@@ -1,0 +1,96 @@
+---
+title: "Get active policies"
+description: "For each policy in an organization, report whether it is currently active based on the enclave's trusted timestamp and the policy's time window (if any). Policies without a time field are always active."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="get_active_policies" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given organization.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="statuses" type="array" required={true}>
+  The active/inactive status of every policy in the organization.
+  <Expandable title="statuses details">
+    <NestedParam parentKey="statuses" childKey="organizationId" type="string" required={true}>
+Unique identifier for the organization the policy belongs to.
+</NestedParam>
+<NestedParam parentKey="statuses" childKey="policyId" type="string" required={true}>
+Unique identifier for a given policy.
+</NestedParam>
+<NestedParam parentKey="statuses" childKey="active" type="boolean" required={true}>
+Whether the policy is currently active. A policy without a time window is always active.
+</NestedParam>
+<NestedParam parentKey="statuses" childKey="timeExpr" type="string" required={false}>
+The policy's time expression, absent when the policy has no time window.
+</NestedParam>
+<NestedParam parentKey="statuses" childKey="error" type="string" required={false}>
+Set when the policy's time expression could not be evaluated; the policy is reported inactive.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+<ResponseField name="evaluatedAtMs" type="string" required={true}>The enclave's trusted timestamp (Unix epoch milliseconds) used to evaluate every policy.</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_active_policies \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().getActivePolicies({
+  organizationId: "<string> (Unique identifier for a given organization.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "statuses": [
+    {
+      "organizationId": "<string>",
+      "policyId": "<string>",
+      "active": "<boolean>",
+      "timeExpr": "<string>",
+      "error": "<string>"
+    }
+  ],
+  "evaluatedAtMs": "<string>"
+}
+```
+
+</ResponseExample>
