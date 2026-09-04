@@ -16,6 +16,20 @@ This guide is for integrations that use legacy OTP activities or SDK methods tha
   legacy flow.
 </Warning>
 
+## Migration checklist
+
+Complete these steps in order. Do not deploy an updated client until its
+policies allow the updated activity types.
+
+1. Update exact-version policies. See [Update policies before deploying](#update-policies-before-deploying).
+2. Upgrade the frontend and backend Turnkey packages together.
+3. Update the OTP flow. Keep each OTP attempt's bundle, token, and client key together.
+4. Send the OTP code to the backend only in `encryptedOtpBundle`.
+5. Test email and SMS separately, if your application supports both.
+6. Test an existing-user login and a new-user signup before deployment.
+7. Deploy the updated client and backend together.
+8. After every client has migrated, remove legacy activity types from exact-version policies.
+
 ## What changed
 
 | Stage    | Legacy SDK activity                                     | Current SDK activity                       | Required change                                                                                                                                     |
@@ -23,14 +37,13 @@ This guide is for integrations that use legacy OTP activities or SDK methods tha
 | Initiate | `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2` | `ACTIVITY_TYPE_INIT_OTP_V3`                | Keep the returned `otpEncryptionTargetBundle` with the `otpId` until verification.                                                                  |
 | Verify   | `ACTIVITY_TYPE_VERIFY_OTP`                              | `ACTIVITY_TYPE_VERIFY_OTP_V2`              | Replace plaintext `otpCode` and `publicKey` with an `encryptedOtpBundle`.                                                                           |
 | Log in   | `ACTIVITY_TYPE_OTP_LOGIN`                               | `ACTIVITY_TYPE_OTP_LOGIN_V2`               | Include a `clientSignature` made by the key bound during verification.                                                                              |
-| Sign up  | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`              | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` | Include a `clientSignature` when the verification token is bound to a public key. Version 8 and later do not accept legacy OTP verification tokens. |
+| Sign up  | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` with a legacy verification token | `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` with an enclave-issued verification token | Include a `clientSignature` made by the key bound during verification. |
 
 <Note>
-  `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` is transitional: it accepts both
-  legacy verification tokens and the enclave-issued tokens returned by
-  `VERIFY_OTP_V2`. `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` accepts only
-  enclave-issued tokens. During a staged rollout, legacy attempts must remain on
-  V7; updated attempts can use V7 or V8.
+  `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7` accepts both legacy verification
+  tokens and the enclave-issued tokens from `VERIFY_OTP_V2`. Migrate customers
+  to the encrypted flow while continuing to use V7. `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8`
+  accepts only enclave-issued tokens and is not required for this migration.
 </Note>
 
 The updated verification flow is:
@@ -182,14 +195,21 @@ Choose the section below that matches your integration.
 
 ## Update policies before deploying
 
-If a policy checks exact activity versions, update it before the new SDKs begin submitting activities. At minimum, review policies that name:
+If a policy checks exact activity versions, update it before the new SDKs begin
+submitting activities. At minimum, review policies that name:
 
 - `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2`
 - `ACTIVITY_TYPE_VERIFY_OTP`
 - `ACTIVITY_TYPE_OTP_LOGIN`
 - `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`
 
-During a staged rollout, exact-type policies must allow both legacy and updated versions until all clients and servers use the new flow. This does not make the activity versions interchangeable within an OTP attempt. Prefer `activity.kind` when the same policy should cover every version of a specific activity:
+During the rollout, exact-type policies must allow the legacy activity types and
+the updated `INIT_OTP_V3`, `VERIFY_OTP_V2`, and `OTP_LOGIN_V2` activity types.
+Keep `CREATE_SUB_ORGANIZATION_V7` allowed because it accepts both token types.
+This does not make activity versions interchangeable within one OTP attempt.
+
+Prefer `activity.kind` when the same policy must cover every version of a
+specific activity:
 
 ```json
 {
@@ -204,16 +224,5 @@ During a staged rollout, exact-type policies must allow both legacy and updated 
   not only OTP signup. Preserve any existing restrictions on who may create a
   sub-organization and which parameters they may submit.
 </Note>
-
-## Rollout checklist
-
-- Update policies before deploying updated SDKs.
-- Upgrade the frontend and backend Turnkey packages together.
-- Store `otpId`, `otpEncryptionTargetBundle`, and the client key as state for one OTP attempt.
-- On resend, replace all attempt state rather than reusing an old bundle or key.
-- Test email and SMS separately if your application supports both.
-- Test both an existing-user login and a new-user signup.
-- Confirm that OTP codes are sent to your backend only as `encryptedOtpBundle`.
-- After all clients have migrated, remove legacy activity versions from exact-version policies.
 
 For the complete set of SDK breaking changes shipped with this migration, see [tkhq/sdk#1250](https://github.com/tkhq/sdk/pull/1250).
