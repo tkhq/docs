@@ -2,32 +2,32 @@
 title: "Get a Swap Quote"
 description: "Request executable quotes for a token pair from a Turnkey wallet, priced net of all fees, with the minimum output enforced at execution."
 mode: "wide"
-noindex: true
 ---
 
 **Prerequisites:**
 
-- Your parent organization has enabled Swaps via [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap) with a valid `feeReceiverWalletAddress` and `feeBps`. Quote requests against organizations without the Swaps feature flag will fail. Without a swap configuration, quotes default to a client fee of 0. See [`Enable Swaps`](/features/transaction-management/swap/enable-swap).
-- The signing address (`signWith`) is a wallet account in the organization submitting the activity. Parent organization wallets and sub-organization wallets can both swap: the activity belongs to the organization that owns the wallet. In a delegated access setup, a delegate can submit the activity to the wallet owner's organization or act as the second signer on an activity submitted by the wallet owner.
+- The parent organization must be Pay As You Go, Pro, or Enterprise.
+- [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap) is optional. Without a swap configuration, quotes default to a client fee of 0.
+- The signing address (`signWith`) is a wallet account address or a private key address in the organization submitting the activity. Private key identifiers are not supported. Parent organization wallets and sub-organization wallets can both swap: the activity belongs to the organization that owns the wallet. In a delegated access setup, a delegate can submit the activity to the wallet owner's organization or act as the second signer on an activity submitted by the wallet owner.
 
 ## Call create\_swap\_quote
 
-Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/api-reference/activities/get-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
+Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-reference/activities/get-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
 
 <ParamField body="organizationId" type="string" required>
   The organization that owns the swapping wallet. Parent organizations and sub-organizations can both swap; the parent's swap configuration applies in either case.
 </ParamField>
 
 <ParamField body="parameters.signWith" type="string" required>
-  The wallet account address that will sign and fund the swap. Quotes are computed against this address, so balances and allowances are reflected accurately.
+  The wallet account address or private key address that will sign and fund the swap. Private key identifiers are not supported. Quotes are computed against this address, so balances and allowances are reflected accurately.
 </ParamField>
 
 <ParamField body="parameters.inputToken" type="string" required>
-  CAIP-19 identifier for the asset being sold, e.g. `eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913` (USDC on Base). The origin chain is derived from this identifier.
+  CAIP-19 identifier for the asset being sold, e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (USDC on Base). The origin chain is derived from this identifier.
 </ParamField>
 
 <ParamField body="parameters.outputToken" type="string" required>
-  CAIP-19 identifier for the asset being bought. If its CAIP-2 prefix matches `inputToken`, the swap is same-chain; otherwise it's a cross-chain route. Native assets use `slip44:`, e.g. `eip155:137/slip44:966` (POL).
+  CAIP-19 identifier for the asset being bought. If its CAIP-2 prefix matches `inputToken`, the swap is same-chain. A different EVM chain is cross-chain. A different protocol (`eip155` vs `solana`) is cross-protocol (EVM ↔ SVM). Native assets use `slip44:`, e.g. `eip155:137/slip44:966` (POL).
 </ParamField>
 
 <ParamField body="parameters.inputAmount" type="string" required>
@@ -35,7 +35,11 @@ Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/api-refer
 </ParamField>
 
 <ParamField body="parameters.slippageBps" type="string">
-  Slippage tolerance in basis points as a stringified integer, e.g. `"50"` for 0.5%. Used to compute each quote's `minOutputAmount`.
+  Optional. Slippage tolerance in basis points as a stringified integer, e.g. `"50"` for 0.5%. Used to compute each quote's `minOutputAmount`. If you omit it, the provider applies its default and the quote returns the effective total.
+</ParamField>
+
+<ParamField body="parameters.destinationAddress" type="string">
+  Required for EVM ↔ SVM. Raw public address that receives the output asset. It must match the output token protocol (a Solana address for a Solana output; an EVM address for an EVM output). Omit it for same-protocol routes. Wallet account IDs, private key IDs, and CAIP identifiers are not accepted.
 </ParamField>
 
 cURL:
@@ -47,12 +51,12 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
       "signWith": "<WALLET_ACCOUNT_ADDRESS>",
-      "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+      "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
       "inputAmount": "1000000",
       "slippageBps": "50"
@@ -75,12 +79,12 @@ const client = new TurnkeyClient(
 );
 
 const { activity } = await client.request("/public/v1/submit/create_swap_quote", {
-  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
   timestampMs: String(Date.now()),
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
     signWith: "<WALLET_ACCOUNT_ADDRESS>",
-    inputToken: "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+    inputToken: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
     inputAmount: "1000000",
     slippageBps: "50",
@@ -88,7 +92,7 @@ const { activity } = await client.request("/public/v1/submit/create_swap_quote",
 });
 
 const { quotes } = activity.result.createSwapQuoteResult;
-const bestQuote = quotes[0];
+const quote = quotes[0]; // today this array contains a single Relay quote
 ```
 
 Response:
@@ -98,7 +102,7 @@ Response:
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
     "result": {
       "createSwapQuoteResult": {
         "quotes": [
@@ -146,18 +150,18 @@ The result contains a quotes array. Each quote is executable as-is:
 }
 ```
 
-- `quoteId` — identifies this quote. Pass it to `ACTIVITY_TYPE_EXECUTE_SWAP_V2` to execute against this quote's pricing; execution is pinned to the quote it references.
+- `quoteId` — identifies this quote. Pass it to `ACTIVITY_TYPE_EXECUTE_SWAP_V3` to execute against this quote's pricing; execution is pinned to the quote it references.
 - `provider` — the provider that produced the quote and will execute the swap.
 - `outputAmount` — expected output in raw onchain units, net of all fees. This is what the recipient receives if the swap fills at the quoted price.
 - `minOutputAmount` — the floor enforced at execution, derived from `outputAmount` and your slippage tolerance. If the swap cannot deliver at least this amount, it fails rather than filling worse.
-- `slippageBps` — the slippage tolerance this quote was priced with, echoed from the request.
+- `slippageBps` — optional. The effective total slippage tolerance for this quote, taken from the provider response when present. If the request omitted `slippageBps`, the provider can calculate this value.
 - `clientFeeBps` — your organization's configured fee, for display or audit. Turnkey's fee is baked into the quoted amounts and is not itemized. See [Fees](/features/transaction-management/swap#fees).
-- `estimatedTimeSeconds` — estimated time to settlement.
+- `estimatedTimeSeconds` — optional. Provider-estimated time to settlement, when available.
 - `expiresAt` — millisecond epoch after which the quote can no longer be executed.
 
 ## Execution price semantics
 
-Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
+Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V3`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
 
 Within those bounds, the actual fill can move:
 
@@ -171,7 +175,7 @@ Within those bounds, the actual fill can move:
 
 Slippage is the difference between the price reflected in a quote and the price at which the swap actually executes onchain. It occurs because prices can move between quoting and execution. Low-liquidity pairs, large trade sizes, and periods of high network activity can increase slippage.
 
-You set your tolerance at quote time via `slippageBps`, in basis points (e.g. `"50"` for 0.5%). Each quote derives its `minOutputAmount` from the quoted `outputAmount` and your tolerance, and the signed execute intent carries that floor. If the swap would return less than `minOutputAmount`, it fails rather than filling worse.
+You can set your tolerance at quote time via `slippageBps`, in basis points (e.g. `"50"` for 0.5%). If you omit it, the provider applies its default. Each quote derives its `minOutputAmount` from the quoted `outputAmount` and the effective tolerance, and the signed execute intent carries that floor. If the swap would return less than `minOutputAmount`, it fails rather than filling worse.
 
 Choosing a tolerance is a tradeoff worth surfacing to your users:
 
@@ -189,9 +193,11 @@ Your fee configuration is applied when the quote is created. The fee baked into 
 
 ## Same-chain vs. cross-chain quotes
 
-Quote shape is identical for same-chain and cross-chain routes. Whether a swap is same-chain or cross-chain is determined by the CAIP-2 prefixes of `inputToken` and `outputToken`; the provider selects the route within that. Same-chain routes cover EVM and Solana. Cross-chain routes are EVM ↔ EVM, with EVM ↔ SVM coming soon.
+Quote shape is identical for same-chain, cross-chain, and cross-protocol routes. The CAIP-2 prefixes of `inputToken` and `outputToken` decide the route. Matching prefixes are same-chain. Different EVM chains are cross-chain. `eip155` paired with `solana` is cross-protocol (EVM ↔ SVM).
 
-Cross-chain quotes are subject to the same freshness and slippage semantics as same-chain quotes, but cross-chain execution has a longer post-broadcast lifecycle — the swap stays `PENDING` until the destination leg settles or funds are refunded. See [Track swap status](/features/transaction-management/swap/track-swap-status) for the two lifecycle models.
+For EVM ↔ SVM, set `destinationAddress` on the quote. Omit it for same-protocol routes. Same-protocol quotes that include `destinationAddress` fail.
+
+Cross-chain and cross-protocol quotes use the same freshness and slippage rules as same-chain quotes, but execution stays `PENDING` longer after broadcast. The swap stays `PENDING` until the destination leg settles, or it becomes `FAILED`. Refund details on a `FAILED` cross-chain or cross-protocol swap can arrive after the status flip. See [Track swap status](/features/transaction-management/swap/track-swap-status).
 
 ## Next steps
 

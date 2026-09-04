@@ -2,10 +2,9 @@
 title: "Track Swap Status"
 description: "Poll a swap from execute acceptance to settlement with get_swap_status. Same-chain and cross-chain swaps normalize to a single PENDING / COMPLETED / FAILED model."
 mode: "wide"
-noindex: true
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP_V2` returns a `swapRequestId`. Query `get_swap_status` with it to observe the full lifecycle — including failures that occur before broadcast, such as pre-flight simulation failures. Same-chain and cross-chain swaps share the same query and the same response shape; provider-specific state machines are normalized to three states: `PENDING`, `COMPLETED`, `FAILED`.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V3` returns a `swapRequestId`. Query `get_swap_status` with it to observe the full lifecycle — including failures that occur before broadcast, such as pre-flight simulation failures. Same-chain, cross-chain, and EVM ↔ SVM swaps share the same query and the same response shape; provider-specific state machines are normalized to three states: `PENDING`, `COMPLETED`, `FAILED`.
 
 ## Lifecycle model
 
@@ -13,9 +12,9 @@ Turnkey normalizes swap lifecycle to three states across same-chain and cross-ch
 
 - **PENDING**: still in flight. Broadcast pending, origin transaction not yet included, or (cross-chain) destination-side execution not yet settled.
 - **COMPLETED**: the user received the destination asset. Terminal, happy path.
-- **FAILED**: the swap will not fill as intended. Reported only when Turnkey knows what the user holds. Terminal.
+- **FAILED**: the swap will not fill as intended. Terminal. Same-chain `FAILED` comes from the origin send-transaction only. Cross-chain `FAILED` can appear before refund fields exist.
 
-Intermediate provider states (`bridge_pending`, `delayed`, `submitted`, and so on) collapse into `PENDING` on purpose. Every state maps to exactly one customer action: `PENDING` means wait, `COMPLETED` means you got the output, `FAILED` means look at what you hold and consider re-swapping.
+Intermediate provider states (`bridge_pending`, `delayed`, `submitted`, and so on) collapse into `PENDING` on purpose. `PENDING` means wait. `COMPLETED` means the output landed. `FAILED` means read `error` and, for cross-chain, keep polling if `refund` is absent.
 
 ## Query get\_swap\_status
 
@@ -26,7 +25,7 @@ Query [`get_swap_status`](/api-reference/queries/get-swap-status) with:
 </ParamField>
 
 <ParamField body="swapRequestId" type="string" required>
-  The handle returned by [`ACTIVITY_TYPE_EXECUTE_SWAP_V2`](/features/transaction-management/swap/execute-swap), e.g. `sha256:9a80031c2def...`.
+  The handle returned by [`ACTIVITY_TYPE_EXECUTE_SWAP_V3`](/features/transaction-management/swap/execute-swap), e.g. `sha256:9a80031c2def...`.
 </ParamField>
 
 cURL:
@@ -81,6 +80,7 @@ Response:
     },
     "providerReason": "<PROVIDER_SPECIFIC_REASON>"
   },
+  "destinationAddress": "<OUTPUT_RECIPIENT>",
   "updatedAt": "<UNIX_MS_TIMESTAMP>"
 }
 ```
@@ -89,12 +89,13 @@ Response:
 
 - `status`: normalized state. `PENDING`, `COMPLETED`, or `FAILED`.
 - `swapKind`: `SAME_CHAIN` or `CROSS_CHAIN`. Set at execute time; does not change.
-- `provider`: the provider that executed the swap. Present when known.
+- `provider`: the provider that executed the swap. Always present.
 - `inputToken`, `outputToken`, `inputAmount`: echoed from the execute intent.
 - `originTxHash`: origin-chain transaction hash. Present once the swap is broadcast, for both same-chain and cross-chain routes.
 - `destinationTxHashes`: array of destination-chain transaction hashes on `COMPLETED`. Cross-chain only.
+- `destinationAddress`: address that receives the output asset. For EVM ↔ SVM this is the `destinationAddress` you set on quote and execute. For same-protocol routes it is the swapping wallet.
 - `outputAmount`: actual amount received, on `COMPLETED`. May lag the `status` transition by seconds while the monitor fetches the final settled amount.
-- `refund`: present on `FAILED` when funds moved and came back. Contains `asset` (CAIP-19), `amount` (raw onchain units), and `txHash`. See [What FAILED means](#what-failed-means).
+- `refund`: present on cross-chain `FAILED` when funds moved and came back. Contains `asset` (CAIP-19), `amount` (raw onchain units), and optional `txHash`. Omitted for origin failures and same-chain swaps. See [What FAILED means](#what-failed-means).
 - `error`: present on `FAILED`. Contains `reason` (`ORIGIN_TRANSACTION_FAILED` or `PROVIDER_FILL_FAILED`), `message` (human-readable detail), `originTxError` (decoded revert detail, origin failures only), and `providerReason` (provider-specific detail, fill failures only). See [What FAILED means](#what-failed-means).
 - `updatedAt`: last observed state change, as a Unix timestamp in milliseconds (stringified).
 
@@ -103,18 +104,21 @@ Response:
 The response shape is identical. Two behaviors differ in practice:
 
 - **Timing.** Same-chain swaps reach a terminal state within roughly one block time of the origin chain. Cross-chain swaps can take tens of seconds to several minutes depending on the route. Each quote's `estimatedTimeSeconds` is the per-swap estimate.
-- **Field population.** `destinationTxHashes` is populated only for cross-chain `COMPLETED` swaps. Same-chain outcomes are fully described by `originTxHash`: on `COMPLETED`, that transaction delivered the output; on `FAILED`, either the transaction reverted or — if `originTxHash` is absent — the swap failed before broadcast and nothing moved onchain.
+- **Field population.** `destinationTxHashes` is populated only for cross-chain `COMPLETED` swaps. Same-chain outcomes are fully described by `originTxHash`: on `COMPLETED`, that transaction delivered the output; on `FAILED`, either the transaction reverted or — if `originTxHash` is absent — the swap failed before broadcast and nothing moved onchain. Same-chain `FAILED` never includes `refund` or `PROVIDER_FILL_FAILED`.
 
 `swapKind` (`SAME_CHAIN` or `CROSS_CHAIN`) tells you which model applies. Branch on it client-side only where the difference matters — for example, showing a bridge-progress state for cross-chain `PENDING` — and otherwise treat both kinds uniformly through the three-state model.
 
 ## What FAILED means
 
-`FAILED` is set as soon as Relay reports a failure. Refund details (`asset`, `amount`, `txHash`) are populated in a subsequent enrichment pass and may be absent when `FAILED` first appears. Keep polling if you need the refund details. `PENDING` means the destination leg may still fill — it does not indicate a refund is in flight.
+Same-chain and cross-chain `FAILED` are not the same event.
+
+- **Same-chain.** `FAILED` comes from the origin send-transaction only. `error.reason` is `ORIGIN_TRANSACTION_FAILED`. The response never includes `refund` or `PROVIDER_FILL_FAILED`.
+- **Cross-chain.** `FAILED` can come from the origin send-transaction (`ORIGIN_TRANSACTION_FAILED`) or from a provider fill failure after origin success (`PROVIDER_FILL_FAILED`). `FAILED` can appear before refund fields exist. Keep polling if you need `refund`. `PENDING` means the destination leg can still fill — it does not mean a refund is in flight.
 
 On `FAILED`, two fields together describe the outcome:
 
 - `error.reason` — why it failed: `ORIGIN_TRANSACTION_FAILED` (the origin transaction failed pre-flight simulation or reverted onchain) or `PROVIDER_FILL_FAILED` (the origin transaction succeeded but the provider could not fill). `error.message` and, for origin failures, `error.originTxError` carry the decoded detail, including the full revert chain.
-- `refund` — present when funds moved and came back: `refund.asset` (CAIP-19), `refund.amount` (raw onchain units), and `refund.txHash`. The refunded asset can differ from the original input if the route included an origin-side swap, and it lands on the origin chain.
+- `refund` — present on cross-chain `FAILED` when funds moved and came back: `refund.asset` (CAIP-19), `refund.amount` (raw onchain units), and optional `refund.txHash`. The refunded asset can differ from the original input if the route included an origin-side swap, and it lands on the origin chain.
 
 Reading the user's position from the response:
 
@@ -123,7 +127,7 @@ Reading the user's position from the response:
 | `ORIGIN_TRANSACTION_FAILED` | absent | absent | The full input — the swap failed simulation and never broadcast. |
 | `ORIGIN_TRANSACTION_FAILED` | present | absent | The full input — the transaction reverted onchain. Gas was spent (yours, if sponsored). |
 | `PROVIDER_FILL_FAILED` | present | present | `refund.amount` of `refund.asset`, on the origin chain. |
-| `PROVIDER_FILL_FAILED` | present | absent | Unknown — refund is still being enriched, or Relay reported failure with no automated return. Keep polling. |
+| `PROVIDER_FILL_FAILED` | present | absent | Unknown — refund is still being enriched, or the provider reported failure with no automated return. Keep polling. |
 
 If the user still wants the swap, re-quote — with the refunded asset as the new input where a refund occurred. Caveats worth surfacing to end users:
 
@@ -132,7 +136,7 @@ If the user still wants the swap, re-quote — with the refunded asset as the ne
 - If the original destination was another chain, the re-swap is again cross-chain.
 
 <Warning>
-  `FAILED` with error reason `PROVIDER_FILL_FAILED` and no `refund` object means Turnkey could not recover funds through the provider's automated flows. Contact support if you encounter this state.
+  If a cross-chain swap stays `FAILED` with `PROVIDER_FILL_FAILED` and no `refund` after you keep polling, the provider did not return funds through its automated flows. Contact support.
 </Warning>
 
 ## Polling cadence
