@@ -69,6 +69,32 @@
   "consumes": ["application/json"],
   "produces": ["application/json"],
   "paths": {
+    "/public/v1/query/get_active_policies": {
+      "post": {
+        "summary": "Get active policies",
+        "description": "For each policy in an organization, report whether it is currently active based on the enclave's trusted timestamp and the policy's time window (if any). Policies without a time field are always active.",
+        "operationId": "GetActivePolicies",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetActivePoliciesResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetActivePoliciesRequest"
+            }
+          }
+        ],
+        "tags": ["Policies"]
+      }
+    },
     "/public/v1/query/get_activity": {
       "post": {
         "summary": "Get activity",
@@ -978,32 +1004,6 @@
         "tags": ["Users"]
       }
     },
-    "/public/v1/query/get_velocity_control": {
-      "post": {
-        "summary": "Get velocity control",
-        "description": "Get details about a velocity control.",
-        "operationId": "GetVelocityControl",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/GetVelocityControlResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/GetVelocityControlRequest"
-            }
-          }
-        ],
-        "tags": ["Velocity Controls"]
-      }
-    },
     "/public/v1/query/get_wallet": {
       "post": {
         "summary": "Get wallet",
@@ -1626,32 +1626,6 @@
           }
         ],
         "tags": ["Users"]
-      }
-    },
-    "/public/v1/query/list_velocity_controls": {
-      "post": {
-        "summary": "List velocity controls",
-        "description": "List all velocity controls within an organization.",
-        "operationId": "ListVelocityControls",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/ListVelocityControlsResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/ListVelocityControlsRequest"
-            }
-          }
-        ],
-        "tags": ["Velocity Controls"]
       }
     },
     "/public/v1/query/list_verified_suborgs": {
@@ -2460,32 +2434,6 @@
         "tags": ["Users"]
       }
     },
-    "/public/v1/submit/create_velocity_control": {
-      "post": {
-        "summary": "Create velocity control",
-        "description": "Create a new velocity control.",
-        "operationId": "CreateVelocityControl",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/ActivityResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/CreateVelocityControlRequest"
-            }
-          }
-        ],
-        "tags": ["Velocity Controls"]
-      }
-    },
     "/public/v1/submit/create_wallet": {
       "post": {
         "summary": "Create wallet",
@@ -3006,32 +2954,6 @@
         "tags": ["Users"]
       }
     },
-    "/public/v1/submit/delete_velocity_control": {
-      "post": {
-        "summary": "Delete velocity control",
-        "description": "Delete an existing velocity control.",
-        "operationId": "DeleteVelocityControl",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/ActivityResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/DeleteVelocityControlRequest"
-            }
-          }
-        ],
-        "tags": ["Velocity Controls"]
-      }
-    },
     "/public/v1/submit/delete_wallet_accounts": {
       "post": {
         "summary": "Delete wallet accounts",
@@ -3550,6 +3472,32 @@
           }
         ],
         "tags": ["Private Keys"]
+      }
+    },
+    "/public/v1/submit/init_import_secrets": {
+      "post": {
+        "summary": "Init import secrets",
+        "description": "Initialize secret imports by generating Ingress Encryption Target Keys.",
+        "operationId": "InitImportSecrets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/InitImportSecretsRequest"
+            }
+          }
+        ],
+        "tags": ["Secrets"]
       }
     },
     "/public/v1/submit/init_import_wallet": {
@@ -4737,6 +4685,34 @@
       },
       "required": ["productId"]
     },
+    "ActivePolicyStatus": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for the organization the policy belongs to."
+        },
+        "policyId": {
+          "type": "string",
+          "description": "Unique identifier for a given policy."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the policy is currently active. A policy without a time window is always active."
+        },
+        "timeExpr": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The policy's time expression, absent when the policy has no time window."
+        },
+        "error": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Set when the policy's time expression could not be evaluated; the policy is reported inactive."
+        }
+      },
+      "required": ["organizationId", "policyId", "active"]
+    },
     "Activity": {
       "type": "object",
       "properties": {
@@ -5004,7 +4980,10 @@
         "ACTIVITY_TYPE_IMPORT_SECRETS",
         "ACTIVITY_TYPE_EXPORT_SECRETS",
         "ACTIVITY_TYPE_CREATE_VELOCITY_CONTROL",
-        "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL"
+        "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL",
+        "ACTIVITY_TYPE_UPDATE_PAYMENT_METHOD",
+        "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+        "ACTIVITY_TYPE_EXECUTE_SWAP_V3"
       ]
     },
     "AddressFormat": {
@@ -7421,6 +7400,38 @@
       },
       "required": ["signWith", "inputToken", "outputToken", "inputAmount"]
     },
+    "CreateSwapQuoteIntentV2": {
+      "type": "object",
+      "properties": {
+        "signWith": {
+          "type": "string",
+          "description": "Wallet account address used to price the executable provider quote. Private Key identifiers are not supported."
+        },
+        "inputToken": {
+          "type": "string",
+          "description": "CAIP-19 asset ID for the input asset. The chain is derived from this value."
+        },
+        "outputToken": {
+          "type": "string",
+          "description": "CAIP-19 asset ID for the output asset."
+        },
+        "inputAmount": {
+          "type": "string",
+          "description": "Base-unit amount of the input asset."
+        },
+        "slippageBps": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Provider-neutral maximum allowed slippage in basis points. Turnkey converts this value to each provider's request format. When omitted, each provider applies its default slippage behavior."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported."
+        }
+      },
+      "required": ["signWith", "inputToken", "outputToken", "inputAmount"]
+    },
     "CreateSwapQuoteRequest": {
       "type": "object",
       "properties": {
@@ -8005,31 +8016,6 @@
         }
       },
       "required": ["name", "dataSource", "aggregation", "identifier"]
-    },
-    "CreateVelocityControlRequest": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["ACTIVITY_TYPE_CREATE_VELOCITY_CONTROL"]
-        },
-        "timestampMs": {
-          "type": "string",
-          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
-        },
-        "organizationId": {
-          "type": "string",
-          "description": "Unique identifier for a given Organization."
-        },
-        "parameters": {
-          "$ref": "#/definitions/CreateVelocityControlIntent"
-        },
-        "generateAppProofs": {
-          "type": "boolean",
-          "x-nullable": true
-        }
-      },
-      "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
     "CreateVelocityControlResult": {
       "type": "object",
@@ -9165,31 +9151,6 @@
       },
       "required": ["velocityControlId"]
     },
-    "DeleteVelocityControlRequest": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL"]
-        },
-        "timestampMs": {
-          "type": "string",
-          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
-        },
-        "organizationId": {
-          "type": "string",
-          "description": "Unique identifier for a given Organization."
-        },
-        "parameters": {
-          "$ref": "#/definitions/DeleteVelocityControlIntent"
-        },
-        "generateAppProofs": {
-          "type": "boolean",
-          "x-nullable": true
-        }
-      },
-      "required": ["type", "timestampMs", "organizationId", "parameters"]
-    },
     "DeleteVelocityControlResult": {
       "type": "object",
       "properties": {
@@ -9376,6 +9337,11 @@
         "lastUpdatedTime": {
           "$ref": "#/definitions/external.data.v1.Timestamp",
           "description": "Last time this deployment was updated"
+        },
+        "provisioningState": {
+          "$ref": "#/definitions/ProvisioningState",
+          "x-nullable": true,
+          "description": "Current quorum-key provisioning state for this deployment"
         }
       },
       "required": [
@@ -9639,6 +9605,14 @@
             "$ref": "#/definitions/EarnVaultExposure"
           },
           "description": "The underlying markets the vault allocates into, ranked by supplied amount descending. Only populated when the request sets include_exposure, and only for providers that expose an allocation breakdown (Morpho)."
+        },
+        "forceDeallocatableLiquidity": {
+          "type": "string",
+          "description": "Additional assets withdrawable from the underlying vault by force-deallocating its non-liquidity adapters at zero penalty, in raw on-chain units of the underlying asset. Additive to liquidity. Empty when the provider does not report it."
+        },
+        "forceDeallocatableLiquidityDisplay": {
+          "$ref": "#/definitions/EarnValueDisplay",
+          "description": "Normalized force-deallocatable liquidity values for display purposes only (usd + crypto). Do not do arithmetic with these; use force_deallocatable_liquidity instead."
         }
       }
     },
@@ -9829,6 +9803,14 @@
         "liquidityDisplay": {
           "$ref": "#/definitions/EarnValueDisplay",
           "description": "Normalized liquidity values for display purposes only (usd + crypto). Do not do arithmetic with these; use liquidity instead."
+        },
+        "forceDeallocatableLiquidity": {
+          "type": "string",
+          "description": "Additional assets withdrawable from the vault by force-deallocating its non-liquidity adapters at zero penalty, in raw on-chain units of the underlying asset. Additive to liquidity. Empty when the provider does not report it."
+        },
+        "forceDeallocatableLiquidityDisplay": {
+          "$ref": "#/definitions/EarnValueDisplay",
+          "description": "Normalized force-deallocatable liquidity values for display purposes only (usd + crypto). Do not do arithmetic with these; use force_deallocatable_liquidity instead."
         }
       }
     },
@@ -10370,7 +10352,9 @@
             "eip155:42161",
             "eip155:4217",
             "eip155:42431",
-            "eip155:421614"
+            "eip155:421614",
+            "eip155:4663",
+            "eip155:46630"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         }
@@ -10417,7 +10401,9 @@
             "eip155:42161",
             "eip155:4217",
             "eip155:42431",
-            "eip155:421614"
+            "eip155:421614",
+            "eip155:4663",
+            "eip155:46630"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -10493,7 +10479,9 @@
             "eip155:42161",
             "eip155:4217",
             "eip155:42431",
-            "eip155:421614"
+            "eip155:421614",
+            "eip155:4663",
+            "eip155:46630"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -10677,7 +10665,9 @@
             "eip155:143",
             "eip155:10143",
             "eip155:42161",
-            "eip155:421614"
+            "eip155:421614",
+            "eip155:4663",
+            "eip155:46630"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -10832,6 +10822,69 @@
           "type": "string",
           "x-nullable": true,
           "description": "Exact gas station delegate contract nonce used in the BatchExecution EIP-712 message. Valid for sponsored EVM swaps and non-sponsored EVM swaps that execute as a multi-call batch (for example ERC-20 approve + swap). This is the replay-protection nonce for gas-station batches; use the nonces endpoint to fetch it. Omit to auto-fetch."
+        }
+      },
+      "required": [
+        "quoteId",
+        "inputToken",
+        "inputAmount",
+        "outputToken",
+        "quotedOutputAmount",
+        "minOutputAmount",
+        "sponsor"
+      ]
+    },
+    "ExecuteSwapIntentV3": {
+      "type": "object",
+      "properties": {
+        "quoteId": {
+          "type": "string",
+          "description": "Quote identifier returned by create_swap_quote. Execution is bound to this quote; the signer is derived from the quote and must not be resupplied."
+        },
+        "inputToken": {
+          "type": "string",
+          "description": "CAIP-19 asset ID for the input asset."
+        },
+        "inputAmount": {
+          "type": "string",
+          "description": "Exact base-unit amount of the input asset committed by the quote."
+        },
+        "outputToken": {
+          "type": "string",
+          "description": "CAIP-19 asset ID for the output asset."
+        },
+        "quotedOutputAmount": {
+          "type": "string",
+          "description": "Exact quoted base-unit output amount committed by the quote."
+        },
+        "minOutputAmount": {
+          "type": "string",
+          "description": "Exact minimum base-unit output committed by the quote."
+        },
+        "sponsor": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether the quoted transaction is sponsored."
+        },
+        "evmNonce": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Exact EVM sender (EOA account) nonce. Valid only for a non-sponsored EVM swap. Honored for already-delegated (Type-2) batch swaps and single-call swaps; ignored for not-yet-delegated EIP-7702 (Type-4) batches where the outer nonce is derived from the authorization. Prefer gas_station_nonce for batch replay protection and use the nonces endpoint to fetch it. Omit to auto-fetch."
+        },
+        "recentBlockhash": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Exact Solana recent blockhash. Valid only for a Solana swap, including sponsored swaps. Omit to auto-fetch."
+        },
+        "gasStationNonce": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Exact gas station delegate contract nonce used in the BatchExecution EIP-712 message. Valid for sponsored EVM swaps and non-sponsored EVM swaps that execute as a multi-call batch (for example ERC-20 approve + swap). This is the replay-protection nonce for gas-station batches; use the nonces endpoint to fetch it. Omit to auto-fetch."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported."
         }
       },
       "required": [
@@ -11282,6 +11335,35 @@
         "FIAT_ON_RAMP_PROVIDER_COINBASE",
         "FIAT_ON_RAMP_PROVIDER_MOONPAY"
       ]
+    },
+    "GetActivePoliciesRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given organization."
+        }
+      },
+      "required": ["organizationId"]
+    },
+    "GetActivePoliciesResponse": {
+      "type": "object",
+      "properties": {
+        "statuses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ActivePolicyStatus"
+          },
+          "description": "The active/inactive status of every policy in the organization."
+        },
+        "evaluatedAtMs": {
+          "type": "string",
+          "format": "uint64",
+          "description": "The enclave's trusted timestamp (Unix epoch milliseconds) used to evaluate every policy."
+        }
+      },
+      "required": ["statuses", "evaluatedAtMs"]
     },
     "GetActivitiesRequest": {
       "type": "object",
@@ -11834,7 +11916,9 @@
             "eip155:42161",
             "eip155:4217",
             "eip155:42431",
-            "eip155:421614"
+            "eip155:421614",
+            "eip155:4663",
+            "eip155:46630"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -12334,6 +12418,11 @@
           "$ref": "#/definitions/SwapError",
           "x-nullable": true,
           "description": "Normalized failure details, present whenever status is FAILED."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Address that receives the output asset."
         }
       },
       "required": [
@@ -12559,27 +12648,6 @@
       },
       "required": ["users"]
     },
-    "GetVelocityControlRequest": {
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "velocityControlId": {
-          "type": "string"
-        }
-      },
-      "required": ["organizationId", "velocityControlId"]
-    },
-    "GetVelocityControlResponse": {
-      "type": "object",
-      "properties": {
-        "velocityControl": {
-          "$ref": "#/definitions/VelocityControl"
-        }
-      },
-      "required": ["velocityControl"]
-    },
     "GetVerifiedSubOrgIdsRequest": {
       "type": "object",
       "properties": {
@@ -12717,6 +12785,8 @@
             "eip155:4217",
             "eip155:42431",
             "eip155:421614",
+            "eip155:4663",
+            "eip155:46630",
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
@@ -13216,6 +13286,27 @@
         }
       },
       "required": ["encryptionSuite", "numSecrets"]
+    },
+    "InitImportSecretsRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_INIT_IMPORT_SECRETS"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/InitImportSecretsIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
     },
     "InitImportSecretsResult": {
       "type": "object",
@@ -14326,6 +14417,15 @@
         },
         "deleteVelocityControlIntent": {
           "$ref": "#/definitions/DeleteVelocityControlIntent"
+        },
+        "updatePaymentMethodIntent": {
+          "$ref": "#/definitions/UpdatePaymentMethodIntent"
+        },
+        "createSwapQuoteIntentV2": {
+          "$ref": "#/definitions/CreateSwapQuoteIntentV2"
+        },
+        "executeSwapIntentV3": {
+          "$ref": "#/definitions/ExecuteSwapIntentV3"
         }
       }
     },
@@ -14605,7 +14705,9 @@
             "eip155:42431",
             "eip155:421614",
             "eip155:56",
-            "eip155:97"
+            "eip155:97",
+            "eip155:4663",
+            "eip155:46630"
           ],
           "description": "EVM CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -14802,6 +14904,8 @@
             "eip155:4217",
             "eip155:42431",
             "eip155:421614",
+            "eip155:4663",
+            "eip155:46630",
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
@@ -14846,34 +14950,6 @@
         }
       },
       "required": ["userTags"]
-    },
-    "ListVelocityControlsRequest": {
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "paginationOptions": {
-          "$ref": "#/definitions/Pagination"
-        }
-      },
-      "required": ["organizationId"]
-    },
-    "ListVelocityControlsResponse": {
-      "type": "object",
-      "properties": {
-        "velocityControls": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/VelocityControl"
-          }
-        },
-        "pageInfo": {
-          "$ref": "#/definitions/PageInfo"
-        }
-      },
-      "required": ["velocityControls", "pageInfo"]
     },
     "ListWebhookEndpointsRequest": {
       "type": "object",
@@ -15851,6 +15927,14 @@
         }
       }
     },
+    "ProvisioningState": {
+      "type": "string",
+      "enum": [
+        "PROVISIONING_STATE_PENDING",
+        "PROVISIONING_STATE_AWAITING_PROVISION",
+        "PROVISIONING_STATE_PROVISIONED"
+      ]
+    },
     "PublicKeyCredentialWithAttestation": {
       "type": "object",
       "properties": {
@@ -16615,6 +16699,9 @@
         },
         "deleteVelocityControlResult": {
           "$ref": "#/definitions/DeleteVelocityControlResult"
+        },
+        "updatePaymentMethodResult": {
+          "$ref": "#/definitions/UpdatePaymentMethodResult"
         }
       }
     },
@@ -19392,6 +19479,26 @@
       },
       "required": ["organizationId", "organizationName"]
     },
+    "UpdatePaymentMethodIntent": {
+      "type": "object",
+      "properties": {
+        "paymentEmail": {
+          "type": "string",
+          "description": "The email that will receive invoices for the payment method."
+        }
+      },
+      "required": ["paymentEmail"]
+    },
+    "UpdatePaymentMethodResult": {
+      "type": "object",
+      "properties": {
+        "paymentEmail": {
+          "type": "string",
+          "description": "The email address associated with the payment method."
+        }
+      },
+      "required": ["paymentEmail"]
+    },
     "UpdatePolicyIntent": {
       "type": "object",
       "properties": {
@@ -20496,53 +20603,6 @@
           "type": "string"
         }
       }
-    },
-    "VelocityControl": {
-      "type": "object",
-      "properties": {
-        "velocityControlId": {
-          "type": "string",
-          "description": "Unique identifier for the Velocity Control."
-        },
-        "organizationId": {
-          "type": "string",
-          "description": "Identifier of the Organization that owns the Velocity Control."
-        },
-        "name": {
-          "type": "string",
-          "description": "Human-readable name for the Velocity Control."
-        },
-        "dataSource": {
-          "$ref": "#/definitions/VelocityControlDataSource",
-          "description": "Data source for the Velocity Control."
-        },
-        "aggregation": {
-          "$ref": "#/definitions/VelocityControlAggregation",
-          "description": "Aggregation expression that the Velocity Control evaluates."
-        },
-        "createdAt": {
-          "$ref": "#/definitions/external.data.v1.Timestamp",
-          "description": "Time when the Velocity Control was created."
-        },
-        "updatedAt": {
-          "$ref": "#/definitions/external.data.v1.Timestamp",
-          "description": "Time when the Velocity Control was last updated."
-        },
-        "identifier": {
-          "type": "string",
-          "description": "Identifier for the Velocity Control. Policies reference it as `controls.\u003cidentifier\u003e`. It must be unique within the Organization."
-        }
-      },
-      "required": [
-        "velocityControlId",
-        "organizationId",
-        "name",
-        "dataSource",
-        "aggregation",
-        "createdAt",
-        "updatedAt",
-        "identifier"
-      ]
     },
     "VelocityControlAggregation": {
       "type": "object",

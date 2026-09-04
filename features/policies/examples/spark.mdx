@@ -119,3 +119,38 @@ approved operator set.
   "condition": "activity.type == 'ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE' && activity.params.sign_with == '<SPARK_WALLET_ACCOUNT_ADDRESS>' && activity.params.lightning_receive.threshold == 2 && activity.params.lightning_receive.operator_recipients.count() == 2 && activity.params.lightning_receive.operator_recipients.all(recipient, (recipient.operator_id == '<OPERATOR_ID_1>' && recipient.encryption_public_key == '<OPERATOR_ENCRYPTION_PUBLIC_KEY_1>') || (recipient.operator_id == '<OPERATOR_ID_2>' && recipient.encryption_public_key == '<OPERATOR_ENCRYPTION_PUBLIC_KEY_2>'))"
 }
 ```
+
+## Key exports
+
+Spark wallet accounts separate key roles by derivation path, under coin type `8797555'`:
+
+- Identity key: `m/8797555'/<account>'/0'`
+- Signing (leaf) keys: `m/8797555'/<account>'/1'/<index>'`
+- Static deposit keys: `m/8797555'/<account>'/3'/<index>'`
+
+The static deposit flow — generating a static deposit address and claiming an incoming L1 Bitcoin
+payment — exports the static deposit key with `EXPORT_WALLET_ACCOUNT`. Use the
+`wallet_account.path_indexes` and `wallet_account.path_hardened` policy fields to grant that export
+without exposing any other key.
+
+#### Allow exporting only static deposit keys
+
+This policy matches only fully hardened four-component paths with coin type `8797555` and purpose
+`3`, so the delegated user can export static deposit keys and nothing else. It never matches the
+identity key (`0'`), the signing leaf keys (`1'/<index>'`), or accounts of other wallets. It also
+never grants seed export: exporting the wallet seed is a separate activity (`EXPORT_WALLET`).
+
+```json
+{
+  "policyName": "Allow exports of Spark static deposit keys only",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
+  "condition": "activity.kind == 'EXPORT_WALLET_ACCOUNT' && wallet_account.path_indexes.count() == 4 && wallet_account.path_indexes[0] == 8797555 && wallet_account.path_indexes[2] == 3 && wallet_account.path_hardened.all(h, h == true)"
+}
+```
+
+<Note>
+  The `wallet_account.path_indexes` and `wallet_account.path_hardened` fields are set only for
+  `EXPORT_WALLET_ACCOUNT` activities. For more export policies, see
+  [Access control](/features/policies/examples/access-control#allow-exporting-only-wallet-accounts-under-a-specific-derivation-subtree).
+</Note>
