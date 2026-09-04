@@ -7,10 +7,6 @@ mode: "wide"
 
 Two queries cover vault discovery: [`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) returns the market of wrappable vaults for an asset, and [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) returns the wrappers your organization has already deployed. Full request/response schemas and cURL examples are in the API reference.
 
-<Note>
-  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
-</Note>
-
 ## Discover vaults with list\_earn\_vaults
 
 [`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) takes a required CAIP-19 asset identifier (e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` for USDC on Base) and returns every wrappable vault for that asset. The chain is derived from the identifier, and you can optionally filter by provider.
@@ -49,7 +45,14 @@ Key fields:
 
 ## Providers
 
-Morpho vaults are available today. Aave support is upcoming; the API shape is identical, so no integration changes will be needed. See the [chain support table](/features/transaction-management/earn#supported-protocols-and-chains).
+Morpho and Aave are both supported, with an identical API shape. Filter with `provider` (`EARN_PROVIDER_MORPHO` or `EARN_PROVIDER_AAVE`), or omit it to get both. See the [chain and asset support tables](/features/transaction-management/earn#supported-protocols-and-chains).
+
+A few fields read differently per provider:
+
+- **Morpho**: curated ERC-4626 vaults. `name` is the vault's name and `curator` lists its curator(s).
+- **Aave**: each entry is an Aave v3 reserve. `vaultAddress` is the reserve's underlying asset address, `name` is the reserve symbol, and `curator` is empty (Aave reserves have no curator).
+
+Reserves that Aave has frozen or paused are excluded from the catalog. If a reserve is frozen or paused after you deploy its wrapper, new deposits fail onchain; withdrawals are unaffected.
 
 **Important:** The vaults accessible through Earn are operated by independent third-party protocols. These providers are not subcontractors, agents, or affiliates of Turnkey. Turnkey does not manage, audit, or guarantee any vault, its strategy, its curator, or its returns. Turnkey's role is limited to providing the API infrastructure that enables wallet-level interaction with these protocols.
 

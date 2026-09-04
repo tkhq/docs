@@ -5,11 +5,7 @@ sidebarTitle: "Deploy a vault wrapper"
 mode: "wide"
 ---
 
-Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into.  It routes funds to the underlying vault and collects the applicable fees out of the yield, by minting fee shares to a payment splitter as interest accrues.. Deploying it is a one-time activity per vault, with gas sponsored by Turnkey.
-
-<Note>
-  Earn is currently an Early Access Product. [Contact us](https://www.turnkey.com/contact-us) to enable it for your organization.
-</Note>
+Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into. It routes funds to the underlying vault, and the applicable fees accrue onchain to a fee splitter as yield accrues. Deploying it is a one-time activity per vault, with gas sponsored by Turnkey.
 
 ## When to deploy
 
@@ -19,7 +15,7 @@ Deploy once per vault you want to offer, per fee configuration. Deposits into a 
 
 The deploy intent carries your fee:
 
-- `clientFeeBps`: your fee on gross yield, in basis points (`"2000"` = 20%). Combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected.
+- `clientFeeBps`: your fee on gross yield, in basis points (`"2000"` = 20%). It is capped at 4,000 bps; combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected. See the [fee model](/features/transaction-management/earn#fees) for current rates and caps.
 - `clientFeeWallet`: the address that receives your fee payouts onchain. It must be a wallet account owned by your organization; addresses outside your org are rejected.
 
 <Warning>
@@ -28,12 +24,16 @@ The deploy intent carries your fee:
 
 ## Submit the activity
 
-Submit an [`ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`](/api-reference/activities/deploy-earn-wrapper) activity with the vault's address (from the catalog), its CAIP-2 chain, and your fee configuration. See [Deploy Earn wrapper](/api-reference/activities/deploy-earn-wrapper) in the API reference for the full request/response schema and cURL example.
+Submit an [`ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`](/api-reference/activities/deploy-earn-wrapper) activity with the vault's address (from the catalog), its CAIP-2 chain, and your fee configuration. For Aave, the catalog's `vaultAddress` is the reserve's underlying asset address; pass it through as-is. See [Deploy Earn wrapper](/api-reference/activities/deploy-earn-wrapper) in the API reference for the full request/response schema and cURL example.
+
+<Note>
+  **Aave only:** Aave takes a small initial deposit at deployment and permanently locks it in the reserve, so a newly deployed Aave wrapper shows a small position straight away, about \$1 for stablecoin reserves. Turnkey currently funds this deposit from its own wallet. See [Aave's deployment docs](https://aave.com/docs/vaults/simple-earn/deploy#define-configuration).
+</Note>
 
 The activity result returns the deployed addresses immediately; they are derived deterministically before the transaction confirms:
 
 - `wrapperAddress`: the deposit target for this vault.
-- `splitterAddress`: the payment splitter that distributes fees between you and Turnkey.
+- `splitterAddress`: the fee splitter that distributes fees between you and Turnkey (a `PaymentSplitter` for Morpho, a `RevenueSplitterOwner` for Aave).
 - `deployRequestId`: poll handle for the deployment transaction.
 
 ## Poll deployment status
@@ -43,7 +43,7 @@ The activity completes when the deployment transaction is broadcast, not when it
 ## Gas and idempotency
 
 <Note>
-  Wrapper deployment gas costs (roughly 7.1M gas per deployment) are currently covered by Turnkey’s infrastructure and are not charged to you or your users. Deployments are also idempotent: resubmitting the activity with identical parameters re-derives the same wrapper and splitter addresses and skips the broadcast if the contracts already exist, so retries are safe.
+  Wrapper deployment gas costs are currently covered by Turnkey’s infrastructure and are not charged to you or your users. This is subject to change. Deployments are also idempotent: resubmitting the activity with identical parameters re-derives the same wrapper and splitter addresses and skips the broadcast if the contracts already exist, so retries are safe.
 </Note>
 
 ## Next steps
