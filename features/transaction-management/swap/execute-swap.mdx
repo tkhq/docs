@@ -2,16 +2,15 @@
 title: "Execute a Swap"
 description: "Execute a quoted token swap from a Turnkey wallet in one signed activity, with ERC-20 approvals handled for you and optional gas sponsorship."
 mode: "wide"
-noindex: true
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP_V2` runs a swap end-to-end against a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE`. You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, and minimum output. From that intent, Turnkey constructs the transaction, batching any required ERC-20 approvals into the same transaction, signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V2` runs a swap end-to-end against a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE`. You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, and minimum output. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
 
 ## Prerequisites
 
-- Your parent organization has enabled Swaps. Execute activities against organizations with no swap configuration fail with `<ERROR_CODE>`. See [Enable Swaps](/features/transaction-management/swap/enable-swap).
+- A swap configuration is not required; without one, the quote already carries a client fee of 0. See [Enable Swaps](/features/transaction-management/swap/enable-swap).
 - You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE`](/features/transaction-management/swap/get-swap-quote).
-- The wallet account the quote was created for holds enough of the input asset to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native asset for gas; if `sponsor: true`, your organization can sponsor the gas for the user's trade. To use the sponsored path gas sponsorship must be enabled for your organization.
+- The address the quote was created for holds enough of the input asset to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native asset for gas; if `sponsor: true`, your organization can sponsor the gas for the user's trade. To use the sponsored path gas sponsorship must be enabled for your organization.
 - For cross-chain routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
 
 ## Submit the swap
@@ -54,7 +53,7 @@ curl --request POST \
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
       "quoteId": "<QUOTE_ID>",
-      "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+      "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
       "inputAmount": "1000000",
       "quotedOutputAmount": "<EXPECTED_OUTPUT>",
@@ -84,7 +83,7 @@ const { activity } = await client.request("/public/v1/submit/execute_swap", {
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
     quoteId: "<QUOTE_ID>",
-    inputToken: "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+    inputToken: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
     inputAmount: "1000000",
     quotedOutputAmount: "<EXPECTED_OUTPUT>",
@@ -132,9 +131,9 @@ The signed intent carries only the swap parameters listed above. Everything else
 - Provider quote payloads
 - Transaction calldata and serialized transactions
 - Token approval signatures and payloads
-- Fee configuration — `feeReceiverWalletAddress` and fee rates are loaded from your parent organization; they cannot be overridden per swap
+- Fee configuration — rates and the fee receiver are snapshotted into the quote at quote time; execute does not re-read your live configuration, and you cannot override fees per swap
 
-Execute only accepts the bound quote terms. You do not pass provider payloads, calldata, or fee overrides. Because none of these inputs exist in the V2 intent, none of them can be tampered with before signing. See [Trust boundary](/features/transaction-management/swap#trust-boundary) for the full model.
+Execute only accepts the bound quote terms. You do not pass provider payloads, calldata, or fee overrides. Because none of these inputs exist in the V2 intent, none of them can be tampered with before signing. Optional replay-protection fields (`evmNonce`, `recentBlockhash`, `gasStationNonce`) can be set on the intent; omit them to auto-fetch. See [Trust boundary](/features/transaction-management/swap#trust-boundary) for the full model.
 
 ## Approvals
 
@@ -150,8 +149,8 @@ Native token swaps (e.g., ETH as `inputToken`) do not require an approval step.
 
 The execute activity is identical for same-chain and cross-chain routes — the route is fixed by the quote you reference, which derives it from the CAIP-19 pair. The difference is in the lifecycle after broadcast:
 
-- **Same-chain swaps** reach a terminal status on origin-chain inclusion: `COMPLETED` with the settled `outputAmount`, or `FAILED` with a structured error.
-- **Cross-chain swaps** stay `PENDING` past origin inclusion until the destination leg settles (`COMPLETED`, with `destinationTxHashes`) or funds are refunded (`FAILED`, with the `refund` object).
+- **Same-chain swaps** reach a terminal status from the origin transaction: `COMPLETED` with the settled `outputAmount`, or `FAILED` with `ORIGIN_TRANSACTION_FAILED`. Same-chain status does not return `refund` or `PROVIDER_FILL_FAILED`.
+- **Cross-chain swaps** stay `PENDING` past origin inclusion until the destination leg settles (`COMPLETED`, with `destinationTxHashes`) or the provider reports a fill failure (`FAILED`). The `refund` object can be absent when `FAILED` first appears.
 
 In both cases, poll [`get_swap_status`](/api-reference/queries/get-swap-status) with the `swapRequestId` returned by the execute activity. See [Track swap status](/features/transaction-management/swap/track-swap-status) for terminal states and error handling.
 
@@ -174,7 +173,7 @@ A successful execute activity returns an ID which you will use to track the stat
   `ACTIVITY_STATUS_COMPLETED` on the execute activity means the swap was accepted and enqueued for broadcast. It does not mean the transaction landed onchain, and it does not mean the swap filled. Settlement — including the actual `outputAmount` received — is only knowable through swap status.
 </Warning>
 
-Poll `get_swap_status` with the `swapRequestId` until it reports a terminal state: `COMPLETED` with the settled amounts, or `FAILED` with a structured error and any refund. This applies to same-chain and cross-chain swaps alike; cross-chain swaps simply remain `PENDING` longer, until the destination leg settles. Full lifecycle semantics on [Track swap status](/features/transaction-management/swap/track-swap-status).
+Poll `get_swap_status` with the `swapRequestId` until it reports a terminal state: `COMPLETED` with the settled amounts, or `FAILED` with a structured error. Same-chain `FAILED` has no refund. Cross-chain `FAILED` can omit `refund` on the first responses. Cross-chain swaps remain `PENDING` longer, until the destination leg settles. Full lifecycle semantics on [Track swap status](/features/transaction-management/swap/track-swap-status).
 
 ## Next steps
 

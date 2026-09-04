@@ -3,16 +3,16 @@ title: "End-to-end example: Swap on Base"
 description: "Configure your fee, quote a USDC → WETH swap, execute it from a Turnkey wallet, and poll to settlement: the full Swaps lifecycle."
 sidebarTitle: "End-to-end example: Swap on Base"
 mode: "wide"
-noindex: true
 ---
 
 This walkthrough runs the complete Swaps lifecycle against Base mainnet: set your fee once, quote 100 USDC into WETH, execute the quote from a Turnkey wallet, and poll until the swap settles onchain.
 
 **Prerequisites**
 
+- A Pay As You Go, Pro, or Enterprise billing organization
 - A Turnkey API key pair
 - A wallet account holding USDC on Base, plus ETH on Base for gas if you don't sponsor
-- An EVM wallet account in your parent organization to receive your fee payouts
+- An EVM wallet account in your parent organization if you want to charge a client fee. Omit the fee configuration to swap with a client fee of 0.
 
 <Steps>
   <Step title="Initialize the client">
@@ -89,7 +89,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
     <CodeGroup>
 
     ```javascript title="JavaScript"
-    const inputToken = "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913"; // USDC
+    const inputToken = "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // USDC
     const outputToken = "eip155:8453/erc20:0x4200000000000000000000000000000000000006"; // WETH
     const inputAmount = "100000000"; // 100 USDC
 
@@ -125,7 +125,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
         "organizationId": "<ORGANIZATION_ID>",
         "parameters": {
           "signWith": "<WALLET_ACCOUNT_ADDRESS>",
-          "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+          "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
           "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
           "inputAmount": "100000000",
           "slippageBps": "50"
@@ -194,7 +194,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
         "organizationId": "<ORGANIZATION_ID>",
         "parameters": {
           "quoteId": "<QUOTE_ID>",
-          "inputToken": "eip155:8453/erc20:0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913",
+          "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
           "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
           "inputAmount": "100000000",
           "quotedOutputAmount": "<EXPECTED_OUTPUT>",
@@ -225,7 +225,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
     }
     ```
 
-    On `FAILED`, `error.reason` is either `ORIGIN_TRANSACTION_FAILED` (never broadcast, or reverted onchain) or `PROVIDER_FILL_FAILED` (origin succeeded, provider could not fill). Refund details are enriched shortly after the status flips, so they may be absent on the first `FAILED` response. See [What FAILED means](/features/transaction-management/swap/track-swap-status#what-failed-means).
+    This Base example is same-chain, so `FAILED` is `ORIGIN_TRANSACTION_FAILED` and has no `refund`. `PROVIDER_FILL_FAILED` and refund enrichment apply to cross-chain swaps. See [What FAILED means](/features/transaction-management/swap/track-swap-status#what-failed-means).
   </Step>
 </Steps>
 
@@ -237,6 +237,7 @@ Two things differ after broadcast:
 
 - The swap stays `PENDING` past origin-chain inclusion until the destination leg settles, so poll every 5–10 seconds rather than every second.
 - On `COMPLETED`, `destinationTxHashes` carries the destination-chain transactions. `swapKind` in the response tells you which model applied.
+- On `FAILED`, refund fields can arrive after the status flip. Keep polling if `refund` is absent.
 
 ## Dive deeper
 

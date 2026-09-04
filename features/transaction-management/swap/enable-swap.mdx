@@ -1,8 +1,7 @@
 ---
 title: "Enable Swaps"
-description: "One-time parent-organization activity that enables swaps and sets your integrator fee configuration."
+description: "One-time parent-organization activity that sets your integrator fee configuration."
 mode: "wide"
-noindex: true
 ---
 
 Configure Swaps once on your parent organization: set your fee and the wallet account that collects it.
@@ -12,16 +11,16 @@ Configure Swaps once on your parent organization: set your fee and the wallet ac
 ## Prerequisites
 
 - You submit the activity **against the parent organization**. Submissions from sub-organizations will fail.
-- You have an EVM wallet account in the parent organization to receive fees. Fees are paid in USDC on Base regardless of which chains your swaps occur on, so a single receiving account covers all swap volume.
+- You have an EVM wallet account in the parent organization to receive fees, or you omit `feeReceiverWalletAddress` and let Turnkey generate one. Fees accrue off-chain and are paid out in USDC on Base. A single receiving account covers all swap volume.
 - You've decided your fee rate in basis points. See [Choose your fee configuration](#choose-your-fee-configuration).
 
 ## Submit the configuration
 
 Submit an [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/api-reference/activities/upsert-swap-config) activity with:
 
-- `feeReceiverWalletAddress` — an EVM address owned by your parent organization, including private key accounts. Optional: if `feeBps` is set and this is omitted, Turnkey auto-generates a parent HD wallet to receive fees.
+- `feeReceiverWalletAddress` — an EVM wallet account in your parent organization. Private key addresses are not accepted. Optional: if `feeBps` is a non-empty string and this is omitted, Turnkey auto-generates a parent HD wallet to receive fees. `"0"` is non-empty and still generates a wallet. To charge no client fee, omit both `feeBps` and `feeReceiverWalletAddress`.
 - `feeBps` — your fee in basis points, as a stringified integer (e.g. `"50"` for 0.5%). Must be between 0% and 5%; values above the cap will fail.
-- `stableFeeBps` — optional; Enterprise plans only. A separate fee applied when both assets carry the `stable` flag in [`list_supported_assets`](/api-reference/queries/list-supported-assets). Omit to charge `feeBps` on every swap.
+- `stableFeeBps` — optional; Enterprise plans only. A separate fee applied when both assets are [supported stablecoins](/features/transaction-management/swap#supported-stablecoins). Omit to charge `feeBps` on every swap.
 
 Example request (cURL):
 
@@ -76,8 +75,7 @@ Response:
     "result": {
       "upsertSwapConfigResult": {
         "feeReceiverWalletAddress": "<WALLET_ADDRESS>",
-        "feeBps": "50",
-        "stableFeeBps": "10"
+        "feeBps": "50"
       }
     }
   }
@@ -97,7 +95,7 @@ When choosing your rates:
 - **Cap.** `feeBps` and `stableFeeBps` must not exceed 500 bps; values above the cap will fail.
 - **Your fee stacks on Turnkey's.** Turnkey's fee is baked into every quote (see [Fees](/features/transaction-management/swap#fees)), so the spread your user experiences is Turnkey's rate plus yours. Quotes always show the net result — `outputAmount` reflects both.
 - **Stablepairs are rate-sensitive.** Stable-to-stable swaps are economically tight; a fee that's reasonable on a volatile pair can exceed the entire spread on a stablepair. If you're on an Enterprise plan, you're able to configure lower fees for stablepair trades if that makes sense in the context of your app.
-- **Fee currency and destination.** All of your fees accrue in USDC on Base to your configured `feeReceiverWalletAddress`, regardless of swap chains or assets — one receiving account, one asset, no in-kind fee management.
+- **Fee currency and destination.** Fees accrue as Relay app-fee balances for your configured `feeReceiverWalletAddress`, regardless of swap chains or assets. Collect them with [`ACTIVITY_TYPE_CLAIM_SWAP_FEES`](/api-reference/activities/claim-swap-fees). The payout is USDC on Base.
 
 Fee changes apply to new quotes only; in-flight quotes settle at the fee baked into them.
 
@@ -111,3 +109,4 @@ Quotes requested after the change use the new configuration immediately. Executi
 
 - [Get a quote](/features/transaction-management/swap/get-swap-quote) — fee-aware indicative pricing for display and selection
 - [Execute a swap](/features/transaction-management/swap/execute-swap) — the signing activity that runs the swap end-to-end
+- [Claim swap fees](/api-reference/activities/claim-swap-fees) — pay accrued integrator fees to your fee-receiver wallet
