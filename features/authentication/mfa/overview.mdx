@@ -10,10 +10,23 @@ Requests made to Turnkey's public API are required to be authenticated using [a 
 
 Turnkey's MFA policies can be configured to require any combination of supported authentication methods.
 
+## MFA is evaluated for the user who stamped
+
+Since every request is authenticated by a stamp, the stamp is also what decides **whose** MFA policies apply. Turnkey evaluates the policies of the user whose credential signed the request, not of the user the activity happens to be about.
+
+This matters most at login, where the two are easily different:
+
+- A login **stamped in the browser** by the end user, such as `STAMP_LOGIN` carrying an [attested stamp](./satisfying-mfa#email-otp-sms-otp-and-oauth) from an email OTP or an OIDC token, is attributed to the sub-organization user. Their MFA policies apply.
+- A login **stamped with a parent-organization API key**, which is what `OTP_LOGIN` and `OAUTH_LOGIN` submitted from your backend or through the Auth Proxy do, is attributed to that parent user. The sub-organization user's MFA policies are never consulted, and the login succeeds with no error.
+
+So an `activity.resource == 'AUTH'` policy only takes effect if the login itself is stamped by the end user. If your login is backend-driven, keep `INIT_OTP` and `VERIFY_OTP` on your server and let the browser stamp the login with the verification token, which is bound to a client-generated key and useless to anyone else.
+
 ## MFA policies
 MFA policies are a unique resource type in Turnkey that allows configuration of authentication requirements, scoped to a specific condition.
 
-MFA policies can be configured in both parent and sub-organizations, and are enforced at the user level rather than the organization level. MFA applies to all users, including root users and non-root users.
+MFA policies can be configured in both parent and sub-organizations, and are enforced at the user level rather than the organization level.
+
+**MFA applies to root users.** This is the exception to the usual rule: a root user's activities bypass the policy engine, but MFA is evaluated before that happens, so an unsatisfied MFA policy stops a root user like anyone else. It is the only policy type that constrains them. Because policies attach to users rather than organizations, each root user needs their own, and a user added to the root quorum later has none until you create one.
 
 Once an MFA policy is created, it is immediately enforced for the user.
 
@@ -81,6 +94,20 @@ In the example above, the user must:
 1. Authenticate with an API key
 2. Authenticate with **either** a passkey **or** email OTP
 
+<Warning>
+  **Do not list the same method in two steps.** A credential is not used up by satisfying a step: each step is checked independently against everything the user has presented. So if a passkey can satisfy step 1, and the passkey is also listed in step 2, a single passkey satisfies both steps.
+
+  ```json
+  // Two steps, but one passkey satisfies both. This is one factor, not two.
+  "requiredAuthenticationMethods": [
+    { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }, { "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }] },
+    { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }, { "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }] }
+  ]
+  ```
+
+  To require two different factors, put one in each step, as the example above does. There is no way to express "any two of these three": every step you add must name the factors it accepts, and those sets must not overlap.
+</Warning>
+
 You can find more examples [here](./examples).
 
 Each `AuthenticationMethodParams` accepts:
@@ -92,6 +119,28 @@ Each `AuthenticationMethodParams` accepts:
   - `AUTHENTICATION_TYPE_SMS_OTP`
   - `AUTHENTICATION_TYPE_OAUTH`
 - `id` (optional): A specific authentication method's ID. When provided, only that specific authentication method satisfies the requirement. When omitted, any authentication method of the specified type can be used. Note that Email OTP and SMS OTP do not have IDs.
+
+#### The user must already be able to satisfy the policy
+
+Turnkey rejects a policy the user has no way to meet, at creation time:
+
+```
+user (<user-id>) cannot satisfy mfa policy requirement: mfa policy '<name>'
+requires one of ["Passkey"] but user does not, or will not, have a matching credential
+```
+
+Each type is checked against what the user has today:
+
+| Type | Requires |
+| :--- | :--- |
+| `AUTHENTICATION_TYPE_PASSKEY` | an enrolled authenticator, or the specific one if you pinned an `id` |
+| `AUTHENTICATION_TYPE_API_KEY` | a long-lived API key |
+| `AUTHENTICATION_TYPE_EMAIL_OTP` | `userEmail` set |
+| `AUTHENTICATION_TYPE_SMS_OTP` | `userPhoneNumber` set |
+| `AUTHENTICATION_TYPE_OAUTH` | at least one linked OAuth provider |
+| `AUTHENTICATION_TYPE_SESSION` | nothing: a session is always obtainable. If you pin an `id`, that session profile must exist |
+
+So enroll the credential first, then create the policy. This also means you cannot lock a user out by writing a policy, only by removing a credential a policy already depends on.
 
 ### Evaluation order
 

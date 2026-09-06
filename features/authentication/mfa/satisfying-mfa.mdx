@@ -38,6 +38,8 @@ If the MFA policy specifies an `id` for a session authentication method, the `id
 
 Note that sessions are **not transitive**. For example, if a passkey was used to create a session, and an MFA policy requires `AUTHENTICATION_TYPE_PASSKEY`, the session **will not** satisfy that requirement. The user must stamp directly with the passkey.
 
+The same applies to logins that used an OTP or OAuth. A session obtained by signing in with Google presents as `AUTHENTICATION_TYPE_SESSION`, never `AUTHENTICATION_TYPE_OAUTH`, so a policy requiring OAuth sends the user back through the provider for a fresh OIDC token. Only an attested stamp presents `AUTHENTICATION_TYPE_OAUTH`, `AUTHENTICATION_TYPE_EMAIL_OTP` or `AUTHENTICATION_TYPE_SMS_OTP`.
+
 ## Email OTP, SMS OTP, and OAuth
 
 Unlike API keys and passkeys, OTP and OAuth authenticators cannot directly sign requests. Instead, they use [attested stamps](/api-reference/overview/stamps#attested), where a client-side key signs the request and a token (verification token or OIDC token) attests that the key belongs to the identity.
@@ -45,6 +47,35 @@ Unlike API keys and passkeys, OTP and OAuth authenticators cannot directly sign 
 To prove Email OTP, SMS OTP, or OAuth authentication, the user stamps the `APPROVE_ACTIVITY` request with an attested stamp.
 
 Only OAuth authenticators support the `id` field in MFA policies. If specified, the user must prove ownership of that specific OAuth provider identity. Email and SMS OTP authenticators do not have IDs.
+
+### Obtaining the attested stamp
+
+Both token types come from a flow the user completes in the browser, and both are bound to a key the client generates.
+
+Email or SMS OTP:
+
+```ts
+// verifyOtp points the attested stamper at the verification token
+await verifyOtp({ otpId, otpCode, otpEncryptionTargetBundle });
+await httpClient.approveActivity({ fingerprint, organizationId }, StamperType.Attested);
+```
+
+OAuth, where `onOauthSuccess` hands back the token instead of logging the user in:
+
+```ts
+await handleGoogleOauth({
+  onOauthSuccess: async ({ oidcToken, publicKey }) => {
+    await overrideAttestedStamper({ oidcToken, publicKey });
+    await httpClient.approveActivity({ fingerprint, organizationId }, StamperType.Attested);
+  },
+});
+```
+
+### How the stamp is attributed
+
+An attested stamp carries no user id: Turnkey resolves the user from the token, inside the organization the activity targets. Verification tokens match on **contact**, so the email or phone must be the one on the user. OIDC tokens match on `(sub, aud, iss)`, so a token from a different OAuth client will not match the same person.
+
+Attested stamps only work against sub-organizations. The same mechanism decides who a **login** belongs to: stamped in the browser it is the end user, so their MFA policies apply; stamped by your backend or the Auth Proxy with a parent-organization API key it is that parent user, and they do not.
 
 ## MFA and consensus
 
