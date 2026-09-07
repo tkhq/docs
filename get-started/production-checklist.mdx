@@ -17,10 +17,35 @@ description: "This checklist contains recommendations and steps specifically for
 
 ## Security
 
-- Lock down your [root quorum](/features/users/root-quorum). We recommend a quorum of at least 3 with a threshold of at least 2.
+- Lock down your [root quorum](/features/users/root-quorum). We recommend a quorum of at least 3 with a threshold of at least 2, counting only credentials that actually work:
+  - Check periodically that every member can still log in. An untested authenticator is not a working credential, and a three-member quorum with one dead credential is a two-member quorum.
+  - Rotate the quorum before someone leaves, not after. Updating it requires the current threshold to approve, so once you fall below that, neither you nor Turnkey can fix it.
+  - Consider holding one credential institutionally, such as a hardware key in a safe, so that staff changes alone cannot exhaust the quorum.
 - Ensure any team members with critical permissions, especially root quorum members, have set up at least two authenticators for their account (e.g., touchID plus a hardware authenticator like a Yubikey).
+- Apply the same thinking to your end users. A sub-organization root user with a single authenticator is one lost device away from an unreachable wallet. Prompt users to register a second credential, whether a backup passkey or an additional auth method. See [backup and recovery for sub-organizations](/get-started/backup-recovery#sub-organizations).
 - Avoid using root user permissions for routine operations and instead use standard users with permissions explicitly granted via policies to limit the surface area of a compromised user.
 - Confirm that all API keys are stored securely and not embedded in exposed or vulnerable parts of the codebase. API keys should be stored in a secure, encrypted environment and should never be hard-coded in publicly accessible repositories or client-side code.
+
+## Backup and recovery
+
+- Read [Backup and recovery](/get-started/backup-recovery) and settle on an approach before you launch. Changing authentication methods or policies later means updating existing users as well as your integration, so it is worth deciding early.
+- Decide whether to expose [wallet export](/features/wallets/export-wallets) to your end users. It is what lets a user take their keys with them, including if your product is discontinued. Some integrations deliberately withhold it, but it is easier to design in than to retrofit, so make it a deliberate choice rather than a default.
+- Consider exposing sub-organization deletion, so a user can remove their data when they leave. Deletion requires that every wallet and private key has already been exported, unless you explicitly override that, so an export step can form part of the deletion flow itself.
+- Decide what happens when a user loses a credential, and what happens when they lose all of them. Turnkey has no write access to your organizations and cannot restore access on your behalf, so whatever path exists has to be one you built. [MFA recovery](/features/authentication/mfa/enforcement-and-recovery) sets out several recovery designs and the practices common to them, most of which apply whether or not you enforce MFA.
+
+## Abuse prevention
+
+Anyone who can reach your sign-in form can cause a message to be sent, since OTP initiation necessarily happens before the user has proven anything. That makes it a target for automated abuse. The controls below apply to both email and SMS.
+
+- Pass `userIdentifier` on every OTP initiation so Turnkey's [OTP rate limits](/features/authentication/sms#otp-rate-limits) apply per user rather than globally.
+- Rate limit in your own application as well, keyed on what you know and Turnkey does not: account, device, and IP alongside the email address or phone number. Turnkey's limits are a backstop, not a first line of defence.
+- Put bot protection in front of OTP initiation, which is the main control against automated abuse. If you use the [Auth Proxy](/features/authentication/auth-proxy), Turnkey's [Captcha](/features/authentication/captcha) integration is a dashboard toggle. If your own backend initiates OTPs instead, that setting does not apply to you and you will need your own captcha or equivalent.
+- Log every initiation with the identifier you rate limit on, so abuse can be attributed rather than only counted.
+- Alert on the ratio, not just the volume. A rising initiation rate with a falling verification rate means something is requesting codes it cannot receive, which is the earliest signal of abuse.
+
+SMS additionally carries a direct, attacker-controllable cost, so treat it as spend as well as a security surface. Watch destination country codes and restrict to the countries you actually serve, since per-message cost varies widely by destination and abuse concentrates in the expensive ones.
+
+Email carries a reputation cost instead. Bulk OTP requests aimed at addresses that do not exist produce hard bounces, and if you send from your [own sender domain](/features/authentication/email#custom-email-sender-domain), a sustained bounce rate damages that domain's sending reputation and can push your legitimate mail to spam folders. Validate address format before initiating, and treat a rising bounce rate as an abuse signal rather than only a deliverability problem.
 
 ## Logging
 
@@ -29,6 +54,8 @@ description: "This checklist contains recommendations and steps specifically for
 
 ## Errors and retries
 
-- Activity submission is optimistically synchronous. In most cases activities will be completed and returned right away (synchronously), but if there is a lot of activity in a single organization, activities will be processed asynchronously. Make sure you handle PENDING activities by polling a few times until their completion. You can use [createActivityPoller](https://github.com/tkhq/sdk/blob/d9ed2aefc92d298826a40e821f959b019ea1936f/packages/http/src/async.ts#L101) to do this if you're using our Typescript SDK.
-- Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. Incorporate [rate limiting](/reference/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) and exponential backoff in retry mechanisms.
-- Set up monitoring to detect and alert on patterns of failures
+- Activity submission is optimistically synchronous. In most cases activities will be completed and returned right away (synchronously), but if there is a lot of activity in a single organization, activities will be processed asynchronously. Make sure you handle PENDING activities by polling a few times until their completion. Our TypeScript SDKs do this for you, and expose an `activityPoller` config with `intervalMs` and `numRetries`. The defaults are short, around three seconds in total, so raise them if you submit enough volume to see asynchronous processing regularly.
+- Polling does not resolve every non-terminal status. `ACTIVITY_STATUS_CONSENSUS_NEEDED` and `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` are waiting on a person rather than on Turnkey, so route them into your approval or MFA flow instead of continuing to poll.
+- Understand what makes a retry safe before you build one. See [Activities](/api-reference/activities/overview) for how idempotency works: submission is keyed on a fingerprint of the request body, so resending the same request returns the same activity, while changing `timestampMs` creates a new one. On a signing activity that difference is a second signature, so retry by resending the original request rather than rebuilding it. Requests more than an hour old are rejected rather than replayed.
+- Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. See [Errors](/api-reference/overview/errors) for the status codes and which of them are worth retrying. Incorporate [rate limiting](/reference/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) and exponential backoff in retry mechanisms.
+- Set up monitoring to detect and alert on patterns of failures.
