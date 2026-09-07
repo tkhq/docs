@@ -71,7 +71,9 @@ sensitive actions until the user logs in again with the newly recovered passkey.
 #### How it works
 
 1. Ahead of time, you create a session profile scoped to authenticator enrollment only, plus a
-   conditional MFA policy that applies to logins targeting that profile.
+   conditional MFA policy that applies to logins targeting that profile. Give that policy two
+   steps, email OTP and then SMS OTP or OAuth, so that recovery is no weaker than the login it
+   replaces.
 2. User initiates recovery, providing their email address.
 3. Your backend runs `INIT_OTP` and `VERIFY_OTP`, then hands the verification token to the
    browser.
@@ -80,21 +82,19 @@ sensitive actions until the user logs in again with the newly recovered passkey.
    makes the login belong to the end user, so their MFA policy is the one evaluated. A login
    stamped by your backend with a parent-organization API key would not be: see
    [who stamped](./overview#mfa-is-evaluated-for-the-user-who-stamped).
-5. The login stops at `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED`, since the stamp presents only
-   the email OTP. The user satisfies the remaining factor, SMS OTP or OAuth, by
-   [approving the activity](./satisfying-mfa#email-otp-sms-otp-and-oauth) with a second
-   attested stamp.
-6. On success, the login returns a session token bound to that profile. It can enroll a
-   credential and nothing else — it cannot sign, export, or move funds.
-7. User enrolls a new passkey using the `CREATE_AUTHENTICATORS_V2` activity, stamped with the
+5. The login does not complete yet. The email OTP counts as the first factor, because the login
+   stamp carried it, and the MFA policy requires a second one. The response comes back with
+   status `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` and the activity's `fingerprint`.
+6. The user completes the second factor, SMS OTP or OAuth. That produces a new token, which the
+   browser turns into a fresh attested stamp and uses to submit `APPROVE_ACTIVITY` for the
+   `fingerprint` from the previous step. See
+   [satisfying MFA](./satisfying-mfa#email-otp-sms-otp-and-oauth).
+7. Both factors are now satisfied, so the login completes and returns a session token bound to
+   the recovery profile. That session can enroll a credential and nothing else. It cannot sign,
+   export, or move funds.
+8. User enrolls a new passkey using the `CREATE_AUTHENTICATORS_V2` activity, stamped with the
    recovery session.
-8. User logs in normally with the new passkey to access their account.
-
-<Warning>
-  The second factor has to be something the login stamp does not already carry. A recovery
-  policy requiring only an email OTP is satisfied the moment the request arrives, so no
-  challenge is raised and recovery is exactly as strong as the inbox.
-</Warning>
+9. User logs in normally with the new passkey to access their account.
 
 #### Design rationale
 

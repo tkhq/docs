@@ -17,16 +17,16 @@ Since every request is authenticated by a stamp, the stamp is also what decides 
 This matters most at login, where the two are easily different:
 
 - A login **stamped in the browser** by the end user, such as `STAMP_LOGIN` carrying an [attested stamp](./satisfying-mfa#email-otp-sms-otp-and-oauth) from an email OTP or an OIDC token, is attributed to the sub-organization user. Their MFA policies apply.
-- A login **stamped with a parent-organization API key**, which is what `OTP_LOGIN` and `OAUTH_LOGIN` submitted from your backend or through the Auth Proxy do, is attributed to that parent user. The sub-organization user's MFA policies are never consulted, and the login succeeds with no error.
+- A login **stamped with a parent-organization API key** is attributed to that parent user, even though the login itself targets the sub-organization. This is what happens when your backend submits `OTP_LOGIN` or `OAUTH_LOGIN` with its own API key, and what the Auth Proxy does. The sub-organization user's MFA policies are never consulted, and the login succeeds with no error.
+
+The second case is a normal, supported way to run authentication, and nothing is wrong with it until you add MFA. It is worth checking which one you are on before writing a policy, because a backend-driven login is easy to build without ever noticing that the stamp came from your infrastructure rather than from the user.
 
 So an `activity.resource == 'AUTH'` policy only takes effect if the login itself is stamped by the end user. If your login is backend-driven, keep `INIT_OTP` and `VERIFY_OTP` on your server and let the browser stamp the login with the verification token, which is bound to a client-generated key and useless to anyone else.
 
 ## MFA policies
 MFA policies are a unique resource type in Turnkey that allows configuration of authentication requirements, scoped to a specific condition.
 
-MFA policies can be configured in both parent and sub-organizations, and are enforced at the user level rather than the organization level.
-
-**MFA applies to root users.** This is the exception to the usual rule: a root user's activities bypass the policy engine, but MFA is evaluated before that happens, so an unsatisfied MFA policy stops a root user like anyone else. It is the only policy type that constrains them. Because policies attach to users rather than organizations, each root user needs their own, and a user added to the root quorum later has none until you create one.
+MFA policies can be configured in both parent and sub-organizations, and are enforced at the user level rather than the organization level. MFA applies to all users, including root users and non-root users.
 
 Once an MFA policy is created, it is immediately enforced for the user.
 
@@ -39,6 +39,10 @@ An MFA policy can be created using the `CreateMfaPolicy` activity and passing in
 - `requiredAuthenticationMethods`: An ordered list of authentication steps that must be satisfied when the policy condition is met. Each step contains an `any` array of acceptable methods. If multiple methods are listed in `any`, satisfying any one of them fulfills that step.
 - `order`: An integer that specifies the order of evaluation for multiple MFA policies. Policies with lower order values are evaluated first.
 - `notes`: Optional field for any additional information about the policy
+
+<Note>
+  When updating a policy with `UpdateMfaPolicy`, an empty `requiredAuthenticationMethods` array means "leave unchanged", not "remove". A policy always has at least one required method, so to relax a policy, send the methods you want rather than an empty array. To stop requiring MFA in a case, narrow the `condition` or delete the policy.
+</Note>
 
 ### Condition
 
@@ -95,17 +99,30 @@ In the example above, the user must:
 2. Authenticate with **either** a passkey **or** email OTP
 
 <Warning>
-  **Do not list the same method in two steps.** A credential is not used up by satisfying a step: each step is checked independently against everything the user has presented. So if a passkey can satisfy step 1, and the passkey is also listed in step 2, a single passkey satisfies both steps.
+  **Do not list the same method in more than one step.** Each step is checked independently against everything the user has presented, and satisfying a step does not use the credential up. A method listed in two steps therefore satisfies both.
+
+  Suppose you want to require any two of passkey and email OTP, and write this:
 
   ```json
-  // Two steps, but one passkey satisfies both. This is one factor, not two.
   "requiredAuthenticationMethods": [
     { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }, { "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }] },
     { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }, { "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }] }
   ]
   ```
 
-  To require two different factors, put one in each step, as the example above does. There is no way to express "any two of these three": every step you add must name the factors it accepts, and those sets must not overlap.
+  The user stamps with their passkey. Step 1 looks for a passkey or an email OTP and finds the passkey. Step 2 looks for the same two things and finds the same passkey. Both steps pass, no challenge is raised, and the activity proceeds on a single factor.
+
+  Listing several methods in one step is fine, and is how you let the user choose. The rule is only that no method may appear in more than one step:
+
+  ```json
+  // A passkey, plus either an email OTP or an SMS OTP
+  "requiredAuthenticationMethods": [
+    { "any": [{ "type": "AUTHENTICATION_TYPE_PASSKEY" }] },
+    { "any": [{ "type": "AUTHENTICATION_TYPE_EMAIL_OTP" }, { "type": "AUTHENTICATION_TYPE_SMS_OTP" }] }
+  ]
+  ```
+
+  This is also why "any two of these three" cannot be expressed. Every step must name the specific methods it accepts.
 </Warning>
 
 You can find more examples [here](./examples).
@@ -119,6 +136,19 @@ Each `AuthenticationMethodParams` accepts:
   - `AUTHENTICATION_TYPE_SMS_OTP`
   - `AUTHENTICATION_TYPE_OAUTH`
 - `id` (optional): A specific authentication method's ID. When provided, only that specific authentication method satisfies the requirement. When omitted, any authentication method of the specified type can be used. Note that Email OTP and SMS OTP do not have IDs.
+
+For `AUTHENTICATION_TYPE_SESSION`, the `id` is a [session profile](../sessions/session-profiles) ID, and the all-zero UUID is a special case that inverts the check: it requires a session with **no** profile attached, meaning an ordinary read/write session. Use it to exclude scoped sessions from an activity.
+
+```json
+// Signing requires a normal session, so a recovery-scoped session cannot satisfy it
+{
+  "condition": "activity.action == 'SIGN'",
+  "order": 0,
+  "requiredAuthenticationMethods": [
+    { "any": [{ "type": "AUTHENTICATION_TYPE_SESSION", "id": "00000000-0000-0000-0000-000000000000" }] }
+  ]
+}
+```
 
 #### The user must already be able to satisfy the policy
 
