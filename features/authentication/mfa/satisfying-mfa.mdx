@@ -18,6 +18,14 @@ The credential used to stamp this approval request determines which authenticati
 
 You can learn more about stamps [here](/api-reference/overview/stamps).
 
+### One approval per outstanding step
+
+Each `APPROVE_ACTIVITY` proves one authentication method. A policy with two steps therefore takes one approval, because the credential that stamped the original activity already proves the first step, and a policy with three steps takes two.
+
+The activity stays in `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` after each approval until every step has been satisfied, so treat this as a loop rather than a single challenge and response. Keep submitting approvals against the same `fingerprint`, each stamped with a different credential, until the activity leaves that status.
+
+Nothing is consumed along the way. Turnkey checks each step against everything the user has presented so far, which is why the same credential cannot satisfy two steps.
+
 ## API key
 
 To prove API key authentication, the user stamps the `APPROVE_ACTIVITY` request with an API key.
@@ -34,9 +42,13 @@ If the MFA policy specifies an `id`, the user must stamp with that specific auth
 
 To prove session authentication, the user stamps the `APPROVE_ACTIVITY` request with a session credential. A session credential is an API key that was classified as a session after a login activity (e.g., `STAMP_LOGIN`, `OTP_LOGIN`).
 
-If the MFA policy specifies an `id` for a session authentication method, the `id` refers to a [session profile](../sessions/session-profiles) ID. The user must stamp with a session credential that was issued with that specific session profile.
+If the MFA policy specifies an `id` for a session authentication method, the `id` refers to a [session profile](../sessions/session-profiles) ID. The user must stamp with a session credential that was issued with that specific session profile. If the `id` is the all-zero UUID, the opposite applies: only a session with no profile attached satisfies it, so a scoped session will not.
 
 Note that sessions are **not transitive**. For example, if a passkey was used to create a session, and an MFA policy requires `AUTHENTICATION_TYPE_PASSKEY`, the session **will not** satisfy that requirement. The user must stamp directly with the passkey.
+
+The same is true of OTP and OAuth logins. If the user signed in with Google, the session they received counts as `AUTHENTICATION_TYPE_SESSION` and nothing else. It does not count as `AUTHENTICATION_TYPE_OAUTH`. A policy requiring OAuth will therefore ask them to sign in with Google again, this time to produce a token used to approve the activity rather than to log in.
+
+Email OTP, SMS OTP and OAuth are only ever proven with an attested stamp, described in the next section.
 
 ## Email OTP, SMS OTP, and OAuth
 
@@ -45,6 +57,32 @@ Unlike API keys and passkeys, OTP and OAuth authenticators cannot directly sign 
 To prove Email OTP, SMS OTP, or OAuth authentication, the user stamps the `APPROVE_ACTIVITY` request with an attested stamp.
 
 Only OAuth authenticators support the `id` field in MFA policies. If specified, the user must prove ownership of that specific OAuth provider identity. Email and SMS OTP authenticators do not have IDs.
+
+### Obtaining the attested stamp
+
+Both token types come from a flow the user completes in the browser, and both are bound to a key the client generates. The examples below use `@turnkey/core`.
+
+For email or SMS OTP, `verifyOtp` points the attested stamper at the resulting verification token:
+
+```ts
+await verifyOtp({ otpId, otpCode, otpEncryptionTargetBundle });
+await httpClient.approveActivity({ fingerprint, organizationId }, StamperType.Attested);
+```
+
+For OAuth, obtain an OIDC token from the provider using the same flow your application uses for sign-in, then point the stamper at it:
+
+```ts
+await overrideAttestedStamper({ oidcToken, publicKey });
+await httpClient.approveActivity({ fingerprint, organizationId }, StamperType.Attested);
+```
+
+If you are using `@turnkey/react-wallet-kit`, `handleGoogleOauth` runs the provider flow for you and returns the token through its `onOauthSuccess` callback, rather than logging the user in.
+
+### How the stamp is attributed
+
+An attested stamp carries no user id: Turnkey resolves the user from the token, inside the organization the activity targets. Verification tokens match on **contact**, so the email or phone must be the one on the user. OIDC tokens match on `(sub, aud, iss)`, so a token from a different OAuth client will not match the same person.
+
+Attested stamps only work against sub-organizations. The same mechanism decides who a **login** belongs to: stamped in the browser it is the end user, so their MFA policies apply; stamped by your backend or the Auth Proxy with a parent-organization API key it is that parent user, and they do not.
 
 ## MFA and consensus
 
