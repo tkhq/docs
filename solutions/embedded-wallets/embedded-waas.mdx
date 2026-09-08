@@ -6,31 +6,30 @@ description: "Distribute embedded wallets through your developer platform with y
 
 import { FeatureCard } from '/snippets/feature-card.mdx'
 
-Your platform sits between Turnkey and your downstream developers: you expose your own SDK or APIs, and Turnkey is invisible to the people integrating with you. Your platform controls onboarding, authentication, transaction approval, and billing, all on top of Turnkey's key management infrastructure.
+Your platform sits between Turnkey and your developers: you expose your own SDK or APIs, and Turnkey is invisible to the people integrating with you. Your platform controls onboarding, authentication, transaction approval, and billing, all on top of Turnkey's key management infrastructure.
 
 ## Powered by Turnkey
 
 - [**DIMO**](https://www.turnkey.com/customers/how-dimo-is-bringing-transportation-solutions-onchain-with-turnkey) -- decentralized transportation network with 165,000+ connected vehicles. 90% reduction in onboarding time, 30% increase in completion rates. Built their own [transactions SDK](https://github.com/DIMO-Network/transactions) on Turnkey's infrastructure
 
-## What is Wallet-as-a-Service?
+## Why Wallet-as-a-Service?
 
-With [consumer wallets](/solutions/embedded-wallets/embedded-consumer-wallet) and [business wallets](/solutions/embedded-wallets/embedded-business-wallets), your application integrates Turnkey directly and manages wallets for end users. With Wallet-as-a-Service, your platform is an intermediary layer: you build wallet infrastructure on top of Turnkey, and your customers integrate with your SDK rather than Turnkey directly.
+With [consumer wallets](/solutions/embedded-wallets/embedded-consumer-wallet) and [business wallets](/solutions/embedded-wallets/embedded-business-wallets), your application integrates Turnkey directly and manages wallets for end users. With Wallet-as-a-Service, you build wallet infrastructure on top of Turnkey, and your customers integrate with your SDK rather than Turnkey directly.
 
-Your platform handles auth, signing flows, and transaction submission on behalf of your downstream integrators. Turnkey processes and secures every signing request, but your customers never interact with Turnkey directly.
+Your platform handles auth, signing flows, and transaction submission on behalf of your developers. Turnkey processes and secures every signing request, but your customers never interact with Turnkey directly.
 
 This gives you control over:
 
 - **The developer experience.** Your APIs, your SDK, your branding.
 - **Transaction approval.** Your backend decides which requests go through and when.
-- **Billing and metering.** Gate signing at the infrastructure layer, not the application layer.
+- **Billing and metering.** Adapt usage to your business model.
 - **Compliance.** Run your own checks before any transaction executes.
 
 ### When to use Wallet-as-a-Service
 
 | Scenario                                                        | Why Wallet-as-a-Service fits                                                                                                                                       |
 | :-------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Your customers integrate with your SDK, not Turnkey's           | You own the developer experience end-to-end. Downstream integrators never interact with Turnkey directly.                                                          |
-| You want to white-label wallet infrastructure                   | Fork or wrap the Embedded Wallet Kit with your branding and expose your own APIs. Turnkey is invisible to your customers.                                          |
+| Your customers integrate with your SDK, not Turnkey's           | You own the developer experience end-to-end. Developers never interact with Turnkey directly.                                                          |
 | You need platform-level approval on every transaction           | Your backend evaluates billing status, compliance checks, or risk rules before any fund-moving transaction executes.                                               |
 | You want per-user key isolation with no shared state            | Each end user maps to a Turnkey sub-organization: isolated wallets, credentials, policies, and activity logs.                                                      |
 
@@ -55,7 +54,7 @@ In the simplest configuration, your platform holds the sole API key that authori
 4. Your platform approves via API key and the transaction executes on Turnkey
 5. If your platform withholds approval, the transaction does not execute
 
-This flow keeps Turnkey entirely behind your platform. Downstream developers and end users interact only with your SDK and APIs.
+This flow keeps Turnkey entirely behind your platform. Developers and end users interact only with your SDK and APIs.
 
 <Note>
   This baseline is a custodial arrangement: your platform holds the only credential that can authorize signing. To make end users verifiably non-custodial, add them as a root user and require their approval on every transaction. See [End-user co-signing](#end-user-co-signing-2-of-2-root-quorum) and [Custody models](/solutions/embedded-wallets/overview#custody-models).
@@ -67,7 +66,9 @@ See [Core concepts](/get-started/about-turnkey#core-concepts) and [Root quorum](
 
 ### Step 1: Create a sub-organization per end user
 
-Map each end user to a [sub-organization](/features/sub-organizations), and track the relationship between your platform's user IDs and their Turnkey sub-org IDs in your own database. Your parent organization has read-only access to sub-orgs and can initiate auth and recovery flows, but cannot sign transactions or modify policies within them.
+Map each end user to a [sub-organization](/features/sub-organizations). Your parent organization has read-only access to sub-orgs and can initiate auth and recovery flows, but cannot sign transactions or modify policies within them.
+
+Creating a sub-org returns a `subOrganizationId`. You can use this identifier to map your users to a Turnkey sub-organization. Future API calls to Turnkey such as wallet lookups, policy changes, and signing will reference this sub-organization identifier.
 
 In the baseline model, your platform is the sole root user of each sub-org, authenticated via API key. Decide up front what every sub-org gets by default: wallet structure, supported chains and accounts, and baseline policies.
 
@@ -89,6 +90,9 @@ const subOrg = await turnkeyClient.createSubOrganization({
     },
   },
 });
+
+// Store this against your own user record
+await db.users.update(userId, { turnkeySubOrgId: subOrg.subOrganizationId });
 ```
 
 Two options to layer in at creation time:
@@ -115,7 +119,7 @@ See [Sub-organizations](/features/sub-organizations), [Policies](/features/polic
 
 ### Step 2: Build your integration surface
 
-Create the SDK, APIs, or UI components that downstream developers will integrate with. Abstract Turnkey and expose only your platform's intended wallet, auth, and signing flows.
+Create the SDK, APIs, or UI components that developers will integrate with. Abstract Turnkey and expose only your platform's intended wallet, auth, and signing flows.
 
 - **Embedded Wallet Kit (EWK):** Fork or wrap [EWK](/solutions/embedded-wallets/integration-guide/react/index) components (authentication, wallet UI, approval prompts) with your branding.
 - **Backend service:** Handle platform API key approvals, billing and risk evaluation, and activity monitoring through your backend.
@@ -125,7 +129,7 @@ See [Embedded Wallet Kit](/solutions/embedded-wallets/integration-guide/react/in
 
 ### Step 3: Wire the wallet into your platform flow
 
-Integrate the wallet into your onboarding and runtime flows so every downstream integration inherits a working embedded wallet.
+Integrate the wallet into your onboarding and runtime flows so every integration inherits a working embedded wallet.
 
 - **Onboarding:** Create the sub-org as part of user registration. The end user should experience this as a natural part of your sign-up flow.
 - **Client initialization:** Initialize the Turnkey client with the user's sub-org context on each session. Use [sessions](/features/authentication/sessions/overview) for batched signing workflows to reduce authentication friction.
