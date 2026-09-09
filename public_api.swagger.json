@@ -2798,6 +2798,32 @@
         "tags": ["Private Keys"]
       }
     },
+    "/public/v1/submit/delete_secrets": {
+      "post": {
+        "summary": "Delete secrets",
+        "description": "Delete secrets by their unique identifiers. All secrets must belong to the organization.",
+        "operationId": "DeleteSecrets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/DeleteSecretsRequest"
+            }
+          }
+        ],
+        "tags": ["Secrets"]
+      }
+    },
     "/public/v1/submit/delete_smart_contract_interface": {
       "post": {
         "summary": "Delete smart contract interface",
@@ -4983,7 +5009,8 @@
         "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL",
         "ACTIVITY_TYPE_UPDATE_PAYMENT_METHOD",
         "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
-        "ACTIVITY_TYPE_EXECUTE_SWAP_V3"
+        "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
+        "ACTIVITY_TYPE_DELETE_SECRETS"
       ]
     },
     "AddressFormat": {
@@ -8853,6 +8880,53 @@
       },
       "required": ["privateKeyIds"]
     },
+    "DeleteSecretsIntent": {
+      "type": "object",
+      "properties": {
+        "secretIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique identifiers of the secrets to delete. Must contain between 1 and 32 distinct UUIDs. All secrets must belong to the organization."
+        }
+      },
+      "required": ["secretIds"]
+    },
+    "DeleteSecretsRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_DELETE_SECRETS"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/DeleteSecretsIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "DeleteSecretsResult": {
+      "type": "object",
+      "properties": {
+        "secretIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique identifiers of the deleted secrets, in the order requested."
+        }
+      },
+      "required": ["secretIds"]
+    },
     "DeleteSmartContractInterfaceIntent": {
       "type": "object",
       "properties": {
@@ -11009,6 +11083,14 @@
         "encryptionSuite": {
           "$ref": "#/definitions/TransportEncryptionSuite",
           "description": "Transport encryption suite used for the exported secret."
+        },
+        "requestContext": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/KeyValue"
+          },
+          "description": "Bind metadata to the request."
         }
       },
       "required": ["secretId", "targetPublicKey", "encryptionSuite"]
@@ -14426,6 +14508,9 @@
         },
         "executeSwapIntentV3": {
           "$ref": "#/definitions/ExecuteSwapIntentV3"
+        },
+        "deleteSecretsIntent": {
+          "$ref": "#/definitions/DeleteSecretsIntent"
         }
       }
     },
@@ -16702,6 +16787,9 @@
         },
         "updatePaymentMethodResult": {
           "$ref": "#/definitions/UpdatePaymentMethodResult"
+        },
+        "deleteSecretsResult": {
+          "$ref": "#/definitions/DeleteSecretsResult"
         }
       }
     },
