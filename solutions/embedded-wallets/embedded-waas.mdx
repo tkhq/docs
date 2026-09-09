@@ -188,17 +188,21 @@ The staged setup matters: establish the threshold last so your platform can conf
 
 See [Root quorum](/features/users/root-quorum) and [Policy examples](/features/policies/examples/access-control).
 
-### IP allowlisting
+### Proxying and IP allowlisting
 
-Lock your platform's API traffic to specific server IP ranges by defining trusted CIDR blocks. Requests from any other IP are rejected. Configure at the organization level (all requests) or per API key (specific keys for specific environments); the org-level allowlist must be enabled for per-key rules to take effect.
+Turnkey's public API has an open CORS policy, so your SDK can POST signed requests straight to `api.turnkey.com`. Routing them through your backend instead gives your platform a single egress point for every Turnkey call. At that chokepoint you can validate requests before forwarding them, apply rate limits per merchant or per user, persist activity results such as new wallet addresses, and feed your own monitoring.
+
+Treat this as a soft gate. Requests are signed on the client, so your proxy can forward, drop, or delay a request but cannot alter it, and a client holding a valid credential can still reach Turnkey directly. Keep the enforceable controls in [policies](/features/policies/overview) and use the proxy for operational visibility and gating.
+
+IP allowlisting hardens the traffic that does originate from your servers. Define trusted CIDR blocks and requests from any other IP are rejected. Configure this at the organization level for all requests, or per API key to scope specific keys to specific environments. The org-level allowlist must be enabled for per-key rules to take effect.
 
 <Warning>
-  IP allowlisting applies to the **parent organization only**. Sub-organizations do not inherit parent allowlist rules and cannot define their own, so requests authenticated against a sub-org (including your platform's transaction approvals) are not evaluated against an allowlist. Enabling an org-level allowlist with no CIDR rules blocks all API traffic, so stage rules with `enabled: false` first.
+  IP allowlisting applies to the **parent organization only**. Sub-organizations do not inherit parent allowlist rules and cannot define their own, so requests authenticated against a sub-org, including your platform's transaction approvals, are not evaluated against an allowlist. Enabling an org-level allowlist with no CIDR rules blocks all API traffic, so stage rules with `enabled: false` first.
 </Warning>
 
 Available to Enterprise clients on the Scale tier or higher.
 
-See [IP Allowlist](/features/ip-allowlisting/overview).
+See [Proxying signed requests](/features/authentication/proxying-signed-requests) and [IP Allowlist](/features/ip-allowlisting/overview).
 
 ### Captcha protection
 
