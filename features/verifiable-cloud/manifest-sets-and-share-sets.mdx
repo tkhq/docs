@@ -19,7 +19,7 @@ Every TVC app is controlled by two groups of [operators](/features/verifiable-cl
 Both sets are instances of the same building block, an **operator set**:
 
 - A **name**, so you can identify the set on the dashboard.
-- A list of **operators**, up to 50 per set. Each operator is an alias plus a P-256 public key. `tvc login` generates a local operator key for you; `tvc operator create` creates a Turnkey-hosted operator instead.
+- A list of **operators**, up to 50 per set. Each operator has a name and public keys for signing and encryption. `tvc login` generates a local operator key for you; `tvc operator create` creates a Turnkey-hosted operator instead.
 - A **threshold**: the number of operators whose signatures are required before the set's authority takes effect. The threshold can't exceed the number of members.
 
 You define both sets when creating an app, via `manifestSetParams` and `shareSetParams` on the [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) activity. If you already have an operator set from a previous app, reuse it by passing its ID (`manifestSetId` or `shareSetId`) instead. TVC also deduplicates automatically: defining a set with the exact same name, threshold, and members as an existing one reuses the existing set.
@@ -71,7 +71,7 @@ Your app's Quorum Key is its long-lived identity: it is the same across all encl
 The Quorum Key is never stored whole. It is split into shares using Shamir's Secret Sharing, each share is encrypted to one share set member's key, and reassembly requires the share set's threshold to be met. By design this only ever happens inside an enclave. Share set thresholds must be at least 2.
 
 <Note>
-Looking to use a custom Quorum Key for your app? Reach out to us via your dedicated Slack channel and we'll get your organization set up.
+To create a custom Quorum Key with hosted operators, follow the [worked example](#worked-example) below.
 </Note>
 
 ## Side by side
@@ -80,7 +80,7 @@ Looking to use a custom Quorum Key for your app? Reach out to us via your dedica
 | :----------------------------- | :--------------------------------------------------- | :------------------------------------------------------------------------ |
 | Authorizes                     | Which code and configuration may run                 | Which verified enclaves receive the Quorum Key                            |
 | Members hold                   | An operator signing key                              | An operator signing key plus an encrypted share of the Quorum Key         |
-| Acts when                      | Every new deployment, before enclaves boot           | Every new deployment, after enclaves boot and attest                      |
+| Acts when                      | Every new deployment, before enclaves boot           | During key provisioning, after enclaves boot and attest                   |
 | Threshold protects against     | A minority of operators shipping unauthorized code   | A minority of share holders reconstructing or leaking the Quorum Key      |
 | If the threshold isn't met     | The deployment never leaves `Approval Required`      | The Quorum Key cannot be reconstructed; the app cannot unlock its secrets |
 | Defined in `create_tvc_app` as | `manifestSetId` / `manifestSetParams`                | `shareSetId` / `shareSetParams`                                           |
@@ -118,50 +118,104 @@ Acme runs a price oracle on TVC. The oracle derives its signing identity from th
 - **Manifest set** `"Acme Deploy Reviewers"`: three platform engineers (Alice, Bob, Carol), threshold **2**. Any production deployment needs two engineers to independently review the manifest.
 - **Share set** `"Acme Key Custodians"`: three members of the security team (Dana, Erin, Frank), threshold **2**. No single custodian can reconstruct the oracle's signing key.
 
-Acme first generates a custom Quorum Key split across the custodians, producing one share encrypted to each custodian's operator key and a `quorumPublicKey` to declare at app creation. No custodian ever holds the whole key.
+Acme uses hosted operators. Turnkey performs hosted key generation, signing, and share re-encryption inside its enclaves without returning private keys or plaintext shares to the CLI.
 
-The app configuration passed to [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) then looks like this:
+### Create the operators and Quorum Key
+
+[Log in](/features/verifiable-cloud/quickstart#login), then keep the same organization and local profile active throughout setup. Create Alice's hosted operator:
+
+```bash
+tvc operator create --name alice
+```
+
+Repeat for Bob, Carol, Dana, Erin, and Frank, using their names. Retain each returned **Operator ID**; the CLI saves the operators' IDs and public-key metadata locally.
+
+You can also use an existing wallet with `--wallet-id` and specify a derivation path with `--account-path`. Run `tvc operator create --help` for the available options.
+
+Create the Quorum Key with a share encrypted to each custodian's operator:
+
+```bash
+tvc keys create-quorum-key \
+  --threshold 2 \
+  --operator-ids "<DANA_OPERATOR_ID>,<ERIN_OPERATOR_ID>,<FRANK_OPERATOR_ID>"
+```
+
+Use the returned **Quorum Public Key** as `<ACME_QUORUM_PUBLIC_KEY>` below.
+
+### Create the app
+
+Save this configuration as `app.json`, replacing the placeholders with the public key and operator IDs from setup:
 
 ```json
 {
   "name": "Acme Price Oracle",
   "quorumPublicKey": "<ACME_QUORUM_PUBLIC_KEY>",
-  "manifestSetId": null,
   "manifestSetParams": {
     "name": "Acme Deploy Reviewers",
     "threshold": 2,
-    "newOperators": [
-      { "name": "alice", "publicKey": "<ALICE_PUBLIC_KEY>" },
-      { "name": "bob", "publicKey": "<BOB_PUBLIC_KEY>" },
-      { "name": "carol", "publicKey": "<CAROL_PUBLIC_KEY>" }
-    ],
-    "existingOperatorIds": []
+    "existingOperatorIds": [
+      "<ALICE_OPERATOR_ID>",
+      "<BOB_OPERATOR_ID>",
+      "<CAROL_OPERATOR_ID>"
+    ]
   },
-  "shareSetId": null,
   "shareSetParams": {
     "name": "Acme Key Custodians",
     "threshold": 2,
-    "newOperators": [
-      { "name": "dana", "publicKey": "<DANA_PUBLIC_KEY>" },
-      { "name": "erin", "publicKey": "<ERIN_PUBLIC_KEY>" },
-      { "name": "frank", "publicKey": "<FRANK_PUBLIC_KEY>" }
-    ],
-    "existingOperatorIds": []
+    "existingOperatorIds": [
+      "<DANA_OPERATOR_ID>",
+      "<ERIN_OPERATOR_ID>",
+      "<FRANK_OPERATOR_ID>"
+    ]
   }
 }
 ```
 
+The share set's operators and threshold must match those used to create the Quorum Key. Set them explicitly: omitting the share set selects the CLI's development share set. The manifest set's membership and threshold are independent. See [`create_tvc_app`](/api-reference/activities/create-a-tvc-app) for all configuration fields.
+
+```bash
+tvc app create --config-file app.json
+```
+
 ### Shipping the first deployment
 
-1. An Acme engineer creates a deployment: the oracle's container image, expected binary digest, ports, and arguments. TVC generates the QOS manifest and the deployment sits at `Approval Required`.
-2. Alice and Bob each run `tvc deploy approve`, review the manifest section by section, and sign it. Carol is on vacation; with a 2-of-3 threshold, that's fine. The threshold is met and TVC boots the enclaves.
-3. Each enclave generates its Ephemeral Key and produces an attestation document.
-4. Dana and Erin each verify an enclave's attestation, re-encrypt their share to its Ephemeral Key, and submit it. At 2 shares, the enclave reconstructs the Quorum Key and launches the oracle.
-5. The oracle is live at `https://app-<APP_UUID>.turnkey.cloud`, signing responses with keys derived from the Quorum Key.
+1. An Acme engineer follows the [quickstart's deployment creation steps](/features/verifiable-cloud/quickstart), using the returned App ID for `appId`. TVC generates the QOS manifest and the deployment sits at `Approval Required`. Use the returned Deployment ID in the commands below.
+
+2. Alice and Bob each run [`tvc deploy approve`](#the-manifest-set-who-approves-what-runs) with their operator ID, review the manifest, and sign it. Carol is on vacation; with a 2-of-3 threshold, that's fine. The threshold is met and TVC boots the enclaves.
+
+3. Wait for an enclave to produce an attestation document. Check that verified provisioning details are available before provisioning shares:
+
+   ```bash
+   tvc deploy provisioning-details \
+     --deploy-id <DEPLOYMENT_ID>
+   ```
+
+4. Dana and Erin provision their shares through Turnkey:
+
+   ```bash
+   tvc deploy provision \
+     --deploy-id <DEPLOYMENT_ID> \
+     --operator-id <DANA_OPERATOR_ID>
+
+   tvc deploy provision \
+     --deploy-id <DEPLOYMENT_ID> \
+     --operator-id <ERIN_OPERATOR_ID>
+   ```
+
+   Each command verifies the attestation and manifest approvals, then requests re-encryption of that operator's share to the enclave's Ephemeral Key. At 2 shares, the enclave reconstructs the Quorum Key and launches the oracle.
+
+5. Check deployment readiness:
+
+   ```bash
+   tvc deploy get-status \
+     --deploy-id <DEPLOYMENT_ID>
+   ```
+
+   Once all desired replicas are ready, the oracle is live at `https://app-<APP_UUID>.turnkey.cloud`, signing responses with keys derived from the Quorum Key.
 
 ### Shipping an upgrade
 
-Acme releases `v2` of the oracle. The new image produces a new manifest, so both sets act again: two of Alice, Bob, and Carol review and approve the new manifest, then two of Dana, Erin, and Frank verify the new enclaves' attestations and post their shares. Key forwarding does not cross deployment boundaries, so a fresh deployment always requires fresh share postings.
+Acme releases `v2` of the oracle. The new image produces a new manifest, so two of Alice, Bob, and Carol review and approve it. Once the replacement deployment is ready, Acme can [direct traffic to it](/features/verifiable-cloud/managing-apps-and-deployments#direct-traffic-to-a-deployment).
 
 The Quorum Key itself stays the same across deployments, which is the point: state encrypted by `v1` remains readable by `v2`, and consumers see a continuous signing identity.
 
