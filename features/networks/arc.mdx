@@ -1,0 +1,65 @@
+---
+title: "Arc support on Turnkey"
+sidebarTitle: "Arc"
+---
+
+import { SupportCallout } from "/snippets/support-callout.mdx";
+
+Arc is a stablecoin-native Layer-1 blockchain built by Circle, purpose-built for real-world financial applications. Arc uses USDC as its native gas token, achieves sub-second deterministic finality, and is fully EVM-compatible. More on [Arc here](https://docs.arc.io).
+
+## Address derivation
+
+Turnkey supports Arc address derivation with `ADDRESS_TYPE_ETHEREUM`. This address format is valid across the Arc network and is identical to standard EVM address derivation.
+
+## Transaction construction and signing
+
+Because Arc is EVM-compatible, existing Ethereum tooling works on Arc without modification:
+
+- [@turnkey/ethers](https://github.com/tkhq/sdk/tree/main/packages/ethers): contains a `TurnkeySigner` which implements Ethers' `AbstractSigner` interface. See [Ethers docs](https://docs.ethers.org/v6/api/providers/abstract-signer/#AbstractSigner).
+- [@turnkey/viem](https://github.com/tkhq/sdk/tree/main/packages/viem): contains a `createAccount` method to create a Turnkey-powered [custom account](https://viem.sh/docs/accounts/local) which [Viem](https://viem.sh/) can use seamlessly.
+
+We have an example that demonstrates how to construct and broadcast an Arc transaction:
+
+- [`examples/chain-integrations/with-arc`](https://github.com/tkhq/sdk/tree/main/examples/chain-integrations/with-arc): demonstrates constructing and broadcasting a native USDC transfer via an EIP-1559 (type 2) transaction on the Arc testnet.
+
+## Transaction management and gas sponsorship
+
+Turnkey's [Transaction Management](/features/transaction-management) handles the full lifecycle of Arc transactions — construction, broadcast, nonce management, and status monitoring.
+
+### Gas sponsorship (fee abstraction)
+
+Set `sponsor: true` to enable fee sponsorship — your users never need to hold USDC to pay gas. Turnkey covers fees on your behalf and passes costs through as a monthly line item.
+
+<Note>
+  To enable gas sponsorship, ensure it is activated in your Turnkey dashboard before setting `sponsor: true`.
+</Note>
+
+## Differences from standard EVM chains
+
+A few Arc-specific behaviors are worth knowing when integrating with Turnkey:
+
+- **USDC is the native gas token.** ETH is not the native asset on Arc, so accounts need a USDC balance to transact. Native USDC uses an 18-decimal interface (standard `msg.value` semantics), while the ERC-20 interface on the same balance uses 6 decimals. To display a native value as USDC, divide by 10<sup>12</sup>. Don't credit or record balances from the 6-decimal value: truncation at the 6-decimal boundary records less than was transferred.
+- **Blob transactions (EIP-4844, type 3) are not supported.** Turnkey supports signing type 3 transactions on Ethereum, but Arc's mempool rejects them — use legacy, type 1, or type 2 transactions on Arc.
+
+For the full list of protocol-level differences, see [Arc's EVM differences](https://docs.arc.io/arc/references/evm-differences).
+
+## Transaction parsing, policies, and signing
+
+Please refer to our [Ethereum network page](/features/networks/ethereum) for details on transaction parsing, policies, and signing, as Arc shares the same EVM architecture. Turnkey's EVM transaction parser, policy engine, and `SIGN_TRANSACTION` activity types all apply — including EIP-712 typed data signing.
+
+## Arc network support
+
+Turnkey supports:
+
+| Network     | Chain ID  | RPC                                                                      |
+| :---------- | :-------- | :----------------------------------------------------------------------- |
+| Arc Mainnet | `5042`    | See [Arc RPC endpoints](https://docs.arc.io/arc/references/rpc-endpoints) |
+| Arc Testnet | `5042002` | See [Arc RPC endpoints](https://docs.arc.io/arc/references/rpc-endpoints) |
+
+## Benefits of using Turnkey with Arc
+
+- **Secure key management**: Private keys are securely stored in Turnkey's enclave infrastructure
+- **Policy controls**: Apply custom policies to authorize transactions based on destination, value, calldata, and more
+- **Developer-friendly**: Integrate with existing EVM development workflows — ethers, viem, Foundry, Hardhat
+
+<SupportCallout prompt="Building on Arc and need help with your Turnkey integration?" />
