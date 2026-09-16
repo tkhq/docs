@@ -1,0 +1,121 @@
+---
+title: "Solana V1 transactions"
+description: "Prepare Solana V1 transactions for signing, sending, sponsorship, and policies."
+sidebarTitle: "V1 transactions"
+---
+
+Turnkey supports Solana V1 transactions for signing, sending, and sponsorship.
+V1 does not require a separate organization opt-in or V1 feature flag.
+
+Solana V1 changes the transaction wire format and moves compute and fee controls into the outer transaction config.
+It supports larger transactions and uses static account keys instead of address lookup tables (ALTs).
+
+## APIs and transaction versions
+
+The Solana transaction version is independent of the Turnkey activity version.
+Both Solana send activity versions accept V1 wire transactions through `/public/v1/submit/sol_send_transaction`.
+
+| API or activity | V1 behavior |
+| --- | --- |
+| `signTransaction` with `ACTIVITY_TYPE_SIGN_TRANSACTION_V2` and `TRANSACTION_TYPE_SOLANA` | Signs with one `signWith` resource and returns the serialized transaction. Does not broadcast or sponsor it. |
+| `ACTIVITY_TYPE_SOL_SEND_TRANSACTION` | Uses `signWith`. The transaction must have exactly one customer signer. Supports customer-paid and sponsored sends. |
+| `ACTIVITY_TYPE_SOL_SEND_TRANSACTION_V2` | Uses `signWiths` for multiple signers. Supports customer-paid and sponsored sends. |
+
+For send requests, use Solana addresses in `signWith` or `signWiths`, rather than private key IDs.
+For sponsored V2 requests, list every customer signer in transaction order in `signWiths`.
+For customer-paid V2 requests, signers outside `signWiths` must already have valid signatures in the submitted transaction.
+
+See [Sign transaction](/api-reference/activities/sign-transaction) and [Broadcast SVM transaction](/api-reference/activities/broadcast-svm-transaction) for request envelopes.
+Use a transaction builder and serializer that support V1; changing an activity type does not convert a legacy or V0 transaction.
+
+## Wire encoding and limits
+
+Set `unsignedTransaction` to the hex-encoded **full serialized transaction**, including its signature slots.
+Do not submit base64, a JSON transaction, or message bytes without signature slots.
+
+V1 wire bytes start with `0x81`, followed by the message contents and then the signatures.
+Each required signer has a trailing 64-byte signature slot, in signer order.
+Fill each unsigned slot with 64 zero bytes. Keep existing signatures when you use partial signing.
+The signed message includes the `0x81` prefix and excludes the trailing signatures.
+
+| Limit | Legacy / V0 | V1 |
+| --- | --- | --- |
+| Full transaction size, including signature slots | 1,232 bytes | 4,096 bytes |
+| Customer signers requested through the V2 send API | Up to 16, subject to the wire size limit | Up to 12 customer-paid; up to 11 sponsored |
+| Total V1 signature slots | Not applicable | Up to 12, including the sponsor |
+| V1 account keys | Not applicable | Up to 64 static keys |
+| V1 instructions | Not applicable | Up to 64 |
+| Address lookup tables | V0 supports account lookups | Not supported |
+
+These limits apply to the final sponsored transaction too.
+Sponsorship adds a fee payer, its signature, config values, and potentially a System Program key and rent-funding instructions.
+Leave space for these additions. An input that fits within the limits can still exceed them after sponsorship.
+Do not add the Turnkey sponsor to the original transaction yourself.
+
+## Customer-paid and sponsored sends
+
+With `sponsor: false`, Turnkey signs and broadcasts the submitted message without changing its blockhash, instructions, or V1 config.
+Supply a current blockhash in the serialized transaction and the config values your application requires.
+The transaction's fee payer pays the network fees. Turnkey monitors the transaction after submission.
+
+With `sponsor: true`, Turnkey reconstructs the transaction with its sponsor as fee payer.
+It preserves V1 and the original instructions, apart from account index adjustments and added rent-funding instructions.
+Existing customer signatures cannot authorize this changed message; Turnkey signs it with all required customer signers and the sponsor.
+
+For sponsored sends, the request-level `recentBlockhash` controls the final blockhash.
+If supplied, Turnkey uses that value. Otherwise, Turnkey fetches a fresh blockhash during execution.
+A blockhash inside `unsignedTransaction` alone does not pin the sponsored transaction's final blockhash.
+
+Gas sponsorship requires the existing [sponsorship setup](/features/transaction-management/sending-sponsored-solana-transactions).
+[Rent sponsorship](/features/networks/solana-rent-refunds) is a separate dashboard option and remains disabled by default.
+V1 does not change rent-refund behavior or remove the need to inspect account-creation and account-closure instructions.
+
+### V1 config during sponsorship
+
+Turnkey preserves explicit values in the original V1 config, including an explicit zero priority fee.
+Invalid values cause rejection; Turnkey does not replace them with estimates.
+
+| Original V1 config field | Unit | If absent during sponsorship |
+| --- | --- | --- |
+| `priority_fee` | Total lamports | Uses `ceil(compute_unit_limit × estimated_micro_lamports_per_CU / 1,000,000)`. Uses zero if no price estimate is available. |
+| `compute_unit_limit` | Compute units (CU) | Uses the sponsor's estimate, or 1,400,000 CU if no estimate is available. |
+| `loaded_accounts_data_size_limit` | Bytes | Uses 67,108,864 bytes (64 MiB). |
+| `heap_size` | Bytes | Uses 32,768 bytes (32 KiB). |
+
+Sponsored V1 transactions require a compute unit limit from 1 through 1,400,000 and a positive loaded accounts data size limit.
+The total priority fee must not exceed 250,000,000 lamports.
+All values must also satisfy transaction validation and the target network's runtime rules.
+
+For example, 100,001 CU at an estimated 11 micro-lamports per CU produces a total priority fee of 2 lamports.
+The policy field for this config value is `solana.tx.priority_fee_lamports`.
+It measures the **total priority fee in lamports**, not a per-CU price or the total fee including base fees and rent.
+
+## Policies and migration
+
+`solana.tx.version` returns `LEGACY`, `V0`, or `V1`.
+V1 exposes `priority_fee_lamports`, `compute_unit_limit`, `loaded_accounts_data_size_limit`, and `heap_size` directly under `solana.tx`.
+See the [policy field reference](/features/policies/language#solana-v1-config) for units and absent-field behavior.
+
+Policies inspect the customer's **original** config, before sponsorship fills missing values.
+An absent V1 priority fee reads as zero in policies, even if sponsorship later fills a nonzero fee.
+To make a policy cap apply to the final sponsored priority fee, supply that fee explicitly in the original config.
+An explicit zero remains zero during sponsorship.
+
+An absent V1 resource limit produces an evaluation error when a policy accesses it.
+All four V1 config fields are unavailable for legacy and V0 transactions.
+The policy engine evaluates both sides of `&&` and `||`; a version check cannot guard access to an unavailable field.
+Use the [separate policy examples](/features/policies/examples/solana#allow-v1-transfers-with-explicit-resource-limits) when you support multiple transaction versions.
+
+To migrate existing policies:
+
+1. Review policies that allow transactions based only on programs, transfers, or IDL instruction data.
+2. Add V1 outer-config restrictions to each applicable allow policy.
+3. Keep legacy/V0 Compute Budget instruction checks in separate policies scoped to those versions.
+4. Supply explicit V1 resource limits when a policy reads those limits.
+5. Test each policy with a non-root user, including missing config, excessive fees, and legacy/V0 transactions.
+
+Compute Budget instructions do not control V1 compute limits or priority fees; they are no-ops for V1.
+Sponsorship preserves those instructions but uses the outer V1 config.
+An instruction allowlist alone therefore does not cap V1 fees.
+V1 has no ALTs, so `solana.tx.address_table_lookups` is empty and all account keys are static.
+Existing transfer and IDL policies still describe the original instructions, but do not automatically restrict the V1 config.
