@@ -1,0 +1,123 @@
+---
+title: "Custom Policy Enforcement"
+description: "Extend Turnkey policies with custom activity checks running in Turnkey Verifiable Cloud."
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { TvcBetaCallout } from '/snippets/tvc-beta-callout.mdx'
+
+<TvcBetaCallout />
+
+With [Turnkey Verifiable Cloud (TVC)](/features/verifiable-cloud/overview), you can require custom checks before a Turnkey activity completes. A policy sidecar running in TVC receives activity webhooks, evaluates based on your application's rules, and submits an approval or rejection to Turnkey.
+
+Your app takes an activity intent as input and returns an approval decision. Its checks can use your own rules and external data, and can apply to signing, key exports, or administrative changes.
+
+## What you can build
+
+| Use case | How it works |
+| :--- | :--- |
+| **Custom transaction parsing** | Parse transactions beyond Turnkey's native parsing support, and apply recipient or amount restrictions before signing. |
+| **Price-based approvals** | Parse a raw transaction payload and use oracle price data to enforce value-based limits before signing. |
+| **Address screening** | Check transaction addresses with a screening provider, and approve or reject requests based on the results. |
+| **Policy creation controls** | Require the user creating a policy to have an email address in your organization's domain, such as `@turnkey.com`. |
+
+The example sidecar validates Aptos signing requests, which Turnkey does not currently parse natively. Other use cases require extending the example.
+
+## Architecture
+
+Your application submits activities as an initiator user. Turnkey evaluates the applicable policies and collects approvals. The sidecar runs your custom checks inside a TVC enclave and votes as a separate service user.
+
+For signing, the transaction signing key stays in Turnkey. The sidecar uses an API credential derived from its long-lived TVC Quorum Key to approve or reject the activity.
+
+<Frame>
+  <img src="/images/verifiable-cloud/custom-policy-architecture.svg" alt="Application initiates activities in Turnkey, which holds the consensus policy and transaction signing key; a separate TVC enclave holds the policy sidecar and its approval credential." />
+</Frame>
+
+<Note>
+  **TVC quorum keys:** Turnkey supports creating and storing quorum key shares in its key management platform. Hosted quorum keys are secured by Turnkey: key generation, signing, and share re-encryption are all inside enclaves. See the [hosted-operator example](/features/verifiable-cloud/manifest-sets-and-share-sets#worked-example) for setup.
+</Note>
+
+### Activity approval flow
+
+The sidecar [verifies the webhook signature](/features/webhooks/verify-signatures), freshness, and organization before evaluating the activity.
+
+1. Your application submits a request; its submission counts as the initiator's approval.
+2. Turnkey records the activity as awaiting consensus and sends a signed webhook.
+3. The sidecar evaluates the activity and submits an approval or rejection for supported requests.
+4. Turnkey evaluates the vote and completes the activity, rejects it, or continues waiting for approvals.
+
+<Frame>
+  <img src="/images/verifiable-cloud/custom-policy-approval-flow.svg" alt="Six stages: submit a request, await consensus, deliver a signed webhook, evaluate checks and vote, evaluate approvals, and retrieve the activity result." />
+</Frame>
+
+## Choosing an approval model
+
+| Model | When to use it |
+| :--- | :--- |
+| **Scoped consensus** | Require the sidecar for selected activities and resources through a policy. This is the example's default. Review other applicable allow policies and root authorization paths, which can authorize independently. |
+| **Root quorum** | Include the sidecar in root authorization. A completed root quorum bypasses Turnkey policies, so the sidecar's checks carry broader responsibility. Membership alone does not make its approval mandatory; the threshold and other authorization paths matter. |
+
+The same API credential, webhook verification, and voting mechanism provide the foundation for either model. Changes to [root membership and threshold](/features/users/root-quorum) require approval from the current root quorum.
+
+The example sidecar ignores administrative activities. Before making it a required root member, add explicit validation for the administrative actions it must approve, including root-quorum updates where needed.
+
+### Implementation steps
+
+<Note>
+  Explore the complete implementation in the [TVC policy sidecar example](https://github.com/tkhq/tvc-examples/tree/main/tvc-policy-sidecar).
+</Note>
+
+<Steps>
+  <Step title="Deploy the policy sidecar">
+    Follow the example's [deployment instructions](https://github.com/tkhq/tvc-examples/tree/main/tvc-policy-sidecar#deploy-to-tvc). They use hosted operators to create and provision a private Quorum Key. Replace the publicly known quorum key: the sidecar uses the quorum key as a Turnkey credential.
+
+    Configure the sidecar for your Turnkey organization, approve the deployment, and provision its shares after verification. Once live, keep its public URL for registration.
+  </Step>
+
+  <Step title="Register the sidecar in Turnkey">
+    Retrieve the deployed sidecar's public key from `GET /turnkey/api_public_key` and register it, with the returned curve type, on a dedicated non-root [service user](/features/users/introduction). Use the returned key rather than generating another keypair.
+
+    Create a separate non-root initiator user with its own credential and a Turnkey-owned Ed25519 signing key with an Aptos address. Two credentials on the same user do not provide two independent approvals.
+  </Step>
+
+  <Step title="Require the sidecar's approval">
+    Create a [policy](/features/policies/overview) requiring both users, scoped to the intended wallet:
+
+    ```json
+    {
+      "policyName": "Require TVC Aptos policy approval",
+      "effect": "EFFECT_ALLOW",
+      "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && wallet.id == '<APTOS_WALLET_ID>'",
+      "consensus": "approvers.any(user, user.id == '<INITIATOR_USER_ID>') && approvers.any(user, user.id == '<TVC_SERVICE_USER_ID>')"
+    }
+    ```
+
+    Replace the placeholders with your wallet and user IDs. Keep the policy's scope aligned with the activities the sidecar can validate.
+  </Step>
+
+  <Step title="Connect activity webhooks">
+    Create a [webhook endpoint](/features/webhooks/overview) in the same organization, using your deployed app's URL with the path `/webhooks/turnkey/activity`. Subscribe it to `ACTIVITY_UPDATES` so the sidecar receives pending activities and can vote.
+  </Step>
+
+  <Step title="Submit and check a request">
+    Submit a supported Aptos raw-signing request with the initiator's credential. Confirm that the activity enters `ACTIVITY_STATUS_CONSENSUS_NEEDED`, then inspect the sidecar's vote and final activity result.
+
+    | Request | Expected sidecar outcome |
+    | :--- | :--- |
+    | Valid transfer below or exactly at 10 APT, including maximum gas cost | Approve |
+    | Transfer plus maximum gas cost exceeds 10 APT | Reject |
+    | Incorrect recipient, sender mismatch, or malformed signing payload | Reject |
+    | Other activity type, completed activity, or unsupported signer format | No vote |
+
+    Ignored activities can remain pending. An API submission failure is separate from a policy rejection. Successful signing returns a signature; it does not fund or broadcast the transaction.
+  </Step>
+</Steps>
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <FeatureCard title="Policy Sidecar Example" icon="file-code-01" href="https://github.com/tkhq/tvc-examples/tree/main/tvc-policy-sidecar" description="Deploy the sidecar and add custom checks." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/overview" description="Scope access and require approvals." />
+  <FeatureCard title="Webhooks" icon="dataflow-02" href="/features/webhooks/overview" description="Receive and verify signed activity updates." />
+  <FeatureCard title="Turnkey Verifiable Cloud" icon="cpu-chip-01" href="/features/verifiable-cloud/overview" description="Deploy apps with secure keys and code review." />
+</div>
