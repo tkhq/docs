@@ -4,7 +4,7 @@ description: "Step-by-step guides for moving wallets from another provider into 
 sidebarTitle: "Migrating to Turnkey"
 ---
 
-**The pattern for migrating a wallet to Turnkey is always the same**: export the key material from your existing provider, then import it into Turnkey encrypted to the enclave that will hold it.
+**The pattern for migrating a wallet to Turnkey is always the same**: export the key material from your existing provider, then import it into Turnkey encrypted to a secure enclave.
 
 What differs is who performs the export, where the key material passes through on its way, and what that means for you. Pick the track that matches your setup:
 
@@ -14,8 +14,8 @@ What differs is who performs the export, where the key material passes through o
     straight to Turnkey's enclaves — it never touches your servers.
   </Card>
   <Card title="Custodial wallets" icon="server" href="#custodial-wallets">
-    You hold the keys. Export and import both run from a backend script you control, which means
-    the key material passes through your infrastructure in plaintext along the way.
+    You hold the keys. Export and import both run from a service you control, so how the key
+    material is handled between the two is yours to decide.
   </Card>
 </CardGroup>
 
@@ -25,7 +25,7 @@ If anything here doesn't map cleanly onto your situation, reach out to [hello@tu
 
 ### Asset availability
 
-In most circumstances user assets remain exactly as they were onchain, belonging to the same key/address. However, if a provider does not meaningfully support export, you may have to instead create a new wallet in Turnkey and transfer assets to it.
+If your provider doesn't support exporting key material, importing isn't an option. You'd generate new wallets in Turnkey and transfer the assets across instead — which *is* an on-chain operation, with new addresses for your users to re-register anywhere they've shared them, plus transaction fees.
 
 <Warning>
   There are no guarantees a previous provider destroys their copy of exported keys, or that the key
@@ -39,7 +39,7 @@ Turnkey holds key material in two different shapes, and the choice affects how y
 
 | | [HD wallets](/features/wallets) | [Private keys](/features/wallets#private-keys) |
 | :--- | :--- | :--- |
-| Rooted in | A BIP39 mnemonic | A single raw key |
+| Rooted in | A BIP-39 mnemonic | A single raw key |
 | Addresses | Unlimited [wallet accounts](/features/wallets#accounts), derived on demand | One key, one or more address formats |
 | Limit per organization | 100 HD wallets | 1,000 private keys |
 | Import source | Mnemonic / seed phrase | Raw private key |
@@ -69,9 +69,11 @@ We generally recommend a [sub-organization](/features/sub-organizations) per use
 
 ## Non-custodial wallets
 
-Your users hold their own keys, so only they can perform the export. Within your application you invoke the outgoing provider's user-facing export method, then hand the user off to Turnkey's import iframe.
+Your users hold their own keys, so only they can perform the export. Within your application you invoke the outgoing provider's user-facing export method, then hand the user off to Turnkey's [import iframe](/features/wallets/import-wallets#embedded-iframe).
 
-This can be done **just in time** — creating the user's sub-organization on the spot during their first login after the cutover — or in a **batch** ahead of time, which is often preferable for larger migrations.
+The import itself always happens with the user present. There is one import per key or seed phrase, and it runs in their browser, so it can't be batched or performed on their behalf.
+
+Each user's sub-organization has to exist before they can import into it. Whether you can create those ahead of the cutover depends on how your users authenticate: with email or SMS you already hold the identifier, so you can provision in advance, while a passkey or OAuth credential only exists once the user has authenticated for the first time.
 
 <Steps>
   <Step title="Create the user's sub-organization">
@@ -79,9 +81,9 @@ This can be done **just in time** — creating the user's sub-organization on th
     [`@turnkey/react-wallet-kit`](/solutions/embedded-wallets/integration-guide/react/getting-started),
     the sub-organization is created automatically on first sign-up.
 
-    By default that also creates a new embedded wallet. When the user is bringing their own key you
-    may not want one — an unused wallet is harmless but confusing, and it will show up alongside the
-    imported one. Use `createSuborgParams` to control this:
+    No wallet is created unless you ask for one, which suits a migration: the user's imported wallet
+    is the only one they end up with. If you do want a fresh wallet alongside it — to give them a
+    Turnkey-generated address to move assets to, for example — specify it with `createSuborgParams`:
 
     ```tsx
     const turnkeyConfig: TurnkeyProviderConfig = {
@@ -90,7 +92,7 @@ This can be done **just in time** — creating the user's sub-organization on th
           emailOtpAuth: {
             userName: "Migrating user",
             customWallet: {
-              walletName: "Default Wallet",
+              walletName: "New Wallet",
               walletAccounts: [
                 {
                   curve: "CURVE_SECP256K1",
@@ -110,10 +112,10 @@ This can be done **just in time** — creating the user's sub-organization on th
     for the full set of options, including per-authentication-method configuration.
 
     <Note>
-      If you'd rather create sub-organizations from your own backend — common for a batch migration
-      where you provision ahead of the user's first login — call `createSubOrganization` from
-      [`@turnkey/sdk-server`](/solutions/embedded-wallets/integration-guide/typescript/advanced-backend-authentication)
-      and simply omit the `wallet` parameter.
+      If you'd rather create sub-organizations from your own backend — when you provision ahead of
+      the user's first login, for example — call `createSubOrganization` from
+      [`@turnkey/sdk-server`](/solutions/embedded-wallets/integration-guide/typescript/advanced-backend-authentication).
+      The `wallet` parameter is optional there too.
     </Note>
   </Step>
 
@@ -172,29 +174,13 @@ This can be done **just in time** — creating the user's sub-organization on th
 
     Show this after the user has copied their key or seed in the previous step.
 
-    <Note>
-      **Using your own backend instead of the Auth Proxy?** These methods still work — importing is
-      not an Auth Proxy feature. `handleImportWallet` and `handleImportPrivateKey` submit ordinary
-      `initImportWallet` / `importWallet` activities against the Turnkey API, stamped by the user's
-      session.
-
-      What they need is an **active session in the browser**, since the import activity is stamped
-      with it and the target organization and user are read from it. The Auth Proxy sets that up
-      during login; with your own backend you have to supply it yourself — mint the session
-      server-side and hand it to the client, then store it before opening the import modal:
-
-      ```tsx
-      const { storeSession } = useTurnkey();
-      await storeSession({ sessionToken }); // token minted by your backend
-      ```
-
-      This matters most for **batch migrations**: if you provision sub-organizations ahead of time,
-      those users have no session on their device until they authenticate, so the import can only run
-      after they log in — not during provisioning.
-    </Note>
+    `curve` and `addressFormats` determine which addresses the imported key produces — see
+    [address formats and curves](/features/wallets#address-formats-and-curves) for the full list and
+    the default derivation path for each.
 
     For lower-level control, or if you're not using React, `@turnkey/iframe-stamper` exposes the same
-    flow directly — see [advanced iframe operations](/sdks/advanced/iframe-stamper) and
+    flow directly — see [Import wallets](/features/wallets/import-wallets#embedded-iframe),
+    [advanced iframe operations](/sdks/advanced/iframe-stamper) and
     [Enclave to end-user secure channels](/security/enclave-secure-channels#import-flow).
   </Step>
 
@@ -212,29 +198,28 @@ This can be done **just in time** — creating the user's sub-organization on th
   A complete Next.js app covering import and export of wallets, wallet accounts, and private keys
   with `@turnkey/react-wallet-kit` — including the sub-organization customization shown above.
 
-  It authenticates through the Auth Proxy, but only the *login* half depends on that. The import and
-  export calls are the same either way — if you run your own backend, keep those and replace the auth
-  setup with your own, per the note above.
+  It authenticates through the Auth Proxy, but only the *login* half depends on that — the import and
+  export calls are the same either way. See [advanced backend authentication](/solutions/embedded-wallets/integration-guide/react/advanced-backend-authentication)
+  if you use your own backend instead of the Auth Proxy.
 </Card>
 
 ## Custodial wallets
 
 If you hold your users' keys, both halves of the migration run from a backend service you control. The shape is the same — export, then import — but you're running it in bulk rather than per user, and the key material passes through your script.
 
-<Warning>
-  **Your migration script handles plaintext key material, and there's no way around that.**
+<Note>
+  **The key material is in your custody between export and import, so that stretch is yours to
+  design.** Turnkey's guarantee begins at the encryption step: `@turnkey/crypto` verifies the
+  enclave's signature on the import bundle before encrypting to it, so a substituted target key is
+  rejected and plaintext never reaches Turnkey's servers.
 
-  Unlike the non-custodial flow, there is no path here that keeps keys away from your infrastructure:
-  your script fetches them from the old provider in the clear and holds them in memory until it
-  encrypts each one to the enclave. What Turnkey guarantees is only what happens from that point on —
-  `@turnkey/crypto` verifies the enclave's signature on the import bundle before encrypting to it, so
-  a substituted target key is rejected and the plaintext never reaches Turnkey's servers.
-
-  Treat the script accordingly: run it on a restricted host, keep keys in memory only, never log them
-  or write them to disk, and tear down the environment afterwards. If your threat model can't
-  accommodate a process that briefly holds every key, generate fresh wallets in Turnkey and transfer
-  assets instead.
-</Warning>
+  How you handle the stretch before that is up to you and your threat model. A straightforward
+  script that holds keys in memory only, runs on a restricted host, never logs them or writes them
+  to disk, and is torn down afterwards is enough for many teams. If it isn't enough for yours, the
+  decryption and re-encryption can be performed somewhere stronger — an HSM, your own enclave, or
+  an air-gapped machine (see [Running a large migration](#running-a-large-migration) for the
+  air-gapped variant).
+</Note>
 
 <Steps>
   <Step title="Determine what you can actually migrate">
@@ -243,34 +228,61 @@ If you hold your users' keys, both halves of the migration run from a backend se
 
     | What you can export | Import as | Addresses preserved? |
     | :--- | :--- | :--- |
-    | BIP39 mnemonic / seed phrase | Wallet | Yes |
+    | BIP-39 mnemonic / seed phrase | Wallet | Yes |
     | Raw private key (secp256k1) | Private key | Yes |
     | Raw private key (ed25519, RFC 8032 seed) | Private key | Yes |
     | **ECDSA extended key** (`xprv`) from an MPC provider | Private keys, one per derived address | Yes — derive locally first |
-    | **EdDSA extended key** (`fprv`) from an MPC provider | Not supported | **No** |
+    | **EdDSA extended key** (`fprv`) from an MPC provider | Imports, but as a different key | **No** |
 
     <Warning>
-      **MPC providers: ECDSA and EdDSA behave differently, and the difference is structural.**
-
-      MPC platforms such as Fireblocks export vault key material as a pair of extended keys — an
-      ECDSA `xprv` and an EdDSA `fprv`. They are not interchangeable:
-
-      * **ECDSA (`xprv`) — addresses are preserved.** For secp256k1 the private key *is* the scalar,
-        so Turnkey loads it unchanged. Expand the `xprv` at your recorded derivation paths on your own
-        infrastructure and import each resulting key individually. Note that the `xprv` itself cannot
-        be imported as a wallet root: Turnkey wallets are BIP39-rooted, and there is no representation
-        for an externally supplied extended key.
-
-      * **EdDSA (`fprv`) — addresses cannot be preserved.** Ed25519 signing keys under RFC 8032 are
-        *seeds*, which are hashed and clamped to produce the signing scalar. MPC derivation produces
-        the scalar directly, with no seed behind it, and a seed cannot be recovered from a scalar.
-        Importing that material yields a valid key at a **different address**. No curve, key format,
-        or address format option changes this.
-
-      For EdDSA balances, the practical options are to sweep funds to freshly generated Turnkey
-      addresses, or to retain the provider's recovery material in cold storage as a backstop for any
-      assets sent to the legacy addresses. Plan this before cutover, not after.
+      **Migrating from an MPC provider? The two curves behave differently.** An ECDSA extended key
+      (`xprv`) imports with addresses preserved. An EdDSA extended key (`fprv`) does not: the import
+      succeeds, but every key lands on a different address. Decide how to handle those balances
+      before cutover, not after.
     </Warning>
+
+    MPC platforms such as Fireblocks export vault key material as a pair of extended keys, an ECDSA
+    `xprv` and an EdDSA `fprv`. You can expand either one locally at your recorded derivation paths,
+    and either way you get a 32-byte private key per address. Your paths are fine and the keys are the
+    right keys. What differs is what those 32 bytes are taken to mean.
+
+    **secp256k1 has one convention, so nothing can go wrong.** The 32 bytes are the private scalar.
+    Both sides compute the address from them the same way, so imported keys keep their addresses:
+
+    ```
+    Fireblocks:  address = d · G
+    Turnkey:     address = d · G
+    ```
+
+    **ed25519 has two conventions, and the two systems use different ones.** A 32-byte ed25519 private
+    key can either *be* the signing scalar, or be a value that gets hashed to *produce* the scalar.
+    RFC 8032 specifies the second: SHA-512 the 32 bytes, clamp the lower half, sign with the result.
+    Turnkey follows RFC 8032. Threshold signing produces the scalar directly, so that is what an MPC
+    export hands you, with no earlier value behind it:
+
+    ```
+    Fireblocks:  address =                 a · B
+    Turnkey:     address = clamp(SHA512(a)) · B
+    ```
+
+    So the import succeeds and gives you a perfectly valid ed25519 key, at an address unrelated to the
+    one you had. You also cannot work backwards: finding a value that Turnkey would hash into `a` means
+    inverting SHA-512. No curve, key format, or address format option changes this.
+
+    **The word "seed" is overloaded here.** The 32-byte value RFC 8032 hashes is per-key, and has
+    nothing to do with a BIP-39 seed, which is a mnemonic-derived wallet root. Fireblocks exports
+    neither: an `xprv` and an `fprv` are extended keys.
+
+    **This is not specific to Turnkey.** Ledger, Phantom and `solana-keygen` are all RFC 8032-based, so
+    the same exported scalar cannot be imported into any of them either.
+
+    **What to do.** On the ECDSA side, expand the `xprv` at your recorded derivation paths on your own
+    infrastructure and import each child key individually. The `xprv` itself cannot be imported as a
+    wallet root, since Turnkey wallets are BIP-39-rooted with no representation for an externally
+    supplied extended key.
+
+    For EdDSA balances, sweep funds to freshly generated Turnkey addresses, or retain the provider's
+    recovery material in cold storage as a backstop for anything later sent to the legacy addresses.
   </Step>
 
   <Step title="Export from the existing provider">
@@ -279,8 +291,7 @@ If you hold your users' keys, both halves of the migration run from a backend se
 
     * Privy: [Node](https://docs.privy.io/wallets/wallets/export#nodejs) and [API](https://docs.privy.io/wallets/wallets/export#rest-api)
     * Dfns: [API](https://docs.dfns.co/d/api-docs/keys/advanced-keys-apis/export-key)
-    * Database (e.g. Firebase): accessing private keys on a database instance may require special permission, but tends to be simple and efficient to fetch in bulk
-    * Hosted platforms: some services require user authentication on key export — check their documentation
+    * Fireblocks Direct Custody Vault: the workspace Recovery Kit, decrypted on an offline machine with their [key recovery tool](https://github.com/fireblocks/fireblocks-key-recovery-tool)
 
     Have your script pass keys straight into the import step as they're retrieved, rather than writing
     them to the local filesystem. If the expansion must happen on an air-gapped machine, see
@@ -324,7 +335,7 @@ If you hold your users' keys, both halves of the migration run from a backend se
         },
       ],
       rootQuorumThreshold: 1,
-      // Omit `wallet` entirely if this sub-org will only hold imported keys.
+      // No `wallet` — this sub-organization holds imported keys only.
     });
 
     console.log(subOrg.subOrganizationId, subOrg.rootUserIds?.[0]);
@@ -411,12 +422,11 @@ If you hold your users' keys, both halves of the migration run from a backend se
     **Choose `addressFormats` carefully.** The wrong format produces a valid but *different* address.
     Bitcoin in particular has several mainnet variants, which you can infer from the existing address
     prefix: `1…` P2PKH, `3…` P2SH, `bc1q…` P2WPKH, `bc1p…` P2TR. See
-    [wallet accounts](/features/wallets#accounts) and the
-    [supported networks](/features/networks/overview) for the full list of address formats.
+    [address formats and curves](/features/wallets#address-formats-and-curves) for the full list.
   </Step>
 
   <Step title="Verify against the source">
-    `importPrivateKey` returns the derived `addresses`. Compare each against the address you expected
+    `importPrivateKey` and `importWallet` both return the derived `addresses`. Compare each against the address you expected
     from the old provider and stop on mismatch — for MPC migrations this is the real check that your
     derivation paths were correct, and it's much cheaper to catch per key than in bulk at the end.
 
@@ -443,23 +453,16 @@ If you hold your users' keys, both halves of the migration run from a backend se
 
 ### Running a large migration
 
-A few things worth building in before you start a run of any real size.
-
 **Make the runner resumable.** Importing a key whose address, format and curve already exist in that
 sub-organization fails with gRPC `ALREADY_EXISTS` (code 6) and a message containing *"has already been
 imported"*. A byte-identical resubmit is idempotent, but a re-run with a fresh timestamp is a **new
 activity** and will hard-fail on anything already imported. Treat that specific error as "already
-done" and continue — otherwise a partial run can't be restarted.
+done", record each success as it happens keyed on something stable like the derivation path, and a
+partial run can pick up where it stopped.
 
-**Record progress durably as you go**, keyed on something stable such as the derivation path. Combined
-with the above, a re-run then skips what's recorded and only retries the tail.
-
-**Stop on unexpected errors** rather than continuing. A systematic problem — a wrong address format, a
-bad path — is better caught on key three than key three hundred.
-
-**Throughput is rarely the constraint.** A few thousand sequential requests sits comfortably inside
-standard [rate limits](/reference/faq#limits) and completes in minutes. Pace the loop gently rather
-than parallelizing aggressively.
+**Pace the loop to your rate limit.** [Rate limits](/reference/faq#limits) vary by plan, and an
+unthrottled loop will exceed the lower tiers — add a delay rather than running flat out. Running
+imports concurrently won't speed things up either, since limits are enforced per organization.
 
 **Air-gapped key expansion.** If key material must be expanded on an offline machine, the import splits
 into three passes instead of two: run the `init` calls online and collect the import bundles, take them
