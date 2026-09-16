@@ -68,7 +68,7 @@ prohibits them).
 </Note>
 
 This approach lets users regain access by proving identity through a strong, secondary channel
-(email + SMS OTP), then immediately enrolling a new passkey. The new credential is scoped to a
+(email OTP + OAuth), then immediately enrolling a new passkey. The new credential is scoped to a
 recovery session that can only complete registration. It cannot sign, export, or perform other
 sensitive actions until the user logs in again with the newly recovered passkey.
 
@@ -76,7 +76,7 @@ sensitive actions until the user logs in again with the newly recovered passkey.
 
 1. Ahead of time, you create a session profile scoped to authenticator enrollment only, plus a
    conditional MFA policy that applies to logins targeting that profile. Give that policy two
-   steps, email OTP and then SMS OTP or OAuth, so that recovery is no weaker than the login it
+   steps, email OTP and then OAuth or SMS OTP, so that recovery is no weaker than the login it
    replaces.
 2. User initiates recovery, providing their email address.
 3. Your backend runs `INIT_OTP` and `VERIFY_OTP`, then hands the verification token to the
@@ -89,7 +89,7 @@ sensitive actions until the user logs in again with the newly recovered passkey.
 5. The login does not complete yet. The email OTP counts as the first factor, because the login
    stamp carried it, and the MFA policy requires a second one. The response comes back with
    status `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` and the activity's `fingerprint`.
-6. The user completes the second factor, SMS OTP or OAuth. That produces a new token, which the
+6. The user completes the second factor, OAuth or SMS OTP. That produces a new token, which the
    browser turns into a fresh attested stamp and uses to submit `APPROVE_ACTIVITY` for the
    `fingerprint` from the previous step. See
    [satisfying MFA](./satisfying-mfa#email-otp-sms-otp-and-oauth).
@@ -128,14 +128,14 @@ Then set up MFA policies on the sub-organization to require two factors for logg
 session:
 
 ```json
-// MFA policy for recovery: email OTP + SMS OTP
+// MFA policy for recovery: email OTP + OAuth
 mfaPolicy: {
   userId: "<user-id>",
   mfaPolicyName: "Recovery MFA",
   condition: "activity.resource == 'AUTH' && activity.params.session_profile_id == '<recovery-authenticator-only_ID>'",
   requiredAuthenticationMethods: [
     { any: [{ type: "AUTHENTICATION_TYPE_EMAIL_OTP" }] },
-    { any: [{ type: "AUTHENTICATION_TYPE_SMS_OTP" }] }
+    { any: [{ type: "AUTHENTICATION_TYPE_OAUTH" }] }
   ],
   order: 0
 }
