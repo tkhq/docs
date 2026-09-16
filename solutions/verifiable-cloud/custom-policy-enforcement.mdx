@@ -113,6 +113,17 @@ The example sidecar ignores administrative activities. Before making it a requir
   </Step>
 </Steps>
 
+### Extending the example to Sui and Stellar
+
+Some signing flows submit a transaction digest rather than the full transaction. To apply custom checks, the sidecar needs the original transaction data and must verify that it produces the digest being signed. This requires extending both the client and the example sidecar.
+
+Turnkey preserves extra top-level fields in an API-key-stamped activity request. Your application can include a field such as `suiContext` or `stellarContext` alongside `type`, `timestampMs`, `organizationId`, and `parameters`. Turnkey does not interpret this context; your TVC sidecar defines its format and validation rules.
+
+1. **Include the transaction context.** For [Sui](/features/networks/sui), include the serialized transaction bytes needed to reconstruct the intent message. For [Stellar](https://stellar.github.io/js-stellar-base/Transaction.html), include the transaction envelope XDR and network passphrase. Add this context before stamping the request, and send the exact body that was stamped. Update the client's request construction so the extra field is preserved.
+2. **Compute the digest as usual.** Use your existing signing flow to compute the transaction digest and submit it in `parameters.payload`, with the additional context alongside the request's standard fields.
+3. **Read the context in the sidecar.** After verifying the webhook, [fetch the activity](/api-reference/queries/get-activity) in your sidecar logic. The original request is available as a JSON string in the initiating vote's `message` within `activity.votes`, rather than in the parsed `intent`. Identify the original request by checking that the SHA-256 hash of its exact message bytes matches the activity's `sha256:` fingerprint, then read your context field.
+4. **Validate before voting.** Parse the supplied transaction and independently reconstruct its signing digest, including Sui's intent prefix or Stellar's network-specific signature base. Your sidecar should require an exact match with the activity's signing payload in addition to evaluating the rest of the policies.
+
 ## Next steps
 
 <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
