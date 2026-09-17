@@ -71,8 +71,9 @@ Do not add the Turnkey sponsor to the original transaction yourself.
 
 ## Customer-paid and sponsored sends
 
-With `sponsor: false`, Turnkey signs and broadcasts the submitted message without changing its blockhash, instructions, or compute and fee controls.
-Supply a current blockhash and the compute and fee controls your application requires in the serialized transaction.
+With `sponsor: false`, Turnkey preserves the submitted instructions and compute and fee controls.
+It preserves a supplied blockhash or fills a missing one before policy evaluation and signing.
+Supply the compute and fee controls your application requires in the serialized transaction.
 The transaction's fee payer pays the network fees. Turnkey monitors the transaction after submission.
 
 With `sponsor: true`, Turnkey reconstructs the transaction with its sponsor as fee payer.
@@ -80,9 +81,7 @@ It preserves the transaction version and adjusts account indexes for the added a
 Compute and fee controls follow the version-specific behavior described in the next sections.
 Existing customer signatures cannot authorize this changed message; Turnkey signs it with all required customer signers and the sponsor.
 
-For sponsored sends, the request-level `recentBlockhash` controls the final blockhash.
-If supplied, Turnkey uses that value. Otherwise, Turnkey fetches a fresh blockhash during execution.
-A blockhash inside `unsignedTransaction` alone does not pin the sponsored transaction's final blockhash.
+See [Blockhash selection and expiration](#blockhash-selection-and-expiration) for blockhash behavior and approval timing.
 
 Gas sponsorship requires the existing [sponsorship setup](/features/transaction-management/sending-sponsored-solana-transactions).
 [Rent sponsorship](/features/networks/solana-rent-refunds) is a separate dashboard option and remains disabled by default.
@@ -119,6 +118,55 @@ All values must also satisfy transaction validation and the target network's run
 For example, 100,001 CU at an estimated 11 micro-lamports per CU produces a total priority fee of 2 lamports.
 The policy field for this config value is `solana.tx.priority_fee_lamports`.
 It measures the **total priority fee in lamports**, not a per-CU price or the total fee including base fees and rent.
+
+## Blockhash selection and expiration
+
+These rules apply to direct `sol_send_transaction` requests through both activity versions, for legacy, V0, and V1 transactions.
+For standalone `signTransaction` requests, supply the blockhash in the serialized transaction.
+
+### Customer-paid sends
+
+For `sponsor: false`, Turnkey selects the blockhash as follows:
+
+| Blockhash in `unsignedTransaction` | Request-level `recentBlockhash` | Behavior |
+| --- | --- | --- |
+| Nonzero | Omitted or matching | Preserves the embedded blockhash |
+| Nonzero | Different | Rejects the conflicting blockhashes |
+| All-zero placeholder | Provided | Inserts the provided blockhash |
+| All-zero placeholder | Omitted | Fetches and inserts a recent blockhash |
+
+The all-zero placeholder is 32 zero bytes, represented as `11111111111111111111111111111111` in base58.
+The serialized transaction must still contain this field; do not remove its bytes.
+The request-level `recentBlockhash`, if provided, must be a nonzero blockhash.
+
+Filling the placeholder requires an unsigned transaction with every signature slot set to zero and all required signers available through Turnkey.
+For the V2 send API, include every required signer in `signWiths`.
+For partial signing, set the blockhash before collecting signatures; changing it invalidates existing signatures.
+
+Turnkey fills the placeholder before policy evaluation. Policies inspect the selected blockhash, and signing uses the same reconstructed message.
+Turnkey preserves a nonzero embedded blockhash even if it is stale; auto-fill does not refresh expired blockhashes.
+
+### Sponsored sends
+
+For `sponsor: true`, Turnkey uses the request-level `recentBlockhash` if supplied.
+Otherwise, it fetches a recent blockhash during execution.
+A blockhash inside `unsignedTransaction` alone does not fix the final sponsored blockhash.
+
+### Approvals, retries, and expiration
+
+Supply `recentBlockhash` when your approval or retry flow requires a fixed blockhash.
+This fixes that field, but does not extend the transaction's validity or freeze sponsorship-filled compute and fee values.
+A transaction must be included onchain before its blockhash expires, whether you or Turnkey select it.
+A fixed recent blockhash therefore does not provide an unlimited approval window.
+
+For customer-paid sends with no supplied blockhash, each access-control evaluation can select a new one.
+The request's original intent stays the same, but the message selected for signing can change.
+The blockhash selected during evaluation is the one used for signing.
+Delays between evaluation and broadcast can still cause expiration.
+
+Rebroadcasting the same signed transaction does not refresh its blockhash.
+Using a new blockhash requires policy evaluation and signing again; do not assume every retry repeats those steps.
+See Solana's [transaction confirmation and expiration guide](https://solana.com/developers/cookbook/transactions/confirmation) for blockhash validity and expiration tracking.
 
 ## Policies and migration
 
