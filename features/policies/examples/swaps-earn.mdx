@@ -1,0 +1,198 @@
+---
+title: "Swaps and Earn"
+description: "Examples of policies governing swap and Earn activities via activity.params."
+sidebarTitle: "Swaps and Earn"
+---
+
+Swap and Earn activities expose request fields through `activity.params`. See the
+[activity parameter reference](/features/policies/language#activity-parameters) for the full field
+list and [Transaction Management](/features/transaction-management) for product flows.
+
+Use [`activity.kind`](/features/policies/language#choosing-between-type-kind-and-resource--action)
+when you want policies to survive activity version upgrades. Pin `activity.type` when you rely on
+fields that exist only on a specific version (for example `destination_address` on
+`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2` and `ACTIVITY_TYPE_EXECUTE_SWAP_V3`).
+
+## Swap quotes
+
+#### Cap slippage on swap quote requests
+
+When `slippage_bps` is omitted on the intent, accessing `activity.params.slippage_bps` fails with
+`FieldNotUsed` rather than evaluating as zero.
+
+```json
+{
+  "policyName": "Deny swap quotes above 1% slippage",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.kind == 'CREATE_SWAP_QUOTE' && activity.params.slippage_bps > 100"
+}
+```
+
+#### Restrict quote output tokens to an allowlist
+
+```json
+{
+  "policyName": "Allow swap quotes only into approved assets",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'CREATE_SWAP_QUOTE' && activity.params.output_token in ['<CAIP19_OUTPUT_1>', '<CAIP19_OUTPUT_2>']"
+}
+```
+
+#### Require organization-controlled destinations on cross-chain quotes (V2)
+
+```json
+{
+  "policyName": "Allow swap quotes only to treasury destinations",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2' && activity.params.destination_address in ['0x<LOWERCASE_TREASURY_ADDRESS>']"
+}
+```
+
+## Swap execution
+
+#### Deny execution into unapproved output assets
+
+```json
+{
+  "policyName": "Deny swap execution into unlisted output tokens",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.kind == 'EXECUTE_SWAP' && !(activity.params.output_token in ['<CAIP19_OUTPUT_1>', '<CAIP19_OUTPUT_2>'])"
+}
+```
+
+#### Require MFA for large trades (base units)
+
+Compare `input_amount` as a [uint](/features/policies/language#type-uint) in token base units.
+
+```json
+{
+  "policyName": "Require approval for large swap execution",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.count() >= 2",
+  "condition": "activity.type == 'ACTIVITY_TYPE_EXECUTE_SWAP_V2' && activity.params.input_amount > 1000000000000000000"
+}
+```
+
+#### Deny sponsored swap execution
+
+```json
+{
+  "policyName": "Deny sponsored swap execution",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.kind == 'EXECUTE_SWAP' && activity.params.sponsor == true"
+}
+```
+
+#### Restrict execute destination (V3)
+
+```json
+{
+  "policyName": "Allow execute swap only to approved recipient",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_EXECUTE_SWAP_V3' && activity.params.destination_address in ['0x<LOWERCASE_WALLET_ADDRESS>']"
+}
+```
+
+## Earn deposits and withdrawals
+
+#### Allow deposits only on approved chains
+
+```json
+{
+  "policyName": "Allow Earn deposits on Base and Ethereum mainnet only",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'EARN_DEPOSIT' && activity.params.chain_caip2 in ['eip155:1', 'eip155:8453']"
+}
+```
+
+#### Restrict deposits to approved wrappers
+
+EVM wrapper addresses in policies should use lowercase `0x` hex to match normalized
+`activity.params.wrapper_address` values.
+
+```json
+{
+  "policyName": "Allow Earn deposits only into approved wrappers",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'EARN_DEPOSIT' && activity.params.wrapper_address in ['0x<LOWERCASE_WRAPPER_1>', '0x<LOWERCASE_WRAPPER_2>']"
+}
+```
+
+#### Deny sponsored Earn deposits
+
+```json
+{
+  "policyName": "Deny sponsored Earn deposits",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.kind == 'EARN_DEPOSIT' && activity.params.sponsor == true"
+}
+```
+
+#### Gate full-position withdrawals
+
+`amount_value` is a string; the API accepts the literal `MAX` to withdraw an entire position.
+
+```json
+{
+  "policyName": "Deny full-position Earn withdrawals",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.kind == 'EARN_WITHDRAW' && activity.params.amount_value == 'MAX'"
+}
+```
+
+## Earn administration
+
+#### Require an approved fee recipient on wrapper deployment
+
+`client_fee_bps` and `client_fee_wallet` are exposed as strings matching the API intent. Compare
+fee basis points to explicit allowed values, or allowlist the fee wallet.
+
+```json
+{
+  "policyName": "Allow Earn wrapper deploy only with treasury fee wallet",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'EARN_DEPLOY_WRAPPER' && activity.params.client_fee_wallet in ['0x<LOWERCASE_TREASURY_FEE_WALLET>']"
+}
+```
+
+#### Require elevated approval to re-enable deposits
+
+```json
+{
+  "policyName": "Require two approvers to re-enable Earn deposits",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.count() >= 2",
+  "condition": "activity.kind == 'EARN_SET_WRAPPER_STATE' && activity.params.deposits_disabled == false"
+}
+```
+
+#### Allow fee claims only for approved wrappers
+
+```json
+{
+  "policyName": "Allow Earn fee claims for approved wrappers only",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'CLAIM_EARN_FEES' && activity.params.wrapper_address in ['0x<LOWERCASE_WRAPPER_1>']"
+}
+```
