@@ -1,0 +1,207 @@
+---
+title: "Solana transactions"
+description: "Choose a Solana transaction version and prepare transactions for signing, sending, sponsorship, and policies."
+sidebarTitle: "Transactions"
+---
+
+Turnkey supports legacy, V0, and V1 Solana transactions through the same signing and send APIs.
+For new integrations, start with V1 when your transaction builder, target network, and RPC provider support it.
+V1 supports larger transactions and puts compute and fee controls directly in the transaction config.
+
+## Choose a transaction version
+
+| Version | Account addresses | Compute and priority fee controls |
+| --- | --- | --- |
+| **V1** | Static account keys; no address lookup tables (ALTs) | Outer transaction config; priority fee in total lamports |
+| **V0** | Static account keys and optional ALTs | Compute Budget instructions; priority fee price in micro-lamports per CU |
+| **Legacy** | Static account keys; no ALTs | Compute Budget instructions; priority fee price in micro-lamports per CU |
+
+Use V0 when your transaction depends on ALTs or your builder produces V0 transactions.
+Existing legacy transactions remain supported too.
+To move a legacy or V0 integration to V1, update the builder and review your compute, fee, and policy controls.
+
+## APIs and transaction versions
+
+The Solana transaction version is independent of the Turnkey activity version.
+Both Solana send activity versions accept legacy, V0, and V1 wire transactions through `/public/v1/submit/sol_send_transaction`.
+
+| API or activity | Behavior for all transaction versions |
+| --- | --- |
+| `signTransaction` with `ACTIVITY_TYPE_SIGN_TRANSACTION_V2` and `TRANSACTION_TYPE_SOLANA` | Signs with one `signWith` resource and returns the serialized transaction. Does not broadcast or sponsor it. |
+| `ACTIVITY_TYPE_SOL_SEND_TRANSACTION` | Uses `signWith`. The transaction must have exactly one customer signer. Supports customer-paid and sponsored sends. |
+| `ACTIVITY_TYPE_SOL_SEND_TRANSACTION_V2` | Uses `signWiths` for multiple signers. Supports customer-paid and sponsored sends. |
+
+For send requests, use Solana addresses in `signWith` or `signWiths`, rather than private key IDs.
+For sponsored V2 requests, list every customer signer in transaction order in `signWiths`.
+For customer-paid V2 requests, signers outside `signWiths` must already have valid signatures in the submitted transaction.
+
+See [Sign transaction](/api-reference/activities/sign-transaction) and [Broadcast SVM transaction](/api-reference/activities/broadcast-svm-transaction) for request envelopes.
+Use a transaction builder and serializer that support your chosen wire version.
+Changing an activity type does not convert a legacy or V0 transaction to V1.
+
+## Wire encoding and limits
+
+Set `unsignedTransaction` to the hex-encoded **full serialized transaction**, including its signature slots.
+Do not submit base64, a JSON transaction, or message bytes without signature slots.
+
+Each required signer has a 64-byte signature slot, in signer order.
+Fill each unsigned slot with 64 zero bytes. Keep existing signatures when you use partial signing.
+The position of these slots depends on the transaction version:
+
+| Version | Full wire layout |
+| --- | --- |
+| Legacy | Signature count, signatures, then the legacy message |
+| V0 | Signature count, signatures, then the message starting with `0x80` |
+| V1 | Message starting with `0x81`, then trailing signatures |
+
+For V1, the signed message includes the `0x81` prefix and excludes the trailing signatures.
+
+| Limit | Legacy / V0 | V1 |
+| --- | --- | --- |
+| Full transaction size, including signature slots | 1,232 bytes | 4,096 bytes |
+| Customer signers requested through the V2 send API | Up to 16, subject to the wire size limit | Up to 12 customer-paid; up to 11 sponsored |
+
+V1 permits up to 12 total signature slots, including the sponsor, 64 static account keys, and 64 instructions.
+
+These limits apply to the final sponsored transaction too.
+Sponsorship adds a fee payer and its signature, and can add account keys and rent-funding instructions.
+It also fills missing compute and fee controls according to the transaction version.
+Leave space for these additions. An input that fits within the limits can still exceed them after sponsorship.
+Do not add the Turnkey sponsor to the original transaction yourself.
+
+## Customer-paid and sponsored sends
+
+With `sponsor: false`, Turnkey preserves the submitted instructions and compute and fee controls.
+It preserves a supplied blockhash or fills a missing one before policy evaluation and signing.
+Supply the compute and fee controls your application requires in the serialized transaction.
+The transaction's fee payer pays the network fees. Turnkey monitors the transaction after submission.
+
+With `sponsor: true`, Turnkey reconstructs the transaction with its sponsor as fee payer.
+It preserves the transaction version and adjusts account indexes for the added accounts.
+Compute and fee controls follow the version-specific behavior described in the next sections.
+Existing customer signatures cannot authorize this changed message; Turnkey signs it with all required customer signers and the sponsor.
+
+See [Blockhash selection and expiration](#blockhash-selection-and-expiration) for blockhash behavior and approval timing.
+
+Gas sponsorship requires the existing [sponsorship setup](/features/transaction-management/sending-sponsored-solana-transactions).
+[Rent sponsorship](/features/networks/solana-rent-refunds) is a separate dashboard option and remains disabled by default.
+Inspect account-creation and account-closure instructions for every transaction version; V1 does not change rent-refund behavior.
+
+### Legacy and V0 compute controls during sponsorship
+
+Turnkey reads explicit compute unit limits and prices from `SetComputeUnitLimit` and `SetComputeUnitPrice` instructions.
+It preserves those values and uses estimates for missing values.
+The compute unit price is in **micro-lamports per CU**, unlike V1's total priority fee in lamports.
+
+Turnkey removes the original Compute Budget instructions and inserts instructions for the resolved compute unit limit and price.
+Other Compute Budget instructions do not carry through sponsorship.
+The remaining customer instructions retain their order, with account index adjustments and added rent-funding instructions.
+
+### V1 config during sponsorship
+
+Turnkey preserves the original V1 instructions, including Compute Budget instructions, which are no-ops for V1.
+It adjusts account indexes and can add rent-funding instructions.
+Turnkey preserves explicit values in the original V1 config, including an explicit zero priority fee.
+Invalid values cause rejection; Turnkey does not replace them with estimates.
+
+| Original V1 config field | Unit | If absent during sponsorship |
+| --- | --- | --- |
+| `priority_fee` | Total lamports | Uses `ceil(compute_unit_limit × estimated_micro_lamports_per_CU / 1,000,000)`. Uses zero if no price estimate is available. |
+| `compute_unit_limit` | Compute units (CU) | Uses the sponsor's estimate, or 1,400,000 CU if no estimate is available. |
+| `loaded_accounts_data_size_limit` | Bytes | Uses 67,108,864 bytes (64 MiB). |
+| `heap_size` | Bytes | Uses 32,768 bytes (32 KiB). |
+
+Sponsored V1 transactions require a compute unit limit from 1 through 1,400,000 and a positive loaded accounts data size limit.
+The total priority fee must not exceed 250,000,000 lamports.
+All values must also satisfy transaction validation and the target network's runtime rules.
+
+For example, 100,001 CU at an estimated 11 micro-lamports per CU produces a total priority fee of 2 lamports.
+The policy field for this config value is `solana.tx.priority_fee_lamports`.
+It measures the **total priority fee in lamports**, not a per-CU price or the total fee including base fees and rent.
+
+## Blockhash selection and expiration
+
+These rules apply to direct `sol_send_transaction` requests through both activity versions, for legacy, V0, and V1 transactions.
+For standalone `signTransaction` requests, supply the blockhash in the serialized transaction.
+
+### Customer-paid sends
+
+For `sponsor: false`, Turnkey selects the blockhash as follows:
+
+| Blockhash in `unsignedTransaction` | Request-level `recentBlockhash` | Behavior |
+| --- | --- | --- |
+| Nonzero | Omitted or matching | Preserves the embedded blockhash |
+| Nonzero | Different | Rejects the conflicting blockhashes |
+| All-zero placeholder | Provided | Inserts the provided blockhash |
+| All-zero placeholder | Omitted | Fetches and inserts a recent blockhash |
+
+The all-zero placeholder is 32 zero bytes, represented as `11111111111111111111111111111111` in base58.
+The serialized transaction must still contain this field; do not remove its bytes.
+The request-level `recentBlockhash`, if provided, must be a nonzero blockhash.
+
+Filling the placeholder requires an unsigned transaction with every signature slot set to zero and all required signers available through Turnkey.
+For the V2 send API, include every required signer in `signWiths`.
+For partial signing, set the blockhash before collecting signatures; changing it invalidates existing signatures.
+
+Turnkey fills the placeholder before policy evaluation. Policies inspect the selected blockhash, and signing uses the same reconstructed message.
+Turnkey preserves a nonzero embedded blockhash even if it is stale; auto-fill does not refresh expired blockhashes.
+
+### Sponsored sends
+
+For `sponsor: true`, Turnkey uses the request-level `recentBlockhash` if supplied.
+Otherwise, it fetches a recent blockhash during execution.
+A blockhash inside `unsignedTransaction` alone does not fix the final sponsored blockhash.
+
+### Approvals, retries, and expiration
+
+Supply `recentBlockhash` when your approval or retry flow requires a fixed blockhash.
+This fixes that field, but does not extend the transaction's validity or freeze sponsorship-filled compute and fee values.
+A transaction must be included onchain before its blockhash expires, whether you or Turnkey select it.
+A fixed recent blockhash therefore does not provide an unlimited approval window.
+
+For customer-paid sends with no supplied blockhash, each access-control evaluation can select a new one.
+The request's original intent stays the same, but the message selected for signing can change.
+The blockhash selected during evaluation is the one used for signing.
+Delays between evaluation and broadcast can still cause expiration.
+
+Rebroadcasting the same signed transaction does not refresh its blockhash.
+Using a new blockhash requires policy evaluation and signing again; do not assume every retry repeats those steps.
+See Solana's [transaction confirmation and expiration guide](https://solana.com/developers/cookbook/transactions/confirmation) for blockhash validity and expiration tracking.
+
+## Policies and migration
+
+`solana.tx.version` returns `LEGACY`, `V0`, or `V1`.
+Use this field to scope policies to the transaction versions your application accepts.
+Transfer and IDL instruction policies work across all three versions.
+Legacy/V0 compute and fee policies inspect Compute Budget instructions; V1 policies inspect the outer transaction config.
+
+### V1 config fields
+
+V1 exposes `priority_fee_lamports`, `compute_unit_limit`, `loaded_accounts_data_size_limit`, and `heap_size` directly under `solana.tx`.
+See the [policy field reference](/features/policies/language#solana-v1-config) for units and absent-field behavior.
+
+Policies inspect the config in your submitted transaction, before sponsorship fills missing values.
+If you omit the V1 priority fee, policies read it as zero, even if sponsorship later fills a nonzero fee.
+To cap the final sponsored priority fee with a policy, set the fee explicitly in the V1 transaction config before serializing the transaction.
+Turnkey preserves this value during sponsorship, including an explicit zero.
+
+An absent V1 resource limit produces an evaluation error when a policy accesses it.
+All four V1 config fields are unavailable for legacy and V0 transactions.
+The policy engine evaluates both sides of `&&` and `||`; a version check cannot guard access to an unavailable field.
+Use the [separate policy examples](/features/policies/examples/solana#allow-v1-transfers-with-explicit-resource-limits) when you support multiple transaction versions.
+
+### Migrate policies to V1
+
+To migrate existing policies:
+
+1. Review policies that allow transactions based only on programs, transfers, or IDL instruction data.
+2. Add V1 outer-config restrictions to each applicable allow policy.
+3. Keep legacy/V0 Compute Budget instruction checks in separate policies scoped to those versions.
+4. Supply explicit V1 resource limits when a policy reads those limits.
+5. Test each policy with a non-root user, including missing config, excessive fees, and legacy/V0 transactions.
+
+Compute Budget instructions do not control V1 compute limits or priority fees; they are no-ops for V1.
+Sponsorship preserves those instructions but uses the outer V1 config.
+An instruction allowlist alone therefore does not cap V1 fees.
+V1 has no ALTs, so `solana.tx.address_table_lookups` is empty and all account keys are static.
+Existing transfer and IDL policies still describe the original instructions, but do not automatically restrict the V1 config.
