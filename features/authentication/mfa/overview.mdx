@@ -180,6 +180,30 @@ The `order` field is an integer that determines the evaluation priority when a u
 
 This lets you place narrowly-scoped, high-sensitivity policies first, and keep broader "catch-all" policies with higher order values as a fallback.
 
+A condition can only be evaluated if the activity exposes the fields it references. When it cannot be, the policy is skipped and evaluation moves to the next one. It is not treated as a match.
+
+Conditions are usually written against `activity` fields, such as `activity.action == 'SIGN'`. A few activities expose none of them: [updating the root quorum](/features/policies/language#root-quorum-activities) is one, since it is governed by the root quorum rather than the policy engine. A set made only of conditions like that leaves those activities with no factor, so always include a final `"condition": "true"` policy. It references no fields, so it always applies.
+
+This also applies inside a single condition. Conditions are not short-circuited, so every operand is evaluated even when an earlier one already settles the result. A condition that uses `||` to cover two kinds of activity is skipped for **both** of them, because each side references fields the other activity does not expose:
+
+```json
+// Never applies. On an Ethereum transaction `solana.tx` cannot be evaluated,
+// and on a Solana transaction `eth.tx` cannot be.
+{
+  "condition": "eth.tx.value > 0 || solana.tx.transfers.count() > 0",
+  "order": 0
+}
+```
+
+Use one policy per activity instead, and let `order` express the priority between them.
+
+```json
+// Each condition only references fields its own activity exposes, so each
+// one is evaluable and applies independently.
+{ "condition": "eth.tx.value > 0", "order": 0 }
+{ "condition": "solana.tx.transfers.count() > 0", "order": 1 }
+```
+
 ```json
 // Order 1: Strict MFA for signing - evaluated first
 {
