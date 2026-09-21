@@ -303,6 +303,32 @@
         "tags": ["Earn"]
       }
     },
+    "/public/v1/query/get_earn_claim_rewards_status": {
+      "post": {
+        "summary": "Get Earn claim rewards status",
+        "description": "Poll the status of a rewards claim by its claim_request_id.",
+        "operationId": "GetEarnClaimRewardsStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetEarnClaimRewardsStatusResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetEarnClaimRewardsStatusRequest"
+            }
+          }
+        ],
+        "tags": ["Earn"]
+      }
+    },
     "/public/v1/query/get_earn_deploy_status": {
       "post": {
         "summary": "Get Earn deploy status",
@@ -1180,6 +1206,32 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/ListEarnPositionsRequest"
+            }
+          }
+        ],
+        "tags": ["Earn"]
+      }
+    },
+    "/public/v1/query/list_earn_rewards": {
+      "post": {
+        "summary": "List Earn rewards",
+        "description": "List the protocol rewards (e.g. MORPHO and third-party campaign tokens, distributed off-chain via Merkl) attributed to a wallet: claimable, lifetime claimed, and pending amounts per reward token.",
+        "operationId": "ListEarnRewards",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ListEarnRewardsResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ListEarnRewardsRequest"
             }
           }
         ],
@@ -3056,6 +3108,32 @@
           }
         ],
         "tags": ["Organizations"]
+      }
+    },
+    "/public/v1/submit/earn_claim_rewards": {
+      "post": {
+        "summary": "Claim Earn rewards",
+        "description": "Claim the Merkl protocol rewards attributed to a wallet's Earn positions. The claim is signed by the wallet itself and every reward token is transferred to it; see ListEarnRewards for what is claimable.",
+        "operationId": "EarnClaimRewards",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/EarnClaimRewardsRequest"
+            }
+          }
+        ],
+        "tags": ["Earn"]
       }
     },
     "/public/v1/submit/earn_deploy_wrapper": {
@@ -5010,7 +5088,8 @@
         "ACTIVITY_TYPE_UPDATE_PAYMENT_METHOD",
         "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
         "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
-        "ACTIVITY_TYPE_DELETE_SECRETS"
+        "ACTIVITY_TYPE_DELETE_SECRETS",
+        "ACTIVITY_TYPE_EARN_CLAIM_REWARDS"
       ]
     },
     "AddressFormat": {
@@ -5287,6 +5366,10 @@
         "name": {
           "type": "string",
           "description": "The asset name"
+        },
+        "tokenProgram": {
+          "type": "string",
+          "description": "Solana token program address that owns this mint, inferred from getTokenAccountsByOwner. TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA for classic SPL Token, TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb for Token-2022. Empty for native SOL and non-Solana assets."
         }
       }
     },
@@ -7678,6 +7761,18 @@
           "format": "int64",
           "x-nullable": true,
           "description": "Optional desired replica count for this deployment."
+        },
+        "instanceSizeCpus": {
+          "type": "integer",
+          "format": "int64",
+          "x-nullable": true,
+          "description": "Optional desired instance cpu count."
+        },
+        "instanceSizeRam": {
+          "type": "integer",
+          "format": "int64",
+          "x-nullable": true,
+          "description": "Optional desired instance memory size in GiB."
         }
       },
       "required": [
@@ -9451,6 +9546,60 @@
       },
       "required": ["privateKeyId"]
     },
+    "EarnClaimRewardsIntent": {
+      "type": "object",
+      "properties": {
+        "signWith": {
+          "type": "string",
+          "description": "A Turnkey-managed wallet address the rewards are attributed to. The claim transaction is signed by this wallet and the Merkl Distributor transfers every reward token to it."
+        },
+        "chainCaip2": {
+          "type": "string",
+          "description": "CAIP-2 chain to claim rewards on (e.g. 'eip155:8453'). Rewards accrue per chain; see ListEarnRewards."
+        },
+        "sponsor": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether to sponsor this transaction via Gas Station."
+        }
+      },
+      "required": ["signWith", "chainCaip2"]
+    },
+    "EarnClaimRewardsRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_EARN_CLAIM_REWARDS"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/EarnClaimRewardsIntent"
+        },
+        "generateAppProofs": {
+          "type": "boolean",
+          "x-nullable": true
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "EarnClaimRewardsResult": {
+      "type": "object",
+      "properties": {
+        "claimRequestId": {
+          "type": "string",
+          "description": "Identifier to poll claim status and tx hash via GetEarnClaimRewardsStatus."
+        }
+      },
+      "required": ["claimRequestId"]
+    },
     "EarnDeployWrapperIntent": {
       "type": "object",
       "properties": {
@@ -9687,6 +9836,18 @@
         "forceDeallocatableLiquidityDisplay": {
           "$ref": "#/definitions/EarnValueDisplay",
           "description": "Normalized force-deallocatable liquidity values for display purposes only (usd + crypto). Do not do arithmetic with these; use force_deallocatable_liquidity instead."
+        },
+        "deployStatus": {
+          "type": "string",
+          "description": "On-chain status of the wrapper deployment: PENDING, COMPLETED, or FAILED. Only a COMPLETED wrapper is usable. Empty when no deploy is recorded for the wrapper."
+        },
+        "deployRequestId": {
+          "type": "string",
+          "description": "Request id of the wrapper's most recent deploy, for polling GetEarnDeployStatus. Empty when no deploy is recorded."
+        },
+        "deployError": {
+          "type": "string",
+          "description": "Failure detail when deploy_status is FAILED."
         }
       }
     },
@@ -9763,6 +9924,73 @@
     "EarnProvider": {
       "type": "string",
       "enum": ["EARN_PROVIDER_MORPHO", "EARN_PROVIDER_AAVE"]
+    },
+    "EarnReward": {
+      "type": "object",
+      "properties": {
+        "caip2": {
+          "type": "string",
+          "description": "CAIP-2 chain the reward is claimable on (e.g. 'eip155:8453')."
+        },
+        "caip19": {
+          "type": "string",
+          "description": "CAIP-19 asset ID of the reward token (e.g. 'eip155:8453/erc20:0xBAa5...'). Reward tokens are campaign-specific and unrelated to the position's underlying asset."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Symbol of the reward token (e.g. 'MORPHO'), as reported by Merkl."
+        },
+        "decimals": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Decimals of the reward token."
+        },
+        "claimable": {
+          "type": "string",
+          "description": "Amount claimable now, in raw on-chain units of the reward token."
+        },
+        "claimed": {
+          "type": "string",
+          "description": "Lifetime amount already claimed, in raw on-chain units of the reward token."
+        },
+        "pending": {
+          "type": "string",
+          "description": "Amount accrued but not yet claimable (not yet in a live on-chain merkle root; roots update roughly every 8 hours), in raw on-chain units of the reward token."
+        },
+        "display": {
+          "$ref": "#/definitions/EarnRewardDisplay",
+          "description": "USD + crypto renderings for display only. Do not do arithmetic with these."
+        }
+      }
+    },
+    "EarnRewardDisplay": {
+      "type": "object",
+      "properties": {
+        "claimableUsd": {
+          "type": "string",
+          "description": "Claimable amount in USD, for display only. Empty when the token is unpriced."
+        },
+        "claimableCrypto": {
+          "type": "string",
+          "description": "Claimable amount in the reward token's own units, for display only."
+        },
+        "claimedUsd": {
+          "type": "string",
+          "description": "Lifetime claimed amount in USD, for display only. Empty when the token is unpriced."
+        },
+        "claimedCrypto": {
+          "type": "string",
+          "description": "Lifetime claimed amount in the reward token's own units, for display only."
+        },
+        "pendingUsd": {
+          "type": "string",
+          "description": "Pending amount in USD, for display only. Empty when the token is unpriced."
+        },
+        "pendingCrypto": {
+          "type": "string",
+          "description": "Pending amount in the reward token's own units, for display only."
+        }
+      }
     },
     "EarnSetWrapperStateIntent": {
       "type": "object",
@@ -10428,7 +10656,9 @@
             "eip155:42431",
             "eip155:421614",
             "eip155:4663",
-            "eip155:46630"
+            "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         }
@@ -10477,7 +10707,9 @@
             "eip155:42431",
             "eip155:421614",
             "eip155:4663",
-            "eip155:46630"
+            "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -10555,7 +10787,9 @@
             "eip155:42431",
             "eip155:421614",
             "eip155:4663",
-            "eip155:46630"
+            "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -10704,6 +10938,11 @@
         "turnkey": {
           "$ref": "#/definitions/TransactionHistoryTurnkey",
           "description": "Turnkey-specific metadata for transactions originated by Turnkey."
+        },
+        "executionFailed": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether the transaction failed during on-chain execution. Omitted when execution outcome is unavailable."
         }
       },
       "required": [
@@ -10741,7 +10980,9 @@
             "eip155:42161",
             "eip155:421614",
             "eip155:4663",
-            "eip155:46630"
+            "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -11708,6 +11949,41 @@
       },
       "required": ["status"]
     },
+    "GetEarnClaimRewardsStatusRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "claimRequestId": {
+          "type": "string",
+          "description": "The claim_request_id returned by EarnClaimRewards."
+        }
+      },
+      "required": ["organizationId", "claimRequestId"]
+    },
+    "GetEarnClaimRewardsStatusResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "COMPLETED", "FAILED"],
+          "description": "Status of the rewards claim."
+        },
+        "claimTxHash": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Transaction hash of the rewards claim, once available."
+        },
+        "error": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Reason the rewards claim transaction failed, when status is FAILED."
+        }
+      },
+      "required": ["status"]
+    },
     "GetEarnDeployStatusRequest": {
       "type": "object",
       "properties": {
@@ -12000,7 +12276,9 @@
             "eip155:42431",
             "eip155:421614",
             "eip155:4663",
-            "eip155:46630"
+            "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002"
           ],
           "description": "CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -12869,6 +13147,8 @@
             "eip155:421614",
             "eip155:4663",
             "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002",
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
@@ -14511,6 +14791,9 @@
         },
         "deleteSecretsIntent": {
           "$ref": "#/definitions/DeleteSecretsIntent"
+        },
+        "earnClaimRewardsIntent": {
+          "$ref": "#/definitions/EarnClaimRewardsIntent"
         }
       }
     },
@@ -14690,6 +14973,38 @@
         }
       }
     },
+    "ListEarnRewardsRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "walletAddress": {
+          "type": "string",
+          "description": "The wallet address to return rewards for."
+        },
+        "caip2": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Optional filter: only return rewards on this chain (e.g. 'eip155:8453'). When unset, every chain the organization has deployed Earn wrappers on is queried."
+        }
+      },
+      "required": ["organizationId", "walletAddress"]
+    },
+    "ListEarnRewardsResponse": {
+      "type": "object",
+      "properties": {
+        "rewards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/EarnReward"
+          },
+          "description": "The wallet's rewards, one entry per (chain, reward token), sorted by chain then token. Entries where every amount is zero are omitted."
+        }
+      }
+    },
     "ListEarnVaultsRequest": {
       "type": "object",
       "properties": {
@@ -14792,7 +15107,9 @@
             "eip155:56",
             "eip155:97",
             "eip155:4663",
-            "eip155:46630"
+            "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002"
           ],
           "description": "EVM CAIP-2 chain ID (e.g., 'eip155:1' for Ethereum mainnet)."
         },
@@ -14991,6 +15308,8 @@
             "eip155:421614",
             "eip155:4663",
             "eip155:46630",
+            "eip155:5042",
+            "eip155:5042002",
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
@@ -16790,6 +17109,9 @@
         },
         "deleteSecretsResult": {
           "$ref": "#/definitions/DeleteSecretsResult"
+        },
+        "earnClaimRewardsResult": {
+          "$ref": "#/definitions/EarnClaimRewardsResult"
         }
       }
     },
@@ -17625,7 +17947,7 @@
       "properties": {
         "unsignedTransaction": {
           "type": "string",
-          "description": "Base64-encoded serialized unsigned Solana transaction"
+          "description": "Hex-encoded serialized unsigned Solana transaction in full wire format. Legacy/V0 transactions allow 1232 bytes. V1 allows 4096 bytes with up to 12 trailing 64-byte signature slots, including the paymaster for sponsored transactions. Fill unsigned slots with zeroes."
         },
         "signWith": {
           "type": "string",
@@ -17651,7 +17973,7 @@
         "recentBlockhash": {
           "type": "string",
           "x-nullable": true,
-          "description": "user-provided blockhash for replay protection / deadline control. If omitted and sponsor=true, we fetch a fresh blockhash during execution"
+          "description": "Optional blockhash used for signing. For non-sponsored transactions, it must match the blockhash in `unsignedTransaction` or replace its all-zero placeholder. If the placeholder is present and this field is omitted, Turnkey fetches a blockhash before policy evaluation. Filling the placeholder requires an unsigned transaction and all required signers. Sponsored transactions use this value or fetch one during execution. Turnkey does not refresh expired blockhashes."
         }
       },
       "required": ["unsignedTransaction", "signWith", "caip2"]
@@ -17661,14 +17983,14 @@
       "properties": {
         "unsignedTransaction": {
           "type": "string",
-          "description": "Hex-encoded serialized unsigned Solana transaction (full wire format with zeroed signature placeholders)"
+          "description": "Hex-encoded serialized unsigned Solana transaction in full wire format. Legacy/V0 transactions allow 1232 bytes. V1 allows 4096 bytes with up to 12 trailing 64-byte signature slots, including the paymaster for sponsored transactions. Fill unsigned slots with zeroes."
         },
         "signWiths": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers. For sponsored transactions this must list every required signer of the transaction in transaction order."
+          "description": "Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers for legacy/V0, or up to 12 for V1 (11 when sponsored). For sponsored transactions this must list every required signer of the transaction in transaction order."
         },
         "sponsor": {
           "type": "boolean",
@@ -17690,7 +18012,7 @@
         "recentBlockhash": {
           "type": "string",
           "x-nullable": true,
-          "description": "User-provided blockhash for replay protection / deadline control. If provided, it is used as-is, including for sponsored transactions (the transaction is only broadcastable while the blockhash is current). If omitted and sponsor=true, a fresh blockhash is fetched during execution."
+          "description": "Optional blockhash used for signing. For non-sponsored transactions, it must match the blockhash in `unsignedTransaction` or replace its all-zero placeholder. If the placeholder is present and this field is omitted, Turnkey fetches a blockhash before policy evaluation. Filling the placeholder requires an unsigned transaction and all required signers. Sponsored transactions use this value or fetch one during execution. Turnkey does not refresh expired blockhashes."
         }
       },
       "required": ["unsignedTransaction", "signWiths", "caip2"]
@@ -17787,6 +18109,11 @@
         "turnkey": {
           "$ref": "#/definitions/TransactionHistoryTurnkey",
           "description": "Turnkey-specific metadata for transactions originated by Turnkey."
+        },
+        "executionFailed": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether the transaction failed during on-chain execution. Omitted when execution outcome is unavailable."
         }
       },
       "required": [
@@ -18918,6 +19245,16 @@
         "debugMode": {
           "type": "boolean",
           "description": "Whether this deployment is running in debug mode. Debug-mode deployments expose enclave logs and cannot be remotely attested."
+        },
+        "instanceSizeCpus": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The instance cpu count for this enclave."
+        },
+        "instanceSizeRam": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The instance memory size in GiB for this enclave."
         }
       },
       "required": [
