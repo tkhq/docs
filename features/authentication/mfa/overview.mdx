@@ -184,6 +184,19 @@ A condition can only be evaluated if the activity exposes the fields it referenc
 
 Conditions are usually written against `activity` fields, such as `activity.action == 'SIGN'`. A few activities expose none of them: [updating the root quorum](/features/policies/language#root-quorum-activities) is one, since it is governed by the root quorum rather than the policy engine. A set made only of conditions like that leaves those activities with no factor, so always include a final `"condition": "true"` policy. It references no fields, so it always applies.
 
+This also applies inside a single condition. Conditions are not short-circuited, so every operand is evaluated even when an earlier one already settles the result. A condition that uses `||` to cover two kinds of activity is skipped for **both** of them, because each side references fields the other activity does not expose:
+
+```json
+// Never applies. On an Ethereum transaction `solana.tx` cannot be evaluated,
+// and on a Solana transaction `eth.tx` cannot be.
+{
+  "condition": "eth.tx.value > 0 || solana.tx.transfers.count() > 0",
+  "order": 0
+}
+```
+
+Use one policy per activity instead, and let `order` express the priority between them.
+
 ```json
 // Order 1: Strict MFA for signing - evaluated first
 {
