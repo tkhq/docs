@@ -1,0 +1,148 @@
+---
+title: "List Earn rewards"
+description: "List the protocol rewards (e.g. MORPHO and third-party campaign tokens, distributed off-chain via Merkl) attributed to a wallet: claimable, lifetime claimed, and pending amounts per reward token."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="list_earn_rewards" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="walletAddress" type="string" required={true}>
+
+The wallet address to return rewards for.
+</ParamField>
+
+<ParamField body="caip2" type="string" required={false}>
+
+Optional filter: only return rewards on this chain (e.g. 'eip155:8453'). When unset, every chain the organization has deployed Earn wrappers on is queried.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="rewards" type="array" required={false}>
+  The wallet's rewards, one entry per (chain, reward token), sorted by chain then token. Entries where every amount is zero are omitted.
+  <Expandable title="rewards details">
+    <NestedParam parentKey="rewards" childKey="caip2" type="string" required={false}>
+CAIP-2 chain the reward is claimable on (e.g. 'eip155:8453').
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="caip19" type="string" required={false}>
+CAIP-19 asset ID of the reward token (e.g. 'eip155:8453/erc20:0xBAa5...'). Reward tokens are campaign-specific and unrelated to the position's underlying asset.
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="symbol" type="string" required={false}>
+Symbol of the reward token (e.g. 'MORPHO'), as reported by Merkl.
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="decimals" type="number" required={false}>
+Decimals of the reward token.
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="claimable" type="string" required={false}>
+Amount claimable now, in raw on-chain units of the reward token.
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="claimed" type="string" required={false}>
+Lifetime amount already claimed, in raw on-chain units of the reward token.
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="pending" type="string" required={false}>
+Amount accrued but not yet claimable (not yet in a live on-chain merkle root; roots update roughly every 8 hours), in raw on-chain units of the reward token.
+</NestedParam>
+<NestedParam parentKey="rewards" childKey="display" type="object" required={false}>
+      display field
+      <Expandable title="display details">
+        <NestedParam parentKey="rewards.display" childKey="claimableUsd" type="string" required={false}>
+Claimable amount in USD, for display only. Empty when the token is unpriced.
+</NestedParam>
+<NestedParam parentKey="rewards.display" childKey="claimableCrypto" type="string" required={false}>
+Claimable amount in the reward token's own units, for display only.
+</NestedParam>
+<NestedParam parentKey="rewards.display" childKey="claimedUsd" type="string" required={false}>
+Lifetime claimed amount in USD, for display only. Empty when the token is unpriced.
+</NestedParam>
+<NestedParam parentKey="rewards.display" childKey="claimedCrypto" type="string" required={false}>
+Lifetime claimed amount in the reward token's own units, for display only.
+</NestedParam>
+<NestedParam parentKey="rewards.display" childKey="pendingUsd" type="string" required={false}>
+Pending amount in USD, for display only. Empty when the token is unpriced.
+</NestedParam>
+<NestedParam parentKey="rewards.display" childKey="pendingCrypto" type="string" required={false}>
+Pending amount in the reward token's own units, for display only.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/list_earn_rewards \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "walletAddress": "<string>",
+    "caip2": "<string>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().listEarnRewards({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  walletAddress: "<string> (The wallet address to return rewards for.)",
+  caip2: "<string> (Optional filter: only return rewards on this chain (e.g. 'eip155:8453'). When unset, every chain the organization has deployed Earn wrappers on is queried.)"
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "rewards": [
+    {
+      "caip2": "<string>",
+      "caip19": "<string>",
+      "symbol": "<string>",
+      "decimals": "<number>",
+      "claimable": "<string>",
+      "claimed": "<string>",
+      "pending": "<string>",
+      "display": {
+        "claimableUsd": "<string>",
+        "claimableCrypto": "<string>",
+        "claimedUsd": "<string>",
+        "claimedCrypto": "<string>",
+        "pendingUsd": "<string>",
+        "pendingCrypto": "<string>"
+      }
+    }
+  ]
+}
+```
+
+</ResponseExample>

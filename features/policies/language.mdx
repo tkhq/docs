@@ -143,10 +143,15 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | chain_id                 | number                                    | The EVM chain ID                                                                                                                                                                                                                                                                                                                                                     |
 |                          | nonce                    | number                                    | The nonce of the authority                                                                                                                                                                                                                                                                                                                                           |
 | <a id="struct-solana-transaction" href="#struct-solana-transaction">**SolanaTransaction**</a>    | account_keys             | list\<[string](#type-string)\>                            | The accounts (public keys) involved in the transaction                                                                                                                                                                                                                                                                                                               |
+|                          | version | [string](#type-string) | Solana wire version of `unsignedTransaction`: `LEGACY`, `V0`, or `V1`. Independent of the activity version. |
+|                          | priority_fee_lamports | [int](#type-int) | V1 only: total priority fee in lamports. Zero when absent in V1. See [V1 config](#solana-v1-config). |
+|                          | compute_unit_limit | [int](#type-int) | V1 only: explicit compute unit limit in CU. Unavailable when absent. |
+|                          | loaded_accounts_data_size_limit | [int](#type-int) | V1 only: explicit loaded accounts data size limit in bytes. Unavailable when absent. |
+|                          | heap_size | [int](#type-int) | V1 only: explicit heap size in bytes. Unavailable when absent. |
 |                          | program_keys             | list\<[string](#type-string)\>                            | The programs (public keys) involved in the transaction                                                                                                                                                                                                                                                                                                               |
 |                          | instructions             | list\<[Instruction](#struct-instruction)\>                       | A list of Instructions (see below). Each instruction exposes a `parsed_instruction_data` field (with `instruction_name`, `named_accounts`, `program_call_args`) when a matching [Smart Contract Interface (IDL)](/features/policies/smart-contract-interfaces) has been uploaded for that program.                                                                   |
 |                          | transfers                | list\<[Transfer](#struct-transfer)\>                          | A list of Transfers (see below)                                                                                                                                                                                                                                                                                                                                      |
-|                          | recent_blockhash         | [string](#type-string)                                    | The recent blockhash specified in a transaction                                                                                                                                                                                                                                                                                                                      |
+|                          | recent_blockhash         | [string](#type-string)                                    | The transaction blockhash. For non-sponsored sends, this is the blockhash in `unsignedTransaction`, or the blockhash Turnkey filled before policy evaluation. For sponsored sends, this is the blockhash in `unsignedTransaction`, not the one selected during execution.                                                                                                                                                                                                                                                                                                                      |
 |                          | spl_transfers            | list\<[SPLTransfer](#struct-spltransfer)\>                       | A list of SPLTransfers (see below)                                                                                                                                                                                                                                                                                                                                   |
 |                          | address_table_lookups    | list\<[AddressTableLookup](#struct-address-table-lookup)\>                | A list of AddressTableLookups (see below)                                                                                                                                                                                                                                                                                                                            |
 | <a id="struct-tron-transaction" href="#struct-tron-transaction">**TronTransaction**</a>      | ref_block_bytes          | [string](#type-string)                                    | The height of the transaction reference block                                                                                                                                                                                                                                                                                                                        |
@@ -718,10 +723,38 @@ Here are some approaches you might take to govern transfers:
   ([example](/features/policies/examples/solana#allow-solana-transactions-that-have-exactly-one-transfer,-to-one-specific-recipient)).
   This is the most secure approach, and thus most restrictive.
 
+#### Solana V1 config
+
+See [Solana transactions](/features/networks/solana-transactions) for wire-format requirements.
+`solana.tx.version` returns the wire version of `unsignedTransaction` as a case-sensitive string: `LEGACY`, `V0`, or `V1`.
+Sponsorship preserves this version. It is independent of the Turnkey activity version.
+
+The following fields expose the V1 transaction config in `unsignedTransaction`, before sponsorship fills missing values:
+
+| Policy field | Type | Unit | When omitted from the transaction |
+| --- | --- | --- | --- |
+| `solana.tx.priority_fee_lamports` | `int` | Total lamports | Returns zero |
+| `solana.tx.compute_unit_limit` | `int` | Compute units (CU) | Evaluation error (`FieldNotUsed`) |
+| `solana.tx.loaded_accounts_data_size_limit` | `int` | Bytes | Evaluation error (`FieldNotUsed`) |
+| `solana.tx.heap_size` | `int` | Bytes | Evaluation error (`FieldNotUsed`) |
+
+`priority_fee_lamports` is a total priority fee, not a per-CU price. It excludes base fees and rent.
+An explicit zero remains zero in the policy value.
+An absent resource limit is unavailable, rather than zero or a runtime default.
+For legacy/V0 transactions, access to any of these four fields produces a `FieldNotUsed` evaluation error.
+
+<Warning>
+  The policy engine does not short-circuit `&&` or `||`.
+  A condition such as `solana.tx.version == 'V1' && solana.tx.priority_fee_lamports <= 1000`
+  still evaluates the fee field for legacy/V0 and produces an error.
+  Use separate, fully scoped allow policies for the transaction versions you accept.
+</Warning>
+
 #### Account address lookups
 
-Solana transactions can reference onchain address lookup tables for account addresses. Turnkey
-surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP`
+V0 transactions can reference onchain address lookup tables for account addresses.
+Legacy and V1 transactions have no ALTs; their `address_table_lookups` lists are empty.
+Turnkey surfaces any account address pulled from a lookup table as the literal string `ADDRESS_TABLE_LOOKUP`
 in Solana address fields (`account_keys`, instruction accounts, `transfers`, and `spl_transfers`).
 The `solana.tx.address_table_lookups` array indicates when lookups are present, but the specific
 addresses are not resolved. If you rely on allowlists or denylists of addresses, add a guard for

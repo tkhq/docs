@@ -15,7 +15,81 @@ Note: see the [language section](/features/policies/language#solana) for various
 
 #### Allow IDL-specific program instructions
 
-See [here](../../../concepts/policies/smart-contract-interfaces) for more information and examples.
+See [Smart Contract Interfaces](/features/policies/smart-contract-interfaces) for more information and examples.
+
+#### Allow V1 transfers with explicit resource limits
+
+See [Solana transactions](/features/networks/solana-transactions) for transaction construction and [V1 config fields](/features/policies/language#solana-v1-config) for units.
+Replace the placeholders with your non-root user ID, wallet ID, and Solana addresses before creating these policies.
+
+This policy permits one System Program transfer of up to 10,000,000 lamports from one sender to one recipient.
+It caps the V1 priority fee in `unsignedTransaction` at 1,000 total lamports and requires explicit resource limits within the stated bounds.
+
+```json
+{
+  "policyName": "Allow bounded V1 SOL transfers",
+  "notes": "Requires explicit V1 resource limits and one approved transfer",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet.id == '<WALLET_ID>' && solana.tx.version == 'V1' && solana.tx.instructions.count() == 1 && solana.tx.program_keys.all(p, p == '11111111111111111111111111111111') && solana.tx.transfers.count() == 1 && solana.tx.transfers.all(t, t.from == '<SENDER_ADDRESS>' && t.to == '<RECIPIENT_ADDRESS>' && t.amount > 0 && t.amount <= 10000000) && solana.tx.priority_fee_lamports <= 1000 && solana.tx.compute_unit_limit > 0 && solana.tx.compute_unit_limit <= 200000 && solana.tx.loaded_accounts_data_size_limit > 0 && solana.tx.loaded_accounts_data_size_limit <= 67108864 && solana.tx.heap_size == 32768"
+}
+```
+
+For example, set the V1 transaction config to 200,000 CU, 67,108,864 loaded-account bytes, 32,768 heap bytes, and a 1,000-lamport priority fee.
+Turnkey preserves these explicit config values during sponsorship.
+Policies inspect the instructions in `unsignedTransaction`, so sponsor-added rent-funding instructions do not change this policy's instruction count.
+
+<Warning>
+  An absent V1 priority fee reads as zero, but sponsorship can fill a nonzero fee later.
+  Supply the priority fee explicitly, including zero, to make this cap apply to the final sponsored fee.
+  The policy cannot distinguish an absent priority fee from an explicit zero.
+  This policy alone cannot enforce a final sponsored fee cap when callers can omit the fee.
+</Warning>
+
+If a V1 resource limit is absent, this policy produces an evaluation error.
+It also produces an error for legacy/V0, because those transactions have no V1 config fields.
+The version check does not prevent this access: `&&` and `||` do not short-circuit.
+
+#### Allow the same transfer for legacy and V0
+
+If your application also accepts legacy/V0, create this separate policy alongside the V1 policy.
+It repeats the user, wallet, and transfer restrictions without accessing V1-only fields.
+
+```json
+{
+  "policyName": "Allow bounded legacy and V0 SOL transfers",
+  "notes": "One approved transfer with no Compute Budget instructions or ALTs",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "wallet.id == '<WALLET_ID>' && (solana.tx.version == 'LEGACY' || solana.tx.version == 'V0') && solana.tx.address_table_lookups.count() == 0 && solana.tx.instructions.count() == 1 && solana.tx.program_keys.all(p, p == '11111111111111111111111111111111') && solana.tx.transfers.count() == 1 && solana.tx.transfers.all(t, t.from == '<SENDER_ADDRESS>' && t.to == '<RECIPIENT_ADDRESS>' && t.amount > 0 && t.amount <= 10000000)"
+}
+```
+
+This example permits no customer-supplied Compute Budget instructions.
+For sponsored legacy/V0 sends, Turnkey can add compute and fee values after policy evaluation.
+If your application accepts explicit legacy/V0 compute and fee controls, add their instruction checks to this version-scoped policy.
+
+A matching explicit allow can authorize a legacy/V0 request despite the V1 policy's evaluation error.
+An explicit deny takes precedence over either allow.
+Review existing allow policies before adding these examples: a broader allow can still authorize transactions that fail these conditions.
+
+#### Deny V1 until policy migration is complete
+
+This optional policy prevents non-root users from using V1 while you update instruction-based fee policies.
+It reads only the version field, which is available for all three Solana transaction versions.
+Remove it when your V1 policies are ready; its explicit deny overrides V1 allow policies.
+
+```json
+{
+  "policyName": "Deny Solana V1 during policy migration",
+  "notes": "Remove after V1 config restrictions are ready",
+  "effect": "EFFECT_DENY",
+  "condition": "solana.tx.version == 'V1'"
+}
+```
+
+Test policies with a non-root user; root quorum authorization can bypass policy restrictions.
+Include V1 transactions with allowed and excessive fees, missing resource limits, and explicit zero fees, plus legacy/V0 regression cases.
 
 #### Allow Solana transactions that include a transfer from one specific sender
 

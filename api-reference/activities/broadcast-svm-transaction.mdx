@@ -33,11 +33,11 @@ Unique identifier for a given Organization.
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="unsignedTransaction" type="string" required={true} default="">
-    Hex-encoded serialized unsigned Solana transaction (full wire format with zeroed signature placeholders)
+    Hex-encoded serialized unsigned Solana transaction in full wire format. Legacy/V0 transactions allow 1232 bytes. V1 allows 4096 bytes with up to 12 trailing 64-byte signature slots, including the paymaster for sponsored transactions. Fill unsigned slots with zeroes.
     </NestedParam>
     
     <ParamField body="signWiths" type="array" required={true} path="parameters.signWiths">
-      <p>Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers. For sponsored transactions this must list every required signer of the transaction in transaction order.</p>
+      <p>Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers for legacy/V0, or up to 12 for V1 (11 when sponsored). For sponsored transactions this must list every required signer of the transaction in transaction order.</p>
       <Expandable title="item details">
             <p>Array item type: <code>string</code></p>
             <p>item field</p>
@@ -52,7 +52,7 @@ Unique identifier for a given Organization.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="recentBlockhash" type="string" required={false} default="">
-    User-provided blockhash for replay protection / deadline control. If provided, it is used as-is, including for sponsored transactions (the transaction is only broadcastable while the blockhash is current). If omitted and sponsor=true, a fresh blockhash is fetched during execution.
+    Optional blockhash used for signing. For non-sponsored transactions, it must match the blockhash in `unsignedTransaction` or replace its all-zero placeholder. If the placeholder is present and this field is omitted, Turnkey fetches a blockhash before policy evaluation. Filling the placeholder requires an unsigned transaction and all required signers. Sponsored transactions use this value or fetch one during execution. Turnkey does not refresh expired blockhashes.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -87,10 +87,10 @@ The activity type
       The solSendTransactionIntentV2 object
       <Expandable title="solSendTransactionIntentV2 details">
         <NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="unsignedTransaction" type="string" required={true}>
-Hex-encoded serialized unsigned Solana transaction (full wire format with zeroed signature placeholders)
+Hex-encoded serialized unsigned Solana transaction in full wire format. Legacy/V0 transactions allow 1232 bytes. V1 allows 4096 bytes with up to 12 trailing 64-byte signature slots, including the paymaster for sponsored transactions. Fill unsigned slots with zeroes.
 </NestedParam>
 <NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="signWiths" type="array" required={true}>
-      Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers. For sponsored transactions this must list every required signer of the transaction in transaction order.
+      Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers for legacy/V0, or up to 12 for V1 (11 when sponsored). For sponsored transactions this must list every required signer of the transaction in transaction order.
       <Expandable title="signWiths details">
         <NestedParam parentKey="activity.intent.solSendTransactionIntentV2.signWiths" childKey="item" type="string" required={true}>
 item field
@@ -108,7 +108,7 @@ Enum options: `solana:mainnet`, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`, `sola
 
 </NestedParam>
 <NestedParam parentKey="activity.intent.solSendTransactionIntentV2" childKey="recentBlockhash" type="string" required={false}>
-User-provided blockhash for replay protection / deadline control. If provided, it is used as-is, including for sponsored transactions (the transaction is only broadcastable while the blockhash is current). If omitted and sponsor=true, a fresh blockhash is fetched during execution.
+Optional blockhash used for signing. For non-sponsored transactions, it must match the blockhash in `unsignedTransaction` or replace its all-zero placeholder. If the placeholder is present and this field is omitted, Turnkey fetches a blockhash before policy evaluation. Filling the placeholder requires an unsigned transaction and all required signers. Sponsored transactions use this value or fetch one during execution. Turnkey does not refresh expired blockhashes.
 </NestedParam>
 
       </Expandable>
@@ -188,11 +188,11 @@ const turnkeyClient = new Turnkey({
 });
 
 const response = await turnkeyClient.apiClient().solSendTransaction({
-  unsignedTransaction: "<string> (Hex-encoded serialized unsigned Solana transaction (full wire format with zeroed signature placeholders))",
-  signWiths: ["<string>"] // Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers. For sponsored transactions this must list every required signer of the transaction in transaction order.,
+  unsignedTransaction: "<string> (Hex-encoded serialized unsigned Solana transaction in full wire format. Legacy/V0 transactions allow 1232 bytes. V1 allows 4096 bytes with up to 12 trailing 64-byte signature slots, including the paymaster for sponsored transactions. Fill unsigned slots with zeroes.)",
+  signWiths: ["<string>"] // Ordered Solana signer addresses Turnkey signs with. Between 1 and 16 signers for legacy/V0, or up to 12 for V1 (11 when sponsored). For sponsored transactions this must list every required signer of the transaction in transaction order.,
   sponsor: true // Whether to sponsor this transaction via Gas Station.,
   caip2: "<solana:mainnet>" // CAIP-2 chain ID (e.g., 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp' for Solana mainnet). Human-readable Solana aliases ('solana:mainnet', 'solana:devnet') are also accepted and normalized to canonical CAIP-2 values.,
-  recentBlockhash: "<string> (User-provided blockhash for replay protection / deadline control. If provided, it is used as-is, including for sponsored transactions (the transaction is only broadcastable while the blockhash is current). If omitted and sponsor=true, a fresh blockhash is fetched during execution.)"
+  recentBlockhash: "<string> (Optional blockhash used for signing. For non-sponsored transactions, it must match the blockhash in `unsignedTransaction` or replace its all-zero placeholder. If the placeholder is present and this field is omitted, Turnkey fetches a blockhash before policy evaluation. Filling the placeholder requires an unsigned transaction and all required signers. Sponsored transactions use this value or fetch one during execution. Turnkey does not refresh expired blockhashes.)"
 });
 ```
 
