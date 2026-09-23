@@ -113,9 +113,9 @@ sequenceDiagram
     OAuth Provider->>User: Prompt to grant permission
     User->>OAuth Provider: Grants permission
     OAuth Provider->>Frontend: User redirected to redirect_uri and delivered auth_code
-    Frontend->>Backend: User calls with redirect_uri and auth_code
-    Backend->>Turnkey: Send auth_code + redirect_uri via `OAuth2Authenticate` call
-    Turnkey->>Backend: Return OIDC Token
+    Frontend->>Backend: Send auth_code + redirect_uri + API publicKey
+    Backend->>Turnkey: Send auth_code + redirect_uri + nonce=sha256(API publicKey) via `OAuth2Authenticate` call
+    Turnkey->>Backend: Issue and return OIDC Token (nonce embedded)
     Backend->>Turnkey: Gets subOrgIds with that associated oidcToken
     Turnkey->>Backend: Return subOrgId (or null)
     alt SubOrgId not found
@@ -138,19 +138,19 @@ sequenceDiagram
     The frontend initiates the OAuth Authentication flow with the provider.
   </Step>
   <Step title="User Grants Permission">
-    The OAuth provider prompts the user to grant permission to share their identity. Once approved, the OAuth provider returns an `oidcToken` to the frontend.
+    The OAuth provider prompts the user to grant permission to share their identity. Once approved, the provider redirects the user back to your `redirect_uri` with a short-lived `auth_code`. Unlike OIDC providers, OAuth 2.0-only providers do not issue an ID token.
   </Step>
-  <Step title="Provider Delivers auth_code">
-    The provider delivers a short-lived auth_code via the redirect_uri.
+  <Step title="Send Credentials to Backend">
+    The frontend sends the `auth_code`, the `redirect_uri` and the API public key to your backend.
   </Step>
   <Step title="Get OIDC Token">
-    The backend exchanges the auth_code + redirect_uri for an OIDC ID Token using the `OAuth2Authenticate` activity.
+    The backend exchanges the `auth_code` + `redirect_uri` for an OIDC ID Token using the `OAuth2Authenticate` activity, passing `nonce` set to `sha256(publicKey)` based on the API public key. Turnkey issues this token, not the provider, and embeds the `nonce` in it. This binds the resulting OIDC token to the keypair.
   </Step>
   <Step title="Get or Create a Turnkey Sub-organization">
     The backend gets subOrgIds that are associated with that `oidcToken`. If no sub-organization exists, it creates one using the identity in the token.
   </Step>
   <Step title="Create a Session">
-    The backend calls `oauth_login` with the `oidcToken`, and API public key. The backend sends this JWT to the frontend. NOTE: For this flow, the `nonce` is _not_ required to match `sha256(publicKey)`.
+    The backend calls `oauth_login` with the `oidcToken`, and API public key. Turnkey validates that the token’s `nonce` matches `sha256(publicKey)` and returns a session JWT. The backend sends this JWT to the frontend.
   </Step>
   <Step title="You're Now Authenticated">
     Your frontend now treats the API keypair as the session keypair. It can use the private key to sign requests to Turnkey using the `x-stamp` header.
