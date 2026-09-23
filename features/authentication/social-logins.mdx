@@ -113,8 +113,8 @@ sequenceDiagram
     OAuth Provider->>User: Prompt to grant permission
     User->>OAuth Provider: Grants permission
     OAuth Provider->>Frontend: User redirected to redirect_uri and delivered auth_code
-    Frontend->>Backend: Send auth_code + redirect_uri + API publicKey
-    Backend->>Turnkey: Send auth_code + redirect_uri + nonce=sha256(API publicKey) via `OAuth2Authenticate` call
+    Frontend->>Backend: Send auth_code + redirect_uri + API publicKey + nonce=sha256(API publicKey)
+    Backend->>Turnkey: Send auth_code + redirect_uri + nonce via `OAuth2Authenticate` call
     Turnkey->>Backend: Issue and return OIDC Token (nonce embedded)
     Backend->>Turnkey: Gets subOrgIds with that associated oidcToken
     Turnkey->>Backend: Return subOrgId (or null)
@@ -141,10 +141,10 @@ sequenceDiagram
     The OAuth provider prompts the user to grant permission to share their identity. Once approved, the provider redirects the user back to your `redirect_uri` with a short-lived `auth_code`. Unlike OIDC providers, OAuth 2.0-only providers do not issue an ID token.
   </Step>
   <Step title="Send Credentials to Backend">
-    The frontend sends the `auth_code`, the `redirect_uri` and the API public key to your backend.
+    The frontend computes the `nonce` as `sha256(publicKey)` and sends it to your backend, along with the `auth_code`, the `redirect_uri` and the API public key. The public key is needed again at the final step, for `oauth_login`.
   </Step>
   <Step title="Get OIDC Token">
-    The backend exchanges the `auth_code` + `redirect_uri` for an OIDC ID Token using the `OAuth2Authenticate` activity, passing `nonce` set to `sha256(publicKey)` based on the API public key. Turnkey issues this token, not the provider, and embeds the `nonce` in it. This binds the resulting OIDC token to the keypair.
+    The backend exchanges the `auth_code` + `redirect_uri` + `nonce` for an OIDC ID Token using the `OAuth2Authenticate` activity. Turnkey issues this token, not the provider, and embeds the `nonce` in it. This binds the resulting OIDC token to the keypair.
   </Step>
   <Step title="Get or Create a Turnkey Sub-organization">
     The backend gets subOrgIds that are associated with that `oidcToken`. If no sub-organization exists, it creates one using the identity in the token.
