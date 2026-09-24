@@ -1,0 +1,125 @@
+---
+title: "Blockchain Oracles"
+description: "Bring your data on-chain with an oracle you control: choose the sources, run your own computation, and publish through a verifiable application on Turnkey Verifiable Cloud."
+---
+
+import { TvcBetaCallout } from "/snippets/tvc-beta-callout.mdx"
+
+<TvcBetaCallout />
+
+## Your application depends on data it cannot see
+
+Smart contracts need information from outside their blockchain: prices, reserve balances, ownership records, or events on another chain. Oracles bring that information on-chain so applications can act on it. A manipulated input can trigger an incorrect payment, an undercollateralized loan, or an improper liquidation. The path from source to contract is part of your application's security.
+
+A common approach uses a decentralized network of oracle operators. Operators observe data and participate in a reporting protocol that produces a value for the receiving contract. For market prices, aggregation across sources helps establish a shared reference value, while an operator quorum authenticates the report.
+
+<Frame>
+  <img src="/images/verifiable-cloud/decentralized-oracle.png" alt="Representative decentralized oracle architecture: data sources feed independent operators, which aggregate observations and sign a report for an oracle contract." />
+</Frame>
+
+*Representative off-chain reporting architecture. Implementations vary.*
+
+## Build around your data and your release cycle
+
+Many applications bring a different kind of information on-chain: a fund administrator's official NAV, a custodian's reserve report, a warehouse's receipt of goods, or an issuer's record of an asset. Each of these data types originates from a single off-chain authority. The application needs an authenticated path from that source to its contract, including any calculations in between.
+
+With Turnkey Verifiable Cloud (TVC), you build that path as an application you control. Your code connects to the source, validates and processes the response, and publishes the result. TVC provides verifiable execution, and Turnkey policies constrain the application's transaction authority.
+
+You can introduce a new data type without having a feed added to an external oracle network's catalog. Adding an API, changing a formula, or adjusting a publication trigger follows your own development and quorum-approved deployment process. That reduces coordination with an additional provider and lets the oracle evolve alongside the application that uses it.
+
+You control three parts of the solution:
+
+- **The inputs.** Use one authoritative API, combine several feeds, or reconcile records across providers. Define how the application handles missing, stale, or conflicting observations.
+- **The computation.** Normalize units, reject outliers, calculate medians or weighted averages, derive collateral ratios, or implement a custom index. Your reviewed code defines the methodology, rounding, and acceptance rules.
+- **The publication schedule.** Publish on a fixed interval, when a value crosses a threshold, or in response to an event. Choose a cadence that fits your source limits, transaction throughput, and gas budget.
+
+TVC supports replicated applications with high availability and SLAs so you can be confident your oracle stays operational.
+
+## How a TVC oracle works
+
+An oracle application runs inside a TVC trusted execution environment (TEE). It fetches and validates inputs, applies your computation, and prepares a transaction. A Turnkey wallet signs permitted transactions, and the application submits them to the destination blockchain. The transaction signing key stays in Turnkey.
+
+
+<Frame>
+  <img src="/images/verifiable-cloud/tvc-oracle.png" alt="TVC oracle architecture: HTTPS sources connect to an attested application that fetches, computes, and submits; a separate Turnkey wallet enforces signing policy, and the destination contract validates and stores the result." />
+</Frame>
+
+*Code and configuration changes follow the deployment quorum's approval process. Routine data updates follow the approved application logic, without requiring agreement across independent oracle nodes for each report.*
+
+The same underlying data can reach your contract through different architectures. The distinction is how it is processed, authenticated, and published.
+
+| Dimension | Decentralized oracle network | TVC oracle |
+| :--- | :--- | :--- |
+| **Data sources** | Operators retrieve data from the sources configured for the feed. | Your application retrieves data from your selected sources. These can be the same underlying providers. |
+| **Basis of trust** | Independent operators and a reporting protocol establish agreement on the reported value. | Hardware attestation establishes application identity; reviewed code defines how inputs become outputs. |
+| **Verification** | In a quorum-reporting design, the receiving contract verifies report signatures and the required operator threshold. | Third parties can verify the application's Boot Proof and code identity. App Proofs can bind individual outputs to that application; on-chain verification requires an explicit integration. |
+| **Code updates** | Follow the network's software rollout and governance processes, which vary by implementation. | Follow your application's deployment process, with changes approved by the configured operator quorum. |
+| **Application control** | Feed methodology, integrations, and publication settings depend on the network's offerings and configuration. | You define source connections, computation, acceptance rules, and publication triggers in application code. |
+
+*Representative architectures; implementations vary. In either model, authenticating a report does not independently establish the accuracy of its underlying source data.*
+
+### Why the path is verifiable
+
+- **Authenticate the source connection.** Fetch over HTTPS with TLS termination and certificate and hostname validation inside the enclave. If a publisher also signs its observations, verify and preserve those signatures for downstream verification. [Learn about TVC's TLS verification.](/features/verifiable-cloud/why-tvc)
+- **Verify the code and configuration.** Reproducible builds and an attested deployment manifest let reviewers identify the application that processes the data. Code changes require the configured operator quorum's approval. [Learn how TVC establishes code identity and controls upgrades.](/features/verifiable-cloud/why-tvc)
+- **Limit publication authority.** Give the application a dedicated Turnkey identity. Scope its signing policy to the intended network, destination contract, function, and applicable value and fee limits.
+- **Enforce acceptance on-chain.** The receiving contract checks the authorized updater, feed identity, freshness, and replay rules before recording a result. Keep administrative changes separate from routine publication authority.
+
+<Note>
+**Anyone can independently verify the oracle’s code.** Third parties can retrieve the enclave’s Boot Proof through Turnkey’s public API, validate its AWS Nitro attestation and deployment manifest, and compare the attested application digest with a reproducible build of the published source. This lets consumers and auditors check which code and configuration the enclave runs and which operators approved it. See [Proofs and verification](/features/verifiable-cloud/proofs-and-verification#fetching-proofs-as-a-verifier) for public endpoints and open-source verification tools.
+</Note>
+
+**Output authentication:** The verification mechanism depends on the application. A publisher signature can authenticate an original observation. For unsigned HTTPS inputs or calculated results, an oracle-specific App Proof can bind the output to the TVC application that produced it. Its payload should identify the result, sources and timestamps, input commitments, and intended destination, with appropriate replay protection.
+
+A verifier checks that App Proof against the enclave's Boot Proof and expected application identity. Enforcing this verification on-chain requires an explicit contract integration; emitting an App Proof alone does not provide it. See [Proofs and verification](/features/verifiable-cloud/proofs-and-verification).
+
+These checks establish provenance and execution. The source remains responsible for the accuracy of its underlying data, and consuming applications should check whether a stored observation is still fresh enough for their use.
+
+### What you can build
+
+| Use case | How it works |
+| :--- | :--- |
+| **Fund NAV publication** | Retrieve the official NAV from a fund administrator, validate the reporting period, and publish it for use by on-chain applications. |
+| **Reserve reporting** | Combine custodian balances and valuation inputs to calculate reserves or a collateral coverage ratio. |
+| **Warehouse receipts** | Retrieve records of goods received, validate identifiers and quantities, and publish receipt data for contracts that track the goods or use them as collateral. |
+| **Custom indices** | Combine selected feeds using your own weighting, filtering, and calculation methodology. |
+| **Cross-chain event reporting** | Observe an event or state on one blockchain, apply source-chain verification and confirmation rules with reorg handling, and report it to a contract on another blockchain. |
+
+<Note>
+**Private inputs, verifiable conditions**
+
+A lender needs to know whether a borrower has enough eligible receivables to support a requested draw, without publishing its customer list, invoice amounts, or outstanding debt.
+
+A TVC oracle can fetch records from the borrower's accounting system and loan servicer, exclude overdue or disputed invoices, apply the facility's advance rates and concentration limits, and calculate the available borrowing capacity inside the enclave. It publishes only whether the requested draw satisfies those rules, tied to the request and observation time.
+
+An App Proof can bind the decision to the reviewed calculation. With output verification integrated into the receiving contract, the facility can authorize the draw while keeping the underlying financial records off-chain and confidential.
+</Note>
+
+## See it in practice: an ETH/USD oracle
+
+Explore the [TVC oracle example](https://github.com/tkhq/tvc-examples/tree/main/tvc-oracle) for the application code, Solidity contract, tests, and build instructions.
+
+The demo implements this architecture with a single source and a daily publication schedule on Ethereum Sepolia. It retrieves CoinGecko's API3-compatible signed ETH/USD observations and publishes the source price directly. Signed inputs are a choice for this example; TVC applications can also use ordinary HTTPS APIs and compute new values from their inputs.
+
+### From observation to on-chain price
+
+1. **Check whether an update is due.** The application reads the contract's current state to avoid an unnecessary transaction before the configured interval has elapsed.
+2. **Fetch and validate.** It retrieves the signed observation, checks CoinGecko's signer certification, and verifies the observation signature.
+3. **Request a permitted signature.** It builds an `updatePrice` call carrying the feed template, source timestamp, encoded price, and original signature. The Turnkey policy restricts signing to the intended Sepolia contract and function, the expected template, zero ETH value, and bounded gas fees.
+4. **Submit and confirm.** The application broadcasts the signed transaction, waits for a successful receipt, and retries transient failures.
+5. **Verify and record.** The contract independently checks the updater, template, publisher signature, positive price, and acceptable timestamp. It rejects replayed or older observations, then stores the price, source timestamp, recording time, and provenance hashes.
+6. **Read the result.** The dashboard reads the canonical value from the contract, including the timestamps consumers need to assess freshness.
+
+The contract administrator can rotate the trusted publisher signer or updater address. The updater cannot change either setting. The daily interval is a demo configuration choice; freshness checks at submission do not keep the stored price fresh indefinitely.
+
+The example demonstrates publisher-signature verification on-chain. Its sample App Proof endpoint does not yet bind each oracle update to the TVC application. A valid CoinGecko signature establishes the observation's origin and integrity, rather than independently establishing the price's economic correctness.
+
+View the [live oracle dashboard](https://app-cb0b148e-3882-44da-8c2d-37fea280ae98.apps.tvc-dev.turnkey.engineering/) to inspect the latest published price, or explore the [verified demo contract source on Sepolia Etherscan](https://sepolia.etherscan.io/address/0x9890Df3894EbF1dbCD8E69aA7fafFBA089d8BF6b#code).
+
+### Build your own
+
+Bring the sources your application needs, the calculation you want to run, and the contract that will consume the result. Define source authentication, output verification, publication triggers, and signing policy together.
+
+Start with the [oracle example's setup and configuration instructions](https://github.com/tkhq/tvc-examples/tree/main/tvc-oracle#getting-the-code) to run and adapt the application.
+
+[Contact us](https://www.turnkey.com/contact-us) to discuss your oracle design, or follow the [TVC quickstart](/features/verifiable-cloud/quickstart) to deploy your first application.
