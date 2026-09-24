@@ -26,7 +26,7 @@ const API_CATEGORIES = [
   "Authentication & credentials",
   "Policies & approvals",
   "Wallets & private keys",
-  "Signing & broadcasting",
+  "Signing",
   "Transaction management",
   "Turnkey Verifiable Cloud",
 ] as const;
@@ -56,9 +56,9 @@ const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
   Wallets: "Wallets & private keys",
   "Private Keys": "Wallets & private keys",
   "Private Key Tags": "Wallets & private keys",
-  Signing: "Signing & broadcasting",
-  Broadcasting: "Signing & broadcasting",
-  "Send Transactions": "Signing & broadcasting",
+  Signing: "Signing",
+  Broadcasting: "Transaction management",
+  "Send Transactions": "Transaction management",
   Swaps: "Transaction management",
   Earn: "Transaction management",
   "On Ramp": "Transaction management",
@@ -93,7 +93,7 @@ function getApiCategory(operation: CategorizedOperation): ApiCategory | null {
     return "Organizations & sub-organizations";
   }
   if (pathAndId.includes("spark") || pathAndId.includes("lightning")) {
-    return "Signing & broadcasting";
+    return "Signing";
   }
   if (
     operation.path === "/public/v1/query/get_oauth2_credential" ||
