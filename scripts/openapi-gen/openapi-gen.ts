@@ -287,7 +287,7 @@ export const tags = ${tagsStr};`;
       }
 
       // Collect generated MDX paths for docs.json update. Within each category,
-      // queries sort before activities, then operations sort by title.
+      // activities sort before queries, then operations sort by title.
       const categorizedPaths = new Map<
         ApiCategory,
         { path: string; title: string; type: "activity" | "query" }[]
@@ -351,7 +351,7 @@ export const tags = ${tagsStr};`;
               .map((operation) => [operation.path, operation])
           );
           const operations = [...pagesByPath.values()].sort((a, b) => {
-            if (a.type !== b.type) return a.type === "query" ? -1 : 1;
+            if (a.type !== b.type) return a.type === "activity" ? -1 : 1;
             return (
               a.title.localeCompare(b.title) || a.path.localeCompare(b.path)
             );
