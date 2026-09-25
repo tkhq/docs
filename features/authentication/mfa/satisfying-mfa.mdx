@@ -26,6 +26,16 @@ The activity stays in `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` after each approva
 
 Nothing is consumed along the way. Turnkey checks each step against everything the user has presented so far, which is why the same credential cannot satisfy two steps.
 
+### While an activity is held
+
+Two things are worth knowing about an activity waiting in `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED`.
+
+**Factors expire after 24 hours.** The original submission starts the [approval expiration](/api-reference/activities/overview) window, and proofs older than that stop counting. Re-submit the approvals to present them again.
+
+**Attestation tokens survive across activities.** Credentials are not used up within a single activity, and tokens are not used up between them either: one verification token or OIDC token can approve several separate activities for as long as it remains valid. A verification token from `VERIFY_OTP` lasts an hour by default, configurable up to 24 with `expirationSeconds`, while an OIDC token expires on its own `exp` claim.
+
+So treat the token, together with the key it is bound to, as a credential for as long as it lives. If you want one code to authorize exactly one action, set a short `expirationSeconds` when you verify.
+
 ## API key
 
 To prove API key authentication, the user stamps the `APPROVE_ACTIVITY` request with an API key.
