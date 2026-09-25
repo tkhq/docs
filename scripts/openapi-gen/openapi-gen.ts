@@ -20,6 +20,135 @@ import { generateMdxFile, generateAuthProxyMdxFile } from "./utils/mdx-generator
 import path from "path";
 import fs from "fs";
 
+const API_CATEGORIES = [
+  "Organizations & sub-organizations",
+  "Users, access & sessions",
+  "Authentication & credentials",
+  "Policies & approvals",
+  "Wallets & private keys",
+  "Signing",
+  "Transaction management",
+  "Turnkey Verifiable Cloud",
+] as const;
+
+type ApiCategory = (typeof API_CATEGORIES)[number];
+
+const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
+  Organizations: "Organizations & sub-organizations",
+  Features: "Organizations & sub-organizations",
+  "IP Allowlist": "Organizations & sub-organizations",
+  Users: "Users, access & sessions",
+  "User Tags": "Users, access & sessions",
+  Invitations: "Users, access & sessions",
+  Sessions: "Users, access & sessions",
+  "Session Profiles": "Users, access & sessions",
+  Email: "Users, access & sessions",
+  "API keys": "Authentication & credentials",
+  "API Keys": "Authentication & credentials",
+  Authenticators: "Authentication & credentials",
+  "User Auth": "Authentication & credentials",
+  "User Verification": "Authentication & credentials",
+  "User Recovery": "Authentication & credentials",
+  Policies: "Policies & approvals",
+  Activities: "Policies & approvals",
+  Consensus: "Policies & approvals",
+  "MFA Policies": "Policies & approvals",
+  Wallets: "Wallets & private keys",
+  "Private Keys": "Wallets & private keys",
+  "Private Key Tags": "Wallets & private keys",
+  Signing: "Signing",
+  Broadcasting: "Transaction management",
+  "Send Transactions": "Transaction management",
+  Swaps: "Transaction management",
+  Earn: "Transaction management",
+  "On Ramp": "Transaction management",
+  TVC: "Turnkey Verifiable Cloud",
+  "Boot Proof": "Turnkey Verifiable Cloud",
+  "App Proof": "Turnkey Verifiable Cloud",
+  Secrets: "Wallets & private keys",
+};
+
+const NOOP_CODEGEN_ANCHOR_PATH = "/tkhq/api/v1/noop-codegen-anchor";
+const MANUAL_QUERY_PATHS = [
+  {
+    path: "api-reference/queries/get-webhook-jwks",
+    title: "Get webhook JWKS",
+    type: "query" as const,
+    category: "Organizations & sub-organizations" as ApiCategory,
+  },
+];
+
+interface CategorizedOperation {
+  path: string;
+  operationId?: string;
+  tags?: string[];
+}
+
+function getApiCategory(operation: CategorizedOperation): ApiCategory | null {
+  const pathAndId = `${operation.path} ${
+    operation.operationId || ""
+  }`.toLowerCase();
+
+  if (pathAndId.includes("webhook")) {
+    return "Organizations & sub-organizations";
+  }
+  if (pathAndId.includes("spark") || pathAndId.includes("lightning")) {
+    return "Signing";
+  }
+  if (
+    operation.path === "/public/v1/query/get_oauth2_credential" ||
+    operation.operationId?.toLowerCase() === "getoauth2credential"
+  ) {
+    return "Authentication & credentials";
+  }
+
+  const categories = (operation.tags || []).map(
+    (tag) => TAG_CATEGORY_ALIASES[tag.trim()]
+  );
+  if (categories.length === 0 || categories.some((category) => !category)) {
+    return null;
+  }
+
+  const uniqueCategories = new Set(categories);
+  return uniqueCategories.size === 1 ? [...uniqueCategories][0] : null;
+}
+
+function validatePublicOperationCategories(api: any): void {
+  const unsupportedOperations: string[] = [];
+  const httpMethods = new Set(["get", "post", "put", "patch", "delete"]);
+
+  for (const [operationPath, pathItem] of Object.entries(api.paths || {})) {
+    if (operationPath === NOOP_CODEGEN_ANCHOR_PATH) continue;
+
+    for (const [method, operationValue] of Object.entries(
+      pathItem as Record<string, any>
+    )) {
+      if (!httpMethods.has(method.toLowerCase())) continue;
+
+      const operation = operationValue as Record<string, any>;
+      if (
+        !getApiCategory({
+          path: operationPath,
+          operationId: operation.operationId,
+          tags: operation.tags,
+        })
+      ) {
+        unsupportedOperations.push(
+          operation.operationId || `${method.toUpperCase()} ${operationPath}`
+        );
+      }
+    }
+  }
+
+  if (unsupportedOperations.length > 0) {
+    throw new Error(
+      `API navigation category mapping is missing for operationIds: ${unsupportedOperations.join(
+        ", "
+      )}`
+    );
+  }
+}
+
 /**
  * Main function
  */
@@ -122,6 +251,9 @@ export const tags = ${tagsStr};`;
           "Endpoint data is required for MDX generation (--endpoints flag might be needed)."
         );
       }
+      if (!options.authProxy) {
+        validatePublicOperationCategories(api);
+      }
       console.log(`--- Starting MDX Generation ---`);
 
       // Calculate project root (assuming script is in <project_root>/scripts/openapi-gen)
@@ -154,13 +286,21 @@ export const tags = ${tagsStr};`;
         }
       }
 
-      // Collect generated MDX paths for docs.json update
-      const activityPaths: string[] = [];
-      const queryPaths: string[] = [];
+      // Collect generated MDX paths for docs.json update. Within each category,
+      // activities sort before queries, then operations sort by title.
+      const categorizedPaths = new Map<
+        ApiCategory,
+        { path: string; title: string; type: "activity" | "query" }[]
+      >(API_CATEGORIES.map((category) => [category, []]));
       const authProxyPaths: string[] = [];
 
       for (const endpoint of endpointResult.endpoints) {
-        if (skipEndpointPaths.has(endpoint.path)) continue;
+        if (
+          skipEndpointPaths.has(endpoint.path) ||
+          (!options.authProxy && endpoint.path === NOOP_CODEGEN_ANCHOR_PATH)
+        ) {
+          continue;
+        }
         // Use the auth-proxy generator when --auth-proxy is set, main generator otherwise
         const generatedPath = options.authProxy
           ? generateAuthProxyMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly)
@@ -172,10 +312,20 @@ export const tags = ${tagsStr};`;
 
           if (options.authProxy) {
             authProxyPaths.push(fullDocsPath);
-          } else if (endpoint.type === "activity") {
-            activityPaths.push(fullDocsPath);
-          } else if (endpoint.type === "query") {
-            queryPaths.push(fullDocsPath);
+          } else {
+            const category = getApiCategory(endpoint);
+            if (!category) {
+              throw new Error(
+                `API navigation category mapping is missing for operationId: ${
+                  endpoint.operationId || endpoint.path
+                }`
+              );
+            }
+            categorizedPaths.get(category)!.push({
+              path: fullDocsPath,
+              title: endpoint.title,
+              type: endpoint.type,
+            });
           }
         }
       }
@@ -189,16 +339,28 @@ export const tags = ${tagsStr};`;
 
         const docsConfig = JSON.parse(docsJsonContent);
 
-        // Remove duplicates before sorting
-        const uniqueActivityPaths = [...new Set(activityPaths)];
-        const uniqueQueryPaths = [...new Set(queryPaths)];
-        const uniqueAuthProxyPaths = [...new Set(authProxyPaths)];
-        const manualQueryPaths = ["api-reference/queries/get-webhook-jwks"];
+        const uniqueAuthProxyPaths = [...new Set(authProxyPaths)].sort();
+        for (const manualPage of MANUAL_QUERY_PATHS) {
+          categorizedPaths.get(manualPage.category)!.push(manualPage);
+        }
 
-        // Sort generated paths alphabetically
-        uniqueActivityPaths.sort();
-        uniqueQueryPaths.sort();
-        uniqueAuthProxyPaths.sort();
+        const categoryGroups = API_CATEGORIES.map((category) => {
+          const pagesByPath = new Map(
+            categorizedPaths
+              .get(category)!
+              .map((operation) => [operation.path, operation])
+          );
+          const operations = [...pagesByPath.values()].sort((a, b) => {
+            if (a.type !== b.type) return a.type === "activity" ? -1 : 1;
+            return (
+              a.title.localeCompare(b.title) || a.path.localeCompare(b.path)
+            );
+          });
+          return {
+            group: category,
+            pages: operations.map((operation) => operation.path),
+          };
+        });
 
         // --- Find and Update Navigation ---
         // Check if docsConfig.navigation is an array before proceeding
@@ -233,50 +395,49 @@ export const tags = ${tagsStr};`;
             navGroup.pages = uniqueAuthProxyPaths;
             console.log(`Updated '${options.navGroup}' paths in docs.json`);
           } else {
-            // Standard mode: update Activities and Queries groups
-            const activitiesGroup = restApiGroup.pages.find(
+            const generatedGroupNames = new Set([
+              "Activities",
+              "Queries",
+              ...API_CATEGORIES,
+            ]);
+            const overviewPaths = new Set([
+              "api-reference/activities/overview",
+              "api-reference/queries/overview",
+            ]);
+            const firstGeneratedGroupIndex = restApiGroup.pages.findIndex(
               (item: any) =>
-                typeof item === "object" && item.group === "Activities"
+                typeof item === "object" && generatedGroupNames.has(item.group)
             );
-            if (activitiesGroup) {
-              activitiesGroup.pages = [
-                "api-reference/activities/overview",
-                ...uniqueActivityPaths,
-              ];
-              console.log(`Updated Activities paths in docs.json`);
-            } else {
-              console.warn(
-                `Could not find 'Activities' group in docs.json under 'REST API'`
-              );
-            }
-
-            const queriesGroup = restApiGroup.pages.find(
-              (item: any) => typeof item === "object" && item.group === "Queries"
+            const insertionIndex = restApiGroup.pages
+              .slice(0, Math.max(firstGeneratedGroupIndex, 0))
+              .filter(
+                (item: any) =>
+                  !overviewPaths.has(item) &&
+                  !(
+                    typeof item === "object" &&
+                    generatedGroupNames.has(item.group)
+                  )
+              ).length;
+            const preservedPages = restApiGroup.pages.filter(
+              (item: any) =>
+                !overviewPaths.has(item) &&
+                !(
+                  typeof item === "object" &&
+                  generatedGroupNames.has(item.group)
+                )
             );
-            if (queriesGroup) {
-              const queryPages = [
-                "api-reference/queries/overview",
-                ...uniqueQueryPaths,
-              ];
-              for (const manualPath of manualQueryPaths) {
-                if (queryPages.includes(manualPath)) continue;
 
-                const webhookEndpointsIndex = queryPages.indexOf(
-                  "api-reference/queries/list-webhook-endpoints"
-                );
-                if (webhookEndpointsIndex === -1) {
-                  queryPages.push(manualPath);
-                } else {
-                  queryPages.splice(webhookEndpointsIndex, 0, manualPath);
-                }
-              }
-              queriesGroup.pages = queryPages;
-              console.log(`Updated Queries paths in docs.json`);
-            } else {
-              console.warn(
-                `Could not find 'Queries' group in docs.json under 'REST API'`
-              );
-            }
+            // These describe API-wide request modes, so keep them as standalone
+            // primers before the mixed query/activity category groups.
+            preservedPages.splice(
+              insertionIndex,
+              0,
+              "api-reference/activities/overview",
+              "api-reference/queries/overview",
+              ...categoryGroups
+            );
+            restApiGroup.pages = preservedPages;
+            console.log(`Updated tag-based REST API categories in docs.json`);
           }
         } else {
           console.warn(
