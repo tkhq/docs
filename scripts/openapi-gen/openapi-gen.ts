@@ -65,7 +65,7 @@ const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
   TVC: "Turnkey Verifiable Cloud",
   "Boot Proof": "Turnkey Verifiable Cloud",
   "App Proof": "Turnkey Verifiable Cloud",
-  Secrets: "Turnkey Verifiable Cloud",
+  Secrets: "Wallets & private keys",
 };
 
 const NOOP_CODEGEN_ANCHOR_PATH = "/tkhq/api/v1/noop-codegen-anchor";
