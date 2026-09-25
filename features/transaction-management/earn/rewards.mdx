@@ -1,0 +1,123 @@
+---
+title: "Claim Merkl rewards"
+description: "Check and claim Morpho and other protocol rewards on your Earn positions."
+mode: "wide"
+---
+
+When wallets deposit into Morpho vaults through Turnkey Earn, they may accrue off-chain rewards distributed by [Merkl](https://merkl.xyz). Rewards are published periodically in onchain Merkle roots by the Merkl Distributor and must be explicitly claimed. Common reward tokens include MORPHO and any third-party campaign tokens the vault's curator has set up.
+
+<Note>
+  Not every position earns rewards. A vault's apy in `list_earn_vaults` already includes any Merkl reward rate, but that rate is a vault-wide figure. Rewards only reach a wallet when the campaign is a forwarding-capable type and the wrapper's total rewards in that token clear Merkl's [per-token hourly minimum](https://docs.merkl.xyz/merkl-mechanisms/reward-forwarding).
+</Note>
+
+## How Merkl rewards work with Earn
+
+Turnkey deploys a FeeWrapper between the user's wallet and the underlying vault. Merkl can attribute rewards from forwarding-capable campaigns through the wrapper to the end depositor automatically — no separate campaign needed for your wrapper. Some campaign types (plain ERC-20 campaigns) do not forward and strand rewards at the adapter; those will not appear in a wallet's claimable rewards.
+
+Claims are sent from the user's wallet. The Merkl Distributor (`0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae`, same address on all supported chains) only accepts claims signed by the earner — third-party senders revert with `NotWhitelisted`. Claimed tokens are paid to the claiming wallet.
+
+## Check rewards
+
+Call [`list_earn_rewards`](/api-reference/queries/list-earn-rewards) to fetch a wallet's current reward state across all chains (or a single chain with the optional `caip2` filter):
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/list_earn_rewards \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <stamp>" \
+  --data '{
+    "organizationId": "<org-id>",
+    "walletAddress": "0xabc...",
+    "caip2": "eip155:1"
+  }'
+```
+
+The response returns one entry per reward token per chain:
+
+| Field | Description |
+| :-- | :-- |
+| `caip2` | Chain the reward is on |
+| `caip19` | Token contract identifier |
+| `symbol` | Token symbol (e.g. `MORPHO`) |
+| `decimals` | Decimals of the reward token |
+| `claimable` | Raw units ready to claim from the current Merkle root |
+| `claimed` | Raw units claimed lifetime (reconciled onchain) |
+| `pending` | Raw units accrued but not yet in the published Merkle root |
+| `display` | Human-readable USD and crypto amounts for all three |
+
+`pending` rewards are not yet claimable — they will move to `claimable` after the next Merkl root publication (roots update roughly every 8 hours).
+
+## Claim rewards
+
+Submit an [`ACTIVITY_TYPE_EARN_CLAIM_REWARDS`](/api-reference/activities/claim-earn-rewards) activity to claim all currently claimable rewards for a wallet on a given chain in a single transaction:
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/earn_claim_rewards \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <stamp>" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EARN_CLAIM_REWARDS",
+    "timestampMs": "<ms>",
+    "organizationId": "<org-id>",
+    "parameters": {
+      "signWith": "<wallet-account-address>",
+      "chainCaip2": "eip155:1"
+    }
+  }'
+```
+
+The activity result returns a `claimRequestId` used to poll status. Pass `sponsor: true` in `parameters` to cover the claim's gas through Gas Station; otherwise the `signWith` wallet pays gas itself.
+
+A claim with nothing currently claimable on that chain is rejected with an invalid-argument error, so check [`list_earn_rewards`](/api-reference/queries/list-earn-rewards) first — rewards that are still `pending` cannot be claimed.
+
+<Note>
+  `signWith` must be the wallet that earned the rewards. The Merkl Distributor rejects claims where the sender does not match the earner.
+</Note>
+
+## Poll claim status (required)
+
+<Warning>
+  A `COMPLETED` activity means the transaction was enqueued for broadcast, not that it landed onchain. Poll [`get_earn_claim_rewards_status`](/api-reference/queries/get-earn-claim-rewards-status) until it reports `COMPLETED` or `FAILED`.
+</Warning>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_earn_claim_rewards_status \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <stamp>" \
+  --data '{
+    "organizationId": "<org-id>",
+    "claimRequestId": "<claim-request-id>"
+  }'
+```
+
+`status` is `PENDING`, `COMPLETED`, or `FAILED`. On `COMPLETED` the response includes `claimTxHash`. On `FAILED` it includes an `error` field.
+
+## SDK usage
+
+```javascript title="JavaScript"
+// Check rewards
+const rewards = await turnkeyClient.apiClient().listEarnRewards({
+  organizationId: process.env.ORGANIZATION_ID!,
+  walletAddress: "0xabc...",
+  caip2: "eip155:1", // optional
+});
+
+// Claim rewards
+const { claimRequestId } = await turnkeyClient.apiClient().earnClaimRewards({
+  signWith: "0xabc...",
+  chainCaip2: "eip155:1",
+});
+
+// Poll
+const status = await turnkeyClient.apiClient().getEarnClaimRewardsStatus({
+  organizationId: process.env.ORGANIZATION_ID!,
+  claimRequestId,
+});
+```
+
+## Next steps
+
+- [Track positions](/features/transaction-management/earn/positions) — see your current value and yield
+- [Withdraw from a vault](/features/transaction-management/earn/withdraw) — partial or full exit
