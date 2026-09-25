@@ -31,6 +31,7 @@ You, and not Turnkey, are responsible for determining whether any digital asset 
 4. Poll the matching status endpoint until the transaction confirms. Deposits, withdrawals, and deployments all confirm asynchronously.
 5. Query [`list_earn_positions`](/features/transaction-management/earn/positions) for a wallet’s current value and lifetime totals.
 6. Call [`earn_withdraw`](/features/transaction-management/earn/withdraw) for a partial amount or the full position.
+7. (Optional) Call [`list_earn_rewards`](/features/transaction-management/earn/rewards) to check accrued Merkl rewards for a wallet, and [`earn_claim_rewards`](/features/transaction-management/earn/rewards) to claim them onchain.
 
 ## Supported protocols and chains
 
@@ -81,7 +82,7 @@ The net yield your users earn is `grossApy × (1 - totalFeeBps / 10000)`. The [`
 
 ## API surface
 
-Earn adds five activities:
+Earn adds six activities:
 
 | Activity | Endpoint | Purpose |
 | :-- | :-- | :-- |
@@ -90,21 +91,24 @@ Earn adds five activities:
 | [`ACTIVITY_TYPE_EARN_WITHDRAW`](/api-reference/activities/withdraw-from-earn-vault) | `POST /public/v1/submit/earn_withdraw` | Withdraw assets or exit a position |
 | [`ACTIVITY_TYPE_EARN_SET_WRAPPER_STATE`](/api-reference/activities/set-earn-wrapper-state) | `POST /public/v1/submit/earn_set_wrapper_state` | Pause or resume deposits to a wrapper (withdrawals are never blocked) |
 | [`ACTIVITY_TYPE_CLAIM_EARN_FEES`](/api-reference/activities/claim-earn-fees) | `POST /public/v1/submit/claim_earn_fees` | Claim your accrued fees for a wrapper |
+| [`ACTIVITY_TYPE_EARN_CLAIM_REWARDS`](/api-reference/activities/claim-earn-rewards) | `POST /public/v1/submit/earn_claim_rewards` | Claim Merkl rewards accrued on Earn positions |
 
-and seven queries:
+and nine queries:
 
 | Query | Endpoint | Purpose |
 | :-- | :-- | :-- |
 | [Vault catalog](/api-reference/queries/get-earn-vault-catalog) | `POST /public/v1/query/list_earn_vaults` | All wrappable vaults for an asset, with live TVL/APY |
 | [Enabled vaults](/api-reference/queries/get-earn-enabled-vaults) | `POST /public/v1/query/list_earn_enabled_vaults` | Your org's deployed wrappers (management view) |
 | [Positions](/api-reference/queries/get-earn-positions) | `POST /public/v1/query/list_earn_positions` | A wallet's active positions |
+| [Rewards](/api-reference/queries/list-earn-rewards) | `POST /public/v1/query/list_earn_rewards` | A wallet's claimable, pending, and claimed Merkl rewards |
 | [Deploy status](/api-reference/queries/get-earn-deploy-status) | `POST /public/v1/query/get_earn_deploy_status` | Poll a wrapper deployment |
 | [Deposit status](/api-reference/queries/get-earn-deposit-status) | `POST /public/v1/query/get_earn_deposit_status` | Poll a deposit until it lands onchain |
 | [Withdraw status](/api-reference/queries/get-earn-withdraw-status) | `POST /public/v1/query/get_earn_withdraw_status` | Poll a withdrawal until it lands onchain |
 | [Claim fees status](/api-reference/queries/get-earn-claim-fees-status) | `POST /public/v1/query/get_claim_earn_fees_status` | Poll a claim fee until it lands onchain |
+| [Claim rewards status](/api-reference/queries/get-earn-claim-rewards-status) | `POST /public/v1/query/get_earn_claim_rewards_status` | Poll a rewards claim until it lands onchain |
 
 <Note>
-  Earn requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). Full request/response schemas and cURL examples live in the API reference pages linked above. The examples on these pages use cURL and [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`, but generated SDK methods are available in [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server): `earnDeployWrapper`, `earnDeposit`, `earnWithdraw`, `earnSetWrapperState`, `claimEarnFees`, `listEarnVaults`, `listEarnEnabledVaults`, `listEarnPositions`, and the matching status queries. A runnable end-to-end SDK example lives at [examples/defi/with-earn](https://github.com/tkhq/sdk/tree/main/examples/defi/with-earn).
+  Earn requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). Full request/response schemas and cURL examples live in the API reference pages linked above. The examples on these pages use cURL and [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`, but generated SDK methods are available in [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server): `earnDeployWrapper`, `earnDeposit`, `earnWithdraw`, `earnSetWrapperState`, `claimEarnFees`, `earnClaimRewards`, `listEarnVaults`, `listEarnEnabledVaults`, `listEarnPositions`, `listEarnRewards`, `getEarnClaimRewardsStatus`, and the matching status queries. A runnable end-to-end SDK example lives at [examples/defi/with-earn](https://github.com/tkhq/sdk/tree/main/examples/defi/with-earn).
 </Note>
 
 ## Explore
@@ -128,6 +132,10 @@ and seven queries:
 
   <Card title="Track positions" href="/features/transaction-management/earn/positions">
     — Current value, lifetime totals, and yield.
+  </Card>
+
+  <Card title="Claim rewards" href="/features/transaction-management/earn/rewards">
+    — Check and claim Merkl rewards on your Earn positions.
   </Card>
 
   <Card title="End-to-end example" href="/features/transaction-management/earn/end-to-end-example">
