@@ -24,7 +24,17 @@ Each `APPROVE_ACTIVITY` proves one authentication method. A policy with two step
 
 The activity stays in `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` after each approval until every step has been satisfied, so treat this as a loop rather than a single challenge and response. Keep submitting approvals against the same `fingerprint`, each stamped with a different credential, until the activity leaves that status.
 
-Nothing is consumed along the way. Turnkey checks each step against everything the user has presented so far, which is why the same credential cannot satisfy two steps.
+Nothing is consumed along the way. Turnkey checks each step against every method the user has presented so far, and satisfying a step leaves that method available to the next one. This is why no method may appear in [more than one step](/features/authentication/mfa/overview#required-authentication-methods): a credential that satisfies two steps satisfies them both at once, and the second challenge is never raised.
+
+### While an activity is held
+
+Two things are worth knowing about an activity waiting in `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED`.
+
+**Factors expire after 24 hours.** The original submission starts the [approval expiration](/api-reference/activities/overview) window, and proofs older than that stop counting. Re-submit the approvals to present them again.
+
+**Attestation tokens survive across activities.** Credentials are not used up within a single activity, and tokens are not used up between them either: one verification token or OIDC token can approve several separate activities for as long as it remains valid. A verification token from `VERIFY_OTP` lasts an hour by default, configurable up to 24 with `expirationSeconds`, while an OIDC token expires on its own `exp` claim.
+
+So treat the token, together with the key it is bound to, as a credential for as long as it lives. If you want one code to authorize exactly one action, set a short `expirationSeconds` when you verify.
 
 ## API key
 
