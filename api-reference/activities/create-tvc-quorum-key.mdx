@@ -1,6 +1,6 @@
 ---
-title: "Update an OAuth 2.0 credential"
-description: "Update an OAuth 2.0 provider credential."
+title: "Create TVC Quorum Key"
+description: "Create a hosted TVC quorum key and encrypted shares."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -8,7 +8,7 @@ import { H3Bordered } from "/snippets/h3-bordered.mdx";
 import { NestedParam } from "/snippets/nested-param.mdx";
 import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
-<EndpointPath type="submit" path="update_oauth2_credential" />
+<EndpointPath type="submit" path="create_tvc_quorum_key" />
 
 <Authorizations />
 
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL`
+Enum options: `ACTIVITY_TYPE_CREATE_TVC_QUORUM_KEY`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -32,21 +32,17 @@ Unique identifier for a given Organization.
 <ParamField body="parameters" type="object" required={true} path="parameters">
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
-    <NestedParam parentKey="parameters" childKey="oauth2CredentialId" type="string" required={true} default="">
-    The ID of the OAuth 2.0 credential to update
+    <NestedParam parentKey="parameters" childKey="threshold" type="number" required={true} default="">
+    The threshold of operators needed to reassemble this TVC quorum key
     </NestedParam>
     
-    <NestedParam parentKey="parameters" childKey="provider" type="enum<string>" required={true} default="">
-    Enum options: `OAUTH2_PROVIDER_X`, `OAUTH2_PROVIDER_DISCORD`
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="clientId" type="string" required={true} default="">
-    The Client ID issued by the OAuth 2.0 provider
-    </NestedParam>
-    
-    <NestedParam parentKey="parameters" childKey="encryptedClientSecret" type="string" required={true} default="">
-    The client secret issued by the OAuth 2.0 provider encrypted to the TLS Fetcher quorum key
-    </NestedParam>
+    <ParamField body="operatorEncryptKeys" type="array" required={true} path="parameters.operatorEncryptKeys">
+      <p>Operator public keys used to encrypt and later approve the generated TVC quorum key shares</p>
+      <Expandable title="item details">
+            <p>Array item type: <code>string</code></p>
+            <p>item field</p>
+      </Expandable>
+    </ParamField>
   </Expandable>
 </ParamField>
 <ParamField body="generateAppProofs" type="boolean" required={false}>
@@ -76,24 +72,21 @@ The activity type
 <NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
       The intent of the activity
       <Expandable title="intent details">
-        <NestedParam parentKey="activity.intent" childKey="updateOauth2CredentialIntent" type="object" required={true}>
-      The updateOauth2CredentialIntent object
-      <Expandable title="updateOauth2CredentialIntent details">
-        <NestedParam parentKey="activity.intent.updateOauth2CredentialIntent" childKey="oauth2CredentialId" type="string" required={true}>
-The ID of the OAuth 2.0 credential to update
+        <NestedParam parentKey="activity.intent" childKey="createTvcQuorumKeyIntent" type="object" required={true}>
+      The createTvcQuorumKeyIntent object
+      <Expandable title="createTvcQuorumKeyIntent details">
+        <NestedParam parentKey="activity.intent.createTvcQuorumKeyIntent" childKey="threshold" type="number" required={true}>
+The threshold of operators needed to reassemble this TVC quorum key
 </NestedParam>
-<NestedParam parentKey="activity.intent.updateOauth2CredentialIntent" childKey="provider" type="enum" required={true}>
-provider field
-  
-Enum options: `OAUTH2_PROVIDER_X`, `OAUTH2_PROVIDER_DISCORD`
+<NestedParam parentKey="activity.intent.createTvcQuorumKeyIntent" childKey="operatorEncryptKeys" type="array" required={true}>
+      Operator public keys used to encrypt and later approve the generated TVC quorum key shares
+      <Expandable title="operatorEncryptKeys details">
+        <NestedParam parentKey="activity.intent.createTvcQuorumKeyIntent.operatorEncryptKeys" childKey="item" type="string" required={true}>
+item field
+</NestedParam>
 
-</NestedParam>
-<NestedParam parentKey="activity.intent.updateOauth2CredentialIntent" childKey="clientId" type="string" required={true}>
-The Client ID issued by the OAuth 2.0 provider
-</NestedParam>
-<NestedParam parentKey="activity.intent.updateOauth2CredentialIntent" childKey="encryptedClientSecret" type="string" required={true}>
-The client secret issued by the OAuth 2.0 provider encrypted to the TLS Fetcher quorum key
-</NestedParam>
+      </Expandable>
+    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -103,12 +96,24 @@ The client secret issued by the OAuth 2.0 provider encrypted to the TLS Fetcher 
 <NestedParam parentKey="activity" childKey="result" type="object" required={true}>
       The result of the activity
       <Expandable title="result details">
-        <NestedParam parentKey="activity.result" childKey="updateOauth2CredentialResult" type="object" required={true}>
-      The updateOauth2CredentialResult object
-      <Expandable title="updateOauth2CredentialResult details">
-        <NestedParam parentKey="activity.result.updateOauth2CredentialResult" childKey="oauth2CredentialId" type="string" required={true}>
-Unique identifier of the OAuth 2.0 credential that was updated
+        <NestedParam parentKey="activity.result" childKey="createTvcQuorumKeyResult" type="object" required={true}>
+      The createTvcQuorumKeyResult object
+      <Expandable title="createTvcQuorumKeyResult details">
+        <NestedParam parentKey="activity.result.createTvcQuorumKeyResult" childKey="quorumKeyId" type="string" required={true}>
+The unique identifier for the TVC quorum key
 </NestedParam>
+<NestedParam parentKey="activity.result.createTvcQuorumKeyResult" childKey="quorumPublicKey" type="string" required={true}>
+Public key for the generated TVC quorum key
+</NestedParam>
+<NestedParam parentKey="activity.result.createTvcQuorumKeyResult" childKey="shareIds" type="array" required={true}>
+      The unique identifier(s) for the generated TVC quorum key shares
+      <Expandable title="shareIds details">
+        <NestedParam parentKey="activity.result.createTvcQuorumKeyResult.shareIds" childKey="item" type="string" required={true}>
+item field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -141,19 +146,19 @@ The last update timestamp.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/update_oauth2_credential \
+  --url https://api.turnkey.com/public/v1/submit/create_tvc_quorum_key \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL",
+    "type": "ACTIVITY_TYPE_CREATE_TVC_QUORUM_KEY",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
-        "oauth2CredentialId": "<string>",
-        "provider": "<OAUTH2_PROVIDER_X>",
-        "clientId": "<string>",
-        "encryptedClientSecret": "<string>"
+        "threshold": "<number>",
+        "operatorEncryptKeys": [
+            "<string>"
+        ]
     }
 }'
 ```
@@ -168,11 +173,9 @@ const turnkeyClient = new Turnkey({
   defaultOrganizationId: process.env.ORGANIZATION_ID!,
 });
 
-const response = await turnkeyClient.apiClient().updateOauth2Credential({
-  oauth2CredentialId: "<string> (The ID of the OAuth 2.0 credential to update)",
-  provider: "<OAUTH2_PROVIDER_X>" // provider field,
-  clientId: "<string> (The Client ID issued by the OAuth 2.0 provider)",
-  encryptedClientSecret: "<string> (The client secret issued by the OAuth 2.0 provider encrypted to the TLS Fetcher quorum key)"
+const response = await turnkeyClient.apiClient().createTvcQuorumKey({
+  threshold: 0 // The threshold of operators needed to reassemble this TVC quorum key,
+  operatorEncryptKeys: ["<string>"] // Operator public keys used to encrypt and later approve the generated TVC quorum key shares
 });
 ```
 
@@ -185,7 +188,7 @@ const response = await turnkeyClient.apiClient().updateOauth2Credential({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_UPDATE_OAUTH2_CREDENTIAL",
+    "type": "ACTIVITY_TYPE_CREATE_TVC_QUORUM_KEY",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -195,16 +198,20 @@ const response = await turnkeyClient.apiClient().updateOauth2Credential({
         "status": "<string>",
         "type": "<string>",
         "intent": {
-          "updateOauth2CredentialIntent": {
-            "oauth2CredentialId": "<string>",
-            "provider": "<OAUTH2_PROVIDER_X>",
-            "clientId": "<string>",
-            "encryptedClientSecret": "<string>"
+          "createTvcQuorumKeyIntent": {
+            "threshold": "<number>",
+            "operatorEncryptKeys": [
+              "<string>"
+            ]
           }
         },
         "result": {
-          "updateOauth2CredentialResult": {
-            "oauth2CredentialId": "<string>"
+          "createTvcQuorumKeyResult": {
+            "quorumKeyId": "<string>",
+            "quorumPublicKey": "<string>",
+            "shareIds": [
+              "<string>"
+            ]
           }
         },
         "votes": "<array>",
