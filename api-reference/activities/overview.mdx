@@ -19,4 +19,26 @@ Submission endpoints are always prefixed with `/public/v1/submit`.
 - **Approval expiration:** Activities do not expire. However, when an activity is submitted, the requester's submission counts as the first approval and starts a 24-hour window. If consensus is not reached within that window, existing approvals expire and must be re-submitted while the activity remains in `ACTIVITY_STATUS_CONSENSUS_NEEDED`.
 - **Status updates:** Poll `get_activity` with the `activity.id`, or re-submit the original request (see idempotency below).
 - **Idempotency:** The submission API is idempotent. Each request's POST body is hashed into a fingerprint — any two requests with the same fingerprint return the same activity. To generate a new activity, change the `timestampMs` value in your request.
-- **Request freshness:** `timestampMs` must be within the last hour, and no more than five minutes in the future. Older requests are rejected with `activity timestamp is not current` rather than returning the original activity, so use `get_activity` to check on anything submitted more than an hour ago. This applies to every submission, including approvals and rejections.
+
+## Signed-request validity
+
+Every activity submission includes `timestampMs`, a Unix timestamp in milliseconds
+encoded as a string. At submission time, it must be **no more than one hour in the
+past** and **no more than five minutes in the future**. This applies to signing
+requests, approvals, rejections, and other activities, including resubmissions.
+
+Keep the submitting machine's clock synchronized and generate the timestamp close
+to when you submit the request. Turnkey rejects stale requests with
+`activity timestamp is not current` and requests too far ahead with
+`activity timestamp is in the future`.
+
+The submission window is separate from the 24-hour approval window described
+above. An accepted activity does not expire when its original request becomes too
+old to submit again. Use [Get activity](/api-reference/queries/get-activity) to check
+its status. Changing `timestampMs` changes the request fingerprint and creates a
+new activity; it is not a way to retry the original activity idempotently.
+
+## Rate limits
+
+Submissions and status queries are subject to [API rate limits](/reference/rate-limits).
+Pace requests and use backoff when a limit is exceeded.
