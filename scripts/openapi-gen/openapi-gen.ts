@@ -37,6 +37,7 @@ const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
   Organizations: "Organizations & sub-organizations",
   Features: "Organizations & sub-organizations",
   "IP Allowlist": "Organizations & sub-organizations",
+  Webhooks: "Organizations & sub-organizations",
   Users: "Users, access & sessions",
   "User Tags": "Users, access & sessions",
   Invitations: "Users, access & sessions",
@@ -57,6 +58,7 @@ const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
   "Private Keys": "Wallets & private keys",
   "Private Key Tags": "Wallets & private keys",
   Signing: "Signing",
+  Spark: "Signing",
   Broadcasting: "Transaction management",
   "Send Transactions": "Transaction management",
   Swaps: "Transaction management",
@@ -85,23 +87,6 @@ interface CategorizedOperation {
 }
 
 function getApiCategory(operation: CategorizedOperation): ApiCategory | null {
-  const pathAndId = `${operation.path} ${
-    operation.operationId || ""
-  }`.toLowerCase();
-
-  if (pathAndId.includes("webhook")) {
-    return "Organizations & sub-organizations";
-  }
-  if (pathAndId.includes("spark") || pathAndId.includes("lightning")) {
-    return "Signing";
-  }
-  if (
-    operation.path === "/public/v1/query/get_oauth2_credential" ||
-    operation.operationId?.toLowerCase() === "getoauth2credential"
-  ) {
-    return "Authentication & credentials";
-  }
-
   const categories = (operation.tags || []).map(
     (tag) => TAG_CATEGORY_ALIASES[tag.trim()]
   );
