@@ -21,8 +21,8 @@ import path from "path";
 import fs from "fs";
 
 const API_CATEGORIES = [
-  "Organizations & sub-organizations",
-  "Users, access & sessions",
+  "Organizations & sub-orgs",
+  "Users & access",
   "Authentication & credentials",
   "Policies & approvals",
   "Wallets & private keys",
@@ -34,16 +34,16 @@ const API_CATEGORIES = [
 type ApiCategory = (typeof API_CATEGORIES)[number];
 
 const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
-  Organizations: "Organizations & sub-organizations",
-  Features: "Organizations & sub-organizations",
-  "IP Allowlist": "Organizations & sub-organizations",
-  Webhooks: "Organizations & sub-organizations",
-  Users: "Users, access & sessions",
-  "User Tags": "Users, access & sessions",
-  Invitations: "Users, access & sessions",
-  Sessions: "Users, access & sessions",
-  "Session Profiles": "Users, access & sessions",
-  Email: "Users, access & sessions",
+  Organizations: "Organizations & sub-orgs",
+  Features: "Organizations & sub-orgs",
+  "IP Allowlist": "Organizations & sub-orgs",
+  Webhooks: "Organizations & sub-orgs",
+  Users: "Users & access",
+  "User Tags": "Users & access",
+  Invitations: "Users & access",
+  Email: "Users & access",
+  Sessions: "Authentication & credentials",
+  "Session Profiles": "Authentication & credentials",
   "API keys": "Authentication & credentials",
   "API Keys": "Authentication & credentials",
   Authenticators: "Authentication & credentials",
@@ -76,7 +76,7 @@ const MANUAL_QUERY_PATHS = [
     path: "api-reference/queries/get-webhook-jwks",
     title: "Get webhook JWKS",
     type: "query" as const,
-    category: "Organizations & sub-organizations" as ApiCategory,
+    category: "Organizations & sub-orgs" as ApiCategory,
   },
 ];
 
@@ -272,7 +272,7 @@ export const tags = ${tagsStr};`;
       }
 
       // Collect generated MDX paths for docs.json update. Within each category,
-      // activities sort before queries, then operations sort by title.
+      // operations are split into Activities/Queries subgroups, each sorted by title.
       const categorizedPaths = new Map<
         ApiCategory,
         { path: string; title: string; type: "activity" | "query" }[]
@@ -329,21 +329,42 @@ export const tags = ${tagsStr};`;
           categorizedPaths.get(manualPage.category)!.push(manualPage);
         }
 
+        const sortOperations = (
+          operations: { path: string; title: string }[]
+        ) =>
+          operations
+            .slice()
+            .sort(
+              (a, b) =>
+                a.title.localeCompare(b.title) || a.path.localeCompare(b.path)
+            )
+            .map((operation) => operation.path);
+
         const categoryGroups = API_CATEGORIES.map((category) => {
           const pagesByPath = new Map(
             categorizedPaths
               .get(category)!
               .map((operation) => [operation.path, operation])
           );
-          const operations = [...pagesByPath.values()].sort((a, b) => {
-            if (a.type !== b.type) return a.type === "activity" ? -1 : 1;
-            return (
-              a.title.localeCompare(b.title) || a.path.localeCompare(b.path)
-            );
-          });
+          const operations = [...pagesByPath.values()];
+          const activities = sortOperations(
+            operations.filter((operation) => operation.type === "activity")
+          );
+          const queries = sortOperations(
+            operations.filter((operation) => operation.type === "query")
+          );
+
+          const subgroups: { group: string; pages: string[] }[] = [];
+          if (activities.length > 0) {
+            subgroups.push({ group: "Activities", pages: activities });
+          }
+          if (queries.length > 0) {
+            subgroups.push({ group: "Queries", pages: queries });
+          }
+
           return {
             group: category,
-            pages: operations.map((operation) => operation.path),
+            pages: subgroups,
           };
         });
 
@@ -412,6 +433,52 @@ export const tags = ${tagsStr};`;
                 )
             );
 
+            // Guard against a category rename in API_CATEGORIES/TAG_CATEGORY_ALIASES
+            // leaving its old-named group behind in docs.json: since that old group's
+            // name no longer matches generatedGroupNames, it would otherwise survive
+            // as a "preserved" page and sit alongside a freshly generated group holding
+            // the same pages under the new name, silently duplicating every page in it.
+            const collectApiReferencePaths = (node: any): string[] => {
+              if (typeof node === "string") {
+                return node.startsWith("api-reference/") ? [node] : [];
+              }
+              if (node && typeof node === "object" && Array.isArray(node.pages)) {
+                return node.pages.flatMap(collectApiReferencePaths);
+              }
+              return [];
+            };
+            const generatedApiPaths = new Set(
+              categoryGroups.flatMap(collectApiReferencePaths)
+            );
+            const staleGroups = preservedPages
+              .filter(
+                (item: any) =>
+                  typeof item === "object" && Array.isArray(item.pages)
+              )
+              .map((item: any) => ({
+                group: item.group,
+                duplicates: collectApiReferencePaths(item).filter((p) =>
+                  generatedApiPaths.has(p)
+                ),
+              }))
+              .filter((entry: any) => entry.duplicates.length > 0);
+
+            if (staleGroups.length > 0) {
+              const details = staleGroups
+                .map(
+                  (entry: any) =>
+                    `  - "${entry.group}" duplicates: ${entry.duplicates.join(", ")}`
+                )
+                .join("\n");
+              throw new Error(
+                `docs.json has group(s) in the "REST API" section whose pages overlap with ` +
+                  `freshly generated category groups. This usually means a category name in ` +
+                  `API_CATEGORIES was renamed without removing the old-named group left behind ` +
+                  `in docs.json:\n${details}\n` +
+                  `Remove the stale group(s) above from docs.json and re-run this script.`
+              );
+            }
+
             // These describe API-wide request modes, so keep them as standalone
             // primers before the mixed query/activity category groups.
             preservedPages.splice(
@@ -440,6 +507,7 @@ export const tags = ${tagsStr};`;
         console.error(
           `Error processing or updating docs.json: ${error.message}`
         );
+        handleError(error);
       }
       console.log(`--- Finished updating docs.json ---`);
 
