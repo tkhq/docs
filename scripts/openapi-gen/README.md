@@ -66,3 +66,4 @@ The tool produces or updates these files/directories:
 ## Maintenance Notes
 
 - **Contribution:** Please update this README and `Makefile` when adding new CLI flags or output modes.
+- **New swagger tags:** Every tag on the main API's swagger operations must have an entry in `TAG_CATEGORY_ALIASES` (in `openapi-gen.ts`), mapping it to one of the `API_CATEGORIES` used for the REST API sidebar grouping. When mono ships a new tag, `--generate-mdx` throws `API navigation category mapping is missing for operationIds: ...` until that tag is added — add it to `TAG_CATEGORY_ALIASES` (or to `getApiCategory` for path/operationId-based overrides) to fix.
