@@ -1,0 +1,95 @@
+---
+title: "API rate limits"
+description: "Plan rates, organization and endpoint buckets, and handling HTTP 429 responses from the Turnkey API."
+sidebarTitle: "Rate limits"
+---
+
+Turnkey rate limits API traffic to protect service availability. Rate limits
+control request throughput; [resource limits](/reference/resource-limits) control
+how many wallets, users, and other resources an organization can contain.
+
+## Plan rates
+
+The published default rates vary by plan:
+
+| Plan | Requests per second (RPS) |
+| --- | ---: |
+| Free | 1 |
+| Pay-as-you-go | 1 |
+| Pro | 3 |
+| Enterprise | 60 |
+
+There is also a default **10 RPS per-sub-organization limit** across plans.
+Rates are enforced as per-minute buckets that refill continuously, so short
+bursts above the per-second rate are absorbed until the bucket empties.
+An organization's custom limits can differ from these defaults. Contact
+[Support](/solutions/support/overview) to confirm capacity for your workload or
+request an adjustment.
+
+## How limits are applied
+
+A request can count toward multiple rate-limit buckets:
+
+- **Shared across a parent organization and its sub-organizations.** The plan rate
+  is applied here.
+- **A single organization or sub-organization.** The 10 RPS per-sub-organization
+  default is applied here.
+- **A particular query endpoint or activity type.**
+- **A group of related operations,** such as signing.
+
+These scopes overlap. An endpoint-specific limit does not replace the shared
+parent-level limit, and a sub-organization's own allowance does not exempt it from
+that shared limit. The plan rates above are not a separate allowance for every API
+method. Custom limits that Support configures for a specific sub-organization take
+precedence over the default per-sub-organization limit. Which limits apply depends
+on the operation and your organization's configuration.
+
+Organization-scoped limits are shared across your servers and API credentials.
+Distributing requests across machines or IP addresses does not increase those
+allowances. Pace traffic across workers and account for status polling as well as
+activity submissions.
+
+## Endpoint-specific limits
+
+The [Broadcast EVM transaction](/api-reference/activities/broadcast-evm-transaction)
+and [Broadcast SVM transaction](/api-reference/activities/broadcast-svm-transaction)
+activities, and the [Get balances](/api-reference/queries/get-balances) query, have
+separate default **10 RPS limits across all plans**. Do not assume your plan's rate
+applies to these endpoints.
+
+Authentication also has abuse-prevention limits. See [OTP rate limits](/features/authentication/sms#otp-rate-limits)
+for the per-user controls used with OTP authentication.
+
+## Handle rate-limit errors
+
+When a request is rate limited, the API returns HTTP **429** with one of these
+messages, depending on which limit was exceeded:
+
+| Message | Limit exceeded |
+| --- | --- |
+| `Too many requests in a short period of time. Please wait a few minutes and try again.` | An organization-wide limit, such as the plan rate. |
+| `Too many requests for this type of activity. Please wait a few minutes and try again.` | A limit on a specific endpoint or activity type. |
+
+Query endpoints and unauthenticated endpoints return
+`Resource exhausted; please wait a minute and try again.` If you keep submitting
+activities while limited, the API returns one of the "has been rate limited"
+messages listed under [API errors](/api-reference/overview/errors).
+
+Handle the 429 status in your retry logic rather than matching on message text.
+A 429 that says signing is disabled because your organization is over its
+allotted quota is a monthly signing quota, not a rate limit; see
+[API errors](/api-reference/overview/errors#this-organization-cannot-execute-activities-because-it-is-over-its-allotted-quota-please-reach-out-to-the-turnkey-team-helpturnkeycom-for-more-information).
+
+- Rate limits usually clear within a few seconds. Start retries with a short
+  delay, then back off exponentially with jitter. Avoid having every worker retry
+  at the same moment.
+- The API does not return rate-limit or `Retry-After` headers. Schedule retries
+  from your own backoff logic.
+- For activity retries, preserve the original request body while it is within
+  the [signed-request validity window](/api-reference/activities/overview#signed-request-validity).
+  Changing `timestampMs` creates a new activity. If you have an activity ID, query
+  its status rather than creating another activity.
+- If throttling persists, contact [Support](/solutions/support/overview) with your
+  organization ID, endpoint or activity type, timestamps, and observed request rate.
+
+See [API errors](/api-reference/overview/errors) for other failure modes.
