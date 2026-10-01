@@ -5,13 +5,13 @@ description: "This checklist contains recommendations and steps specifically for
 
 ## Production setup
 
-- Many of our customers prefer to maintain separate Development and Production [organizations](/features/organizations). If you choose to do so, ensure your production environment is referencing the correct organization ID.
-- Ensure you have an active subscription via the Account Settings page in the Turnkey dashboard.
+- Many of our customers prefer to maintain separate Development and Production [organizations](/features/organizations#test-and-production-organizations). If you choose to do so, ensure your production environment is referencing the correct organization ID.
+- Ensure you have an active subscription via the Account Settings page in the Turnkey dashboard. Turnkey is priced per signature and includes 25 free signatures per month. To create more, add a credit card and select a plan in Account Settings, or arrange an Enterprise plan with the Turnkey team. See the [pricing page](https://www.turnkey.com/pricing) for current rates.
 - If you are on an Enterprise plan, confirm your production organization ID with your account rep.
 
 <Warning>
   Double check our [resource limits](/reference/resource-limits) and [rate
-  limits](/reference/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) to
+  limits](/reference/rate-limits) to
   ensure your implementation will not trigger these limits at production scale.
 </Warning>
 
@@ -64,5 +64,5 @@ Email carries a reputation cost instead. Bulk OTP requests aimed at addresses th
 - Activity submission is optimistically synchronous. In most cases activities will be completed and returned right away (synchronously), but if there is a lot of activity in a single organization, activities will be processed asynchronously. Make sure you handle PENDING activities by polling a few times until their completion. Our TypeScript SDKs do this for you, and expose an `activityPoller` config with `intervalMs` and `numRetries`. The defaults are short, around three seconds in total, so raise them if you submit enough volume to see asynchronous processing regularly.
 - Polling does not resolve every non-terminal status. `ACTIVITY_STATUS_CONSENSUS_NEEDED` and `ACTIVITY_STATUS_AUTHENTICATORS_NEEDED` are waiting on a person rather than on Turnkey, so route them into your approval or MFA flow instead of continuing to poll.
 - Understand what makes a retry safe before you build one. See [Activities](/api-reference/activities/overview) for how idempotency works: submission is keyed on a fingerprint of the request body, so resending the same request returns the same activity, while changing `timestampMs` creates a new one. On a signing activity that difference is a second signature, so retry by resending the original request rather than rebuilding it. Requests more than an hour old are rejected rather than replayed.
-- Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. See [Errors](/api-reference/overview/errors) for the status codes and which of them are worth retrying. Incorporate [rate limiting](/reference/faq#do-you-have-any-rate-limits-in-place-in-your-public-api) and exponential backoff in retry mechanisms.
+- Implement retry strategies for API calls, adjusting for various error types and avoiding over-retrying on critical failures. See [Errors](/api-reference/overview/errors) for the status codes and which of them are worth retrying. Incorporate [rate limiting](/reference/rate-limits) and exponential backoff in retry mechanisms.
 - Set up monitoring to detect and alert on patterns of failures.

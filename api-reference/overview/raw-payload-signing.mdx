@@ -1,0 +1,53 @@
+---
+title: "Raw payload signing"
+description: "Choose the hash function for ECDSA and Ed25519 signing, including prehashed payloads."
+---
+
+Use [Sign raw payload](/api-reference/activities/sign-raw-payload) or
+[Sign raw payloads](/api-reference/activities/sign-raw-payloads) when your integration
+constructs the data to sign. The `hashFunction` determines how Turnkey prepares
+that payload for the signing algorithm.
+
+## ECDSA hash functions
+
+ECDSA signs a message digest. For SECP256k1 and P-256 keys, choose the option that
+matches your protocol and the data you pass:
+
+| Hash function | Behavior |
+| --- | --- |
+| `HASH_FUNCTION_KECCAK256` | Hash the payload with Keccak-256 before signing; commonly used in Ethereum integrations. |
+| `HASH_FUNCTION_SHA256` | Hash the payload with SHA-256 before signing; used in Bitcoin and other integrations where that digest is required. |
+| `HASH_FUNCTION_NO_OP` | Sign the supplied digest without an additional hashing step. Use this when your integration has already produced the digest the protocol requires. |
+
+Do not hash an already prepared digest again unless the protocol calls for it.
+Some protocols require additional encoding or multiple hashing steps; select the
+option based on the payload you submit, not just the chain name. Turnkey's SDK
+integrations, such as [Viem](/sdks/web3/viem), handle this preparation for
+their supported signing flows.
+
+Raw-payload signing does not provide transaction parsing or transaction-policy
+enforcement for any hash function. When you pass only a digest with
+`HASH_FUNCTION_NO_OP`, Turnkey does not receive the original message (the
+preimage) at all. Use
+[Sign transaction](/api-reference/activities/sign-transaction) when you need
+supported transaction parsing and [transaction policies](/features/policies/overview).
+For supported structured-data parsing, including EIP-712 typed data, see the
+[Ethereum signing guidance](/features/networks/ethereum#eip-712).
+
+## Ed25519 hashing
+
+Use `HASH_FUNCTION_NOT_APPLICABLE` with Ed25519 keys. Ed25519 performs hashing as
+part of the signature algorithm itself, so there is no separate optional hashing
+step for Turnkey to apply. This differs from `HASH_FUNCTION_NO_OP`, which is used
+to provide an already hashed ECDSA payload.
+
+Pass the message expected by the Ed25519 protocol, not an ECDSA-style digest. See
+[Solana signing](/features/networks/solana) for an integration example and
+[RFC 8032, section 5.1](https://datatracker.ietf.org/doc/html/rfc8032#section-5.1)
+for the Ed25519 algorithm.
+
+## Request validity
+
+Raw-payload signing is an activity submission. The signed request must meet the
+[timestamp validity window](/api-reference/activities/overview#signed-request-validity)
+and your organization's [rate limits](/reference/rate-limits).
