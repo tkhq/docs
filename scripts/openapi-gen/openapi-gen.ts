@@ -20,6 +20,120 @@ import { generateMdxFile, generateAuthProxyMdxFile } from "./utils/mdx-generator
 import path from "path";
 import fs from "fs";
 
+const API_CATEGORIES = [
+  "Organizations & sub-orgs",
+  "Users & access",
+  "Authentication & credentials",
+  "Policies & approvals",
+  "Wallets & private keys",
+  "Signing",
+  "Transaction management",
+  "Turnkey Verifiable Cloud",
+] as const;
+
+type ApiCategory = (typeof API_CATEGORIES)[number];
+
+const TAG_CATEGORY_ALIASES: Record<string, ApiCategory> = {
+  Organizations: "Organizations & sub-orgs",
+  Features: "Organizations & sub-orgs",
+  "IP Allowlist": "Organizations & sub-orgs",
+  Webhooks: "Organizations & sub-orgs",
+  Users: "Users & access",
+  "User Tags": "Users & access",
+  Invitations: "Users & access",
+  Email: "Users & access",
+  Sessions: "Authentication & credentials",
+  "Session Profiles": "Authentication & credentials",
+  "API keys": "Authentication & credentials",
+  "API Keys": "Authentication & credentials",
+  Authenticators: "Authentication & credentials",
+  "User Auth": "Authentication & credentials",
+  "User Verification": "Authentication & credentials",
+  "User Recovery": "Authentication & credentials",
+  Policies: "Policies & approvals",
+  Activities: "Policies & approvals",
+  Consensus: "Policies & approvals",
+  "MFA Policies": "Policies & approvals",
+  Wallets: "Wallets & private keys",
+  "Private Keys": "Wallets & private keys",
+  "Private Key Tags": "Wallets & private keys",
+  Signing: "Signing",
+  Spark: "Signing",
+  Broadcasting: "Transaction management",
+  "Send Transactions": "Transaction management",
+  Swaps: "Transaction management",
+  Earn: "Transaction management",
+  "On Ramp": "Transaction management",
+  TVC: "Turnkey Verifiable Cloud",
+  "Boot Proof": "Turnkey Verifiable Cloud",
+  "App Proof": "Turnkey Verifiable Cloud",
+  Secrets: "Wallets & private keys",
+};
+
+const NOOP_CODEGEN_ANCHOR_PATH = "/tkhq/api/v1/noop-codegen-anchor";
+const MANUAL_QUERY_PATHS = [
+  {
+    path: "api-reference/queries/get-webhook-jwks",
+    title: "Get webhook JWKS",
+    type: "query" as const,
+    category: "Organizations & sub-orgs" as ApiCategory,
+  },
+];
+
+interface CategorizedOperation {
+  path: string;
+  operationId?: string;
+  tags?: string[];
+}
+
+function getApiCategory(operation: CategorizedOperation): ApiCategory | null {
+  const categories = (operation.tags || []).map(
+    (tag) => TAG_CATEGORY_ALIASES[tag.trim()]
+  );
+  if (categories.length === 0 || categories.some((category) => !category)) {
+    return null;
+  }
+
+  const uniqueCategories = new Set(categories);
+  return uniqueCategories.size === 1 ? [...uniqueCategories][0] : null;
+}
+
+function validatePublicOperationCategories(api: any): void {
+  const unsupportedOperations: string[] = [];
+  const httpMethods = new Set(["get", "post", "put", "patch", "delete"]);
+
+  for (const [operationPath, pathItem] of Object.entries(api.paths || {})) {
+    if (operationPath === NOOP_CODEGEN_ANCHOR_PATH) continue;
+
+    for (const [method, operationValue] of Object.entries(
+      pathItem as Record<string, any>
+    )) {
+      if (!httpMethods.has(method.toLowerCase())) continue;
+
+      const operation = operationValue as Record<string, any>;
+      if (
+        !getApiCategory({
+          path: operationPath,
+          operationId: operation.operationId,
+          tags: operation.tags,
+        })
+      ) {
+        unsupportedOperations.push(
+          operation.operationId || `${method.toUpperCase()} ${operationPath}`
+        );
+      }
+    }
+  }
+
+  if (unsupportedOperations.length > 0) {
+    throw new Error(
+      `API navigation category mapping is missing for operationIds: ${unsupportedOperations.join(
+        ", "
+      )}`
+    );
+  }
+}
+
 /**
  * Main function
  */
@@ -122,6 +236,9 @@ export const tags = ${tagsStr};`;
           "Endpoint data is required for MDX generation (--endpoints flag might be needed)."
         );
       }
+      if (!options.authProxy) {
+        validatePublicOperationCategories(api);
+      }
       console.log(`--- Starting MDX Generation ---`);
 
       // Calculate project root (assuming script is in <project_root>/scripts/openapi-gen)
@@ -154,13 +271,21 @@ export const tags = ${tagsStr};`;
         }
       }
 
-      // Collect generated MDX paths for docs.json update
-      const activityPaths: string[] = [];
-      const queryPaths: string[] = [];
+      // Collect generated MDX paths for docs.json update. Within each category,
+      // operations are split into Activities/Queries subgroups, each sorted by title.
+      const categorizedPaths = new Map<
+        ApiCategory,
+        { path: string; title: string; type: "activity" | "query" }[]
+      >(API_CATEGORIES.map((category) => [category, []]));
       const authProxyPaths: string[] = [];
 
       for (const endpoint of endpointResult.endpoints) {
-        if (skipEndpointPaths.has(endpoint.path)) continue;
+        if (
+          skipEndpointPaths.has(endpoint.path) ||
+          (!options.authProxy && endpoint.path === NOOP_CODEGEN_ANCHOR_PATH)
+        ) {
+          continue;
+        }
         // Use the auth-proxy generator when --auth-proxy is set, main generator otherwise
         const generatedPath = options.authProxy
           ? generateAuthProxyMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly)
@@ -172,10 +297,20 @@ export const tags = ${tagsStr};`;
 
           if (options.authProxy) {
             authProxyPaths.push(fullDocsPath);
-          } else if (endpoint.type === "activity") {
-            activityPaths.push(fullDocsPath);
-          } else if (endpoint.type === "query") {
-            queryPaths.push(fullDocsPath);
+          } else {
+            const category = getApiCategory(endpoint);
+            if (!category) {
+              throw new Error(
+                `API navigation category mapping is missing for operationId: ${
+                  endpoint.operationId || endpoint.path
+                }`
+              );
+            }
+            categorizedPaths.get(category)!.push({
+              path: fullDocsPath,
+              title: endpoint.title,
+              type: endpoint.type,
+            });
           }
         }
       }
@@ -189,16 +324,49 @@ export const tags = ${tagsStr};`;
 
         const docsConfig = JSON.parse(docsJsonContent);
 
-        // Remove duplicates before sorting
-        const uniqueActivityPaths = [...new Set(activityPaths)];
-        const uniqueQueryPaths = [...new Set(queryPaths)];
-        const uniqueAuthProxyPaths = [...new Set(authProxyPaths)];
-        const manualQueryPaths = ["api-reference/queries/get-webhook-jwks"];
+        const uniqueAuthProxyPaths = [...new Set(authProxyPaths)].sort();
+        for (const manualPage of MANUAL_QUERY_PATHS) {
+          categorizedPaths.get(manualPage.category)!.push(manualPage);
+        }
 
-        // Sort generated paths alphabetically
-        uniqueActivityPaths.sort();
-        uniqueQueryPaths.sort();
-        uniqueAuthProxyPaths.sort();
+        const sortOperations = (
+          operations: { path: string; title: string }[]
+        ) =>
+          operations
+            .slice()
+            .sort(
+              (a, b) =>
+                a.title.localeCompare(b.title) || a.path.localeCompare(b.path)
+            )
+            .map((operation) => operation.path);
+
+        const categoryGroups = API_CATEGORIES.map((category) => {
+          const pagesByPath = new Map(
+            categorizedPaths
+              .get(category)!
+              .map((operation) => [operation.path, operation])
+          );
+          const operations = [...pagesByPath.values()];
+          const activities = sortOperations(
+            operations.filter((operation) => operation.type === "activity")
+          );
+          const queries = sortOperations(
+            operations.filter((operation) => operation.type === "query")
+          );
+
+          const subgroups: { group: string; pages: string[] }[] = [];
+          if (activities.length > 0) {
+            subgroups.push({ group: "Activities", pages: activities });
+          }
+          if (queries.length > 0) {
+            subgroups.push({ group: "Queries", pages: queries });
+          }
+
+          return {
+            group: category,
+            pages: subgroups,
+          };
+        });
 
         // --- Find and Update Navigation ---
         // Check if docsConfig.navigation is an array before proceeding
@@ -233,50 +401,95 @@ export const tags = ${tagsStr};`;
             navGroup.pages = uniqueAuthProxyPaths;
             console.log(`Updated '${options.navGroup}' paths in docs.json`);
           } else {
-            // Standard mode: update Activities and Queries groups
-            const activitiesGroup = restApiGroup.pages.find(
+            const generatedGroupNames = new Set([
+              "Activities",
+              "Queries",
+              ...API_CATEGORIES,
+            ]);
+            const overviewPaths = new Set([
+              "api-reference/activities/overview",
+              "api-reference/queries/overview",
+            ]);
+            const firstGeneratedGroupIndex = restApiGroup.pages.findIndex(
               (item: any) =>
-                typeof item === "object" && item.group === "Activities"
+                typeof item === "object" && generatedGroupNames.has(item.group)
             );
-            if (activitiesGroup) {
-              activitiesGroup.pages = [
-                "api-reference/activities/overview",
-                ...uniqueActivityPaths,
-              ];
-              console.log(`Updated Activities paths in docs.json`);
-            } else {
-              console.warn(
-                `Could not find 'Activities' group in docs.json under 'REST API'`
-              );
-            }
-
-            const queriesGroup = restApiGroup.pages.find(
-              (item: any) => typeof item === "object" && item.group === "Queries"
+            const insertionIndex = restApiGroup.pages
+              .slice(0, Math.max(firstGeneratedGroupIndex, 0))
+              .filter(
+                (item: any) =>
+                  !overviewPaths.has(item) &&
+                  !(
+                    typeof item === "object" &&
+                    generatedGroupNames.has(item.group)
+                  )
+              ).length;
+            const preservedPages = restApiGroup.pages.filter(
+              (item: any) =>
+                !overviewPaths.has(item) &&
+                !(
+                  typeof item === "object" &&
+                  generatedGroupNames.has(item.group)
+                )
             );
-            if (queriesGroup) {
-              const queryPages = [
-                "api-reference/queries/overview",
-                ...uniqueQueryPaths,
-              ];
-              for (const manualPath of manualQueryPaths) {
-                if (queryPages.includes(manualPath)) continue;
 
-                const webhookEndpointsIndex = queryPages.indexOf(
-                  "api-reference/queries/list-webhook-endpoints"
-                );
-                if (webhookEndpointsIndex === -1) {
-                  queryPages.push(manualPath);
-                } else {
-                  queryPages.splice(webhookEndpointsIndex, 0, manualPath);
-                }
+            // Guard against a category rename in API_CATEGORIES/TAG_CATEGORY_ALIASES
+            // leaving its old-named group behind in docs.json: since that old group's
+            // name no longer matches generatedGroupNames, it would otherwise survive
+            // as a "preserved" page and sit alongside a freshly generated group holding
+            // the same pages under the new name, silently duplicating every page in it.
+            const collectApiReferencePaths = (node: any): string[] => {
+              if (typeof node === "string") {
+                return node.startsWith("api-reference/") ? [node] : [];
               }
-              queriesGroup.pages = queryPages;
-              console.log(`Updated Queries paths in docs.json`);
-            } else {
-              console.warn(
-                `Could not find 'Queries' group in docs.json under 'REST API'`
+              if (node && typeof node === "object" && Array.isArray(node.pages)) {
+                return node.pages.flatMap(collectApiReferencePaths);
+              }
+              return [];
+            };
+            const generatedApiPaths = new Set(
+              categoryGroups.flatMap(collectApiReferencePaths)
+            );
+            const staleGroups = preservedPages
+              .filter(
+                (item: any) =>
+                  typeof item === "object" && Array.isArray(item.pages)
+              )
+              .map((item: any) => ({
+                group: item.group,
+                duplicates: collectApiReferencePaths(item).filter((p) =>
+                  generatedApiPaths.has(p)
+                ),
+              }))
+              .filter((entry: any) => entry.duplicates.length > 0);
+
+            if (staleGroups.length > 0) {
+              const details = staleGroups
+                .map(
+                  (entry: any) =>
+                    `  - "${entry.group}" duplicates: ${entry.duplicates.join(", ")}`
+                )
+                .join("\n");
+              throw new Error(
+                `docs.json has group(s) in the "REST API" section whose pages overlap with ` +
+                  `freshly generated category groups. This usually means a category name in ` +
+                  `API_CATEGORIES was renamed without removing the old-named group left behind ` +
+                  `in docs.json:\n${details}\n` +
+                  `Remove the stale group(s) above from docs.json and re-run this script.`
               );
             }
+
+            // These describe API-wide request modes, so keep them as standalone
+            // primers before the mixed query/activity category groups.
+            preservedPages.splice(
+              insertionIndex,
+              0,
+              "api-reference/activities/overview",
+              "api-reference/queries/overview",
+              ...categoryGroups
+            );
+            restApiGroup.pages = preservedPages;
+            console.log(`Updated tag-based REST API categories in docs.json`);
           }
         } else {
           console.warn(
@@ -294,6 +507,7 @@ export const tags = ${tagsStr};`;
         console.error(
           `Error processing or updating docs.json: ${error.message}`
         );
+        handleError(error);
       }
       console.log(`--- Finished updating docs.json ---`);
 
