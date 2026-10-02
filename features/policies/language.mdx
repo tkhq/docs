@@ -187,6 +187,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 
 | Struct                          | Field                   | Type                                  | Description                                                                                                                                                                                                                                                |
 | ------------------------------- | ----------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="struct-api-key-params" href="#struct-api-key-params">**ApiKeyParams**</a> | expiration_seconds | [int](#type-int) | The requested lifetime of the API key in seconds. A key with no expiration reads as the maximum value, so `expiration_seconds > N` matches it |
 | <a id="struct-eip-712-domain" href="#struct-eip-712-domain">**Eip712Domain**</a>                | name                    | [string](#type-string)                                | The name                                                                                                                                                                                                                                                   |
 |                                 | version                 | [string](#type-string)                                | The version                                                                                                                                                                                                                                                |
 |                                 | chain_id                | [uint](#type-uint)                                  | The chain ID                                                                                                                                                                                                                                               |
@@ -605,7 +606,9 @@ contact [help@turnkey.com](mailto:help@turnkey.com).
 |                    | `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`             | `type`               | [string](#type-string)                        | The transaction type (one of `[TRANSACTION_TYPE_ETHEREUM, TRANSACTION_TYPE_SOLANA, TRANSACTION_TYPE_BITCOIN, TRANSACTION_TYPE_TRON, TRANSACTION_TYPE_TEMPO]`) |
 | User Management    | `ACTIVITY_TYPE_DELETE_USERS`                    | `user_ids`           | list\<[string](#type-string)\>                | The list of user IDs being deleted                                                                                                                            |
 | API Key Management | `ACTIVITY_TYPE_CREATE_API_KEYS`                 | `user_id`            | [string](#type-string)                        | The ID of the user who will own the API keys                                                                                                                  |
+|                    |                                                 | `api_keys`           | list\<[ApiKeyParams](#struct-api-key-params)\> | The API keys being created                                                                                                                                    |
 |                    | `ACTIVITY_TYPE_CREATE_API_KEYS_V2`              | `user_id`            | [string](#type-string)                        | The ID of the user who will own the API keys                                                                                                                  |
+|                    |                                                 | `api_keys`           | list\<[ApiKeyParams](#struct-api-key-params)\> | The API keys being created                                                                                                                                    |
 |                    | `ACTIVITY_TYPE_DELETE_API_KEYS`                 | `user_id`            | [string](#type-string)                        | The ID of the user who owns the API keys                                                                                                                      |
 |                    |                                                 | `api_key_ids`        | list\<[string](#type-string)\>                | The IDs of the API keys being deleted                                                                                                                         |
 | Export             | `ACTIVITY_TYPE_EXPORT_WALLET`                   | `target_public_key`  | [string](#type-string)                        | The public key the export bundle is encrypted to                                                                                                              |
@@ -629,6 +632,10 @@ contact [help@turnkey.com](mailto:help@turnkey.com).
 |                    | `ACTIVITY_TYPE_SPARK_PREPARE_LIGHTNING_RECEIVE` | `sign_with`          | [string](#type-string)                        | The Spark wallet account address identifying the wallet                                                                                                       |
 |                    |                                                 | `lightning_receive`  | [SparkLightningReceivePackage](#struct-spark-lightning-receive-package)  | The Lightning receive package                                                                                                                                 |
 
+Conditions on `api_keys` cover only `ACTIVITY_TYPE_CREATE_API_KEYS` and
+`ACTIVITY_TYPE_CREATE_API_KEYS_V2`. Other activities can also create API keys, for example
+`ACTIVITY_TYPE_CREATE_USERS` and `ACTIVITY_TYPE_CREATE_API_ONLY_USERS`; they do not expose `api_keys`.
+
 #### Examples
 
 To deny signing raw payloads with the NO_OP hash function (except for EIP-712):
@@ -651,6 +658,16 @@ To allow a user to delete only themselves:
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
   "condition": "activity.type == 'ACTIVITY_TYPE_DELETE_USERS' && activity.params.user_ids.count() == 1 && '<USER_ID>' in activity.params.user_ids"
+}
+```
+
+To deny API keys that expire after more than 7 days, or that never expire:
+
+```json
+{
+  "policyName": "Deny long-lived API keys",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type == 'ACTIVITY_TYPE_CREATE_API_KEYS_V2' && activity.params.api_keys.any(k, k.expiration_seconds > 604800)"
 }
 ```
 
