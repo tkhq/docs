@@ -100,6 +100,7 @@ The encrypted flow was introduced in the following releases. Use these versions 
 | `@turnkey/http`                    | [`4.0.0`](https://github.com/tkhq/sdk/blob/main/packages/http/CHANGELOG.md#400)                    |
 | `@turnkey/sdk-types`               | [`1.0.0`](https://github.com/tkhq/sdk/blob/main/packages/sdk-types/CHANGELOG.md#100)               |
 | `@turnkey/crypto`                  | [`2.9.0`](https://github.com/tkhq/sdk/blob/main/packages/crypto/CHANGELOG.md#290)                  |
+| `@turnkey/api-key-stamper`         | [`0.6.0`](https://github.com/tkhq/sdk/blob/main/packages/api-key-stamper/CHANGELOG.md#060)         |
 
 Choose the section below that matches your integration.
 
@@ -170,7 +171,7 @@ Choose the section below that matches your integration.
     />
     ```
 
-    The component handles creation of the encrypted OTP bundle. Make sure a resend replaces both `otpId` and `otpEncryptionTargetBundle`; never combine values from separate attempts.
+    The component handles creation of the encrypted OTP bundle and creates a new verification key when the user submits a code. Make sure a resend replaces both `otpId` and `otpEncryptionTargetBundle`; never combine values from separate attempts.
 
   </Tab>
 
@@ -215,6 +216,9 @@ Choose the section below that matches your integration.
     });
     ```
 
+    On resend, replace the `otpId`, `otpEncryptionTargetBundle`, and verification
+    key together, and discard any previous verification token.
+
     The [`otp-auth/with-backend`](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend) example shows the full split between client-side encryption and signing and server-side Turnkey API calls.
 
   </Tab>
@@ -226,12 +230,16 @@ For a backend integration, the client must sign the signup parameters with the
 same P-256 key that it bound during `VERIFY_OTP_V2`. This example uses email
 OTP with V7 during rollout.
 
+Install `@turnkey/core`, `@turnkey/api-key-stamper`, and `@turnkey/sdk-types`
+as direct dependencies of your client application, using the versions above
+or later.
+
 On the client, use the `verificationToken` returned by verification and the
 matching client private key. Keep that private key on the client:
 
 ```ts
 import { decodeVerificationToken } from "@turnkey/core";
-import { signWithApiKey } from "@turnkey/api-key-stamper";
+import { ApiKeyStamper, SignatureFormat } from "@turnkey/api-key-stamper";
 import type { v1CreateSubOrganizationIntentV7 } from "@turnkey/sdk-types";
 
 const rootUser = {
@@ -258,11 +266,11 @@ const message = JSON.stringify({
   type: "USAGE_TYPE_SIGNUP",
 });
 
-const signature = await signWithApiKey({
-  content: message,
-  publicKey: verificationPublicKey,
-  privateKey: verificationPrivateKey,
+const clientStamper = new ApiKeyStamper({
+  apiPublicKey: verificationPublicKey,
+  apiPrivateKey: verificationPrivateKey,
 });
+const signature = await clientStamper.sign(message, SignatureFormat.Raw);
 
 const signupParameters = {
   subOrganizationName: "OTP account",
@@ -279,10 +287,13 @@ const signupParameters = {
 } satisfies v1CreateSubOrganizationIntentV7;
 ```
 
-Send `signupParameters` to your backend. The signed email and credential arrays
-must match the root user in the submitted request. For SMS, sign `phoneNumber`
-instead of `email`, set `userPhoneNumber` on the root user, and enable SMS auth
-with `disableSmsAuth: false`.
+Send `signupParameters` to your backend. The signed contact fields and credential arrays
+must match the root user in the submitted request. `clientSignature.signature`
+must contain the raw 64-byte P-256 signature encoded as hex, not a DER signature.
+For SMS-only signup, replace the root user's `userEmail` with `userPhoneNumber`,
+sign `phoneNumber` instead of `email`, and enable SMS auth with
+`disableSmsAuth: false`. If the root user includes both contacts, include both
+`email` and `phoneNumber` in the signed message.
 
 On the backend, `parentClient` is an `@turnkey/http` `TurnkeyClient` configured
 with your parent organization's API key stamper. After applying your application's
