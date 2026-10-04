@@ -282,11 +282,74 @@ To allow signing only when the first permitted token is USDC:
 
 #### Allow signing of EIP-7702 authorizations
 
+A signed authorization lets anyone set the code of the account. Allow only the delegate contracts
+that you trust, on the chains that you use:
+
 ```json
 {
   "policyName": "Allow signing of EIP-7702 Authorizations",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_7702_authorization.address == '<ADDRESS>' && eth.eip_7702_authorization.chain_id == '<CHAIN_ID>' && eth.eip_7702_authorization.nonce == '<NONCE>' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP7702_AUTHORIZATION' && eth.eip_7702_authorization.address in ['<CHECKSUMMED_ADDRESS_1>', '<CHECKSUMMED_ADDRESS_2>'] && eth.eip_7702_authorization.chain_id == <CHAIN_ID>"
+}
+```
+
+To allow one authorization only, also set the nonce:
+
+```json
+{
+  "policyName": "Allow signing of one EIP-7702 Authorization",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP7702_AUTHORIZATION' && eth.eip_7702_authorization.address == '<CHECKSUMMED_ADDRESS>' && eth.eip_7702_authorization.chain_id == <CHAIN_ID> && eth.eip_7702_authorization.nonce == <NONCE>"
+}
+```
+
+Write each address in the EIP-55 checksummed (mixed-case) form. The comparison is case-sensitive.
+
+`chain_id` and `nonce` are numbers. Do not put quotes around their values. A quoted value is a
+string, and a comparison between a number and a string results in an evaluation error.
+
+`eth.eip_7702_authorization` is available only for some activities. For the list, and for what a
+signed authorization allows, see [EIP-7702](/features/policies/language#eip-7702).
+
+#### Deny signing of EIP-7702 authorizations for all chains
+
+An authorization with `chain_id` 0 is valid on all EVM chains. To deny these authorizations:
+
+```json
+{
+  "policyName": "Deny signing of EIP-7702 Authorizations for all chains",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "eth.eip_7702_authorization.chain_id == 0"
+}
+```
+
+#### Deny batch signing of EIP-7702 authorizations
+
+`ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` does not populate `eth.eip_7702_authorization`, so policies on
+that keyword do not apply to it. To deny EIP-7702 authorizations in this activity:
+
+```json
+{
+  "policyName": "Deny batch signing of EIP-7702 Authorizations",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOADS' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP7702_AUTHORIZATION'"
+}
+```
+
+#### Deny signing of Type 4 transactions
+
+The policy engine does not expose the authorization list of a Type 4 (EIP-7702) transaction. To
+block Type 4 transactions, deny them by transaction type:
+
+```json
+{
+  "policyName": "Deny signing of Type 4 transactions",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.kind == 'SIGN_TRANSACTION' && eth.tx.type == 'TYPE_4'"
 }
 ```
