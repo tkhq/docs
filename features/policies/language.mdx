@@ -51,7 +51,7 @@ Each field supports a different set of keywords.
 | **activity**                   | [Activity](#struct-activity)             | The activity metadata of the request                                        |
 | **eth.tx**                     | [EthereumTransaction](#struct-ethereum-transaction)  | The parsed Ethereum transaction payload (see Appendix below)                |
 | **eth.eip_712**                | [Eip712TypedData](#struct-eip-712-typed-data)      | EIP-712 Typed Data (see Appendix below)                                     |
-| **eth.eip_7702_authorization** | [Eip7702Authorization](#struct-eip-7702-authorization) | EIP-7702 Authorization (see Appendix below)                                 |
+| **eth.eip_7702_authorization** | [Eip7702Authorization](#struct-eip-7702-authorization) | An EIP-7702 authorization that the signing key signs (see [EIP-7702](#eip-7702) for supported activities) |
 | **solana.tx**                  | [SolanaTransaction](#struct-solana-transaction)    | The parsed Solana transaction payload (see Appendix below)                  |
 | **tron.tx**                    | [TronTransaction](#struct-tron-transaction)      | The parsed Tron transaction payload (see Appendix below)                    |
 | **bitcoin.tx**                 | [BitcoinTransaction](#struct-bitcoin-transaction)   | The parsed Bitcoin transaction payload (see Appendix below)                 |
@@ -589,6 +589,13 @@ wallet clause will fail (because a wallet isn't being passed into the policy eva
 Conversely, if you're trying to sign with a wallet, the private key clause will fail for the same
 reason.
 
+A policy whose condition results in an error does not match. It has no effect on the outcome. An
+allow policy that errors does not allow the activity. A deny policy that errors does not deny the
+activity, so another allow policy can still allow it. A condition errors when it uses a keyword
+that the activity does not populate. For example, `eth.eip_7702_authorization` results in an error
+for `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`. Write each deny policy with keywords that the target
+activity populates, and use `activity.type` to limit the policy to those activities.
+
 ### Activity parameters
 
 The `activity.params` field exposes specific request parameters based on the activity type. An
@@ -772,6 +779,78 @@ policies for EIP-712 messages, please ensure that all hex-encoded strings (e.g. 
 selectors, bytes) are **lowercase**. The policy engine expects lowercase hex strings to conform to
 Ethereum's standard convention. Using uppercase hex strings may result in errors or policy
 rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
+
+For `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` with `PAYLOAD_ENCODING_EIP712`, the policy engine evaluates
+the condition once for each payload. A deny policy applies if any payload matches. An allow policy
+applies only if every payload matches.
+
+#### EIP-7702
+
+`eth.eip_7702_authorization` is an EIP-7702 authorization that the signing key signs. The policy
+engine populates it for these activities:
+
+- `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD`, `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2`, and
+  `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` with `PAYLOAD_ENCODING_EIP7702_AUTHORIZATION`. For
+  `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS`, the policy engine evaluates the condition once for each
+  payload. A deny policy applies if any payload matches. An allow policy applies only if every
+  payload matches.
+- `ACTIVITY_TYPE_ETH_SEND_TRANSACTION` and `ACTIVITY_TYPE_ETH_SEND_TRANSACTION_V2`, when Turnkey
+  constructs an authorization for a sponsored transaction.
+- `ACTIVITY_TYPE_ETH_UNDELEGATE_7702`.
+
+For all other activities, a condition that uses `eth.eip_7702_authorization` results in an
+evaluation error. A deny policy that errors does not deny the activity. For more information, see
+[Policy evaluation](#policy-evaluation).
+
+There is no `eth.eip_7702_authorizations` (plural) keyword. Each evaluation sees one
+authorization.
+
+##### What a signed authorization allows
+
+A signed EIP-7702 authorization does not need another signature from the key. Anyone who has the
+authorization can put it in a Type 4 transaction and send it from any account. The network gets
+the delegated account from the signature on the authorization, not from the sender of the
+transaction. After the transaction, calls to the account run the code at `address`. The delegation
+stays until another authorization replaces it. If the code at `address` does not check the caller,
+anyone can move the funds of the account.
+
+Thus, the policy that allows the authorization is the control. Write it as an allowlist:
+
+- **`address`**: Allow only the delegate contracts that you trust. Use `==` or `in`. Do not use a
+  deny policy with a list of bad contracts, because an attacker can deploy a new contract.
+- **`chain_id`**: Set the chains. An authorization with `chain_id` 0 is valid on all EVM chains.
+- **`nonce`**: An authorization stays valid until the account nonce gets to its `nonce`. An
+  authorization with a nonce in the future can be used later.
+
+`address` is in the EIP-55 checksummed (mixed-case) form, and the comparison is case-sensitive.
+Write the address in the checksummed form. If the case of the address is different, the
+comparison is false. An allow policy then does not allow the authorization, and a deny policy does
+not deny it.
+
+For examples, see
+[Allow signing of EIP-7702 authorizations](/features/policies/examples/ethereum#allow-signing-of-eip-7702-authorizations).
+
+##### Type 4 transactions
+
+`ACTIVITY_TYPE_SIGN_TRANSACTION_V2` does not populate `eth.eip_7702_authorization`. A Type 4
+transaction can contain an authorization list, but the authority of each entry already signed it.
+When you sign the transaction, the signing key does not authorize a delegation. The transaction
+signature and the authorization signature use different message formats, so one cannot be used as
+the other. A Type 4 transaction sends value and a call to `eth.tx.to`, the same as a Type 2
+transaction.
+
+The policy engine does not expose the authorization list of a Type 4 transaction. To control Type
+4 transactions, use `eth.tx.type`. For an example, see
+[Deny signing of Type 4 transactions](/features/policies/examples/ethereum#deny-signing-of-type-4-transactions).
+
+An account that has a delegation runs code when it gets a call. Thus, if `eth.tx.to` is an
+externally owned account, the transaction can still run code. This is true for all transaction
+types.
+
+A raw digest signature (`PAYLOAD_ENCODING_HEXADECIMAL` with `HASH_FUNCTION_NO_OP`) can sign the
+hash of any message, which includes an EIP-7702 authorization. Policies on
+`eth.eip_7702_authorization` do not apply to raw digest signatures. To restrict them, use
+`activity.params.hash_function`.
 
 ### Solana
 
