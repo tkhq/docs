@@ -54,25 +54,12 @@ Exchanges and custodial payment processors are common examples requiring highly 
 <Steps>
 <Step title="Create deposit addresses on demand">
 
-Turnkey lets you create unlimited wallet accounts at no cost, each with a unique address belonging to the same underlying [wallet](/features/wallets). Create a deposits wallet with both EVM and SVM accounts:
+Turnkey lets you create unlimited wallet accounts at no cost, each with a unique address belonging to the same underlying [wallet](/features/wallets). Create an empty deposits wallet to hold them:
 
 ```ts
 const { walletId } = await turnkeyClient.apiClient().createWallet({
   walletName: "Deposits wallet",
-  accounts: [
-    {
-      curve: "CURVE_SECP256K1",
-      pathFormat: "PATH_FORMAT_BIP32",
-      path: "m/44'/60'/0'/0/0",
-      addressFormat: "ADDRESS_FORMAT_ETHEREUM",
-    },
-    {
-      curve: "CURVE_ED25519",
-      pathFormat: "PATH_FORMAT_BIP32",
-      path: "m/44'/501'/0'/0'",
-      addressFormat: "ADDRESS_FORMAT_SOLANA",
-    },
-  ],
+  accounts: [],
 });
 ```
 
@@ -81,18 +68,35 @@ Then generate fresh deposit addresses on demand:
 ```ts
 async function createDepositAddresses(
   turnkeyClient: Turnkey,
-  walletId: string
+  walletId: string,
+  index: number
 ): Promise<string[]> {
-  const addresses = await turnkeyClient.apiClient().createWalletAccounts({
+  const { addresses } = await turnkeyClient.apiClient().createWalletAccounts({
     walletId,
-    accounts: ["ADDRESS_FORMAT_ETHEREUM", "ADDRESS_FORMAT_SOLANA"],
+    accounts: [
+      {
+        curve: "CURVE_SECP256K1",
+        pathFormat: "PATH_FORMAT_BIP32",
+        path: `m/44'/60'/${index}'/0/0`,
+        addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+      },
+      {
+        curve: "CURVE_ED25519",
+        pathFormat: "PATH_FORMAT_BIP32",
+        path: `m/44'/501'/${index}'/0'`,
+        addressFormat: "ADDRESS_FORMAT_SOLANA",
+      },
+    ],
   });
 
-  return addresses.addresses;
+  return addresses;
 }
 ```
 
 This function can be triggered by end-user signup, a deposit request, or any internal flow.
+Pass an `index` that is unique per user — it's what gives each user a distinct derivation path,
+and therefore a distinct pair of addresses. Keep the user-to-index mapping on your side; a
+monotonic counter is enough.
 
 </Step>
 
@@ -115,7 +119,7 @@ Create policies that restrict deposit wallets to only transfer to the omnibus ad
   "policyName": "(SVM) Deposit wallet sweep to omnibus",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<API_USER_ID>')",
-  "condition": "activity.action == 'SIGN' && wallet.id == '<DEPOSITS_WALLET_ID>' && solana.tx.transfers.count == 1 && solana.tx.transfers[0].to == '<OMNIBUS_ADDRESS>'"
+  "condition": "activity.action == 'SIGN' && wallet.id == '<DEPOSITS_WALLET_ID>' && solana.tx.transfers.count() == 1 && solana.tx.transfers[0].to == '<OMNIBUS_ADDRESS>'"
 }
 ```
 
