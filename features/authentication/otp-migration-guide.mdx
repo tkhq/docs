@@ -76,7 +76,7 @@ signature message also changes from `signup` in V7 to `signupV2` in V8. See
 The updated verification flow is:
 
 1. `INIT_OTP_V3` returns `otpId` and `otpEncryptionTargetBundle`.
-2. The client generates or selects a P-256 key pair.
+2. The client generates or selects a P-256 key pair. Use the hex-encoded compressed public key (33 bytes). `VERIFY_OTP_V2` rejects uncompressed keys.
 3. The client uses `encryptOtpCodeToBundle` to encrypt the OTP code and public key with `otpEncryptionTargetBundle`.
 4. `VERIFY_OTP_V2` accepts the encrypted bundle and returns a verification token bound to the client public key.
 5. The client signs the login or signup payload with the same private key.
@@ -186,7 +186,7 @@ Choose the section below that matches your integration.
     });
     ```
 
-    Replace the plaintext `otpCode` field with a bundle created on the client:
+    Replace the plaintext `otpCode` field with a bundle created on the client. `publicKey` must be the hex-encoded compressed P-256 public key (33 bytes):
 
     ```ts
     import { encryptOtpCodeToBundle } from "@turnkey/crypto";
@@ -375,7 +375,7 @@ to run all three activities in the sub-organization.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `otpId`              | `otpId` in `VERIFY_OTP_V2`.                                                                                                                      |
 | `otpCode`            | Encrypted on the client into `encryptedOtpBundle` in `VERIFY_OTP_V2`. Do not send the plaintext code.                                            |
-| `targetPublicKey`    | The client key pair's public key. Encrypt it into `encryptedOtpBundle`, then send it as `publicKey` in `OTP_LOGIN_V2`. It becomes the session key. |
+| `targetPublicKey`    | The client key pair's public key. Encrypt it into `encryptedOtpBundle`, then send it as `publicKey` in `OTP_LOGIN_V2`. It becomes the session key. You can use a different session key, but the `clientSignature` must still come from the key in `encryptedOtpBundle`. |
 | `apiKeyName`         | No replacement.                                                                                                                                  |
 | `expirationSeconds`  | `expirationSeconds` in `OTP_LOGIN_V2`, which sets the session lifetime. The default is still 15 minutes.                                         |
 | `invalidateExisting` | `invalidateExisting` in `OTP_LOGIN_V2`.                                                                                                          |
