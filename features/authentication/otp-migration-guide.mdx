@@ -357,6 +357,36 @@ To migrate:
    return an encrypted credential. It returns a `session` for the `publicKey`
    that the client supplied.
 
+### Parameter mapping
+
+`INIT_OTP_V3` takes the same parameters as `INIT_OTP_AUTH_V3`. The result
+adds `otpEncryptionTargetBundle`, which the client needs for verification.
+
+The organization changes. `INIT_OTP_AUTH` runs in the user's sub-organization
+and fails if no user in that sub-organization has the contact. `INIT_OTP_V3`
+and `VERIFY_OTP_V2` usually run in the parent organization and do not need an
+existing user. `OTP_LOGIN_V2` runs in the user's sub-organization. See
+[Sub-organization initiated OTP](/features/authentication/email#sub-organization-initiated-otp)
+to run all three activities in the sub-organization.
+
+`OTP_AUTH` parameters move to `VERIFY_OTP_V2` and `OTP_LOGIN_V2`:
+
+| `OTP_AUTH` parameter | Replacement                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `otpId`              | `otpId` in `VERIFY_OTP_V2`.                                                                                                                      |
+| `otpCode`            | Encrypted on the client into `encryptedOtpBundle` in `VERIFY_OTP_V2`. Do not send the plaintext code.                                            |
+| `targetPublicKey`    | The client key pair's public key. Encrypt it into `encryptedOtpBundle`, then send it as `publicKey` in `OTP_LOGIN_V2`. It becomes the session key. |
+| `apiKeyName`         | No replacement.                                                                                                                                  |
+| `expirationSeconds`  | `expirationSeconds` in `OTP_LOGIN_V2`, which sets the session lifetime. The default is still 15 minutes.                                         |
+| `invalidateExisting` | `invalidateExisting` in `OTP_LOGIN_V2`.                                                                                                          |
+
+`VERIFY_OTP_V2` also takes an optional `expirationSeconds` for the
+verification token. `OTP_LOGIN_V2` also requires a `clientSignature` and takes
+an optional `sessionProfileId`.
+
+`OTP_AUTH` returned `userId`, `apiKeyId`, and `credentialBundle`.
+`OTP_LOGIN_V2` returns only `session`.
+
 ## Update policies before deploying
 
 If a policy checks exact activity versions, update it before the new SDKs begin
