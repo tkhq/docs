@@ -137,9 +137,31 @@ and one query:
 | :-- | :-- | :-- |
 | [`Swap status`](/api-reference/queries/get-swap-status) | `POST /public/v1/query/get_swap_status` | Poll the full swap lifecycle. Handles same-chain and cross-chain with a unified response shape. |
 
-<Note>
-  Swap requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). The examples on these pages use cURL and [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`, but generated SDK methods are available: `createSwapQuote`, `executeSwap`, `executeSwapV2`, `getSwapStatus`, `upsertSwapConfig`, and `claimSwapFees`.
-</Note>
+## Who each call acts as
+
+Swap calls divide by the organization the request is authenticated for, not by where it is
+sent from. Fee configuration belongs to your parent organization; quoting and executing belong
+to whoever holds the wallet doing the swap.
+
+| Acts as | Calls |
+| :-- | :-- |
+| **Your parent organization** | `upsert_swap_config`, `claim_swap_fees` |
+| **The organization whose wallet swaps** | `create_swap_quote`, `execute_swap`, `get_swap_status` |
+
+Your parent organization's credentials sign the configuration calls.
+
+The swap itself is signed either by **the end user**, with whatever credential they
+authenticated with — any [authentication method](/features/authentication/overview) works — or
+by **your backend**, with an API key registered in that organization. Scoping that key with a
+policy, so it can do only what you intend, is what
+[delegated access](/features/policies/delegated-access/overview) describes.
+
+Both can be the same organization: one that swaps for its own account sets its own fee
+configuration and signs the swap.
+
+What is fixed is the wallet: a quote is bound to the wallet named in `signWith`, and
+`execute_swap` must be signed by that same wallet, so the two calls are a pair. Quotes are also
+single-use and expire, so quote close to the point of execution.
 
 ## Trust boundary
 
