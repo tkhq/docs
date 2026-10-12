@@ -107,8 +107,32 @@ and nine queries:
 | [Claim fees status](/api-reference/queries/get-earn-claim-fees-status) | `POST /public/v1/query/get_claim_earn_fees_status` | Poll a claim fee until it lands onchain |
 | [Claim rewards status](/api-reference/queries/get-earn-claim-rewards-status) | `POST /public/v1/query/get_earn_claim_rewards_status` | Poll a rewards claim until it lands onchain |
 
+## Who each call acts as
+
+Earn calls divide by the organization the request is authenticated for. Enabling a vault is a
+one-time setup your parent organization performs; depositing and withdrawing belong to whoever
+holds the position.
+
+| Acts as | Calls | Notes |
+| :-- | :-- | :-- |
+| **Your parent organization** | `list_earn_vaults`, `earn_deploy_wrapper`, `get_earn_deploy_status`, `earn_set_wrapper_state`, `claim_earn_fees` | **Enforced.** A sub-organization calling these gets `this endpoint is only callable by a parent organization` |
+| **The organization holding the position** | `list_earn_enabled_vaults`, `list_earn_positions`, `earn_deposit`, `earn_withdraw`, `list_earn_rewards`, `earn_claim_rewards`, and the matching status queries | Usually a sub-organization, whose wallet signs. Wrapper configuration stays on the parent; no per-sub-organization deployment is needed |
+
+Your parent organization's credentials sign the setup calls.
+
+A deposit or withdrawal is signed either by **the end user**, with whatever credential they
+authenticated with — any [authentication method](/features/authentication/overview) works — or
+by **your backend**, with an API key registered in that organization. Scoping that key with a
+policy, so it can do only what you intend, is what
+[delegated access](/features/policies/delegated-access/overview) describes.
+
+Both can be the same organization: one that deposits for its own account deploys the wrapper
+and holds the position.
+
 <Note>
-  Earn requests are stamped and submitted like any other Turnkey request. See [Stamps](/api-reference/overview/stamps) and [Submissions](/api-reference/activities/overview). Full request/response schemas and cURL examples live in the API reference pages linked above. The examples on these pages use cURL and [`@turnkey/http`](https://www.npmjs.com/package/@turnkey/http)'s `TurnkeyClient`, but generated SDK methods are available in [`@turnkey/sdk-server`](https://www.npmjs.com/package/@turnkey/sdk-server): `earnDeployWrapper`, `earnDeposit`, `earnWithdraw`, `earnSetWrapperState`, `claimEarnFees`, `earnClaimRewards`, `listEarnVaults`, `listEarnEnabledVaults`, `listEarnPositions`, `listEarnRewards`, `getEarnClaimRewardsStatus`, and the matching status queries. A runnable end-to-end SDK example lives at [examples/defi/with-earn](https://github.com/tkhq/sdk/tree/main/examples/defi/with-earn).
+  `list_earn_enabled_vaults` is callable by either, but `claimableClientFee` and
+  `clientFeeWallet` are returned **only to the parent organization**. A sub-organization gets a
+  successful response with those fields absent, not an error.
 </Note>
 
 ## Explore
