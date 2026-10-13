@@ -8,9 +8,11 @@ Turnkey's current email and SMS OTP flows encrypt each OTP attempt before it lea
 
 This guide is for integrations that use legacy OTP activities or SDK methods that send `otpCode` in plaintext. New integrations should use the current flow documented in [Email auth & recovery](/features/authentication/email) and [SMS authentication](/features/authentication/sms).
 
+If your integration calls `initOtpAuth` followed by `otpAuth`, start with [Migrating from legacy OTP Auth](#migrating-from-legacy-otp-auth). That flow changes both the activity sequence and how the client receives and uses credentials.
+
 <Warning>
   Migrate each OTP attempt as a unit. Do not start an attempt with a legacy
-  `INIT_OTP` activity and finish it with the updated `VERIFY_OTP_V2` or
+  `INIT_OTP`, `INIT_OTP_V2`, or `INIT_OTP_AUTH*` activity and finish it with the updated `VERIFY_OTP_V2` or
   `OTP_LOGIN_V2` activities. The encryption bundle, verification token, and
   client key belong to the same attempt and are not interchangeable with the
   legacy flow.
@@ -43,6 +45,53 @@ The updated verification flow is:
 6. `OTP_LOGIN_V2` or the sub-organization creation flow validates the verification token and client signature.
 
 See [OTP login flow](/security/enclave-secure-channels#otp-login-flow) for the protocol diagram and security properties.
+
+## Migrating from legacy OTP Auth
+
+This section applies to integrations that call one of the following initialization activities, followed by `ACTIVITY_TYPE_OTP_AUTH`:
+
+- `ACTIVITY_TYPE_INIT_OTP_AUTH`
+- `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`
+- `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`
+
+All four activities are deprecated. Replace the complete flow:
+
+| Legacy flow | Replacement flow |
+| --- | --- |
+| One `INIT_OTP_AUTH` version → `OTP_AUTH` | `INIT_OTP_V3` → `VERIFY_OTP_V2` → `OTP_LOGIN_V2` |
+
+`INIT_OTP_AUTH_V3` is part of the legacy family; it is different from `INIT_OTP_V3`. Upgrading an SDK without replacing calls to `initOtpAuth` and `otpAuth` does not migrate this flow.
+
+### Replace initialization, verification, and login
+
+1. **Update policies before deploying.** Permit the three replacement activities for the API user that submits them, preserving existing user and organization restrictions. See [Update policies before deploying](#update-policies-before-deploying).
+2. **Replace `initOtpAuth` with `initOtp`.** Submit `ACTIVITY_TYPE_INIT_OTP_V3` with the contact, `otpType` (`OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`), and required `appName`. Keep both `otpId` and `otpEncryptionTargetBundle` from the response and pass them to the client. Review your email/SMS customization parameters against the new activity rather than copying the legacy request unchanged.
+3. **Encrypt the code on the client.** Generate or select a client-held P-256 signing key pair. Use `encryptOtpCodeToBundle(otpCode, otpEncryptionTargetBundle, publicKey)` to encrypt the code and public key before sending anything to your backend. The private key stays on the client.
+4. **Verify with `VERIFY_OTP_V2`.** Submit `otpId` and `encryptedOtpBundle` to `verifyOtp`, using the same organization ID as initialization. Retain the returned `verificationToken`; it is bound to the client key used in the encrypted bundle.
+5. **Replace `otpAuth` with `otpLogin`.** For an existing user, submit `ACTIVITY_TYPE_OTP_LOGIN_V2` to that user's sub-organization with `verificationToken`, the session `publicKey`, and `clientSignature`. Use the verification-bound client key to sign the token ID and session public key. The current SDK helpers construct this message; do not sign an arbitrary JSON representation of the token.
+6. **Store and use the session.** Use the returned `session` with the matching client-held signing key, following your SDK's session handling. Remove the legacy credential-bundle decryption and import step. See [Credential handling changes](#credential-handling-changes).
+
+For the common parent-backend integration, initialize and verify under the parent organization, then log in to the existing user's sub-organization. Keep the parent API key on the backend. If you already use sub-organization credentials to submit OTP activities, keep that sub-organization ID throughout; see [Sub-organization initiated OTP](/features/authentication/email#sub-organization-initiated-otp).
+
+The [SDK examples below](#upgrade-the-sdks) show the encrypted bundle and client signature inputs. The [`otp-auth/with-backend` example](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend) shows client-side key creation, `getClientSignatureMessageForLogin`, signing, and session storage. Its name refers to OTP authentication generally; the example uses the replacement flow.
+
+<Warning>
+  An OTP ID issued by `INIT_OTP_AUTH*` cannot be used with `VERIFY_OTP_V2`.
+  Start a fresh attempt with `INIT_OTP_V3` when switching flows. On resend,
+  replace the OTP ID and encryption bundle together.
+</Warning>
+
+### Credential handling changes
+
+| Legacy `OTP_AUTH` | Replacement `OTP_LOGIN_V2` |
+| --- | --- |
+| Takes `otpCode` and a `targetPublicKey` used to encrypt a generated credential. | Takes a `verificationToken`, session `publicKey`, and `clientSignature` after encrypted OTP verification. |
+| Returns `userId`, `apiKeyId`, and `credentialBundle`. The client decrypts the bundle to obtain its signing credential. | Returns `session`, a session JWT. The client keeps the signing private key it generated; the JWT does not contain a replacement private key. |
+| `expirationSeconds` sets the generated OTP Auth API key's lifetime. | `expirationSeconds` on login sets the session lifetime. Initialization and verification have separate expiration settings for the OTP and verification token. |
+| `invalidateExisting` invalidates previous OTP Auth API keys. | `invalidateExisting` invalidates previous Login sessions. Do not rely on it to revoke legacy OTP Auth API keys. |
+| Accepts an optional `apiKeyName`. | Has no `apiKeyName` parameter. |
+
+Allow legacy OTP Auth credentials to expire, or revoke them separately if your application requires an immediate cutoff. Test session expiration and invalidation during the migration, including any policies that depend on the authentication method or credential type. A successful login alone does not establish that every subsequent wallet operation has the permissions your application expects.
 
 ## Upgrade the SDKs
 
@@ -187,7 +236,23 @@ If a policy checks exact activity versions, update it before the new SDKs begin 
 - `ACTIVITY_TYPE_INIT_OTP` or `ACTIVITY_TYPE_INIT_OTP_V2`
 - `ACTIVITY_TYPE_VERIFY_OTP`
 - `ACTIVITY_TYPE_OTP_LOGIN`
+- `ACTIVITY_TYPE_INIT_OTP_AUTH`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`, or `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`
+- `ACTIVITY_TYPE_OTP_AUTH`
 - `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V7`
+
+For the legacy OTP Auth migration, add permission for `ACTIVITY_TYPE_INIT_OTP_V3`, `ACTIVITY_TYPE_VERIFY_OTP_V2`, and `ACTIVITY_TYPE_OTP_LOGIN_V2`. This changes activity kinds as well as versions: a condition permitting `INIT_OTP_AUTH` or `OTP_AUTH` will not match `INIT_OTP`, `VERIFY_OTP`, or `OTP_LOGIN`.
+
+For a backend API user performing existing-user login, the following example permits only the three replacement activity versions. Replace the user ID and preserve any additional restrictions from your existing policies:
+
+```json
+{
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
+  "condition": "activity.type in ['ACTIVITY_TYPE_INIT_OTP_V3', 'ACTIVITY_TYPE_VERIFY_OTP_V2', 'ACTIVITY_TYPE_OTP_LOGIN_V2']"
+}
+```
+
+This example does not grant signup permission. Add sub-organization creation permissions only if your integration also supports signup.
 
 During a staged rollout, exact-type policies must allow both legacy and updated versions until all clients and servers use the new flow. This does not make the activity versions interchangeable within an OTP attempt. Prefer `activity.kind` when the same policy should cover every version of a specific activity:
 
@@ -214,6 +279,8 @@ During a staged rollout, exact-type policies must allow both legacy and updated 
 - Test email and SMS separately if your application supports both.
 - Test both an existing-user login and a new-user signup.
 - Confirm that OTP codes are sent to your backend only as `encryptedOtpBundle`.
+- For legacy OTP Auth integrations, confirm there are no remaining `initOtpAuth` or `otpAuth` callers, and that clients use sessions instead of decrypting `credentialBundle` responses.
+- Test session expiration, invalidation, and a wallet operation with the new session. Account for any legacy OTP Auth credentials that have not yet expired or been revoked.
 - After all clients have migrated, remove legacy activity versions from exact-version policies.
 
 For the complete set of SDK breaking changes shipped with this migration, see [tkhq/sdk#1250](https://github.com/tkhq/sdk/pull/1250).
