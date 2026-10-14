@@ -65,11 +65,11 @@ All four activities are deprecated. Replace the complete flow:
 ### Replace initialization, verification, and login
 
 1. **Update policies before deploying.** Permit the three replacement activities for the API user that submits them, preserving existing user and organization restrictions. See [Update policies before deploying](#update-policies-before-deploying).
-2. **Replace `initOtpAuth` with `initOtp`.** Submit `ACTIVITY_TYPE_INIT_OTP_V3` with the contact, `otpType` (`OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`), and required `appName`. Keep both `otpId` and `otpEncryptionTargetBundle` from the response and pass them to the client. Review your email/SMS customization parameters against the new activity rather than copying the legacy request unchanged.
+2. **Replace `initOtpAuth` with `initOtp`.** Submit `ACTIVITY_TYPE_INIT_OTP_V3` with the contact, `otpType` (`OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`), and required `appName`. Keep both `otpId` and `otpEncryptionTargetBundle` from the response and pass them to the client. If you use `INIT_OTP_AUTH` or `INIT_OTP_AUTH_V2`, move `appName` out of `emailCustomization` into the top-level `appName` field: `INIT_OTP_V3` requires it, and its `emailCustomization` no longer accepts `appName`. See [Breaking change: `appName` required](/features/authentication/email#breaking-change-appname-required). Review your other email/SMS customization parameters against the new activity rather than copying the legacy request unchanged.
 3. **Encrypt the code on the client.** Generate or select a client-held P-256 signing key pair. Use `encryptOtpCodeToBundle(otpCode, otpEncryptionTargetBundle, publicKey)` to encrypt the code and public key before sending anything to your backend. The private key stays on the client.
 4. **Verify with `VERIFY_OTP_V2`.** Submit `otpId` and `encryptedOtpBundle` to `verifyOtp`, using the same organization ID as initialization. Retain the returned `verificationToken`; it is bound to the client key used in the encrypted bundle.
 5. **Replace `otpAuth` with `otpLogin`.** For an existing user, submit `ACTIVITY_TYPE_OTP_LOGIN_V2` to that user's sub-organization with `verificationToken`, the session `publicKey`, and `clientSignature`. Use the verification-bound client key to sign the token ID and session public key. The current SDK helpers construct this message; do not sign an arbitrary JSON representation of the token.
-6. **Store and use the session.** Use the returned `session` with the matching client-held signing key, following your SDK's session handling. Remove the legacy credential-bundle decryption and import step. See [Credential handling changes](#credential-handling-changes).
+6. **Store and use the session.** Use the returned `session` with the private key matching the session `publicKey` you passed to `OTP_LOGIN_V2`, following your SDK's session handling. Remove the legacy credential-bundle decryption and import step. See [Credential handling changes](#credential-handling-changes).
 
 For the common parent-backend integration, initialize and verify under the parent organization, then log in to the existing user's sub-organization. Keep the parent API key on the backend. If you already use sub-organization credentials to submit OTP activities, keep that sub-organization ID throughout; see [Sub-organization initiated OTP](/features/authentication/email#sub-organization-initiated-otp).
 
@@ -86,9 +86,9 @@ The [SDK examples below](#upgrade-the-sdks) show the encrypted bundle and client
 | Legacy `OTP_AUTH` | Replacement `OTP_LOGIN_V2` |
 | --- | --- |
 | Takes `otpCode` and a `targetPublicKey` used to encrypt a generated credential. | Takes a `verificationToken`, session `publicKey`, and `clientSignature` after encrypted OTP verification. |
-| Returns `userId`, `apiKeyId`, and `credentialBundle`. The client decrypts the bundle to obtain its signing credential. | Returns `session`, a session JWT. The client keeps the signing private key it generated; the JWT does not contain a replacement private key. |
+| Returns `userId`, `apiKeyId`, and `credentialBundle`. The client decrypts the bundle to obtain its signing credential. | Returns `session`, a session JWT. The client keeps the signing private key it generated; the JWT does not contain a replacement private key. If you used `userId` from the `OTP_AUTH` result, read it from the session JWT's `user_id` claim. |
 | `expirationSeconds` sets the generated OTP Auth API key's lifetime. | `expirationSeconds` on login sets the session lifetime. Initialization and verification have separate expiration settings for the OTP and verification token. |
-| `invalidateExisting` invalidates previous OTP Auth API keys. | `invalidateExisting` invalidates previous Login sessions. Do not rely on it to revoke legacy OTP Auth API keys. |
+| `invalidateExisting` invalidates previous OTP Auth API keys. | `invalidateExisting` invalidates all of the user's existing login sessions, including sessions created through OAuth or passkey login, not only OTP sessions. It does not revoke legacy OTP Auth API keys. |
 | Accepts an optional `apiKeyName`. | Has no `apiKeyName` parameter. |
 
 Allow legacy OTP Auth credentials to expire, or revoke them separately if your application requires an immediate cutoff. Test session expiration and invalidation during the migration, including any policies that depend on the authentication method or credential type. A successful login alone does not establish that every subsequent wallet operation has the permissions your application expects.
@@ -263,6 +263,8 @@ During a staged rollout, exact-type policies must allow both legacy and updated 
   "condition": "activity.kind in ['INIT_OTP', 'VERIFY_OTP', 'OTP_LOGIN', 'CREATE_SUB_ORGANIZATION']"
 }
 ```
+
+If you are migrating from legacy OTP Auth, also include `INIT_OTP_AUTH` and `OTP_AUTH` in the `activity.kind` list until every client uses the replacement flow. Otherwise clients still on the legacy flow will be denied.
 
 <Note>
   `CREATE_SUB_ORGANIZATION` covers every version of sub-organization creation,
