@@ -1,0 +1,50 @@
+---
+title: "Swaps in Dashboard"
+sidebarTitle: "Swaps in Dashboard"
+mode: "wide"
+---
+
+You can swap tokens from any wallet account in the [Turnkey Dashboard](https://app.turnkey.com). Dashboard swaps use the same [quote](/features/transaction-management/swap/get-swap-quote) and [execute](/features/transaction-management/swap/execute-swap) activities as the API, so they are recorded in your activity log and governed by your policies.
+
+<Note>
+  Swaps are available on Pay As You Go, Pro, and Enterprise plans. Gas sponsorship is available on Enterprise plans. If you'd like to use gas sponsorship, please [reach out](https://www.turnkey.com/contact-us).
+</Note>
+
+## Requirements
+
+**The Dashboard only supports swaps you can quote and execute on your own.** If either step needs approval from another user, you will see an error. This happens when:
+
+- You are a root user and your [root quorum](/features/users/root-quorum) threshold is greater than 1.
+- The policy that allows you to swap requires additional approvals.
+
+In either case, add the sample policy below. **Support for swaps that require consensus is coming soon.** The attempted activity is still created and will remain pending, so clear the activity afterward by clicking **Deny** in the **Activities** section.
+
+## Sample policy
+
+This policy allows one user to get swap quotes and execute swaps without additional approvals. Replace `<USER_ID>` with the ID of that user, found on the **Users** page.
+
+```json
+{
+  "policyName": "Allow <USER_NAME> to quote and execute swaps",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind == 'CREATE_SWAP_QUOTE' || activity.kind == 'EXECUTE_SWAP'"
+}
+```
+
+The policy also applies to root users: it lets a single root user swap without the rest of the root quorum. See [Using root users with policies](/features/users/root-quorum#using-root-users-with-policies).
+
+Creating the policy is itself an activity, so it needs your organization's usual approvals (for example, both root users in a 2/2 root quorum). Deny policies still take precedence over it.
+
+To allow swaps only from a specific wallet, add a `wallet.id` condition:
+
+```json
+{
+  "policyName": "Allow <USER_NAME> to swap from <WALLET_NAME>",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "(activity.kind == 'CREATE_SWAP_QUOTE' || activity.kind == 'EXECUTE_SWAP') && wallet.id == '<WALLET_ID>'"
+}
+```
+
+For more controls, such as allowlisting output tokens or capping slippage, see [Swaps and Earn policy examples](/features/policies/examples/swaps-earn).
