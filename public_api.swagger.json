@@ -883,6 +883,32 @@
         "tags": ["Policies"]
       }
     },
+    "/public/v1/query/get_swap_sponsorship_usage": {
+      "post": {
+        "summary": "Get swap sponsorship usage",
+        "description": "Read each swap sponsorship feature's spending window and settled spending in the current rolling window. Parents see aggregate spending; children see their own spending. Pending swaps are not reserved.",
+        "operationId": "GetSwapSponsorshipUsage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetSwapSponsorshipUsageResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetSwapSponsorshipUsageRequest"
+            }
+          }
+        ],
+        "tags": ["Swaps"]
+      }
+    },
     "/public/v1/query/get_swap_status": {
       "post": {
         "summary": "Get Swap status",
@@ -4861,6 +4887,58 @@
         "tags": ["Swaps"]
       }
     },
+    "/public/v1/submit/upsert_swap_fee_sponsorship_limit_config": {
+      "post": {
+        "summary": "Upsert swap fee sponsorship limits",
+        "description": "Replace this feature's spending window. Requires the billing parent's signed permission and activity authorization.",
+        "operationId": "UpsertSwapFeeSponsorshipLimitConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpsertSwapFeeSponsorshipLimitConfigRequest"
+            }
+          }
+        ],
+        "tags": ["Swaps"]
+      }
+    },
+    "/public/v1/submit/upsert_swap_fixed_rate_limit_config": {
+      "post": {
+        "summary": "Upsert swap fixed rate limits",
+        "description": "Replace this feature's spending window. Requires the billing parent's signed permission and activity authorization.",
+        "operationId": "UpsertSwapFixedRateLimitConfig",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ActivityResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpsertSwapFixedRateLimitConfigRequest"
+            }
+          }
+        ],
+        "tags": ["Swaps"]
+      }
+    },
     "/public/v1/submit/verify_otp": {
       "post": {
         "summary": "Verify generic OTP",
@@ -5278,13 +5356,15 @@
         "ACTIVITY_TYPE_IMPORT_SECRETS",
         "ACTIVITY_TYPE_EXPORT_SECRETS",
         "ACTIVITY_TYPE_CREATE_VELOCITY_CONTROL",
-        "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROL",
+        "ACTIVITY_TYPE_DELETE_VELOCITY_CONTROLS",
         "ACTIVITY_TYPE_UPDATE_PAYMENT_METHOD",
         "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
         "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
         "ACTIVITY_TYPE_DELETE_SECRETS",
         "ACTIVITY_TYPE_EARN_CLAIM_REWARDS",
-        "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3"
+        "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
+        "ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG",
+        "ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG"
       ]
     },
     "AddressFormat": {
@@ -9608,23 +9688,31 @@
       },
       "required": ["userIds"]
     },
-    "DeleteVelocityControlIntent": {
+    "DeleteVelocityControlsIntent": {
       "type": "object",
       "properties": {
-        "velocityControlId": {
-          "type": "string"
+        "velocityControlIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of unique identifiers for Velocity Controls within an Organization."
         }
       },
-      "required": ["velocityControlId"]
+      "required": ["velocityControlIds"]
     },
-    "DeleteVelocityControlResult": {
+    "DeleteVelocityControlsResult": {
       "type": "object",
       "properties": {
-        "velocityControlId": {
-          "type": "string"
+        "velocityControlIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A list of unique identifiers for the deleted Velocity Controls."
         }
       },
-      "required": ["velocityControlId"]
+      "required": ["velocityControlIds"]
     },
     "DeleteWalletAccountsIntent": {
       "type": "object",
@@ -9912,7 +10000,11 @@
             "eip155:42161",
             "eip155:137",
             "eip155:56",
-            "eip155:4217"
+            "eip155:4217",
+            "solana:mainnet",
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+            "solana:devnet",
+            "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
           "description": "CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base)."
         },
@@ -9993,7 +10085,11 @@
             "eip155:42161",
             "eip155:137",
             "eip155:56",
-            "eip155:4217"
+            "eip155:4217",
+            "solana:mainnet",
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+            "solana:devnet",
+            "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
           "description": "CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base)."
         },
@@ -10215,7 +10311,11 @@
     },
     "EarnProvider": {
       "type": "string",
-      "enum": ["EARN_PROVIDER_MORPHO", "EARN_PROVIDER_AAVE"]
+      "enum": [
+        "EARN_PROVIDER_MORPHO",
+        "EARN_PROVIDER_AAVE",
+        "EARN_PROVIDER_KAMINO"
+      ]
     },
     "EarnReward": {
       "type": "object",
@@ -10460,7 +10560,11 @@
             "eip155:42161",
             "eip155:137",
             "eip155:56",
-            "eip155:4217"
+            "eip155:4217",
+            "solana:mainnet",
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+            "solana:devnet",
+            "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
           ],
           "description": "CAIP-2 chain ID the vault lives on (e.g., 'eip155:8453' for Base)."
         },
@@ -13001,6 +13105,27 @@
       },
       "required": ["organizationIds"]
     },
+    "GetSwapSponsorshipUsageRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        }
+      },
+      "required": ["organizationId"]
+    },
+    "GetSwapSponsorshipUsageResponse": {
+      "type": "object",
+      "properties": {
+        "feeSponsorship": {
+          "$ref": "#/definitions/SwapSponsorshipFeature"
+        },
+        "fixedRate": {
+          "$ref": "#/definitions/SwapSponsorshipFeature"
+        }
+      },
+      "required": ["feeSponsorship", "fixedRate"]
+    },
     "GetSwapStatusRequest": {
       "type": "object",
       "properties": {
@@ -15158,8 +15283,8 @@
         "createVelocityControlIntent": {
           "$ref": "#/definitions/CreateVelocityControlIntent"
         },
-        "deleteVelocityControlIntent": {
-          "$ref": "#/definitions/DeleteVelocityControlIntent"
+        "deleteVelocityControlsIntent": {
+          "$ref": "#/definitions/DeleteVelocityControlsIntent"
         },
         "updatePaymentMethodIntent": {
           "$ref": "#/definitions/UpdatePaymentMethodIntent"
@@ -15178,6 +15303,12 @@
         },
         "createSwapQuoteIntentV3": {
           "$ref": "#/definitions/CreateSwapQuoteIntentV3"
+        },
+        "upsertSwapFeeSponsorshipLimitConfigIntent": {
+          "$ref": "#/definitions/UpsertSwapFeeSponsorshipLimitConfigIntent"
+        },
+        "upsertSwapFixedRateLimitConfigIntent": {
+          "$ref": "#/definitions/UpsertSwapFixedRateLimitConfigIntent"
         }
       }
     },
@@ -17531,8 +17662,8 @@
         "createVelocityControlResult": {
           "$ref": "#/definitions/CreateVelocityControlResult"
         },
-        "deleteVelocityControlResult": {
-          "$ref": "#/definitions/DeleteVelocityControlResult"
+        "deleteVelocityControlsResult": {
+          "$ref": "#/definitions/DeleteVelocityControlsResult"
         },
         "updatePaymentMethodResult": {
           "$ref": "#/definitions/UpdatePaymentMethodResult"
@@ -17545,6 +17676,12 @@
         },
         "createSwapQuoteResultV2": {
           "$ref": "#/definitions/CreateSwapQuoteResultV2"
+        },
+        "upsertSwapFeeSponsorshipLimitConfigResult": {
+          "$ref": "#/definitions/UpsertSwapFeeSponsorshipLimitConfigResult"
+        },
+        "upsertSwapFixedRateLimitConfigResult": {
+          "$ref": "#/definitions/UpsertSwapFixedRateLimitConfigResult"
         }
       }
     },
@@ -19423,6 +19560,56 @@
       },
       "required": ["asset", "amount"]
     },
+    "SwapSpendingWindow": {
+      "type": "object",
+      "properties": {
+        "windowDurationMinutes": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "windowLimitUsd": {
+          "type": "string",
+          "description": "The parent's window limit, or the per-child limit when queried by a sub-organization."
+        },
+        "usageUsd": {
+          "type": "string",
+          "description": "Settled spending in the current window. Fixed-rate usage stays zero until final fixed-rate costs are recorded."
+        },
+        "remainingUsd": {
+          "type": "string",
+          "description": "Remaining spending capacity, clamped to zero. For children, also capped by remaining parent capacity. Zero when the window is disabled. This is not a reservation or a guarantee of feature eligibility."
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "subOrgWindowLimitUsd": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Configured per-child limit. Returned only when querying the billing parent."
+        }
+      },
+      "required": [
+        "windowDurationMinutes",
+        "windowLimitUsd",
+        "usageUsd",
+        "remainingUsd",
+        "enabled"
+      ]
+    },
+    "SwapSponsorshipFeature": {
+      "type": "object",
+      "properties": {
+        "permitted": {
+          "type": "boolean",
+          "description": "Whether the billing parent holds this feature's signed permission. Quotes can use the feature only when it is permitted and its window is enabled."
+        },
+        "window": {
+          "$ref": "#/definitions/SwapSpendingWindow",
+          "description": "Absent until the billing parent saves a spending window."
+        }
+      },
+      "required": ["permitted"]
+    },
     "TagType": {
       "type": "string",
       "enum": ["TAG_TYPE_USER", "TAG_TYPE_PRIVATE_KEY"]
@@ -21275,6 +21462,122 @@
           "x-nullable": true
         }
       }
+    },
+    "UpsertSwapFeeSponsorshipLimitConfigIntent": {
+      "type": "object",
+      "properties": {
+        "orgWindowLimitUsd": {
+          "type": "string",
+          "description": "Positive USD limit shared by the billing parent and its sub-organizations. At most 18 integer and 12 fractional digits."
+        },
+        "subOrgWindowLimitUsd": {
+          "type": "string",
+          "description": "Positive USD limit for each sub-organization, no greater than the parent limit."
+        },
+        "windowDurationMinutes": {
+          "type": "string",
+          "description": "Positive rolling window duration in minutes, at most 153722867."
+        },
+        "enabled": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether this spending window permits new swaps. Setting false only turns the saved window off and keeps its limits; it doesn't require the signed permission. This does not grant or remove the signed organization permission."
+        }
+      },
+      "required": [
+        "orgWindowLimitUsd",
+        "subOrgWindowLimitUsd",
+        "windowDurationMinutes",
+        "enabled"
+      ]
+    },
+    "UpsertSwapFeeSponsorshipLimitConfigRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/UpsertSwapFeeSponsorshipLimitConfigIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "UpsertSwapFeeSponsorshipLimitConfigResult": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        }
+      },
+      "required": ["organizationId"]
+    },
+    "UpsertSwapFixedRateLimitConfigIntent": {
+      "type": "object",
+      "properties": {
+        "orgWindowLimitUsd": {
+          "type": "string",
+          "description": "Positive USD limit shared by the billing parent and its sub-organizations. At most 18 integer and 12 fractional digits."
+        },
+        "subOrgWindowLimitUsd": {
+          "type": "string",
+          "description": "Positive USD limit for each sub-organization, no greater than the parent limit."
+        },
+        "windowDurationMinutes": {
+          "type": "string",
+          "description": "Positive rolling window duration in minutes, at most 153722867."
+        },
+        "enabled": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Whether this spending window permits new swaps. Setting false only turns the saved window off and keeps its limits; it doesn't require the signed permission. This does not grant or remove the signed organization permission."
+        }
+      },
+      "required": [
+        "orgWindowLimitUsd",
+        "subOrgWindowLimitUsd",
+        "windowDurationMinutes",
+        "enabled"
+      ]
+    },
+    "UpsertSwapFixedRateLimitConfigRequest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG"]
+        },
+        "timestampMs": {
+          "type": "string",
+          "description": "Timestamp (in milliseconds) of the request, used to verify liveness of user requests."
+        },
+        "organizationId": {
+          "type": "string",
+          "description": "Unique identifier for a given Organization."
+        },
+        "parameters": {
+          "$ref": "#/definitions/UpsertSwapFixedRateLimitConfigIntent"
+        }
+      },
+      "required": ["type", "timestampMs", "organizationId", "parameters"]
+    },
+    "UpsertSwapFixedRateLimitConfigResult": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        }
+      },
+      "required": ["organizationId"]
     },
     "UsageType": {
       "type": "string",
