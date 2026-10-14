@@ -60,6 +60,8 @@ Each field supports a different set of keywords.
 | **wallets**                    | list\<[Wallet](#struct-wallet)\>       | The target wallets associated with requests involving with multiple wallets |
 | **private_key**                | [PrivateKey](#struct-private-key)           | The target private key used in sign + export requests                       |
 | **wallet_account**             | [WalletAccount](#struct-wallet-account)        | The target wallet account used in sign + export requests                    |
+| **secret**                     | [Secret](#struct-secret)               | The secret currently being evaluated in export secrets requests (see [Secrets](#secrets) below) |
+| **request_context**            | map\<[string](#type-string), [string](#type-string)\> | The request context bound to the secret currently being evaluated in export secrets requests (see [Secrets](#secrets) below) |
 
 ### Time
 
@@ -120,6 +122,8 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | imported                 | [bool](#type-bool)                                      | Boolean indicating whether or not this private key has been imported                                                                                                                                                                                                                                                                                                 |
 |                          | exported                 | [bool](#type-bool)                                      | Boolean indicating whether or not this private key has been exported                                                                                                                                                                                                                                                                                                 |
 |                          | label                    | [string](#type-string)                                    | The label of this private key                                                                                                                                                                                                                                                                                                                                        |
+| <a id="struct-secret" href="#struct-secret">**Secret**</a> | id                       | [string](#type-string)                    | The identifier of the secret |
+|                          | static_properties        | map\<[string](#type-string), [string](#type-string)\> | The static properties bound to the secret at import. Access via `secret.static_properties['key']` |
 | <a id="struct-ethereum-transaction" href="#struct-ethereum-transaction">**EthereumTransaction**</a>  | from                     | [string](#type-string)                                    | The sender address of the transaction                                                                                                                                                                                                                                                                                                                                |
 |                          | to                       | [string](#type-string)                                    | The receiver address of the transaction (can be an EOA or smart contract)                                                                                                                                                                                                                                                                                            |
 |                          | data                     | [string](#type-string)                                    | The arbitrary calldata of the transaction (hex-encoded). Prefer `function_name` / `contract_call_args` when an ABI is available — see [Smart Contract Interfaces](/features/policies/smart-contract-interfaces).                                                                                                                                                     |
@@ -968,5 +972,24 @@ You can also govern Tempo transactions at the activity level using
 wallets, private keys, or consensus rules.
 
 See the [Tempo policy examples](/features/policies/examples/tempo) for sample scenarios.
+
+### Secrets
+
+Export secrets requests expose two keywords: `secret`, the secret being evaluated, and `request_context`,
+the string key-value pairs the request binds to that secret. Each secret in a batch is evaluated
+separately, and [batch export is all-or-nothing](/features/secrets#how-it-works). Read both by key and
+compare them with strings:
+
+```json
+{
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS' && secret.static_properties['kind'] == 'creditCard' && request_context['domain'] == secret.static_properties['domain']"
+}
+```
+
+- Reading a key the request does not carry is an evaluation error. An erroring `EFFECT_ALLOW` policy does not allow, and an erroring `EFFECT_DENY` policy does not deny, so a deny policy on `request_context` can be skipped by omitting the key. Prefer allow policies when gating on request context.
+- An export that repeats a key within one secret's request context is rejected before policy evaluation.
+
+See [Secret storage](/features/secrets#request-context) for how request context is set and signed, and the [key management solutions](/solutions/key-management/overview) for more policies.
 
 </div>

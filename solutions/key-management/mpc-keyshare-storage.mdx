@@ -40,18 +40,34 @@ const secretId = await turnkey.apiClient().importSecret({
 });
 ```
 
-Gate export on those properties. For example, require two recovery operators to approve before any production keyshare is released:
+Gate export on those properties, and on the [request context](/features/secrets#request-context) the export carries. For example, require two recovery operators to approve, and an incident reference bound into the request, before any production keyshare is released:
 
 ```json
 {
   "policyName": "Production MPC keyshares require two recovery operators",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.filter(u, u.tags.contains('<RECOVERY_OPERATOR_TAG_ID>')).count() >= 2",
-  "condition": "secret.static_properties['kind'] == 'mpcKeyshare' && secret.static_properties['environment'] == 'production' && activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS'"
+  "condition": "secret.static_properties['kind'] == 'mpcKeyshare' && secret.static_properties['environment'] == 'production' && activity.type == 'ACTIVITY_TYPE_EXPORT_SECRETS' && request_context['incident'] != ''"
 }
 ```
 
+Both recovery operators see and sign the incident reference with their approvals, which ties every keyshare release to a recorded recovery event.
+
 At recovery time, the designated recovery participant retrieves the bundle with `exportSecret`, which generates the ephemeral keypair internally and returns the plaintext in one call. When the export requires additional approvals, use the proposal helpers described in [Programmable credential access](/solutions/key-management/programmable-credential-access) instead: the participant generates its own keypair and holds the private half across the approval window. Only that participant can decrypt the released bundle, which then re-enters your MPC provider's own recovery procedure.
+
+The participant binds the incident reference into the proposal that the recovery operators approve:
+
+```typescript
+import { generateP256KeyPair } from "@turnkey/crypto";
+
+const { privateKey, publicKeyUncompressed } = generateP256KeyPair();
+
+const proposal = recoveryParticipant.createExportSecretsProposal({
+  secrets: [{ secretId, requestContext: { incident: "INC-2291" } }],
+  targetPublicKey: publicKeyUncompressed,
+  timestampMs: String(Date.now()),
+});
+```
 
 ## Next steps
 
