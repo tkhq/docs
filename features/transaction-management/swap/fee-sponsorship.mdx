@@ -1,0 +1,159 @@
+---
+title: "Fee Sponsorship"
+description: "Pay the swap provider's fees on behalf of your users, capped by a spending window you set."
+tag: "Early access"
+mode: "wide"
+---
+
+import { SwapEarlyAccessCallout } from "/snippets/swap-early-access-callout.mdx";
+
+<SwapEarlyAccessCallout />
+
+With fee sponsorship, your organization pays the swap provider's fees (execution, swap, and platform fees), so the wallet keeps more of the output. Your own client fee is not sponsored. Sponsored fees are billed to your organization.
+
+Fee sponsorship is turned on, and capped, by a **spending window**: a USD limit over a rolling period that the parent organization sets. Quotes then request it individually.
+
+**Prerequisites:**
+
+- Your parent organization is enabled for early access, and is on Pay As You Go, Pro, or Enterprise.
+- Only the parent organization can change the spending window. Sub-organizations use their parent's settings.
+
+## Turn it on
+
+Submit `ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG` to `/public/v1/submit/upsert_swap_fee_sponsorship_limit_config` from the parent organization.
+
+<ParamField body="parameters.orgWindowLimitUsd" type="string" required>
+  The USD limit for the window, shared by the parent organization and all of its sub-organizations, e.g. `"1000"`. Up to 18 integer and 12 fractional digits.
+</ParamField>
+
+<ParamField body="parameters.subOrgWindowLimitUsd" type="string" required>
+  The USD limit for each sub-organization, no greater than `orgWindowLimitUsd`.
+</ParamField>
+
+<ParamField body="parameters.windowDurationMinutes" type="string" required>
+  The rolling window length in minutes, e.g. `"1440"` for one day.
+</ParamField>
+
+<ParamField body="parameters.enabled" type="boolean" required>
+  `true` turns fee sponsorship on. `false` turns it off and keeps the saved limits.
+</ParamField>
+
+Turning fee sponsorship on or off changes your organization's signed configuration, so it needs root quorum approval, like any other organization feature change. Changing the limits while it's on follows your policies.
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/upsert_swap_fee_sponsorship_limit_config \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<PARENT_ORGANIZATION_ID>",
+    "parameters": {
+      "orgWindowLimitUsd": "1000",
+      "subOrgWindowLimitUsd": "100",
+      "windowDurationMinutes": "1440",
+      "enabled": true
+    }
+  }'
+```
+
+With the Go SDK, use `Client.UpsertSwapFeeSponsorshipLimitConfig`.
+
+## Request a sponsored quote
+
+Submit `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`. It uses the same route and parameters as [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote), plus:
+
+<ParamField body="parameters.feeSponsorship" type="boolean">
+  Optional, defaults to `false`. When `true`, your organization pays the provider's fees for this swap.
+</ParamField>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/create_swap_quote \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<ORGANIZATION_ID>",
+    "parameters": {
+      "signWith": "<WALLET_ACCOUNT_ADDRESS>",
+      "inputToken": "eip155:8453/slip44:60",
+      "outputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "inputAmount": "1000000000000000",
+      "feeSponsorship": true
+    }
+  }'
+```
+
+With the Go SDK, use `Client.CreateSwapQuoteV3`. The TypeScript SDK's `createSwapQuote` sends V2; until it adds V3, submit the activity with a stamped request as above.
+
+The result is in `activity.result.createSwapQuoteResultV2.quotes`. Each quote has the V2 fields plus `feeSponsorship`, which is `true` when the quote is sponsored. A sponsored quote's `outputAmount` and `minOutputAmount` are no longer reduced by the provider's fees. Your client fee, if configured, still applies and is reflected in both.
+
+To also swap stablecoins at a fixed rate, set `fixedRate` too. See [Fixed Rate](/features/transaction-management/swap/fixed-rate).
+
+## Execute the quote
+
+Submit `ACTIVITY_TYPE_EXECUTE_SWAP_V3` with the quote's `quoteId`, amounts, and `minOutputAmount`, as for any quote. The quote binds the sponsorship, so nothing else changes. See [Execute a Swap](/features/transaction-management/swap/execute-swap).
+
+Fee sponsorship and gas sponsorship are separate. Fee sponsorship covers the provider's fees and is set on the quote. Gas sponsorship covers the origin-chain transaction's gas and is set with `sponsor: true` on execute.
+
+## Check usage
+
+`POST /public/v1/query/get_swap_sponsorship_usage` returns the state of fee sponsorship and fixed rate, and what is left in each window.
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_swap_sponsorship_usage \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{ "organizationId": "<ORGANIZATION_ID>" }'
+```
+
+```json title="Response"
+{
+  "feeSponsorship": {
+    "permitted": true,
+    "window": {
+      "enabled": true,
+      "windowDurationMinutes": 1440,
+      "windowLimitUsd": "1000",
+      "subOrgWindowLimitUsd": "100",
+      "usageUsd": "12.48",
+      "remainingUsd": "987.52"
+    }
+  },
+  "fixedRate": {
+    "permitted": true,
+    "window": {
+      "enabled": true,
+      "windowDurationMinutes": 1440,
+      "windowLimitUsd": "500",
+      "subOrgWindowLimitUsd": "50",
+      "usageUsd": "0",
+      "remainingUsd": "500"
+    }
+  }
+}
+```
+
+- `permitted`: the feature is on for the parent organization. Quotes can use it only when it is permitted and its window is enabled.
+- `window`: absent until the parent saves a spending window.
+- `windowLimitUsd`: the parent limit, or the per-sub-organization limit when a sub-organization queries.
+- `subOrgWindowLimitUsd`: returned only when the parent queries.
+- `usageUsd`: settled spending in the current window. A swap counts once its final cost is recorded, shortly after it completes.
+- `remainingUsd`: limit minus usage, floored at zero. For a sub-organization, also capped by what the parent has left.
+
+## Errors
+
+A quote that requests fee sponsorship fails, rather than falling back to an unsponsored quote, when:
+
+| Error code | Meaning |
+| :-- | :-- |
+| `SWAP_FEATURE_NOT_ENABLED` | The parent organization hasn't turned fee sponsorship on. |
+| `SWAP_FEE_SPONSORSHIP_UNAVAILABLE` | The provider can't sponsor fees for this swap right now. |
+
+A quote is also rejected when the spending window is disabled, or when the swap's estimated cost would exceed the window's remaining capacity. [Check usage](#check-usage) or raise the limit.
