@@ -1,0 +1,120 @@
+---
+title: "Enable Fee Sponsorship and Fixed Rate"
+description: "Turn on swap fee sponsorship and fixed-rate swaps for your organization and cap what each can cost with a spending window."
+tag: "Early access"
+mode: "wide"
+---
+
+import { SwapEarlyAccessCallout } from "/snippets/swap-early-access-callout.mdx";
+
+<SwapEarlyAccessCallout />
+
+Two optional features change who pays for a swap:
+
+- **Fee sponsorship:** your organization pays the swap provider's fees (execution, swap, and platform fees), so the wallet keeps more of the output. Your own client fee is not sponsored. Sponsored fees are billed to your organization.
+- **Fixed rate:** for a pair of supported stablecoins, the wallet receives the quoted output at a fixed rate instead of the market rate at settlement. When the market rate is below the fixed rate, your organization is billed the difference. When it is above, the difference is credited against your transaction management charges at the end of the billing period.
+
+Each feature is turned on, and capped, by a **spending window**: a USD limit over a rolling period that the parent organization sets. A quote that requests a feature is rejected when the feature is off or when the swap would exceed the window's remaining capacity.
+
+**Prerequisites:**
+
+- Your parent organization is enabled for early access, and is on Pay As You Go, Pro, or Enterprise.
+- Only the parent organization can change spending windows. Sub-organizations use their parent's features and limits.
+
+## Turn a feature on
+
+Submit one activity per feature from the parent organization:
+
+| Feature | Activity | Route |
+| :-- | :-- | :-- |
+| Fee sponsorship | `ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG` | `/public/v1/submit/upsert_swap_fee_sponsorship_limit_config` |
+| Fixed rate | `ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG` | `/public/v1/submit/upsert_swap_fixed_rate_limit_config` |
+
+Both take the same parameters:
+
+<ParamField body="parameters.orgWindowLimitUsd" type="string" required>
+  The USD limit for the window, shared by the parent organization and all of its sub-organizations, e.g. `"1000"`. Up to 18 integer and 12 fractional digits.
+</ParamField>
+
+<ParamField body="parameters.subOrgWindowLimitUsd" type="string" required>
+  The USD limit for each sub-organization, no greater than `orgWindowLimitUsd`.
+</ParamField>
+
+<ParamField body="parameters.windowDurationMinutes" type="string" required>
+  The rolling window length in minutes, e.g. `"1440"` for one day.
+</ParamField>
+
+<ParamField body="parameters.enabled" type="boolean" required>
+  `true` turns the feature on. `false` turns it off and keeps the saved limits.
+</ParamField>
+
+Turning a feature on or off changes your organization's signed configuration, so it needs root quorum approval, like any other organization feature change. Changing the limits of a feature that is already on follows your policies.
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/upsert_swap_fee_sponsorship_limit_config \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<PARENT_ORGANIZATION_ID>",
+    "parameters": {
+      "orgWindowLimitUsd": "1000",
+      "subOrgWindowLimitUsd": "100",
+      "windowDurationMinutes": "1440",
+      "enabled": true
+    }
+  }'
+```
+
+With the Go SDK, use `Client.UpsertSwapFeeSponsorshipLimitConfig` and `Client.UpsertSwapFixedRateLimitConfig`.
+
+## Check usage
+
+`POST /public/v1/query/get_swap_sponsorship_usage` returns each feature's state and what is left in its window.
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_swap_sponsorship_usage \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{ "organizationId": "<ORGANIZATION_ID>" }'
+```
+
+```json title="Response"
+{
+  "feeSponsorship": {
+    "permitted": true,
+    "window": {
+      "enabled": true,
+      "windowDurationMinutes": 1440,
+      "windowLimitUsd": "1000",
+      "subOrgWindowLimitUsd": "100",
+      "usageUsd": "12.48",
+      "remainingUsd": "987.52"
+    }
+  },
+  "fixedRate": {
+    "permitted": true,
+    "window": {
+      "enabled": true,
+      "windowDurationMinutes": 1440,
+      "windowLimitUsd": "500",
+      "subOrgWindowLimitUsd": "50",
+      "usageUsd": "0",
+      "remainingUsd": "500"
+    }
+  }
+}
+```
+
+- `permitted`: the feature is on for the parent organization. Quotes can use it only when it is permitted and its window is enabled.
+- `window`: absent until the parent saves a spending window.
+- `windowLimitUsd`: the parent limit, or the per-sub-organization limit when a sub-organization queries.
+- `subOrgWindowLimitUsd`: returned only when the parent queries.
+- `usageUsd`: settled spending in the current window. A swap counts once its final cost is recorded, shortly after it completes. Fixed-rate usage nets earnings against costs and never goes below zero.
+- `remainingUsd`: limit minus usage, floored at zero. For a sub-organization, also capped by what the parent has left.
+
+Next, [request a sponsored or fixed-rate quote](/features/transaction-management/swap/early-access/sponsored-and-fixed-rate-quotes).
