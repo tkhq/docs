@@ -1,0 +1,193 @@
+---
+title: "Back up parent organization key material"
+description: "Create and protect a customer-controlled copy of wallet or private-key material held by your Turnkey parent organization."
+---
+
+This guide explains how to export key material that belongs to your Turnkey parent organization, using the Dashboard or the Turnkey CLI. Use the exported material for a customer-managed backup or a planned migration.
+
+An export is **not** a complete organization backup. It does not include users, policies, authenticators, API keys, activity history, or other organization configuration. A parent organization also cannot export key material owned by its sub-organizations.
+
+<Warning>
+  Exported mnemonics and private keys can control funds. Choose your storage
+  location and access controls **before** you decrypt an export bundle.
+</Warning>
+
+## How export works
+
+Every export uses the same enclave-backed protocol:
+
+1. Your client (Dashboard export iframe or CLI) holds a P-256 target encryption key (TEK).
+2. The signed export activity includes the TEK public key.
+3. A Turnkey secure enclave encrypts the mnemonic or private key to the TEK using HPKE.
+4. Only the holder of the TEK private key can decrypt the export bundle.
+
+The exported wallet or private key remains in Turnkey and is marked as exported. Export does not move custody and does not delete anything.
+
+## Choose what to export
+
+| Export | Activity | Output | Best for |
+| --- | --- | --- | --- |
+| Wallet | `ACTIVITY_TYPE_EXPORT_WALLET` | HD wallet mnemonic (and optional passphrase) | Broadest backup — one mnemonic recovers all derived accounts |
+| Wallet account | `ACTIVITY_TYPE_EXPORT_WALLET_ACCOUNT` | One account's private key | Migrating a single address |
+| Private key | `ACTIVITY_TYPE_EXPORT_PRIVATE_KEY` | One raw private key | Raw (non-HD) keys |
+
+For backup purposes, prefer exporting the **wallet mnemonic**: it is the only export that covers accounts derived later. For a deeper discussion of HD wallets versus raw private keys, see [Choosing your structure](/reference/migration-guide#choosing-your-structure).
+
+Each activity exports exactly one resource. To back up several wallets or raw private keys, run one export per resource.
+
+## Prerequisites
+
+- Inventory the wallets and raw private keys owned by the parent organization (Dashboard **Company Wallets**, or `turnkey wallets list` / `turnkey private-keys list`).
+- Know your root quorum threshold and which users can approve activities. Exports may require consensus.
+- Decide where plaintext material will live (offline medium or approved secret store) before you export.
+- For the CLI: an API key pair registered to a parent-organization user.
+
+## Export with the Dashboard
+
+The Dashboard exports wallets and raw private keys. It does not expose wallet-account export — use the CLI or API for a single account key.
+
+### Export a wallet
+
+1. Go to **Company Wallets → Wallets** and select the wallet.
+2. Select **Export**. (If the wallet was exported before, the action reads **Exported** — you can export again.)
+3. Read the warning dialog, then select an authenticator and confirm. Follow the on-screen guidance: make sure nobody can see your screen, and do not copy the seed phrase to the clipboard.
+4. **If your root quorum threshold is 1:** the seed phrase appears inside the secure export iframe. Record it directly into your chosen storage. The Dashboard never produces a plaintext download.
+5. **If your root quorum threshold is greater than 1:** the Dashboard shows **Consensus Required for Export**:
+   1. Visit [export.turnkey.com](https://export.turnkey.com) and copy the embedded key's public key. Double-check the site's validity before pasting anything.
+   2. Paste the public key into the Dashboard and select **Continue export**.
+   3. Ask the required approvers to open **Activity Log → Pending**, where the export activity shows **Action required** / **Awaiting consensus** with **Approve** and **Deny** actions.
+   4. Once consensus is met, return to [export.turnkey.com](https://export.turnkey.com) **in the same browser within 48 hours**, paste the export bundle from the completed activity result into the **Bundle** field, and select **Inject Bundle**. (The activity detail's `activity-{id}.json` download contains the full activity, including the encrypted bundle — never plaintext.)
+
+<Warning>
+  The export.turnkey.com encryption key lives in your browser's local storage
+  for 48 hours and is removed after one successful decryption. If you clear
+  site data, use a different browser, select **Reset Key**, or wait longer
+  than 48 hours, the bundle cannot be decrypted — run a new export instead.
+</Warning>
+
+### Export a raw private key
+
+Same flow from **Company Wallets → Private Keys**: select the key, then **Export**. In the single-approval flow, you choose the display format before exporting; options depend on the key's curve:
+
+- `CURVE_SECP256K1`: Hexadecimal or Bitcoin (WIF)
+- `CURVE_ED25519`: Hexadecimal, Solana (Base58), or Sui (Bech32)
+- `CURVE_P256`: Hexadecimal
+
+In the consensus flow, the export.turnkey.com **Key Format** selector offers Hexadecimal (default) or Solana. The Solana format is the Base58-encoded 64-byte keypair (`private || public`), the same convention `solana-keygen` uses.
+
+<Note>
+  Sub-organization wallets and private keys are visible to the parent under
+  **Sub-Orgs**, but have no export action. A parent organization cannot export
+  sub-organization key material.
+</Note>
+
+## Export with the Turnkey CLI
+
+The CLI writes the **encrypted** export bundle to a file; decryption is a separate, deliberate step.
+
+### 1. Create a local encryption key (TEK)
+
+```sh
+turnkey generate encryption-key \
+  --organization "$ORGANIZATION_ID" \
+  --user "$USER_ID" \
+  --encryption-key-name backup-tek
+```
+
+This stores a P-256 encryption key locally. Its public key becomes the `targetPublicKey` for export activities. Protect the private half like the exported material itself.
+
+### 2. Export
+
+One command per resource:
+
+```sh
+# Wallet mnemonic
+turnkey wallets export \
+  --organization "$ORGANIZATION_ID" \
+  --name "$WALLET_NAME_OR_ID" \
+  --encryption-key-name backup-tek \
+  --export-bundle-output ./wallet.export
+
+# One wallet account's private key
+turnkey wallets accounts export \
+  --organization "$ORGANIZATION_ID" \
+  --address "$ACCOUNT_ADDRESS" \
+  --encryption-key-name backup-tek \
+  --export-bundle-output ./wallet-account.export
+
+# One raw private key
+turnkey private-keys export \
+  --organization "$ORGANIZATION_ID" \
+  --id "$PRIVATE_KEY_NAME_OR_ID" \
+  --encryption-key-name backup-tek \
+  --export-bundle-output ./private-key.export
+```
+
+The encrypted bundle is written to the output path with file mode `0600`. Standard output shows only the exported resource's identifier.
+
+<Note>
+  **If your organization requires consensus for exports,** the export command
+  exits with an error when the activity returns `CONSENSUS_NEEDED` — it cannot
+  wait for approval. The activity is still created. To complete the export:
+
+  1. Have approvers approve it in the Dashboard (**Activity Log → Pending**).
+  2. Retrieve the completed activity:
+     `turnkey activities get <activity-id> --organization "$ORGANIZATION_ID"`
+  3. Save the value of `result.exportWalletResult.exportBundle` (or
+     `exportWalletAccountResult` / `exportPrivateKeyResult`) to a file and
+     decrypt it as shown below.
+
+  The bundle is encrypted to your local encryption key, not to anything
+  session-specific, so it remains decryptable later — keep the encryption key
+  you exported with.
+</Note>
+
+### 3. Decrypt — only when you are ready to store the plaintext
+
+<Warning>
+  Always use `--plaintext-output`. Without it, the plaintext prints to standard
+  output, where it can land in terminal scrollback, shell history, or logs.
+  Never commit exported material or TEK private keys to source control.
+</Warning>
+
+```sh
+turnkey decrypt \
+  --organization "$ORGANIZATION_ID" \
+  --encryption-key-name backup-tek \
+  --export-bundle-input ./wallet.export \
+  --plaintext-output ./wallet.plaintext
+```
+
+The wallet-export plaintext is the mnemonic (followed by a newline and passphrase, if the wallet has one). Wallet-account and private-key exports decrypt to the raw key material.
+
+For **Solana** private-key exports, add `--solana-address "$SOLANA_ADDRESS"` (the exported key's address) to produce the standard Base58-encoded 64-byte keypair that Solana tooling such as `solana-keygen` expects. Do not use this flag for non-Solana keys.
+
+Move the plaintext file to its final storage location immediately, then securely delete the working copy.
+
+## Store the backup
+
+- Keep plaintext mnemonics and private keys offline or in an approved secret-management system.
+- Restrict access and use separation of duties; require more than one person to reconstruct spend capability where your threat model calls for it.
+- Keep redundant copies in independent failure domains.
+- The encrypted `.export` bundle is only as safe as the TEK private key. Treat both accordingly.
+
+## Test recovery safely
+
+1. Create a **non-production** wallet with no funds.
+2. Export and decrypt it using this guide.
+3. Import the recovered mnemonic or key into your target recovery tooling and verify the derived public address matches the address Turnkey displays.
+4. Securely delete the test plaintext.
+
+Do this test before you rely on any production export.
+
+## Repeat the process
+
+- A wallet-mnemonic export covers accounts derived from that wallet later. New **wallets** and new **raw private keys** each need their own export.
+- Export activities are subject to your quorum and policy configuration; consensus requirements mean exports generally cannot run unattended. Turnkey does not currently provide scheduled or automatic export snapshots.
+
+## Limitations
+
+- Exports contain key material only — no users, policies, authenticators, API keys, activity history, or organization configuration.
+- No recursive sub-organization export.
+- Export does not delete the source or move custody.
+- Importing exported material elsewhere depends on the destination system's supported formats. Turnkey's ed25519 keys follow RFC 8032 — the same convention as Ledger, Phantom, and `solana-keygen` — and secp256k1 raw keys use the universal convention, so both import cleanly into systems that accept those formats. See [the migration guide](/reference/migration-guide#custodial-wallets) for the curve-convention details.
