@@ -1,6 +1,6 @@
 ---
-title: "Fixed Rate"
-description: "Swap stablecoins at a fixed rate instead of the market rate at settlement, capped by a spending window you set."
+title: "Fixed-Rate Swaps"
+description: "Swap stablecoins at a fixed rate instead of the market rate at settlement, up to a spend limit you set."
 tag: "Early access"
 mode: "wide"
 ---
@@ -12,86 +12,37 @@ import { SwapEarlyAccessCallout } from "/snippets/swap-early-access-callout.mdx"
 With fixed rate, a swap between two supported stablecoins delivers the quoted output at a fixed rate instead of the market rate at settlement. When the market rate is below the fixed rate, your organization is billed the difference. When it is above, the difference is credited against your transaction management charges at the end of the billing period.
 
 <Note>
-  Fixed rate is almost always used with [fee sponsorship](/features/transaction-management/swap/fee-sponsorship). Without it, the provider's fees aren't sponsored. Turn on both, and set `fixedRate` and `feeSponsorship` together on each quote. Fixed rate does work on its own if you only need the rate fixed.
+  Fixed rate sets the rate but doesn't cover the provider's fees. To deliver a fixed-rate output without provider fees, also turn on [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship), and set `fixedRate` and `feeSponsorship` together on each quote.
 </Note>
 
-Like fee sponsorship, fixed rate is turned on, and capped, by a **spending window** that the parent organization sets.
+A quote can use fixed rate only when Turnkey has enabled it for your parent organization and the parent organization has turned it on with a spend limit.
 
 **Prerequisites:**
 
-- Your parent organization is enabled for early access, and is on Pay As You Go, Pro, or Enterprise.
-- Only the parent organization can change the spending window. Sub-organizations use their parent's settings.
+- Your parent organization is on Pay As You Go, Pro, or Enterprise.
+- Only the parent organization can change the spend limit. Sub-organizations use their parent's settings.
 
-## Turn it on
+## Set the spend limit
 
-Submit [`ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG`](/api-reference/activities/upsert-swap-fixed-rate-limits) to `/public/v1/submit/upsert_swap_fixed_rate_limit_config` from the parent organization. It takes the same parameters as the [fee sponsorship spending window](/features/transaction-management/swap/fee-sponsorship#turn-it-on): `orgWindowLimitUsd`, `subOrgWindowLimitUsd`, `windowDurationMinutes`, and `enabled`. Turning it on or off needs root quorum approval; changing the limits while it's on follows your policies.
+From the parent organization, submit [`ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG`](/api-reference/activities/upsert-swap-fixed-rate-limits) with `enabled: true`. Like swap fee sponsorship, fixed rate has an organization-wide limit and a sub-organization limit over a rolling time window, set separately from the swap fee sponsorship limits.
 
-```bash title="cURL"
-curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/upsert_swap_fixed_rate_limit_config \
-  --header 'Accept: application/json' \
-  --header 'Content-Type: application/json' \
-  --header "X-Stamp: <string> (see Stamps)" \
-  --data '{
-    "type": "ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG",
-    "timestampMs": "<string> (e.g. 1745474677453)",
-    "organizationId": "<PARENT_ORGANIZATION_ID>",
-    "parameters": {
-      "orgWindowLimitUsd": "500",
-      "subOrgWindowLimitUsd": "50",
-      "windowDurationMinutes": "1440",
-      "enabled": true
-    }
-  }'
-```
-
-With the Go SDK, use `Client.UpsertSwapFixedRateLimitConfig`.
+Turning fixed rate on or off needs [root quorum](/features/users/root-quorum) approval. Changing the limits while it's on follows your policies.
 
 ## Request a fixed-rate quote
 
-Submit `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`. It uses the same route and parameters as [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote), plus:
+Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) with `fixedRate: true`, and usually `feeSponsorship: true`. Both tokens must be stablecoins supported for fixed rate. Same-chain and cross-chain routes both work. Everything else is the same as a [regular quote](/features/transaction-management/swap/get-swap-quote).
 
-<ParamField body="parameters.fixedRate" type="boolean">
-  Optional, defaults to `false`. When `true`, the wallet receives the quoted output at a fixed rate. Both `inputToken` and `outputToken` must be stablecoins supported for fixed rate. Same-chain and cross-chain routes both work.
-</ParamField>
+With the Go SDK, use `Client.CreateSwapQuoteV3`. The TypeScript SDK's `createSwapQuote` sends V2; until it adds V3, submit the activity with `client.request`, as in [Enable Swaps](/features/transaction-management/swap/enable-swap#submit-the-configuration).
 
-<ParamField body="parameters.feeSponsorship" type="boolean">
-  Optional, defaults to `false`. Set it too to have your organization pay the provider's fees. See [Fee Sponsorship](/features/transaction-management/swap/fee-sponsorship).
-</ParamField>
+A fixed-rate quote comes back with `fixedRate: true` and `estimatedFixedRateAdjustmentUsd`, the estimated USD cost of the fixed rate. Positive is billed to you; negative is an earning credited against your transaction management charges. It is informational; the final amount is settled after the swap completes.
 
-```bash title="cURL"
-curl --request POST \
-  --url https://api.turnkey.com/public/v1/submit/create_swap_quote \
-  --header 'Accept: application/json' \
-  --header 'Content-Type: application/json' \
-  --header "X-Stamp: <string> (see Stamps)" \
-  --data '{
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
-    "timestampMs": "<string> (e.g. 1745474677453)",
-    "organizationId": "<ORGANIZATION_ID>",
-    "parameters": {
-      "signWith": "<WALLET_ACCOUNT_ADDRESS>",
-      "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      "outputToken": "eip155:42161/erc20:0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-      "inputAmount": "1000000",
-      "fixedRate": true,
-      "feeSponsorship": true
-    }
-  }'
-```
+## Execute the quote
 
-With the Go SDK, use `Client.CreateSwapQuoteV3`. The TypeScript SDK's `createSwapQuote` sends V2; until it adds V3, submit the activity with a stamped request as above.
-
-The result is in `activity.result.createSwapQuoteResultV2.quotes`. Each quote has the V2 fields plus:
-
-- `fixedRate`: `true` when the quote applies a fixed rate.
-- `estimatedFixedRateAdjustmentUsd`: the estimated USD cost of the fixed rate. Positive is billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. It is informational; the final amount is settled after the swap completes.
-
-Execute the quote with `ACTIVITY_TYPE_EXECUTE_SWAP_V3` as for any quote; the quote binds the fixed rate. See [Execute a Swap](/features/transaction-management/swap/execute-swap).
+[Execute the quote](/features/transaction-management/swap/execute-swap) with `ACTIVITY_TYPE_EXECUTE_SWAP_V3` as for any quote. The quote binds the fixed rate, so nothing else changes.
 
 ## Check usage
 
-[`POST /public/v1/query/get_swap_sponsorship_usage`](/api-reference/queries/get-swap-sponsorship-usage) returns the fixed-rate window under `fixedRate`, in the same shape as fee sponsorship. See [Check usage](/features/transaction-management/swap/fee-sponsorship#check-usage). Fixed-rate `usageUsd` nets earnings against costs within the window and never goes below zero, so earnings restore capacity up to the limit.
+[`get_swap_sponsorship_usage`](/api-reference/queries/get-swap-sponsorship-usage) returns the fixed-rate spend limit under `fixedRate`. Fixed-rate `usageUsd` nets earnings against costs within the window and never goes below zero, so earnings restore capacity up to the limit. Pending swaps are not reserved, so what is left does not account for swaps still in progress.
 
 ## Errors
 
@@ -103,4 +54,10 @@ A quote that requests a fixed rate fails, rather than falling back to the market
 | `SWAP_FIXED_RATE_PAIR_NOT_ELIGIBLE` | The token pair isn't eligible for a fixed rate. |
 | `SWAP_FIXED_RATE_UNAVAILABLE` | The provider can't offer a fixed rate for this swap right now. |
 
-A quote is also rejected when the spending window is disabled, or when the swap's estimated cost would exceed the window's remaining capacity.
+A quote is also rejected when the spend limit is turned off, or when the swap's estimated cost would exceed what is left in the window.
+
+## Next steps
+
+- [Swap Fee Sponsorship](/features/transaction-management/swap/fee-sponsorship): pay the provider's fees on behalf of your users.
+- [Execute a swap](/features/transaction-management/swap/execute-swap): the signing activity that runs the swap end-to-end.
+- [Track swap status](/features/transaction-management/swap/track-swap-status): same-chain vs. cross-chain polling.
