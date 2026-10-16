@@ -1,0 +1,63 @@
+---
+title: "Swap Fee Sponsorship"
+description: "Pay the swap provider's fees on behalf of your users, up to a spend limit you set."
+tag: "Early access"
+mode: "wide"
+---
+
+import { SwapEarlyAccessCallout } from "/snippets/swap-early-access-callout.mdx";
+
+<SwapEarlyAccessCallout />
+
+With swap fee sponsorship, your organization pays the swap provider's fees (execution, swap, and platform fees), so the wallet keeps more of the output. Your own client fee is not sponsored. Sponsored fees are billed to your organization.
+
+Swap fee sponsorship is separate from [gas sponsorship](/features/transaction-management/sending-sponsored-transactions). Swap fee sponsorship covers the provider's fees and is set on the quote. Gas sponsorship covers the origin-chain transaction's gas and is set with `sponsor: true` on execute.
+
+**Prerequisites:**
+
+- Turnkey has enabled swap fee sponsorship for your parent organization. Early access is invite-only: reach out to your Turnkey contact with your parent organization ID.
+- Only the parent organization can turn it on and change the spend limit. Sub-organizations use their parent's settings.
+
+## Set the spend limit
+
+From the parent organization, submit [`ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG`](/api-reference/activities/upsert-swap-fee-sponsorship-limits) with `enabled: true` and two USD limits over a rolling time window:
+
+- **Organization-wide limit**: the cap on sponsored fees across your parent organization and all of its sub-organizations.
+- **Sub-organization limit**: the cap that applies to each of your sub-organizations.
+
+Turning swap fee sponsorship on or off changes your organization's signed configuration, so it needs [root quorum](/features/users/root-quorum) approval, like any other organization feature change. Changing the limits while it's on follows your policies. Setting `enabled: false` turns it off and keeps the saved limits.
+
+## Request a sponsored quote
+
+Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) with `feeSponsorship: true`. Everything else is the same as a [regular quote](/features/transaction-management/swap/get-swap-quote).
+
+With the Go SDK, use `Client.CreateSwapQuoteV3`. The TypeScript SDK's `createSwapQuote` sends V2; until it adds V3, submit the activity with `client.request`, as in [Enable Swaps](/features/transaction-management/swap/enable-swap#submit-the-configuration).
+
+A sponsored quote comes back with `feeSponsorship: true`, and its `outputAmount` and `minOutputAmount` are no longer reduced by the provider's fees. Your client fee, if configured, still applies.
+
+To also swap stablecoins at a fixed rate, set `fixedRate` too. See [Fixed-Rate Swaps](/features/transaction-management/swap/fixed-rate).
+
+## Execute the quote
+
+[Execute the quote](/features/transaction-management/swap/execute-swap) with `ACTIVITY_TYPE_EXECUTE_SWAP_V3` as for any quote. The quote binds the sponsorship, so nothing else changes. To also sponsor gas, set `sponsor: true`.
+
+## Check usage
+
+[`get_swap_sponsorship_usage`](/api-reference/queries/get-swap-sponsorship-usage) returns whether swap fee sponsorship is permitted for your organization, its spend limit, and what is left in the current window. A swap counts against the limit once its final cost is recorded, shortly after it completes. Pending swaps are not reserved, so what is left does not account for swaps still in progress.
+
+## Errors
+
+A quote that requests swap fee sponsorship fails, rather than falling back to an unsponsored quote, when:
+
+| Error code | Meaning |
+| :-- | :-- |
+| `SWAP_FEATURE_NOT_ENABLED` | Swap fee sponsorship isn't enabled for the parent organization. |
+| `SWAP_FEE_SPONSORSHIP_UNAVAILABLE` | The provider can't sponsor fees for this swap right now. |
+
+A quote is also rejected when the spend limit is turned off, or when the swap's estimated cost would exceed what is left in the window. [Check usage](#check-usage) or raise the limit.
+
+## Next steps
+
+- [Fixed-Rate Swaps](/features/transaction-management/swap/fixed-rate): swap stablecoins at a fixed rate, usually together with swap fee sponsorship.
+- [Execute a swap](/features/transaction-management/swap/execute-swap): the signing activity that runs the swap end-to-end.
+- [Track swap status](/features/transaction-management/swap/track-swap-status): same-chain vs. cross-chain polling.
