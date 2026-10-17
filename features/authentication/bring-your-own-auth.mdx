@@ -1,6 +1,6 @@
 ---
 title: "Bring your own auth"
-description: "Learn how to integrate Turnkey with your existing authentication system while keeping user wallets non-custodial."
+description: "Learn how to integrate Turnkey with your existing authentication system, with signing keys that stay on the user's device."
 ---
 
 Some teams have requirements that make it impractical to use Turnkey's built-in authentication directly — existing enterprise SSO, compliance constraints, a mature identity platform already in production, or simply a preference to keep auth centralized in one system. In these cases, you don't need to replace your auth layer: Turnkey can work alongside it.
@@ -36,7 +36,7 @@ await client.createSubOrganization({
 
 ### Non-custodial (OIDC approach)
 
-If you want users to fully control their wallets, Turnkey must be able to independently verify that a user has authenticated with your system. This requires your auth system to issue **OIDC-compliant tokens**, a standard Turnkey knows how to validate. With that in place, the user's device generates a keypair, receives an OIDC token from your auth system that binds that keypair to their identity, and Turnkey registers the public key as a session credential directly in the sub-org.
+If you want signing keys to stay on users' devices rather than on your backend, Turnkey must be able to independently verify that a user has authenticated with your system. This requires your auth system to issue **OIDC-compliant tokens**, a standard Turnkey knows how to validate. With that in place, the user's device generates a keypair, receives an OIDC token from your auth system that binds that keypair to their identity, and Turnkey registers the public key as a session credential directly in the sub-org.
 
 **Sub-org provisioning:** Your backend still creates the sub-org (using the parent org API key) on first registration, but includes the user's OIDC provider in the root user so that the user can authenticate directly with Turnkey on subsequent logins.
 
@@ -67,6 +67,10 @@ After provisioning, each login follows these steps:
 5. **Backend** calls `oauthLogin` (stamped with the parent org API key) with the OIDC token and `publicKey`
 6. **Turnkey** verifies the token signature and checks that `nonce == sha256(publicKey)`, then returns a session JWT
 7. **Client** stores the session — only the device holding the private key can use it to sign
+
+<Note>
+Because your auth system issues the tokens, it can always authenticate as any user: the nonce binds a token to a device keypair, but the issuer chooses the nonce. A compromised issuer could create a session and act on a user's behalf. To keep specific actions under the user's sole control (for example exports, policy changes, or large transfers), require a factor your issuer can't produce, such as a passkey, with an [MFA policy](/features/authentication/mfa/overview).
+</Note>
 
 ## Requirements for your OIDC issuer
 
