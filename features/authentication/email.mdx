@@ -27,14 +27,12 @@ To test OTP codes in our sandbox environment you can use the following:
 - Alternative method for specific use cases
 - More secure, but requires copying the full credential to the client
 
-Both methods provide users with an expiring API key for authentication or account recovery.
+Both methods provide users with expiring credentials for authentication or account recovery: OTP login returns a session bound to a client-held key, and the credential bundle method delivers an encrypted API key.
 
 <Warning>
   **Use the current OTP activities.** The `ACTIVITY_TYPE_INIT_OTP_AUTH` family (including `_V2` and `_V3`) and `ACTIVITY_TYPE_OTP_AUTH` are deprecated. New integrations — and any integration touching OTP today — should use `ACTIVITY_TYPE_INIT_OTP_V3` → `ACTIVITY_TYPE_VERIFY_OTP_V2` → `ACTIVITY_TYPE_OTP_LOGIN_V2`, with `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` for signup. 
 
-  For all future implementations please ensure that you are using `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` for signup. The latest version of this activity is available today and recommended as a best practice. This version is enhanced with more secure signup flows.
-
-  See the [OTP migration guide](/features/authentication/otp-migration-guide) for the full upgrade path, including required policy changes. 
+  If you call `initOtpAuth` followed by `otpAuth`, follow [Migrating from legacy OTP Auth](/features/authentication/otp-migration-guide#migrating-from-legacy-otp-auth) for the complete replacement flow, policy changes, and the switch from encrypted credential bundles to sessions.
 </Warning>
 
 ## Core mechanism
@@ -43,14 +41,17 @@ Email Authentication is built with expiring API keys as the foundation. The two 
 
 ### OTP-based method
 
-The authentication process happens in two steps:
+The current OTP authentication process uses three activities:
 
 <Steps>
   <Step>
-    A 6-9 digit or alphanumeric OTP code is sent to the user's verified email address
+    `INIT_OTP_V3` sends a 6-9 digit or alphanumeric OTP to the user's email address and returns an encryption target bundle.
   </Step>
   <Step>
-    Upon verification of the correct code, an API key credential is generated and encrypted for the client
+    The client encrypts the OTP and a client-generated public key using that bundle. `VERIFY_OTP_V2` verifies the encrypted submission and returns a verification token bound to the client key.
+  </Step>
+  <Step>
+    `OTP_LOGIN_V2` validates the verification token and client signature, registers the session public key, and returns a session JWT. The signing private key remains on the client; there is no credential bundle to decrypt.
   </Step>
 </Steps>
 
