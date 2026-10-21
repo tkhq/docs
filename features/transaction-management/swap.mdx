@@ -83,17 +83,17 @@ Both assets must appear in the list for their network for a swap to qualify for 
 
 | Chain | Stablecoins |
 | :-- | :-- |
-| Ethereum | DAI, mUSD, PYUSD, USD1, USDC, USDG, USDS, USDT |
+| Ethereum | DAI, mUSD, OUSD, PYUSD, USD1, USDC, USDG, USDS, USDT |
 | Optimism | DAI, USDC, USDT, USDT0 |
 | BNB Chain | DAI, USDC |
 | Polygon | DAI, USDC, USDT0 |
 | Monad | mUSD, USDC, USDT0 |
-| Tempo | USDC.e, USD1, USDe, USDT0 |
+| Tempo | OUSD, USDC.e, USD1, USDe, USDT0 |
 | Arc | USDC (native) |
-| Base | USDC, USDT |
+| Base | OUSD, USDC, USDT |
 | Arbitrum | DAI, PYUSD, USDC, USDT0 |
 | Robinhood Chain | USDG |
-| Solana | PYUSD, USD1, USDC, USDG, USDS, USDT |
+| Solana | OUSD, PYUSD, USD1, USDC, USDG, USDS, USDT |
 
 <Note>
   This list describes fee classification only. A listed asset does not guarantee that a provider offers a route or sufficient liquidity.
@@ -120,6 +120,13 @@ Fees are configured on the parent organization and apply to every swap submitted
   To change your fee configuration, submit `upsert_swap_config` again with the new values. New quotes requested after the change immediately use the new configuration. Executing an existing quote always settles at the fees baked into that quote — execute does not re-read your fee configuration.
 </Warning>
 
+## Early access: swap fee sponsorship and fixed rate
+
+Two optional features change a quote's economics. Both are in early access, and both are capped by a spend limit that your parent organization sets. A quote requests either one with [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote), which is `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2` plus the `feeSponsorship` and `fixedRate` flags.
+
+- [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship): your organization pays the swap provider's fees, so the wallet keeps more of the output.
+- [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate): a swap between two supported stablecoins delivers the quoted output at a fixed rate instead of the market rate at settlement.
+
 ## API surface
 
 Swaps add four activities:
@@ -131,11 +138,19 @@ Swaps add four activities:
 | [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-reference/activities/create-swap-quote) | `POST /public/v1/submit/create_swap_quote` | Request an executable quote for a token pair |
 | [`ACTIVITY_TYPE_EXECUTE_SWAP_V3`](/api-reference/activities/execute-swap) | `POST /public/v1/submit/execute_swap` | Execute the quoted swap identified by `quote_id` |
 
+Early access adds two more activities, and `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`:
+
+| Activity | Endpoint | Purpose |
+| :-- | :-- | :-- |
+| [`ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG`](/api-reference/activities/upsert-swap-fee-sponsorship-limits) | `POST /public/v1/submit/upsert_swap_fee_sponsorship_limit_config` | Turn swap fee sponsorship on or off and set its spend limit |
+| [`ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG`](/api-reference/activities/upsert-swap-fixed-rate-limits) | `POST /public/v1/submit/upsert_swap_fixed_rate_limit_config` | Turn fixed rate on or off and set its spend limit |
+
 and one query:
 
 | Query | Endpoint | Purpose |
 | :-- | :-- | :-- |
 | [`Swap status`](/api-reference/queries/get-swap-status) | `POST /public/v1/query/get_swap_status` | Poll the full swap lifecycle. Handles same-chain and cross-chain with a unified response shape. |
+| [`Swap sponsorship usage`](/api-reference/queries/get-swap-sponsorship-usage) | `POST /public/v1/query/get_swap_sponsorship_usage` | Early access. Read the swap fee sponsorship and fixed-rate spend limits and what is left in each window. |
 
 ## Who each call acts as
 
@@ -145,7 +160,7 @@ to whoever holds the wallet doing the swap.
 
 | Acts as | Calls |
 | :-- | :-- |
-| **Your parent organization** | `upsert_swap_config`, `claim_swap_fees` |
+| **Your parent organization** | `upsert_swap_config`, `claim_swap_fees`, `upsert_swap_fee_sponsorship_limit_config`, `upsert_swap_fixed_rate_limit_config` |
 | **The organization whose wallet swaps** | `create_swap_quote`, `execute_swap`, `get_swap_status` |
 
 Your parent organization's credentials sign the configuration calls.
@@ -188,6 +203,14 @@ Turnkey does not exercise discretion over the selection, routing, or execution o
 
   <Card title="Track swap status" href="/features/transaction-management/swap/track-swap-status">
     Poll to settlement across same-chain and cross-chain lifecycles.
+  </Card>
+
+  <Card title="Swap fee sponsorship" href="/features/transaction-management/swap/fee-sponsorship">
+    Early access. Pay the provider's fees on behalf of your users.
+  </Card>
+
+  <Card title="Fixed-rate swaps" href="/features/transaction-management/swap/fixed-rate">
+    Early access. Swap stablecoins at a fixed rate.
   </Card>
 </CardGroup>
 

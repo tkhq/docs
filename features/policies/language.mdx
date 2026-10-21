@@ -752,6 +752,24 @@ evaluator. A condition referencing `activity.*` cannot be evaluated for these ac
 MFA policy it is skipped and the next policy is evaluated, and in a session profile scope the
 request is denied.
 
+### Activities that target a root user
+
+Users outside the [root quorum](/features/users/root-quorum) can't modify users in the root quorum.
+If a non-root user submits any of the activities below against a root quorum user, the request is
+denied before any policy is evaluated, so no policy can allow it:
+
+- `ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2`, `ACTIVITY_TYPE_DELETE_AUTHENTICATORS`
+- `ACTIVITY_TYPE_CREATE_API_KEYS`, `ACTIVITY_TYPE_CREATE_API_KEYS_V2`, `ACTIVITY_TYPE_DELETE_API_KEYS`
+- `ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS`, `ACTIVITY_TYPE_CREATE_OAUTH_PROVIDERS_V2`,
+  `ACTIVITY_TYPE_DELETE_OAUTH_PROVIDERS`
+- `ACTIVITY_TYPE_UPDATE_USER`, `ACTIVITY_TYPE_UPDATE_USER_NAME`, `ACTIVITY_TYPE_UPDATE_USER_EMAIL`,
+  `ACTIVITY_TYPE_UPDATE_USER_PHONE_NUMBER`
+- `ACTIVITY_TYPE_DELETE_USERS`, when any of the users being deleted is a root user
+
+The request fails with a permission error and no policy evaluations are recorded.
+For example, a non-root recovery user cannot add a passkey to a root user, even with a policy that
+allows `CREATE_AUTHENTICATORS`.
+
 ### Ethereum
 
 Our Ethereum policy language (accessible via `eth.tx`) allows for the granular governance of signing

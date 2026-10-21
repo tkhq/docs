@@ -1,0 +1,61 @@
+---
+title: "Fixed-Rate Swaps"
+description: "Swap stablecoins at a fixed rate instead of the market rate at settlement, up to a spend limit you set."
+tag: "Early access"
+mode: "wide"
+---
+
+import { SwapEarlyAccessCallout } from "/snippets/swap-early-access-callout.mdx";
+
+<SwapEarlyAccessCallout />
+
+With fixed rate, a swap between two supported stablecoins delivers the quoted output at a fixed rate instead of the market rate at settlement. When the market rate is below the fixed rate, your organization is billed the difference. When it is above, the difference is credited against your transaction management charges at the end of the billing period.
+
+<Note>
+  Fixed rate sets the rate but doesn't cover the provider's fees. To deliver a fixed-rate output without provider fees, also turn on [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship), and set `fixedRate` and `feeSponsorship` together on each quote.
+</Note>
+
+**Prerequisites:**
+
+- Turnkey has enabled fixed rate for your parent organization. Early access is invite-only: reach out to your Turnkey contact with your parent organization ID.
+- Only the parent organization can turn it on and change the spend limit. Sub-organizations use their parent's settings.
+
+## Set the spend limit
+
+From the parent organization, submit [`ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG`](/api-reference/activities/upsert-swap-fixed-rate-limits) with `enabled: true`. Like swap fee sponsorship, fixed rate has an organization-wide limit and a sub-organization limit over a rolling time window, set separately from the swap fee sponsorship limits.
+
+Turning fixed rate on or off needs [root quorum](/features/users/root-quorum) approval. Changing the limits while it's on follows your policies.
+
+## Request a fixed-rate quote
+
+Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) with `fixedRate: true`, and usually `feeSponsorship: true`. Both tokens must be stablecoins supported for fixed rate. Same-chain and cross-chain routes both work. Everything else is the same as a [regular quote](/features/transaction-management/swap/get-swap-quote).
+
+With the Go SDK, use `Client.CreateSwapQuoteV3`. The TypeScript SDK's `createSwapQuote` sends V2; until it adds V3, submit the activity with `client.request`, as in [Enable Swaps](/features/transaction-management/swap/enable-swap#submit-the-configuration).
+
+A fixed-rate quote comes back with `fixedRate: true` and `estimatedFixedRateAdjustmentUsd`, the estimated USD cost of the fixed rate. Positive is billed to you; negative is an earning credited against your transaction management charges. It is informational; the final amount is settled after the swap completes.
+
+## Execute the quote
+
+[Execute the quote](/features/transaction-management/swap/execute-swap) with `ACTIVITY_TYPE_EXECUTE_SWAP_V3` as for any quote. The quote binds the fixed rate, so nothing else changes.
+
+## Check usage
+
+[`get_swap_sponsorship_usage`](/api-reference/queries/get-swap-sponsorship-usage) returns the fixed-rate spend limit under `fixedRate`. Fixed-rate `usageUsd` nets earnings against costs within the window and never goes below zero, so earnings restore capacity up to the limit. Pending swaps are not reserved, so what is left does not account for swaps still in progress.
+
+## Errors
+
+A quote that requests a fixed rate fails, rather than falling back to the market rate, when:
+
+| Error code | Meaning |
+| :-- | :-- |
+| `SWAP_FEATURE_NOT_ENABLED` | Fixed rate isn't enabled for the parent organization. |
+| `SWAP_FIXED_RATE_PAIR_NOT_ELIGIBLE` | The token pair isn't eligible for a fixed rate. |
+| `SWAP_FIXED_RATE_UNAVAILABLE` | The provider can't offer a fixed rate for this swap right now. |
+
+A quote is also rejected when the spend limit is turned off, or when the swap's estimated cost would exceed what is left in the window.
+
+## Next steps
+
+- [Swap Fee Sponsorship](/features/transaction-management/swap/fee-sponsorship): pay the provider's fees on behalf of your users.
+- [Execute a swap](/features/transaction-management/swap/execute-swap): the signing activity that runs the swap end-to-end.
+- [Track swap status](/features/transaction-management/swap/track-swap-status): same-chain vs. cross-chain polling.
