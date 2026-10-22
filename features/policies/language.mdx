@@ -774,7 +774,8 @@ allows `CREATE_AUTHENTICATORS`.
 
 A user can manage their own credentials without a policy granting it. When no policy reaches a
 decision, the engine allows the activities below as long as the user submitting the request is the
-user the activity targets. `ACTIVITY_TYPE_CREATE_AUTHENTICATORS` (V1) is not among them.
+user the activity targets. `ACTIVITY_TYPE_CREATE_AUTHENTICATORS` (V1) is deprecated and is not
+among them.
 
 - `ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2`, `ACTIVITY_TYPE_DELETE_AUTHENTICATORS`
 - `ACTIVITY_TYPE_CREATE_API_KEYS`, `ACTIVITY_TYPE_CREATE_API_KEYS_V2`, `ACTIVITY_TYPE_DELETE_API_KEYS`
@@ -785,25 +786,25 @@ user the activity targets. `ACTIVITY_TYPE_CREATE_AUTHENTICATORS` (V1) is not amo
 
 This self-only allowance applies only under the following conditions:
 
-- No policy produced a decision. An explicit allow or deny stands, so a policy that denies
-  `ACTIVITY_TYPE_CREATE_API_KEYS_V2` denies it for the user's own keys too.
+- No policy produced a decision. For non-root users an explicit allow or deny stands, so a policy
+  that denies `ACTIVITY_TYPE_CREATE_API_KEYS_V2` denies it for the user's own keys too.
 - The request targets the organization it is submitted to. A parent organization user acting on
   a sub-organization user is not allowed by default and needs a policy.
 - The requesting user's MFA policy, if any, is satisfied. Otherwise the activity requires
   additional authenticators before it runs.
-- The requesting user is not targeting a root user. A non-root user targeting a root user is
-  denied before policies are evaluated, as described above.
 - The request did not already meet the root quorum. A request that does is allowed before policies
   are evaluated, so root users rarely need the allowance. A root user below the threshold can
-  still act on their own credentials through it, and anything else they request waits for quorum
-  approval.
+  still act on their own credentials through it. For anything else, a root user below the
+  threshold acts alone only when a policy allows it. Any other outcome for a root user, including
+  an explicit deny, becomes a request for quorum approval rather than a denial.
 
 This default is what lets a scoped recovery session enroll a passkey for only the authenticated
 user. Neither a [session profile](/features/authentication/sessions/session-profiles) scope nor a
-policy condition can name the target user of `CREATE_AUTHENTICATORS_V2`: there is no keyword for
-the requesting user, and `activity.params.user_id` is exposed only for the API key activities. With
-no policy allowing the activity, a session scoped to it can add authenticators to the session
-holder alone.
+policy condition can name the target user of `CREATE_AUTHENTICATORS_V2`. The `approvers` and
+`credentials` keywords identify the requesting user, but the activity exposes no keyword for the
+user it targets, and `activity.params.user_id` is exposed only for the API key activities. With no
+policy allowing the activity, a session scoped to it can add authenticators to the session holder
+alone.
 
 <Note>
   Wallet and private key import activities and `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION` must
