@@ -137,7 +137,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | contract_call_args       | Option\<Map\<[String](#type-string), ContractArgument\>\> | ABI field specifying all contract arguments parsed from the contract call data. It is a mapping of the string representations of the arg name to the argument itself. Populated only when a matching [Smart Contract Interface](/features/policies/smart-contract-interfaces) has been uploaded for `eth.tx.to`. Access via `eth.tx.contract_call_args['arg_name']`. |
 | <a id="struct-eip-712-typed-data" href="#struct-eip-712-typed-data">**Eip712TypedData**</a>      | primary_type             | [string](#type-string)                                    | The type of the primary (i.e. outermost) structure in the `message` JSON                                                                                                                                                                                                                                                                                             |
 |                          | domain                   | [Eip712Domain](#struct-eip-712-domain)                              | The `Domain` of the payload                                                                                                                                                                                                                                                                                                                                          |
-|                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serializaiton of the message payload                                                                                                                                                                                                                                                                                                                            |
+|                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serialization of the message payload. Values are typed by their declared EIP-712 type: `uintN` as [uint](#type-uint), `intN` as [int](#type-int) (except negative values below -2^127), `address` and `bytes`/`bytesN` as case-insensitive [string](#type-string), and everything else as its JSON type. See [EIP-712](#eip-712) for accepted integer encodings. |
 | <a id="struct-eip-7702-authorization" href="#struct-eip-7702-authorization">**Eip7702Authorization**</a> | address                  | [string](#type-string)                                    | The address you would like to authorize                                                                                                                                                                                                                                                                                                                              |
 |                          | chain_id                 | number                                    | The EVM chain ID                                                                                                                                                                                                                                                                                                                                                     |
 |                          | nonce                    | number                                    | The nonce of the authority                                                                                                                                                                                                                                                                                                                                           |
@@ -788,11 +788,58 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
 
 #### EIP-712
 
-Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When defining
-policies for EIP-712 messages, please ensure that all hex-encoded strings (e.g. addresses, function
-selectors, bytes) are **lowercase**. The policy engine expects lowercase hex strings to conform to
-Ethereum's standard convention. Using uppercase hex strings may result in errors or policy
-rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
+Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`).
+
+<Warning>
+  Comparing an integer field to a quoted string, such as `eth.eip_712.message['value'] == '0'` or
+  `eth.eip_712.message['value'] in ['1', '2']`, raises an evaluation error instead of matching.
+  Write the numeric literal instead: `== 0` or `in [1, 2]`. An ALLOW policy with such a comparison
+  stops allowing. A DENY policy with such a comparison stops denying. Review existing policies that
+  compare integer fields to quoted strings.
+</Warning>
+
+Policy conditions see each `eth.eip_712.message` leaf according to its declared EIP-712 type. This
+applies at any depth, including nested structs and dynamic and fixed-size arrays.
+
+| Declared type             | Policy type                      | Notes                                                                                                          |
+| ------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `uintN`                   | [uint](#type-uint)               | Compared numerically. Accepted encodings are listed below.                                                     |
+| `intN`                    | [int](#type-int)                 | Compared numerically, except negative values below -2^127 (the i128 minimum). Those are not typed numerically, so numeric comparisons on them are not supported. |
+| `address`, `bytes`, `bytesN` | [string](#type-string)        | Compared case-insensitively, including inside fixed-size arrays such as `address[2]`.                          |
+| Any other type            | Its JSON type                    |                                                                                                                |
+
+Unsigned integers (`uintN`) can be encoded in the signed payload in any of these ways:
+
+- A decimal string, which covers any `uint256` value (for example `"30000000000000000000"`). Leading zeros are allowed.
+- A hex string (for example `"0x1a055690d9db80000"`).
+- A JSON number up to 2^64 - 1.
+
+JSON numbers of 2^64 or more are rejected at signing with an "invalid EIP-712 payload" error. Send
+large integers as decimal strings. viem's `serializeTypedData` already does this for `bigint`
+values.
+
+The `in` operator and `.contains` compare integer values regardless of their declared width. For
+example, a small value matches against a `uint256` list element.
+
+Hex-encoded `address` and `bytes`/`bytesN` message values compare case-insensitively, so you do not
+need to lowercase them in policy conditions.
+
+For example, to allow only messages on one chain and one contract, with a `Transfer` primary type
+and an `amount` field (declared as `uint256`) of at most 100 tokens with 18 decimals:
+
+```json
+{
+  "policyName": "Allow EIP-712 messages with amount up to 100 tokens",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x<TOKEN_CONTRACT>' && eth.eip_712.primary_type == 'Transfer' && eth.eip_712.message['amount'] <= 100000000000000000000 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+Pin `chain_id` and `verifying_contract`, not `domain.name`, which any contract can claim. Constrain
+every field you rely on.
+
+See the [Ethereum policy examples](/features/policies/examples/ethereum) for Permit2 and other EIP-712 policies.
 
 ### Solana
 
