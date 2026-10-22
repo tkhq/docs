@@ -75,7 +75,7 @@ These steps assume your backend holds a parent-organization API key, which stays
 1. **Before you deploy: update policies.** In the parent organization, permit the three replacement activities for the non-root API user that submits them, preserving existing user and organization restrictions. A root API user satisfying a root quorum threshold of one does not need these additional allow policies. See [Update policies before deploying](#update-policies-before-deploying).
 2. **Backend: replace `initOtpAuth` with `initOtp`.** Submit `ACTIVITY_TYPE_INIT_OTP_V3` under the parent organization with the contact, `otpType` (`OTP_TYPE_EMAIL` or `OTP_TYPE_SMS`), and required `appName`. Return `otpId` and `otpEncryptionTargetBundle` to the client.
    - If you use `INIT_OTP_AUTH` or `INIT_OTP_AUTH_V2`, move `appName` out of `emailCustomization` into the top-level `appName` field. `INIT_OTP_V3` requires it, and its `emailCustomization` no longer accepts `appName`. See [Breaking change: `appName` required](/features/authentication/email#breaking-change-appname-required).
-   - If you rely on the organization's default email template, register it for `ACTIVITY_TYPE_INIT_OTP`. Default templates registered for `ACTIVITY_TYPE_INIT_OTP_AUTH` are not selected automatically by the new flow. An existing template passed explicitly through `emailCustomization.templateId` can still be selected. Review its content for compatibility with the new flow.
+   - If you rely on the organization's default email template, have Turnkey configure it for `ACTIVITY_TYPE_INIT_OTP`. Default templates registered for `ACTIVITY_TYPE_INIT_OTP_AUTH` are not selected automatically by the new flow. An existing template passed explicitly through `emailCustomization.templateId` can still be selected. Review its content for compatibility with the new flow.
    - Review your other email and SMS customization parameters against the new activity rather than copying the legacy request unchanged.
 3. **Client: encrypt the code.** Generate or select a P-256 key pair. Use `encryptOtpCodeToBundle(otpCode, otpEncryptionTargetBundle, publicKey)` to encrypt the code and public key, and send only the resulting `encryptedOtpBundle` to your backend. The private key stays on the client.
 4. **Backend: verify with `verifyOtp`.** Submit `ACTIVITY_TYPE_VERIFY_OTP_V2` with `otpId` and `encryptedOtpBundle`, using the same organization ID as initialization. Return the `verificationToken` to the client; it is bound to the client key used in the encrypted bundle.
@@ -218,6 +218,8 @@ These legacy flows deliver an encrypted credential bundle through email. The rep
 
 Email remains available for authentication and recovery through the encrypted OTP flow. This migration changes the activity sequence, email experience, credential handling, and permissions. Upgrading the SDK alone does not replace existing calls to the legacy methods.
 
+The numbered sequences and recovery examples below use low-level SDK clients. Core and Wallet Kit login helpers use different activities depending on the SDK version; see [Wallet Kit and Core login activities](#wallet-kit-and-core-login-activities).
+
 ### Choose the flow that matches your integration
 
 | Existing use case | Replacement |
@@ -230,7 +232,7 @@ Recovery includes authenticator enrollment. Completing OTP login alone does not 
 ### Before you deploy
 
 - Upgrade the relevant SDK packages to the versions listed in [Upgrade the SDKs](#upgrade-the-sdks).
-- Confirm that `FEATURE_NAME_OTP_EMAIL_AUTH` is enabled for the target sub-organization. The legacy email-authentication and email-recovery feature settings do not substitute for this setting. See [Email feature configuration](/features/authentication/email#implementation-in-organizations) and [Set organization feature](/api-reference/activities/set-organization-feature).
+- Confirm that `FEATURE_NAME_OTP_EMAIL_AUTH` is enabled for the target sub-organization, as it is by default for new sub-organizations. The legacy email-authentication and email-recovery feature settings do not substitute for this setting. If it is disabled, enabling it requires the sub-organization's own root quorum; the parent organization cannot enable it on the user's behalf during recovery. See [Organization features](/features/organizations#features).
 - Update activity permissions to allow `ACTIVITY_TYPE_INIT_OTP_V3`, `ACTIVITY_TYPE_VERIFY_OTP_V2`, and `ACTIVITY_TYPE_OTP_LOGIN_V2` for the users submitting those requests. For recovery, also ensure the recovering user can submit `ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2` with the recovery session. Preserve existing user, organization, and operation restrictions; see [Update policies before deploying](#update-policies-before-deploying).
 - Review credential-type checks in policy `consensus` expressions. Legacy checks for `CREDENTIAL_TYPE_EMAIL_AUTH_KEY_P256` or `CREDENTIAL_TYPE_RECOVER_USER_KEY_P256` do not match requests stamped with the new `CREDENTIAL_TYPE_LOGIN` sessions. When updating these checks, retain the recovery flow's restrictions on permitted operations and users; matching a login session alone does not restrict it to recovery.
 - Review your email templates and callback UI. The replacement sends an OTP to verify, rather than a recovery or authentication credential bundle to import.
@@ -240,7 +242,9 @@ Adding MFA is not a prerequisite for this migration. Existing applicable MFA pol
 
 ### Preserve existing MFA enforcement
 
-Update MFA conditions that match legacy activities. For example, `activity.kind == 'EMAIL_AUTH'` does not match `OTP_LOGIN`, and `activity.kind == 'RECOVER_USER'` does not match `CREATE_AUTHENTICATORS`. Review conditions using exact `activity.type` values too. Apply the intended authentication requirements to the replacement login and authenticator-enrollment activities, preserving existing user and operation restrictions. During a staged rollout, keep the legacy activities covered until all clients have migrated.
+Update MFA conditions that match legacy activities. For example, `activity.kind == 'EMAIL_AUTH'` does not match `OTP_LOGIN`. The legacy recovery initialization kind is `INIT_USER_EMAIL_RECOVERY`; there is no `RECOVER_USER` activity kind. Review conditions using exact `activity.type` values too. Recovery now includes separate login and authenticator-enrollment activities, so review the intended MFA requirements for both rather than substituting a single activity name.
+
+For Core and Wallet Kit versions using attested login, include `STAMP_LOGIN` in the relevant login conditions; a condition matching only `OTP_LOGIN` will miss that path. Preserve existing user and operation restrictions, and keep legacy activities covered during a staged rollout.
 
 Before implementing login, decide which user will stamp the request. MFA policies apply to the user whose credential stamps the request.
 
@@ -278,7 +282,9 @@ Before enabling recovery, create a short-lived session profile in the parent org
 
 A session profile limits the session's permissions; it does not automatically require MFA.
 
-Email OTP is an authentication method, not a separate recovery-only credential. The profile restricts requests stamped with the issued session; it does not restrict other uses of the verification token and its bound client key. Those remain usable for [attested requests while the token is valid](/features/authentication/mfa/satisfying-mfa#while-an-activity-is-held). If your application intends email to grant only recovery access, enforce that requirement through the applicable authorization and MFA policies, and validate every supported login path. Selecting the recovery profile in the UI alone does not enforce it. Test requests that omit or change `sessionProfileId`, as well as direct attested requests for operations outside recovery.
+Email OTP is an authentication method, not a separate recovery-only credential. For a root user who satisfies a quorum threshold of one, the verification token and its bound client key grant full account access unless applicable MFA policies require an additional factor. Ordinary authorization policies cannot restrict actions that satisfy the [root quorum](/features/users/root-quorum#technical-overview). If email alone should grant only recovery access, configure MFA to protect normal login and sensitive direct attested requests as well as the recovery path; a policy matching only the recovery profile is insufficient.
+
+The profile restricts the issued session, but it does not make the email credential recovery-only. For low-level `OTP_LOGIN_V2`, `clientSignature` does not cover `sessionProfileId`, so the party submitting login can omit it or request another profile. Login also does not consume the verification token, which remains usable for [attested requests until it expires](/features/authentication/mfa/satisfying-mfa#while-an-activity-is-held). Token expiration does not revoke sessions or authenticators created beforehand. Validate the intended MFA requirements with requests that omit or change `sessionProfileId`, and with direct attested requests outside recovery.
 
 For each recovery attempt, follow the initialization, encryption, and verification steps above, then complete login directly into the recovery session:
 
@@ -328,7 +334,7 @@ Before removing the legacy flow, confirm that:
 - Recovery enrolls a working replacement authenticator in the existing account.
 - MFA conditions cover the replacement activities and still trigger the intended challenges. During rollout, verify the legacy flow remains covered too.
 - Any recovery-session restrictions prevent operations outside the intended scope.
-- If email is intended only for recovery, omitting or changing `sessionProfileId`, or submitting direct attested requests with the verification token, does not bypass those restrictions.
+- If email alone should grant only recovery access, MFA requires an additional factor for normal login and sensitive direct attested requests, including for root users with a quorum threshold of one. Test omitted or changed `sessionProfileId` values; ordinary authorization policies and a recovery session profile do not enforce this restriction for those users.
 - The replacement passkey is subject to the intended authorization and MFA policies when used for normal login and subsequent operations.
 - Session expiration and invalidation behave as expected, including the effect on sessions created through other login methods.
 - Subsequent wallet operations work with the normal login session; recovery sessions remain limited to authenticator enrollment.
@@ -350,6 +356,12 @@ The encrypted flow was introduced in the following releases. Use these versions 
 | `@turnkey/http`                    | [`4.0.0`](https://github.com/tkhq/sdk/blob/main/packages/http/CHANGELOG.md#400)                    |
 | `@turnkey/sdk-types`               | [`1.0.0`](https://github.com/tkhq/sdk/blob/main/packages/sdk-types/CHANGELOG.md#100)               |
 | `@turnkey/crypto`                  | [`2.9.0`](https://github.com/tkhq/sdk/blob/main/packages/crypto/CHANGELOG.md#290)                  |
+
+### Wallet Kit and Core login activities
+
+The versions above are the minimum for encrypted OTP support. Attested login, session-profile parameters on auth helpers, and built-in MFA handling were added later: [`@turnkey/core` 2.7.0](https://github.com/tkhq/sdk/blob/main/packages/core/CHANGELOG.md#270), [`@turnkey/react-wallet-kit` 2.4.0](https://github.com/tkhq/sdk/blob/main/packages/react-wallet-kit/CHANGELOG.md#240), and [`@turnkey/react-native-wallet-kit` 2.3.0](https://github.com/tkhq/sdk/blob/main/packages/react-native-wallet-kit/CHANGELOG.md#230).
+
+Starting with those releases, `loginWithOtp` submits `STAMP_LOGIN` with an end-user attested stamp. Earlier encrypted-OTP releases use `proxyOtpLoginV2`, whose login is stamped by the Auth Proxy. Low-level integrations calling `otpLogin` directly submit `OTP_LOGIN_V2`. Review permissions and MFA conditions against the activity and stamping user used by your integration.
 
 Choose the section below that matches your integration.
 
@@ -383,7 +395,7 @@ Choose the section below that matches your integration.
 
     `verifyOtp` no longer accepts `contact` or `otpType`, and it no longer returns `subOrganizationId`. Use `completeOtp` to perform verification plus account lookup and login/signup. For Auth Proxy integrations that perform account lookup separately, call `httpClient.proxyGetAccount` after verification. For backend-driven integrations, use the `getSubOrgIds` lookup shown in [Migrating from legacy OTP Auth](#migrating-from-legacy-otp-auth).
 
-    `loginWithOtp` and `signUpWithOtp` no longer accept a separate `publicKey`. They reuse the key bound during `verifyOtp` and generate the required client signature automatically.
+    `loginWithOtp` and `signUpWithOtp` no longer accept a separate `publicKey`. They reuse the key bound during `verifyOtp`. `signUpWithOtp` generates the required signup `clientSignature` automatically. In the [attested-login releases](#wallet-kit-and-core-login-activities), `loginWithOtp` instead submits `STAMP_LOGIN` with an attested stamp; earlier encrypted-OTP releases generate a login `clientSignature` for the Auth Proxy flow.
 
     ```ts
     await loginWithOtp({
