@@ -32,6 +32,63 @@ operations:
 | function   | Timestamp(\<rfc3339>)                 | "Timestamp('2025-01-01T00:00:00Z')"                   | ([string](#type-string)) -> [timestamp](#type-timestamp)            |
 | function   | CronSpan(\<cron>, \<duration>, \<tz>) | "CronSpan('0 9 \* \* 1-5', '8h', 'America/New_York')" | ([string](#type-string), [string](#type-string), [string](#type-string)) -> [bool](#type-bool) |
 
+### Operator precedence
+
+Operators bind in this order, from tightest to loosest:
+
+| Level | Operators                                  | Associativity |
+| ----- | ------------------------------------------ | ------------- |
+| 1     | access (`.`, `[]`) and function calls      | left          |
+| 2     | unary `!`, `-`                             | n/a           |
+| 3     | `==`, `!=`, `<`, `>`, `<=`, `>=`, `in`     | left          |
+| 4     | `&&`, `\|\|`                               | left          |
+
+<Warning>
+`&&` and `||` have the **same** precedence and are evaluated left to right. This is different
+from most programming languages, where AND binds tighter than OR.
+
+So `A || B && C` is evaluated as `(A || B) && C`, not as `A || (B && C)`.
+
+For example, this condition:
+
+```
+eth.tx.to == '<ADDRESS_A>'
+  || eth.tx.to == '<ADDRESS_B>'
+  && eth.tx.value == 0
+```
+
+is evaluated as:
+
+```
+(eth.tx.to == '<ADDRESS_A>'
+  || eth.tx.to == '<ADDRESS_B>')
+  && eth.tx.value == 0
+```
+
+It matches only zero-value transactions, to either address. It does not match a non-zero
+transaction to `<ADDRESS_A>`.
+
+Always use parentheses when a condition mixes `&&` and `||`:
+
+```
+eth.tx.to == '<ADDRESS_A>'
+  || (eth.tx.to == '<ADDRESS_B>'
+      && eth.tx.value == 0)
+```
+
+The line breaks in these examples are only for readability.
+
+</Warning>
+
+Comparisons bind tighter than `&&` and `||`, so `a == 1 && b == 2` is `(a == 1) && (b == 2)`.
+Unary `!` and `-` apply only to the single operand directly after them: a value, a field access,
+a function call, or a parenthesized expression. For example, `!x == y` is `(!x) == y`. Use
+parentheses to negate a larger expression, as in `!(x == y)`. A double negation such as `!!x` is
+not valid.
+
+Both operands of `&&` and `||` are always evaluated. Refer to
+[Policy evaluation](#policy-evaluation).
+
 ## Keywords
 
 Keywords are reserved words that are dynamically interchanged for real values at evaluation time.
