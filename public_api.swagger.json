@@ -1039,6 +1039,32 @@
         "tags": ["TVC"]
       }
     },
+    "/public/v1/query/get_tvc_manifest_generation_info": {
+      "post": {
+        "summary": "Get TVC manifest generation info",
+        "description": "Get default values for creating a QOS manifest. Relevant for client manifest generation.",
+        "operationId": "GetTvcManifestGenerationInfo",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GetTvcManifestGenerationInfoResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GetTvcManifestGenerationInfoRequest"
+            }
+          }
+        ],
+        "tags": ["TVC"]
+      }
+    },
     "/public/v1/query/get_tvc_qos_versions": {
       "post": {
         "summary": "Get TVC QOS versions",
@@ -2420,7 +2446,7 @@
     "/public/v1/submit/create_sub_organization": {
       "post": {
         "summary": "Create sub-organization",
-        "description": "Create a new sub-organization. Each root user must have at least one valid credential: an API key, an authenticator, an OAuth provider, or an email or phone number with a login method enabled on the sub-organization (email, email OTP, or SMS).",
+        "description": "Create a new sub-organization. Each root user must have at least one valid credential: an API key, an authenticator, an OAuth provider, a wallet authenticator, or an email or phone number with a login method enabled on the sub-organization (email, email OTP, or SMS).",
         "operationId": "CreateSubOrganization",
         "responses": {
           "200": {
@@ -2446,7 +2472,7 @@
     "/public/v1/submit/create_swap_quote": {
       "post": {
         "summary": "Create Swap quote",
-        "description": "Create a swap quote. Asset chains are derived from CAIP-19 asset IDs; cross-chain quotes are supported.",
+        "description": "Create a swap quote. Asset chains are derived from CAIP-19 asset IDs; cross-chain quotes are supported. Requests must use ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3, which returns its quotes in createSwapQuoteResultV2.",
         "operationId": "CreateSwapQuote",
         "responses": {
           "200": {
@@ -3486,7 +3512,7 @@
     "/public/v1/submit/execute_swap": {
       "post": {
         "summary": "Execute Swap",
-        "description": "Execute the exact provider quote identified by quote_id through the activity pipeline and Turnkey broadcasting. Requests must use ACTIVITY_TYPE_EXECUTE_SWAP_V2.",
+        "description": "Execute the exact provider quote identified by quote_id through the activity pipeline and Turnkey broadcasting. Requests must use ACTIVITY_TYPE_EXECUTE_SWAP_V3.",
         "operationId": "ExecuteSwap",
         "responses": {
           "200": {
@@ -5363,8 +5389,11 @@
         "ACTIVITY_TYPE_DELETE_SECRETS",
         "ACTIVITY_TYPE_EARN_CLAIM_REWARDS",
         "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
+        "ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V9",
         "ACTIVITY_TYPE_UPSERT_SWAP_FEE_SPONSORSHIP_LIMIT_CONFIG",
-        "ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG"
+        "ACTIVITY_TYPE_UPSERT_SWAP_FIXED_RATE_LIMIT_CONFIG",
+        "ACTIVITY_TYPE_CREATE_FIAT_ON_RAMP_SESSION",
+        "ACTIVITY_TYPE_CREATE_FIAT_OFF_RAMP_SESSION"
       ]
     },
     "AddressFormat": {
@@ -5766,7 +5795,8 @@
         "AUTHENTICATION_TYPE_PASSKEY",
         "AUTHENTICATION_TYPE_API_KEY",
         "AUTHENTICATION_TYPE_OAUTH",
-        "AUTHENTICATION_TYPE_SESSION"
+        "AUTHENTICATION_TYPE_SESSION",
+        "AUTHENTICATION_TYPE_WALLET"
       ]
     },
     "Authenticator": {
@@ -6257,6 +6287,39 @@
       },
       "required": ["authenticatorIds"]
     },
+    "CreateFiatOffRampSessionIntent": {
+      "type": "object",
+      "properties": {
+        "quoteId": {
+          "type": "string",
+          "description": "Identifier of a saved fiat off-ramp quote. Returned by GetFiatOffRampQuotes."
+        },
+        "walletAddress": {
+          "type": "string",
+          "description": "Wallet address for this sale. Coinbase uses it as the source address. MoonPay uses it as the refund address; the user deposits the crypto to MoonPay separately."
+        },
+        "redirectUrl": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "URL Coinbase redirects to after the user submits the sell. Required when the saved quote is from Coinbase. Coinbase buy does not use this field. MoonPay ignores it."
+        }
+      },
+      "required": ["quoteId", "walletAddress"]
+    },
+    "CreateFiatOffRampSessionResult": {
+      "type": "object",
+      "properties": {
+        "offRampUrl": {
+          "type": "string",
+          "description": "URL of the fiat off-ramp session for the saved quote."
+        },
+        "offRampTransactionId": {
+          "type": "string",
+          "description": "Unique identifier used to retrieve transaction statuses for a given fiat off-ramp flow."
+        }
+      },
+      "required": ["offRampUrl", "offRampTransactionId"]
+    },
     "CreateFiatOnRampCredentialIntent": {
       "type": "object",
       "properties": {
@@ -6327,6 +6390,34 @@
         }
       },
       "required": ["fiatOnRampCredentialId"]
+    },
+    "CreateFiatOnRampSessionIntent": {
+      "type": "object",
+      "properties": {
+        "quoteId": {
+          "type": "string",
+          "description": "Identifier of a saved fiat on-ramp quote. Returned by GetFiatOnRampQuotes."
+        },
+        "walletAddress": {
+          "type": "string",
+          "description": "Destination wallet address for the buy transaction."
+        }
+      },
+      "required": ["quoteId", "walletAddress"]
+    },
+    "CreateFiatOnRampSessionResult": {
+      "type": "object",
+      "properties": {
+        "onRampUrl": {
+          "type": "string",
+          "description": "URL of the fiat on-ramp session for the saved quote."
+        },
+        "onRampTransactionId": {
+          "type": "string",
+          "description": "Unique identifier used to retrieve transaction statuses for a given fiat on-ramp flow."
+        }
+      },
+      "required": ["onRampUrl", "onRampTransactionId"]
     },
     "CreateInvitationsIntent": {
       "type": "object",
@@ -6902,6 +6993,16 @@
             "$ref": "#/definitions/PrivateKeyParams"
           },
           "description": "A list of Private Keys."
+        },
+        "externalSignerPubkey": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The public key of the external signer to use for creating the private keys. Only needed for external signer requests."
+        },
+        "externalSignerWrappingKeyId": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The object ID of the wrapping key the external signer will use when creating the private keys. Only needed for external signer requests."
         }
       },
       "required": ["privateKeys"]
@@ -7600,6 +7701,64 @@
       },
       "required": ["subOrganizationName", "rootUsers", "rootQuorumThreshold"]
     },
+    "CreateSubOrganizationIntentV9": {
+      "type": "object",
+      "properties": {
+        "subOrganizationName": {
+          "type": "string",
+          "description": "Name for this sub-organization"
+        },
+        "rootUsers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/RootUserParamsV6"
+          },
+          "description": "Root users to create within this sub-organization"
+        },
+        "rootQuorumThreshold": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The threshold of unique approvals to reach root quorum. This value must be less than or equal to the number of root users"
+        },
+        "wallet": {
+          "$ref": "#/definitions/WalletParams",
+          "x-nullable": true,
+          "description": "The wallet to create for the sub-organization"
+        },
+        "disableEmailRecovery": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Disable email recovery for the sub-organization"
+        },
+        "disableEmailAuth": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Disable email auth for the sub-organization"
+        },
+        "disableSmsAuth": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Disable OTP SMS auth for the sub-organization"
+        },
+        "disableOtpEmailAuth": {
+          "type": "boolean",
+          "x-nullable": true,
+          "description": "Disable OTP email auth for the sub-organization"
+        },
+        "verificationToken": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Signed JWT containing a unique id, expiry, verification type, contact"
+        },
+        "clientSignature": {
+          "$ref": "#/definitions/ClientSignature",
+          "x-nullable": true,
+          "description": "Optional signature proving authorization for this sub-organization creation. The signature is over the verification token ID and the root user parameters for the root user associated with the verification token. Only required if a public key was provided during the verification step."
+        }
+      },
+      "required": ["subOrganizationName", "rootUsers", "rootQuorumThreshold"]
+    },
     "CreateSubOrganizationRequest": {
       "type": "object",
       "properties": {
@@ -7758,6 +7917,25 @@
       },
       "required": ["subOrganizationId"]
     },
+    "CreateSubOrganizationResultV9": {
+      "type": "object",
+      "properties": {
+        "subOrganizationId": {
+          "type": "string"
+        },
+        "wallet": {
+          "$ref": "#/definitions/WalletResult",
+          "x-nullable": true
+        },
+        "rootUserIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["subOrganizationId"]
+    },
     "CreateSwapQuoteIntent": {
       "type": "object",
       "properties": {
@@ -7848,11 +8026,13 @@
         },
         "feeSponsorship": {
           "type": "boolean",
-          "x-nullable": true
+          "x-nullable": true,
+          "description": "When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false."
         },
         "fixedRate": {
           "type": "boolean",
-          "x-nullable": true
+          "x-nullable": true,
+          "description": "When true, requests a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false."
         }
       },
       "required": ["signWith", "inputToken", "outputToken", "inputAmount"]
@@ -7862,7 +8042,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ACTIVITY_TYPE_CREATE_SWAP_QUOTE"]
+          "enum": ["ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3"]
         },
         "timestampMs": {
           "type": "string",
@@ -7873,7 +8053,7 @@
           "description": "Unique identifier for a given Organization."
         },
         "parameters": {
-          "$ref": "#/definitions/CreateSwapQuoteIntent"
+          "$ref": "#/definitions/CreateSwapQuoteIntentV3"
         },
         "generateAppProofs": {
           "type": "boolean",
@@ -7904,9 +8084,11 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SwapQuoteV2"
-          }
+          },
+          "description": "One or more provider quotes for this request. Today this contains a single Relay quote; pass quotes[i].quoteId to execute_swap to bind execution."
         }
-      }
+      },
+      "required": ["quotes"]
     },
     "CreateTvcAppIntent": {
       "type": "object",
@@ -8100,6 +8282,12 @@
           "format": "int64",
           "x-nullable": true,
           "description": "Optional desired instance memory size in GiB."
+        },
+        "qosManifest": {
+          "type": "string",
+          "format": "byte",
+          "x-nullable": true,
+          "description": "Optional client-generated QOS manifest."
         }
       },
       "required": [
@@ -9696,7 +9884,7 @@
           "items": {
             "type": "string"
           },
-          "description": "List of unique identifiers for Velocity Controls within an Organization."
+          "description": "List of 1 to 32 unique identifiers for Velocity Controls within an Organization."
         }
       },
       "required": ["velocityControlIds"]
@@ -11613,7 +11801,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ACTIVITY_TYPE_EXECUTE_SWAP_V2"]
+          "enum": ["ACTIVITY_TYPE_EXECUTE_SWAP_V3"]
         },
         "timestampMs": {
           "type": "string",
@@ -11624,7 +11812,7 @@
           "description": "Unique identifier for a given Organization."
         },
         "parameters": {
-          "$ref": "#/definitions/ExecuteSwapIntentV2"
+          "$ref": "#/definitions/ExecuteSwapIntentV3"
         },
         "generateAppProofs": {
           "type": "boolean",
@@ -11924,7 +12112,6 @@
     "FiatOnRampBlockchainNetwork": {
       "type": "string",
       "enum": [
-        "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_BITCOIN",
         "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_ETHEREUM",
         "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_SOLANA",
         "FIAT_ON_RAMP_BLOCKCHAIN_NETWORK_BASE"
@@ -12062,7 +12249,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -12091,7 +12278,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "filterByStatus": {
           "type": "array",
@@ -12133,7 +12320,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "activityId": {
           "type": "string",
@@ -12147,7 +12334,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "apiKeyId": {
           "type": "string",
@@ -12171,7 +12358,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "userId": {
           "type": "string",
@@ -12251,7 +12438,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "authenticatorId": {
           "type": "string",
@@ -12275,7 +12462,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "userId": {
           "type": "string",
@@ -12521,7 +12708,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "publicKey": {
           "type": "string",
@@ -12559,7 +12746,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "userId": {
           "type": "string",
@@ -12587,7 +12774,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "userId": {
           "type": "string",
@@ -12615,7 +12802,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "activityId": {
           "type": "string",
@@ -12736,7 +12923,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "userId": {
           "type": "string",
@@ -12765,7 +12952,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "transactionId": {
           "type": "string",
@@ -12794,7 +12981,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -12814,7 +13001,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -12838,7 +13025,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "activityId": {
           "type": "string",
@@ -12865,7 +13052,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "policyId": {
           "type": "string",
@@ -12889,7 +13076,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "privateKeyId": {
           "type": "string",
@@ -12913,7 +13100,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -12937,7 +13124,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "sendTransactionStatusId": {
           "type": "string",
@@ -12979,7 +13166,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "sessionProfileId": {
           "type": "string",
@@ -13003,7 +13190,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -13027,7 +13214,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "smartContractInterfaceId": {
           "type": "string",
@@ -13051,7 +13238,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -13109,7 +13296,8 @@
       "type": "object",
       "properties": {
         "organizationId": {
-          "type": "string"
+          "type": "string",
+          "description": "Unique identifier for a given organization."
         }
       },
       "required": ["organizationId"]
@@ -13219,7 +13407,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "appId": {
           "type": "string",
@@ -13247,7 +13435,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "tvcAppId": {
           "type": "string",
@@ -13271,7 +13459,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "isLive": {
           "type": "boolean",
@@ -13374,7 +13562,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "deploymentId": {
           "type": "string",
@@ -13393,12 +13581,70 @@
       },
       "required": ["tvcDeployment"]
     },
+    "GetTvcManifestGenerationInfoRequest": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "appId": {
+          "type": "string"
+        },
+        "qosVersion": {
+          "type": "string",
+          "description": "QOS version of the deployment. Defaults to the latest recommended TVC QOS version."
+        }
+      },
+      "required": ["organizationId", "appId"]
+    },
+    "GetTvcManifestGenerationInfoResponse": {
+      "type": "object",
+      "properties": {
+        "nonce": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "pcr0": {
+          "type": "string"
+        },
+        "pcr1": {
+          "type": "string"
+        },
+        "pcr2": {
+          "type": "string"
+        },
+        "pcr3": {
+          "type": "string"
+        },
+        "qosVersion": {
+          "type": "string"
+        },
+        "defaultDnsResolvers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "nonce",
+        "namespace",
+        "pcr0",
+        "pcr1",
+        "pcr2",
+        "pcr3",
+        "qosVersion"
+      ]
+    },
     "GetTvcOperatorsRequest": {
       "type": "object",
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -13448,7 +13694,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -13471,7 +13717,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "userId": {
           "type": "string",
@@ -13495,7 +13741,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -13554,7 +13800,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "walletId": {
           "type": "string",
@@ -13588,7 +13834,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "walletId": {
           "type": "string",
@@ -13626,7 +13872,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "address": {
           "type": "string",
@@ -13681,7 +13927,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "walletId": {
           "type": "string",
@@ -13705,7 +13951,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -13739,7 +13985,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "organizationName": {
           "type": "string",
@@ -15304,11 +15550,20 @@
         "createSwapQuoteIntentV3": {
           "$ref": "#/definitions/CreateSwapQuoteIntentV3"
         },
+        "createSubOrganizationIntentV9": {
+          "$ref": "#/definitions/CreateSubOrganizationIntentV9"
+        },
         "upsertSwapFeeSponsorshipLimitConfigIntent": {
           "$ref": "#/definitions/UpsertSwapFeeSponsorshipLimitConfigIntent"
         },
         "upsertSwapFixedRateLimitConfigIntent": {
           "$ref": "#/definitions/UpsertSwapFixedRateLimitConfigIntent"
+        },
+        "createFiatOnRampSessionIntent": {
+          "$ref": "#/definitions/CreateFiatOnRampSessionIntent"
+        },
+        "createFiatOffRampSessionIntent": {
+          "$ref": "#/definitions/CreateFiatOffRampSessionIntent"
         }
       }
     },
@@ -15600,7 +15855,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "address": {
           "type": "string",
@@ -15703,7 +15958,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -15755,7 +16010,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "address": {
           "type": "string",
@@ -15800,7 +16055,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         },
         "caip2": {
           "type": "string",
@@ -15851,7 +16106,7 @@
       "properties": {
         "organizationId": {
           "type": "string",
-          "description": "Unique identifier for a given organization."
+          "description": "Unique identifier for a given Organization."
         }
       },
       "required": ["organizationId"]
@@ -17677,11 +17932,20 @@
         "createSwapQuoteResultV2": {
           "$ref": "#/definitions/CreateSwapQuoteResultV2"
         },
+        "createSubOrganizationResultV9": {
+          "$ref": "#/definitions/CreateSubOrganizationResultV9"
+        },
         "upsertSwapFeeSponsorshipLimitConfigResult": {
           "$ref": "#/definitions/UpsertSwapFeeSponsorshipLimitConfigResult"
         },
         "upsertSwapFixedRateLimitConfigResult": {
           "$ref": "#/definitions/UpsertSwapFixedRateLimitConfigResult"
+        },
+        "createFiatOnRampSessionResult": {
+          "$ref": "#/definitions/CreateFiatOnRampSessionResult"
+        },
+        "createFiatOffRampSessionResult": {
+          "$ref": "#/definitions/CreateFiatOffRampSessionResult"
         }
       }
     },
@@ -17910,6 +18174,64 @@
         }
       },
       "required": ["userName", "apiKeys", "authenticators", "oauthProviders"]
+    },
+    "RootUserParamsV6": {
+      "type": "object",
+      "properties": {
+        "userName": {
+          "type": "string",
+          "description": "Human-readable name for a User."
+        },
+        "userEmail": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The user's email address."
+        },
+        "userPhoneNumber": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The user's phone number in E.164 format e.g. +13214567890"
+        },
+        "apiKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ApiKeyParamsV2"
+          },
+          "description": "A list of API Key parameters. This field, if not needed, should be an empty array in your request body."
+        },
+        "authenticators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthenticatorParamsV2"
+          },
+          "description": "A list of Authenticator parameters. This field, if not needed, should be an empty array in your request body."
+        },
+        "oauthProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OauthProviderParamsV2"
+          },
+          "description": "A list of Oauth providers. This field, if not needed, should be an empty array in your request body."
+        },
+        "walletAuthenticators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WalletAuthenticatorParams"
+          },
+          "description": "A list of wallet authenticators. This field, if not needed, should be an empty array in your request body."
+        }
+      },
+      "required": [
+        "userName",
+        "apiKeys",
+        "authenticators",
+        "oauthProviders",
+        "walletAuthenticators"
+      ]
     },
     "SecretMetadata": {
       "type": "object",
@@ -18233,6 +18555,11 @@
         "hashFunction": {
           "$ref": "#/definitions/HashFunction",
           "description": "Hash function to apply to payload bytes before signing. This field must be set to HASH_FUNCTION_NOT_APPLICABLE for EdDSA/ed25519 signature requests; configurable payload hashing is not supported by RFC 8032."
+        },
+        "externalSignerPubkey": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The public key of the external signer to use for signing the payload. Only needed for external signer requests."
         }
       },
       "required": ["signWith", "payload", "encoding", "hashFunction"]
@@ -18301,6 +18628,11 @@
         "hashFunction": {
           "$ref": "#/definitions/HashFunction",
           "description": "Hash function to apply to payload bytes before signing. This field must be set to HASH_FUNCTION_NOT_APPLICABLE for EdDSA/ed25519 signature requests; configurable payload hashing is not supported by RFC 8032."
+        },
+        "externalSignerPubkey": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The public key of the external signer to use for signing the payloads. Only needed for external signer requests."
         }
       },
       "required": ["signWith", "payloads", "encoding", "hashFunction"]
@@ -18372,6 +18704,11 @@
         },
         "type": {
           "$ref": "#/definitions/TransactionType"
+        },
+        "externalSignerPubkey": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The public key of the external signer to use for signing this transaction. Only needed for external signer requests."
         }
       },
       "required": ["signWith", "unsignedTransaction", "type"]
@@ -18474,6 +18811,47 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/OauthProviderParamsV2"
+          }
+        }
+      }
+    },
+    "SignupUsageV3": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "phoneNumber": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "apiKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ApiKeyParamsV2"
+          }
+        },
+        "authenticators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthenticatorParamsV2"
+          }
+        },
+        "oauthProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OauthProviderParamsV2"
+          }
+        },
+        "walletAuthenticators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WalletAuthenticatorParams"
           }
         }
       }
@@ -19511,25 +19889,17 @@
           "description": "Provider-estimated completion time in seconds, when available."
         },
         "feeSponsorship": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether Turnkey pays the provider fees for this quote."
         },
         "fixedRate": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether this quote uses a 1:1 fixed rate."
         },
-        "turnkeyFeeCollection": {
-          "type": "string"
-        },
-        "sponsoredFeeComponents": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "remainingFeeComponents": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
+        "estimatedFixedRateAdjustmentUsd": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Estimated USD adjustment for the fixed rate. Present only for fixed-rate quotes. Positive is a cost billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. Informational; the final amount is settled after execution."
         }
       },
       "required": [
@@ -19538,7 +19908,9 @@
         "outputAmount",
         "minOutputAmount",
         "expiresAt",
-        "clientFeeBps"
+        "clientFeeBps",
+        "feeSponsorship",
+        "fixedRate"
       ]
     },
     "SwapRefund": {
@@ -19565,7 +19937,8 @@
       "properties": {
         "windowDurationMinutes": {
           "type": "integer",
-          "format": "int32"
+          "format": "int32",
+          "description": "Rolling window duration in minutes."
         },
         "windowLimitUsd": {
           "type": "string",
@@ -19573,14 +19946,15 @@
         },
         "usageUsd": {
           "type": "string",
-          "description": "Settled spending in the current window. Fixed-rate usage stays zero until final fixed-rate costs are recorded."
+          "description": "Settled spending in the current window. Fixed-rate earnings offset fixed-rate costs, and usage never goes below zero. Fixed-rate usage stays zero until final fixed-rate costs are recorded."
         },
         "remainingUsd": {
           "type": "string",
           "description": "Remaining spending capacity, clamped to zero. For children, also capped by remaining parent capacity. Zero when the window is disabled. This is not a reservation or a guarantee of feature eligibility."
         },
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether the saved spending window permits new swaps."
         },
         "subOrgWindowLimitUsd": {
           "type": "string",
@@ -19601,7 +19975,7 @@
       "properties": {
         "permitted": {
           "type": "boolean",
-          "description": "Whether the billing parent holds this feature's signed permission. Quotes can use the feature only when it is permitted and its window is enabled."
+          "description": "Whether the billing parent holds this feature's signed permission, which enabling its spending window grants. Quotes can use the feature only when it is permitted and its window is enabled."
         },
         "window": {
           "$ref": "#/definitions/SwapSpendingWindow",
@@ -19633,6 +20007,9 @@
         },
         "signupV2": {
           "$ref": "#/definitions/SignupUsageV2"
+        },
+        "signupV3": {
+          "$ref": "#/definitions/SignupUsageV3"
         }
       },
       "required": ["type", "tokenId"]
@@ -19809,7 +20186,7 @@
         },
         "publicDomain": {
           "type": "string",
-          "description": "The public domain for ingress to this TVC App (in the format \"app-\u003cID\u003e.turnkey.cloud\")."
+          "description": "The public domain for ingress to this TVC App (in the format \"app-\u003cID\u003e.app.turnkey.cloud\"). May contain multiple comma-separated hostnames."
         },
         "enableDebugModeDeployments": {
           "type": "boolean",
@@ -21407,7 +21784,8 @@
       "properties": {
         "feeReceiverWalletAddress": {
           "type": "string",
-          "x-nullable": true
+          "x-nullable": true,
+          "description": "Organization-owned wallet account that receives swap fees. Required when fee_bps is set. Omit together with fee_bps to clear swap fees."
         },
         "feeBps": {
           "type": "string",
@@ -21481,7 +21859,7 @@
         "enabled": {
           "type": "boolean",
           "x-nullable": true,
-          "description": "Whether this spending window permits new swaps. Setting false only turns the saved window off and keeps its limits; it doesn't require the signed permission. This does not grant or remove the signed organization permission."
+          "description": "Whether this spending window permits new swaps. True also grants the billing parent's signed permission for the feature. False turns the saved window off, keeps its limits, and removes the permission. Granting or removing the permission needs root quorum."
         }
       },
       "required": [
@@ -21516,7 +21894,8 @@
       "type": "object",
       "properties": {
         "organizationId": {
-          "type": "string"
+          "type": "string",
+          "description": "Unique identifier of the organization the limit config was saved for."
         }
       },
       "required": ["organizationId"]
@@ -21539,7 +21918,7 @@
         "enabled": {
           "type": "boolean",
           "x-nullable": true,
-          "description": "Whether this spending window permits new swaps. Setting false only turns the saved window off and keeps its limits; it doesn't require the signed permission. This does not grant or remove the signed organization permission."
+          "description": "Whether this spending window permits new swaps. True also grants the billing parent's signed permission for the feature. False turns the saved window off, keeps its limits, and removes the permission. Granting or removing the permission needs root quorum."
         }
       },
       "required": [
@@ -21574,7 +21953,8 @@
       "type": "object",
       "properties": {
         "organizationId": {
-          "type": "string"
+          "type": "string",
+          "description": "Unique identifier of the organization the limit config was saved for."
         }
       },
       "required": ["organizationId"]
@@ -21648,6 +22028,14 @@
             "$ref": "#/definitions/MfaPolicy"
           },
           "description": "A list of MFA Policies that define multi-factor authentication requirements for this user."
+        },
+        "walletAuthenticators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WalletAuthenticator"
+          },
+          "description": "A list of wallet authenticators (externally-owned Ethereum or Solana accounts used to authenticate). If not needed, this should be an empty array."
         }
       },
       "required": [
@@ -21659,7 +22047,8 @@
         "oauthProviders",
         "createdAt",
         "updatedAt",
-        "mfaPolicies"
+        "mfaPolicies",
+        "walletAuthenticators"
       ]
     },
     "UserParams": {
@@ -21902,7 +22291,7 @@
         },
         "threshold": {
           "type": "string",
-          "description": "Non-negative base-10 decimal string with at most 38 total digits and 18 fractional digits."
+          "description": "Non-negative base-10 decimal string with at most 46 integer digits and 32 fractional digits."
         },
         "window": {
           "$ref": "#/definitions/VelocityControlAggregationWindow",
@@ -22055,7 +22444,8 @@
         "decimals": {
           "type": "integer",
           "format": "int64",
-          "description": "Integer between 0 and 255 (inclusive) that specifies the number of decimal places for the asset."
+          "description": "Integer between 0 and 32 (inclusive) that specifies the number of decimal places for the asset.",
+          "maximum": 32
         }
       },
       "required": ["caip19", "decimals"]
@@ -22372,6 +22762,66 @@
         }
       },
       "required": ["curve", "pathFormat", "path", "addressFormat"]
+    },
+    "WalletAuthenticator": {
+      "type": "object",
+      "properties": {
+        "walletAuthenticatorId": {
+          "type": "string",
+          "description": "Unique identifier for a wallet authenticator."
+        },
+        "type": {
+          "$ref": "#/definitions/WalletAuthenticatorType",
+          "description": "Network this authenticator belongs to."
+        },
+        "address": {
+          "type": "string",
+          "description": "Normalized account address."
+        },
+        "domain": {
+          "type": "string",
+          "description": "SIWE/SIWS domain this authenticator is bound to."
+        },
+        "createdAt": {
+          "$ref": "#/definitions/external.data.v1.Timestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/definitions/external.data.v1.Timestamp"
+        }
+      },
+      "required": [
+        "walletAuthenticatorId",
+        "type",
+        "address",
+        "domain",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WalletAuthenticatorParams": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/WalletAuthenticatorType",
+          "description": "Network this authenticator belongs to."
+        },
+        "address": {
+          "type": "string",
+          "description": "Account address. Ethereum addresses are stored lowercase with a 0x prefix. Solana addresses are canonical base58."
+        },
+        "domain": {
+          "type": "string",
+          "description": "SIWE/SIWS domain this authenticator is bound to. Host only, lowercased."
+        }
+      },
+      "required": ["type", "address", "domain"]
+    },
+    "WalletAuthenticatorType": {
+      "type": "string",
+      "enum": [
+        "WALLET_AUTHENTICATOR_TYPE_ETHEREUM",
+        "WALLET_AUTHENTICATOR_TYPE_SOLANA"
+      ]
     },
     "WalletKitSettingsParams": {
       "type": "object",
