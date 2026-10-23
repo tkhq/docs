@@ -1,0 +1,67 @@
+---
+title: "TVC agent skill"
+description: "Install the tvc-deployments agent skill so AI coding agents can build, deploy, and maintain TVC apps with the tvc CLI."
+sidebarTitle: "Agent skill"
+tag: "Beta"
+---
+
+import { TvcBetaCallout } from "/snippets/tvc-beta-callout.mdx";
+
+<TvcBetaCallout />
+
+The `tvc` CLI ships with an agent skill, `tvc-deployments`, that teaches AI coding agents such as Claude Code, Codex, and Cursor how to drive the CLI. It is written in the open [Agent Skills](/get-started/ai-skills) format: a `SKILL.md` file plus a `references/` directory the agent reads when it needs command-by-command detail.
+
+The skill is embedded in the `tvc` binary and installed from it, so the copy you have always documents the CLI at the version you installed.
+
+## What the skill covers
+
+- **The deployment lifecycle.** Scaffolding and creating an app, creating and approving a deployment, polling until it is live, and switching traffic to a new deployment.
+- **The JSON output contract.** Running every command with `--message-format json`, parsing the NDJSON stdout, and branching on outcome `reason`s and error `code`s instead of message text.
+- **Maintaining an established app.** Finding apps and deployments, shipping a new version, reading debug logs, and rolling back or cleaning up.
+- **Guardrails.** Which commands are destructive, why non-interactive approval is blind, and when to stop and ask a human.
+
+The skill does not cover first-time human onboarding (organization setup, `tvc login`, dashboard key registration). That is what the [quickstart](/features/verifiable-cloud/quickstart) is for. Wallet, signing, and policy work over the HTTP API is covered by the other [Turnkey agent skills](/get-started/ai-skills).
+
+## Install
+
+Install the CLI if you have not already, then save the bundled skill into a skills directory. By default it writes to the project-level `./.claude/skills`:
+
+```bash
+cargo install tvc
+tvc skills save
+```
+
+Other targets:
+
+```bash
+# User-level skills directory (~/.claude/skills)
+tvc skills save --global
+
+# Any other skills root, for example one your agent of choice scans
+tvc skills save --dir <DIR>
+```
+
+The command writes `tvc-deployments/SKILL.md` and `tvc-deployments/references/` under the chosen root. You can also set the root with the `TVC_SKILLS_DIR` environment variable.
+
+## Keep it in sync
+
+Re-run `tvc skills save` after upgrading `tvc`. The command rewrites files that match an older bundled version and leaves files you have edited locally untouched. Pass `--force` to replace locally modified files with the version bundled in your binary.
+
+## Credentials
+
+The skill authenticates the same way the CLI does: either all three of `TVC_ORG_ID`, `TVC_API_KEY_PUBLIC`, and `TVC_API_KEY_PRIVATE` set in the environment, or a profile created earlier with `tvc login`. These are separate from the `TURNKEY_API_*` variables used by the HTTP API skills.
+
+<Warning>
+  Read the [credentials and security guidance](/get-started/ai-skills#credentials-and-security) before giving an agent access to your organization. In particular, `tvc deploy approve` in non-interactive mode cannot show the agent a manifest to review, and `tvc app delete` removes the app and all of its deployments with no undo. Scope the API key the agent uses and require human confirmation for approvals and deletes.
+</Warning>
+
+## Source
+
+The skill lives in the [tkhq/rust-sdk](https://github.com/tkhq/rust-sdk/tree/main/tvc/skills/tvc-deployments) repository next to the CLI code. To read it without installing anything, open the [raw `SKILL.md`](https://raw.githubusercontent.com/tkhq/rust-sdk/main/tvc/skills/tvc-deployments/SKILL.md).
+
+## Related
+
+- [Quickstart](/features/verifiable-cloud/quickstart): first-time setup and your first deployment.
+- [Managing apps and deployments](/features/verifiable-cloud/managing-apps-and-deployments): the lifecycle the skill automates.
+- [Debug mode](/features/verifiable-cloud/debug-mode): what the skill's log commands require.
+- [Agent Skills](/get-started/ai-skills): the full set of Turnkey skills and how to use them safely.
