@@ -1,6 +1,6 @@
 ---
 title: "Create Swap quote"
-description: "Create a swap quote. Asset chains are derived from CAIP-19 asset IDs; cross-chain quotes are supported."
+description: "Create a swap quote. Asset chains are derived from CAIP-19 asset IDs; cross-chain quotes are supported. Requests must use ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3, which returns its quotes in createSwapQuoteResultV2."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_CREATE_SWAP_QUOTE`
+Enum options: `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -33,7 +33,7 @@ Unique identifier for a given Organization.
   <p>The parameters object containing the specific intent data for this activity.</p>
   <Expandable title="details">
     <NestedParam parentKey="parameters" childKey="signWith" type="string" required={true} default="">
-    Wallet account or Private Key address used to price the executable provider quote. Private Key identifiers are not supported.
+    Wallet account address used to price the executable provider quote. Private Key identifiers are not supported.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="inputToken" type="string" required={true} default="">
@@ -50,6 +50,18 @@ Unique identifier for a given Organization.
     
     <NestedParam parentKey="parameters" childKey="slippageBps" type="string" required={false} default="">
     Provider-neutral maximum allowed slippage in basis points. Turnkey converts this value to each provider's request format. When omitted, each provider applies its default slippage behavior.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="destinationAddress" type="string" required={false} default="">
+    Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="feeSponsorship" type="boolean" required={false} default="">
+    When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="fixedRate" type="boolean" required={false} default="">
+    When true, requests a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -102,10 +114,10 @@ Provider-neutral maximum allowed slippage in basis points. Turnkey converts this
 Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.
 </NestedParam>
 <NestedParam parentKey="activity.intent.createSwapQuoteIntentV3" childKey="feeSponsorship" type="boolean" required={false}>
-feeSponsorship field
+When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
 </NestedParam>
 <NestedParam parentKey="activity.intent.createSwapQuoteIntentV3" childKey="fixedRate" type="boolean" required={false}>
-fixedRate field
+When true, requests a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
 </NestedParam>
 
       </Expandable>
@@ -119,8 +131,8 @@ fixedRate field
         <NestedParam parentKey="activity.result" childKey="createSwapQuoteResultV2" type="object" required={true}>
       The createSwapQuoteResultV2 object
       <Expandable title="createSwapQuoteResultV2 details">
-        <NestedParam parentKey="activity.result.createSwapQuoteResultV2" childKey="quotes" type="array" required={false}>
-      quotes field
+        <NestedParam parentKey="activity.result.createSwapQuoteResultV2" childKey="quotes" type="array" required={true}>
+      One or more provider quotes for this request. Today this contains a single Relay quote; pass quotes[i].quoteId to execute_swap to bind execution.
       <Expandable title="quotes details">
         <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="quoteId" type="string" required={true}>
 Identifier for this provider quote. Pass this value to execute_swap_v2 to bind execution to this exact quote. The signer is derived from the quote; clients do not resupply sign_with on execute.
@@ -146,33 +158,15 @@ Client fee in basis points applied for this pair. Informational only; already re
 <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="estimatedTimeSeconds" type="string" required={false}>
 Provider-estimated completion time in seconds, when available.
 </NestedParam>
-<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="feeSponsorship" type="boolean" required={false}>
-feeSponsorship field
+<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="feeSponsorship" type="boolean" required={true}>
+Whether Turnkey pays the provider fees for this quote.
 </NestedParam>
-<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="fixedRate" type="boolean" required={false}>
-fixedRate field
+<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="fixedRate" type="boolean" required={true}>
+Whether this quote uses a 1:1 fixed rate.
 </NestedParam>
-<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="turnkeyFeeCollection" type="string" required={false}>
-turnkeyFeeCollection field
+<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="estimatedFixedRateAdjustmentUsd" type="string" required={false}>
+Estimated USD adjustment for the fixed rate. Present only for fixed-rate quotes. Positive is a cost billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. Informational; the final amount is settled after execution.
 </NestedParam>
-<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="sponsoredFeeComponents" type="array" required={false}>
-      sponsoredFeeComponents field
-      <Expandable title="sponsoredFeeComponents details">
-        <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes.sponsoredFeeComponents" childKey="item" type="string" required={true}>
-item field
-</NestedParam>
-
-      </Expandable>
-    </NestedParam>
-<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="remainingFeeComponents" type="array" required={false}>
-      remainingFeeComponents field
-      <Expandable title="remainingFeeComponents details">
-        <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes.remainingFeeComponents" childKey="item" type="string" required={true}>
-item field
-</NestedParam>
-
-      </Expandable>
-    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -213,7 +207,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
@@ -221,7 +215,10 @@ curl --request POST \
         "inputToken": "<string>",
         "outputToken": "<string>",
         "inputAmount": "<string>",
-        "slippageBps": "<string>"
+        "slippageBps": "<string>",
+        "destinationAddress": "<string>",
+        "feeSponsorship": "<boolean>",
+        "fixedRate": "<boolean>"
     }
 }'
 ```
@@ -237,11 +234,14 @@ const turnkeyClient = new Turnkey({
 });
 
 const response = await turnkeyClient.apiClient().createSwapQuote({
-  signWith: "<string> (Wallet account or Private Key address used to price the executable provider quote. Private Key identifiers are not supported.)",
+  signWith: "<string> (Wallet account address used to price the executable provider quote. Private Key identifiers are not supported.)",
   inputToken: "<string> (CAIP-19 asset ID for the input asset. The chain is derived from this value.)",
   outputToken: "<string> (CAIP-19 asset ID for the output asset.)",
   inputAmount: "<string> (Base-unit amount of the input asset.)",
-  slippageBps: "<string> (Provider-neutral maximum allowed slippage in basis points. Turnkey converts this value to each provider's request format. When omitted, each provider applies its default slippage behavior.)"
+  slippageBps: "<string> (Provider-neutral maximum allowed slippage in basis points. Turnkey converts this value to each provider's request format. When omitted, each provider applies its default slippage behavior.)",
+  destinationAddress: "<string> (Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.)",
+  feeSponsorship: true // When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.,
+  fixedRate: true // When true, requests a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
 });
 ```
 
@@ -254,7 +254,7 @@ const response = await turnkeyClient.apiClient().createSwapQuote({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
@@ -289,13 +289,7 @@ const response = await turnkeyClient.apiClient().createSwapQuote({
                 "estimatedTimeSeconds": "<string>",
                 "feeSponsorship": "<boolean>",
                 "fixedRate": "<boolean>",
-                "turnkeyFeeCollection": "<string>",
-                "sponsoredFeeComponents": [
-                  "<string>"
-                ],
-                "remainingFeeComponents": [
-                  "<string>"
-                ]
+                "estimatedFixedRateAdjustmentUsd": "<string>"
               }
             ]
           }

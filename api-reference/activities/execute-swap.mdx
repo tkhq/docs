@@ -1,6 +1,6 @@
 ---
 title: "Execute Swap"
-description: "Execute the exact provider quote identified by quote_id through the activity pipeline and Turnkey broadcasting. Requests must use ACTIVITY_TYPE_EXECUTE_SWAP_V2."
+description: "Execute the exact provider quote identified by quote_id through the activity pipeline and Turnkey broadcasting. Requests must use ACTIVITY_TYPE_EXECUTE_SWAP_V3."
 ---
 
 import { Authorizations } from "/snippets/api/authorizations.mdx";
@@ -16,7 +16,7 @@ import { EndpointPath } from "/snippets/api/endpoint.mdx";
 
 <ParamField body="type" type="enum<string>" required={true}>
 
-Enum options: `ACTIVITY_TYPE_EXECUTE_SWAP_V2`
+Enum options: `ACTIVITY_TYPE_EXECUTE_SWAP_V3`
 </ParamField>
 
 <ParamField body="timestampMs" type="string" required={true}>
@@ -70,6 +70,10 @@ Unique identifier for a given Organization.
     
     <NestedParam parentKey="parameters" childKey="gasStationNonce" type="string" required={false} default="">
     Exact gas station delegate contract nonce used in the BatchExecution EIP-712 message. Valid for sponsored EVM swaps and non-sponsored EVM swaps that execute as a multi-call batch (for example ERC-20 approve + swap). This is the replay-protection nonce for gas-station batches; use the nonces endpoint to fetch it. Omit to auto-fetch.
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="destinationAddress" type="string" required={false} default="">
+    Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.
     </NestedParam>
   </Expandable>
 </ParamField>
@@ -194,7 +198,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Authorizations)" \
   --data '{
-    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
     "timestampMs": "<string> (e.g. 1746736509954)",
     "organizationId": "<string> (Your Organization ID)",
     "parameters": {
@@ -207,7 +211,8 @@ curl --request POST \
         "sponsor": "<boolean>",
         "evmNonce": "<string>",
         "recentBlockhash": "<string>",
-        "gasStationNonce": "<string>"
+        "gasStationNonce": "<string>",
+        "destinationAddress": "<string>"
     }
 }'
 ```
@@ -232,7 +237,8 @@ const response = await turnkeyClient.apiClient().executeSwap({
   sponsor: true // Whether the quoted transaction is sponsored.,
   evmNonce: "<string> (Exact EVM sender (EOA account) nonce. Valid only for a non-sponsored EVM swap. Honored for already-delegated (Type-2) batch swaps and single-call swaps; ignored for not-yet-delegated EIP-7702 (Type-4) batches where the outer nonce is derived from the authorization. Prefer gas_station_nonce for batch replay protection and use the nonces endpoint to fetch it. Omit to auto-fetch.)",
   recentBlockhash: "<string> (Exact Solana recent blockhash. Valid only for a Solana swap, including sponsored swaps. Omit to auto-fetch.)",
-  gasStationNonce: "<string> (Exact gas station delegate contract nonce used in the BatchExecution EIP-712 message. Valid for sponsored EVM swaps and non-sponsored EVM swaps that execute as a multi-call batch (for example ERC-20 approve + swap). This is the replay-protection nonce for gas-station batches; use the nonces endpoint to fetch it. Omit to auto-fetch.)"
+  gasStationNonce: "<string> (Exact gas station delegate contract nonce used in the BatchExecution EIP-712 message. Valid for sponsored EVM swaps and non-sponsored EVM swaps that execute as a multi-call batch (for example ERC-20 approve + swap). This is the replay-protection nonce for gas-station batches; use the nonces endpoint to fetch it. Omit to auto-fetch.)",
+  destinationAddress: "<string> (Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.)"
 });
 ```
 
@@ -245,7 +251,7 @@ const response = await turnkeyClient.apiClient().executeSwap({
   "activity": {
     "id": "<activity-id>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V2",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
     "organizationId": "<organization-id>",
     "timestampMs": "<timestamp> (e.g. 1746736509954)",
     "result": {
