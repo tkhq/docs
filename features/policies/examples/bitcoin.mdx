@@ -6,8 +6,40 @@ sidebarTitle: "Bitcoin"
 
 Note: see the [language section](/features/policies/language#bitcoin) for more details. For context on Bitcoin transaction reinsertion, see the [Bitcoin network support](/features/networks/bitcoin) page
 
+<Note>
+  Use `o.script_pubkey` to match a destination on *every* network. Use `o.address` only when you
+  want to match *one* network's address format (where `o` is one output in `bitcoin.tx.outputs`).
+
+  `o.address` uses the address format of the `signWith` account. A wallet can hold a testnet
+  account on the same key as a mainnet account, and any user allowed to create wallet accounts can
+  add one. A transaction signed with that testnet account shows `tb1...` addresses, and a
+  deny on a `bc1...` address does not match them. The transaction still spends the key's mainnet
+  coins, so it can pay the address you meant to block. `o.script_pubkey` is the same on every
+  network.
+
+  Due to the nature of Bitcoin signing, which account signs does not change where a transaction runs. Its inputs decide that. A deny
+  that matches one network's address format misses the same destination when an account in another
+  format signs. If you know every allowed destination, prefer an allow policy to a deny policy.
+</Note>
+
+#### Allow signing Bitcoin transactions only to certain destinations, on every network
+
+Match each output's script against a list. The list must include the script of your change
+address, or the policy refuses transactions that return change.
+
+```json
+{
+  "policyName": "Allow signing bitcoin transactions only to approved destinations",
+  "notes": "<SCRIPT_1> and <SCRIPT_2> are the scriptPubKeys of the approved addresses",
+  "effect": "EFFECT_ALLOW",
+  "condition": "bitcoin.tx.outputs.all(o, o.script_pubkey in ['<SCRIPT_1>', '<SCRIPT_2>'])"
+}
+```
 
 #### Allow signing Bitcoin transactions ONLY if all outputs are being sent to a certain address
+
+`o.address` matches one address format only. This policy also refuses a transaction signed with an
+account in another format, such as a testnet account.
 
 ```json
 {
@@ -15,6 +47,54 @@ Note: see the [language section](/features/policies/language#bitcoin) for more d
   "notes": "",
   "effect": "EFFECT_ALLOW",
   "condition": "bitcoin.tx.outputs.all(o, o.address == <BITCOIN_ADDRESS>)"
+}
+```
+
+#### Deny signing Bitcoin transactions to a certain address
+
+Match the destination's output script, as lowercase hex. For example, the address
+`bc1qeln8v9chnchymmmgmad374z3qz598y3mh3ed4r` has the script
+`0014cfe67617179e2e4def68df5b1f545100a853923b`. To get the script for an address, use the
+`scriptPubKey` field from `bitcoin-cli validateaddress`, or your Bitcoin library.
+
+<Accordion title="How an address maps to its script">
+  Decode the address, then put the decoded bytes into the script for its type. Decoding drops the
+  network prefix, so the mainnet and testnet addresses of one key have the same script.
+
+  | Address | Decoding gives | Script (hex) |
+  | --- | --- | --- |
+  | `bc1q...`, `tb1q...` (P2WPKH, P2WSH) | A bech32 witness version 0 and a 20- or 32-byte program | `0014` + program (20 bytes) or `0020` + program (32 bytes) |
+  | `bc1p...`, `tb1p...` (P2TR) | A bech32m witness version 1 and a 32-byte program | `5120` + program |
+  | `1...`, `m...`, `n...` (P2PKH) | A base58check version byte and a 20-byte hash | `76a914` + hash + `88ac` |
+  | `3...`, `2...` (P2SH) | A base58check version byte and a 20-byte hash | `a914` + hash + `87` |
+
+  A P2PKH address and a P2WPKH address of the same key have different scripts. To block both,
+  list both scripts.
+</Accordion>
+
+```json
+{
+  "policyName": "Deny signing bitcoin transactions to <BITCOIN_ADDRESS>",
+  "notes": "<SCRIPT_PUBKEY_HEX> is the scriptPubKey of <BITCOIN_ADDRESS>",
+  "effect": "EFFECT_DENY",
+  "condition": "bitcoin.tx.outputs.any(o, o.script_pubkey == '<SCRIPT_PUBKEY_HEX>')"
+}
+```
+
+To deny several destinations, match a list: `bitcoin.tx.outputs.any(o, o.script_pubkey in ['<SCRIPT_1>', '<SCRIPT_2>'])`.
+
+#### Deny signing Bitcoin transactions with testnet accounts
+
+Outputs use the address format of the `signWith` account, so this policy matches any transaction
+signed with a testnet wallet account or private key. It blocks all testnet signing for the users
+it applies to.
+
+```json
+{
+  "policyName": "Deny signing bitcoin transactions with testnet accounts",
+  "notes": "Matches any output that is not in a mainnet address format",
+  "effect": "EFFECT_DENY",
+  "condition": "bitcoin.tx.outputs.any(o, o.address[0..3] != 'bc1' && o.address[0..1] != '1' && o.address[0..1] != '3')"
 }
 ```
 
