@@ -337,6 +337,10 @@ Valid `activity.action` values are `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT
 | **ORGANIZATION**             | CREATE  |      ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8 |
 |                              | DELETE  |             ACTIVITY_TYPE_DELETE_ORGANIZATION |
 |                              | DELETE  |         ACTIVITY_TYPE_DELETE_SUB_ORGANIZATION |
+|                              | UPDATE  |              ACTIVITY_TYPE_UPDATE_ROOT_QUORUM |
+|                              | UPDATE  |        ACTIVITY_TYPE_UPDATE_ORGANIZATION_NAME |
+|                              | UPDATE  |        ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE |
+|                              | UPDATE  |     ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE |
 | **INVITATION**               | CREATE  |              ACTIVITY_TYPE_CREATE_INVITATIONS |
 |                              | DELETE  |               ACTIVITY_TYPE_DELETE_INVITATION |
 | **POLICY**                   | CREATE  |                ACTIVITY_TYPE_CREATE_POLICY_V3 |
@@ -433,9 +437,8 @@ Valid `activity.action` values are `CREATE`, `UPDATE`, `DELETE`, `SIGN`, `EXPORT
 lists each kind and the activity types it matches.
 
 <Note>
-  This table covers policy-governed activities only. Activities governed by the root quorum (see
-  [Root quorum activities](#root-quorum-activities)) are not policy-governed and have no
-  `activity.kind`.
+  The kinds for [root quorum activities](#root-quorum-activities) can be matched by MFA policy
+  conditions and session profile scopes, but a policy can't allow those activities.
 </Note>
 
 | Kind                            | Matches Activity Types                                                                                                                                                                                                                                                                                                                      |
@@ -549,6 +552,10 @@ lists each kind and the activity types it matches.
 | <a id="activity-kind-update-mfa-policy" />UPDATE_MFA_POLICY               | ACTIVITY_TYPE_UPDATE_MFA_POLICY                                                                                                                                                                                                                                                                                                             |
 | <a id="activity-kind-delete-mfa-policy" />DELETE_MFA_POLICY               | ACTIVITY_TYPE_DELETE_MFA_POLICY                                                                                                                                                                                                                                                                                                             |
 | <a id="activity-kind-create-session-profile" />CREATE_SESSION_PROFILE          | ACTIVITY_TYPE_CREATE_SESSION_PROFILE                                                                                                                                                                                                                                                                                                        |
+| <a id="activity-kind-update-root-quorum" />UPDATE_ROOT_QUORUM | ACTIVITY_TYPE_UPDATE_ROOT_QUORUM |
+| <a id="activity-kind-update-organization-name" />UPDATE_ORGANIZATION_NAME | ACTIVITY_TYPE_UPDATE_ORGANIZATION_NAME |
+| <a id="activity-kind-set-organization-feature" />SET_ORGANIZATION_FEATURE | ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE |
+| <a id="activity-kind-remove-organization-feature" />REMOVE_ORGANIZATION_FEATURE | ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE |
 
 <Note>
   Prefer `activity.kind` over `activity.type` when you want a policy to apply across all versions of
@@ -746,11 +753,20 @@ if a policy is added that allows a specific non-root user to perform
 `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` activities, these requests will still fail as they are
 subject specifically to root quorum.
 
-The same exclusion applies to [MFA policy](/features/authentication/mfa/overview) conditions and
-[session profile](/features/authentication/sessions/overview) scopes, which share the policy
-evaluator. A condition referencing `activity.*` cannot be evaluated for these activities: in an
-MFA policy it is skipped and the next policy is evaluated, and in a session profile scope the
-request is denied.
+Policies can't allow these activities, but [MFA policy](/features/authentication/mfa/overview)
+conditions and [session profile](/features/authentication/sessions/overview) scopes still apply to
+them. Both can reference:
+
+- `activity.type` and `activity.kind`
+- `activity.resource`, which is `ORGANIZATION`
+- `activity.action`, which is `UPDATE`
+
+These activities have no `activity.params`. A condition that references `activity.params.*` can't be
+evaluated for them: an MFA policy that uses one is skipped, and a session profile scope that uses one
+denies the request.
+
+A session profile scope only narrows what a session can do. A request whose scope matches still needs
+root quorum approval.
 
 ### Activities that target a root user
 
