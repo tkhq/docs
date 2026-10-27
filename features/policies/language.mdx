@@ -612,6 +612,8 @@ contact [help@turnkey.com](mailto:help@turnkey.com).
 |                    |                                                 | `encoding`           | [string](#type-string)                        | The payload encoding                                                                                                                                          |
 |                    | `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`             | `type`               | [string](#type-string)                        | The transaction type (one of `[TRANSACTION_TYPE_ETHEREUM, TRANSACTION_TYPE_SOLANA, TRANSACTION_TYPE_BITCOIN, TRANSACTION_TYPE_TRON, TRANSACTION_TYPE_TEMPO]`) |
 | User Management    | `ACTIVITY_TYPE_DELETE_USERS`                    | `user_ids`           | list\<[string](#type-string)\>                | The list of user IDs being deleted                                                                                                                            |
+| Authenticators     | `ACTIVITY_TYPE_CREATE_AUTHENTICATORS`           | `user_id`            | [string](#type-string)                        | The ID of the user who will own the authenticators                                                                                                            |
+|                    | `ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2`        | `user_id`            | [string](#type-string)                        | The ID of the user who will own the authenticators                                                                                                            |
 | API Key Management | `ACTIVITY_TYPE_CREATE_API_KEYS`                 | `user_id`            | [string](#type-string)                        | The ID of the user who will own the API keys                                                                                                                  |
 |                    |                                                 | `api_keys`           | list\<[ApiKeyParams](#struct-api-key-params)\> | The API keys being created                                                                                                                                    |
 |                    | `ACTIVITY_TYPE_CREATE_API_KEYS_V2`              | `user_id`            | [string](#type-string)                        | The ID of the user who will own the API keys                                                                                                                  |
@@ -799,12 +801,13 @@ This self-only allowance applies only under the following conditions:
   an explicit deny, becomes a request for quorum approval rather than a denial.
 
 This default is what lets a scoped recovery session enroll a passkey for only the authenticated
-user. Neither a [session profile](/features/authentication/sessions/session-profiles) scope nor a
-policy condition can name the target user of `CREATE_AUTHENTICATORS_V2`. The `approvers` and
-`credentials` keywords identify the requesting user, but the activity exposes no keyword for the
-user it targets, and `activity.params.user_id` is exposed only for the API key activities. With no
-policy allowing the activity, a session scoped to it can add authenticators to the session holder
-alone.
+user. A policy condition or [session profile](/features/authentication/sessions/session-profiles)
+scope can pin the target of `CREATE_AUTHENTICATORS` and the API key activities to a fixed user
+with `activity.params.user_id`, but neither can refer to the user submitting the request. The
+`approvers` and `credentials` keywords identify the requester and are not available in a scope,
+and a consensus expression cannot read `activity.params`. A session scoped only to the activity
+kind therefore adds authenticators to the session holder alone, as long as no policy allows the
+activity for other users.
 
 <Note>
   Wallet and private key import activities and `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION` must
