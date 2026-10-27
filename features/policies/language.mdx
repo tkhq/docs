@@ -774,19 +774,18 @@ allows `CREATE_AUTHENTICATORS`.
 
 ### Activities a user can perform on themselves
 
-A user can manage their own credentials without a policy granting it. When no policy reaches a
-decision, the engine allows the activities below as long as the user submitting the request is the
-user the activity targets. `ACTIVITY_TYPE_CREATE_AUTHENTICATORS` (V1) is deprecated and is not
-among them.
+A user can manage their own authenticators, API keys and MFA policies without a policy granting
+it. When no policy reaches a decision, the engine allows the activities below as long as the user
+submitting the request is targeting themselves.
 
 - `ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2`, `ACTIVITY_TYPE_DELETE_AUTHENTICATORS`
-- `ACTIVITY_TYPE_CREATE_API_KEYS`, `ACTIVITY_TYPE_CREATE_API_KEYS_V2`, `ACTIVITY_TYPE_DELETE_API_KEYS`
+- `ACTIVITY_TYPE_CREATE_API_KEYS_V2`, `ACTIVITY_TYPE_DELETE_API_KEYS`
 - `ACTIVITY_TYPE_RECOVER_USER`
 - `ACTIVITY_TYPE_CREATE_MFA_POLICY`, `ACTIVITY_TYPE_UPDATE_MFA_POLICY`, `ACTIVITY_TYPE_DELETE_MFA_POLICY`
 - `ACTIVITY_TYPE_CREATE_READ_ONLY_SESSION`, for any requesting user, since it only creates a
   session for that user
 
-This self-only allowance applies only under the following conditions:
+Note that this self-targeting behavior applies only under the following conditions:
 
 - No policy produced a decision. For non-root users an explicit allow or deny stands, so a policy
   that denies `ACTIVITY_TYPE_CREATE_API_KEYS_V2` denies it for the user's own keys too.
@@ -802,12 +801,12 @@ This self-only allowance applies only under the following conditions:
 
 This default is what lets a scoped recovery session enroll a passkey for only the authenticated
 user. A policy condition or [session profile](/features/authentication/sessions/session-profiles)
-scope can pin the target of `CREATE_AUTHENTICATORS` and the API key activities to a fixed user
+scope can pin the target of `CREATE_AUTHENTICATORS_V2` and the API key activities to a fixed user
 with `activity.params.user_id`, but neither can refer to the user submitting the request. The
-`approvers` and `credentials` keywords identify the requester and are not available in a scope,
-and a consensus expression cannot read `activity.params`. A session scoped only to the activity
-kind therefore adds authenticators to the session holder alone, as long as no policy allows the
-activity for other users.
+`approvers` and `credentials` keywords identify the requester and are not available in a condition
+or scope, and a consensus expression cannot read `activity.params`. A session scoped only to the
+activity kind therefore adds authenticators to the session holder alone, as long as no policy
+allows the activity for other users and the request does not meet the root quorum.
 
 <Note>
   Wallet and private key import activities and `ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION` must
