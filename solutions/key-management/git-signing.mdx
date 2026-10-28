@@ -89,7 +89,7 @@ The agent does the root steps with your admin profile and tells you when it need
 
     The installer puts `tk` in `~/.local/bin`. If `tk --version` says `command not found`, add that directory to your `PATH` and open a new shell: `export PATH="$HOME/.local/bin:$PATH"`. Add the same line to your shell profile.
 
-    Make sure that `tk --version` shows the latest release. If the download fails, the pipe can still exit 0, and an older `tk` on your `PATH` can answer instead.
+    Make sure that `tk --version` shows the version on the [tk releases page](https://github.com/tkhq/tk/releases/latest). If the download fails, the pipe can still exit 0, and an older `tk` on your `PATH` can answer instead.
 
     Create a profile for your root user. `tk` generates an API key and prints its public key. In the [Turnkey Dashboard](https://app.turnkey.com), open your user, add an API key, open **Advanced settings**, and paste the public key (curve P-256).
 
@@ -99,10 +99,12 @@ The agent does the root steps with your admin profile and tells you when it need
     tk --profile admin whoami
     ```
 
-    If you have a root API key file already, add `--api-key-file /full/path/to/root-key.json` to `profile create`. `tk` then uses that key and does not generate a new one. If the key is already on your root user, go directly to `tk login`.
+    If you have a root API key file already, add `--api-key-file /full/path/to/root-key.json` to `profile create`. `tk` then uses that key and does not generate a new one. If the key is already on your root user, do not add it in the dashboard again. Still run `profile create` with `--api-key-file`, because `tk login` needs the profile. `profile create` prints a message that tells you to register the public key. Ignore it, and run `tk login`.
   </Step>
 
   <Step title="2. Create the agent identity">
+    The steps keep IDs in shell variables, such as `AGENT_TAG`, `AGENT_USER_ID`, `WALLET_ID`, and `FINGERPRINT`. If your agent runs each command in a new shell, it loses the variables. Write each value to a file, for example `echo "AGENT_USER_ID=$AGENT_USER_ID" >> ~/.config/turnkey/setup.env`, and run `. ~/.config/turnkey/setup.env` at the start of each later command.
+
     Create the `agent` tag, if your organization does not have it:
 
     ```bash
@@ -117,17 +119,18 @@ The agent does the root steps with your admin profile and tells you when it need
       | jq -r '.data.userTags[] | select(.tagName=="agent") | .tagId')
     ```
 
-    Generate the agent's API key on the machine where the agent runs. Keep the public key that `tk` prints:
+    Generate the agent's API key on the machine where the agent runs. Save the public key as `PUBLIC_KEY`:
 
     ```bash
-    tk --organization-id ORG_UUID profile create --profile-name agent
+    PUBLIC_KEY=$(tk --organization-id ORG_UUID --message-format json profile create --profile-name agent \
+      | jq -r .data.publicKey)
     ```
 
     Create the agent user with that public key. Save the user ID from the result as `AGENT_USER_ID`:
 
     ```bash
     AGENT_USER_ID=$(tk --profile admin --message-format json user create \
-      --user-name agent --tag-name agent --public-key PUBLIC_KEY \
+      --user-name agent --tag-name agent --public-key "$PUBLIC_KEY" \
       | jq -r '.data.activity.result.createUsersResult.userIds[0]')
     ```
 
@@ -151,6 +154,8 @@ The agent does the root steps with your admin profile and tells you when it need
     tk login --profile-name agent
     tk --profile agent whoami
     ```
+
+    `tk login` also selects `agent` as the default profile. Pass `--profile admin` or `--profile agent` in every command, or run `tk login --profile-name admin` to select your root profile again.
   </Step>
 
   <Step title="3. Create the signing key">
@@ -188,7 +193,10 @@ The agent does the root steps with your admin profile and tells you when it need
         mkdir -p "$GNUPGHOME" && chmod 700 "$GNUPGHOME"
         tk --profile agent gpg keys export --key "$FINGERPRINT" | gpg --import
         echo "$FINGERPRINT:6:" | gpg --import-ownertrust
+        unset GNUPGHOME
         ```
+
+        The `unset` makes your own `gpg` and `git` commands in this shell use your keyring again.
       </Tab>
       <Tab title="SSH">
         Create an Ed25519 key:
@@ -215,12 +223,16 @@ The agent does the root steps with your admin profile and tells you when it need
         printf '%s %s\n' "jane+agent@example.com" "$SSH_PUBLIC_KEY" >> ~/.config/git/allowed_signers
         ```
 
+        These commands do not use the policy. The test commit in step 4 is the first signature. If it fails with `unauthorized` (403), check the agent user ID and the private key ID in `agents-sign-ssh`.
+
         You can use this key for SSH in step 5 too. Then you need only one key and one policy.
       </Tab>
     </Tabs>
   </Step>
 
   <Step title="4. Point Git at tk for the agent only">
+    This step uses the names `agent` and `tk-sign`. If you set up more than one agent on this machine, use the names in [Several agents on one machine](#several-agents-on-one-machine) from the start.
+
     Git starts `tk` with no `tk` flags, so a small wrapper selects the agent's profile:
 
     ```bash
@@ -238,7 +250,7 @@ The agent does the root steps with your admin profile and tells you when it need
 
     <Tabs>
       <Tab title="Claude Code">
-        In `~/.claude/settings.json`. Replace `FINGERPRINT` with the value from step 3 (`echo "$FINGERPRINT"`), and replace `/Users/jane` with your home directory. If the file has an `env` object already, add these keys to it:
+        In `~/.claude/settings.json` (create the file if it does not exist). Replace `FINGERPRINT` with the value from step 3 (`echo "$FINGERPRINT"`), and replace `/Users/jane` with your home directory. If the file has an `env` object already, add these keys to it:
 
         ```json
         {
@@ -299,21 +311,31 @@ The agent does the root steps with your admin profile and tells you when it need
       </Tab>
     </Tabs>
 
-    For SSH signing, change three pairs, add one pair, and remove `GNUPGHOME`. For `user.signingkey`, write `key::` and then the output of `tk --profile agent ssh public-key --key "$PRIVATE_KEY_ID"`. There are 7 pairs, so `GIT_CONFIG_COUNT` is `7`:
+    For SSH signing, use these 7 pairs in place of the GPG pairs, and do not set `GNUPGHOME`. For `user.signingkey`, write `key::` and then the output of `tk --profile agent ssh public-key --key "$PRIVATE_KEY_ID"`:
 
     ```json
-    "GIT_CONFIG_COUNT": "7",
-    "GIT_CONFIG_KEY_0": "gpg.format",
-    "GIT_CONFIG_VALUE_0": "ssh",
-    "GIT_CONFIG_KEY_1": "gpg.ssh.program",
-    "GIT_CONFIG_VALUE_1": "/Users/jane/.local/bin/tk-sign",
-    "GIT_CONFIG_KEY_2": "user.signingkey",
-    "GIT_CONFIG_VALUE_2": "key::ssh-ed25519 AAAA...",
-    "GIT_CONFIG_KEY_6": "gpg.ssh.allowedSignersFile",
-    "GIT_CONFIG_VALUE_6": "/Users/jane/.config/git/allowed_signers"
+    {
+      "env": {
+        "GIT_CONFIG_COUNT": "7",
+        "GIT_CONFIG_KEY_0": "gpg.format",
+        "GIT_CONFIG_VALUE_0": "ssh",
+        "GIT_CONFIG_KEY_1": "gpg.ssh.program",
+        "GIT_CONFIG_VALUE_1": "/Users/jane/.local/bin/tk-sign",
+        "GIT_CONFIG_KEY_2": "user.signingkey",
+        "GIT_CONFIG_VALUE_2": "key::ssh-ed25519 AAAA...",
+        "GIT_CONFIG_KEY_3": "commit.gpgsign",
+        "GIT_CONFIG_VALUE_3": "true",
+        "GIT_CONFIG_KEY_4": "user.name",
+        "GIT_CONFIG_VALUE_4": "Jane Doe (agent)",
+        "GIT_CONFIG_KEY_5": "user.email",
+        "GIT_CONFIG_VALUE_5": "jane+agent@example.com",
+        "GIT_CONFIG_KEY_6": "gpg.ssh.allowedSignersFile",
+        "GIT_CONFIG_VALUE_6": "/Users/jane/.config/git/allowed_signers"
+      }
+    }
     ```
 
-    Keep pairs 3, 4, and 5 as they are. For Codex, use the same keys and values in the TOML table.
+    For Codex, use the same keys and values in the TOML table.
 
     Start a new agent session, and make a test commit in a Git repository in it:
 
@@ -322,7 +344,21 @@ The agent does the root steps with your admin profile and tells you when it need
     git verify-commit HEAD
     ```
 
-    To test without a new agent session, run the same commands in a new shell that has the `env` values from the file exported.
+    To test without a new agent session, export the `env` values in a new shell, and run the same commands in it. For Claude Code:
+
+    ```bash
+    (eval "$(jq -r '.env | to_entries[] | "export \(.key)=\(.value|@sh)"' ~/.claude/settings.json)"
+     git commit -S --allow-empty -m "test signing" && git verify-commit HEAD)
+    ```
+
+    For Codex:
+
+    ```bash
+    (eval "$(awk '/^\[/{s=($0=="[shell_environment_policy.set]")} s && /=/{k=$1; sub(/^[^=]*= */,""); print "export " k "=" $0}' ~/.codex/config.toml)"
+     git commit -S --allow-empty -m "test signing" && git verify-commit HEAD)
+    ```
+
+    Run these in a Git repository.
   </Step>
 
   <Step title="5. Push over SSH with a Turnkey key">
@@ -354,6 +390,8 @@ The agent does the root steps with your admin profile and tells you when it need
     "GIT_CONFIG_VALUE_6": "ssh -o IdentityAgent=~/.config/turnkey/ssh-agent.sock -o IdentitiesOnly=yes -o IdentityFile=~/.config/turnkey/agent-ssh.pub -o UserKnownHostsFile=~/.config/turnkey/ssh-allowed-hosts"
     ```
 
+    For Codex, add the same key and value to the `[shell_environment_policy.set]` table, for example `GIT_CONFIG_KEY_6 = "core.sshCommand"`.
+
     `ssh` expands `~` in these options. `IdentitiesOnly` stops `ssh` from offering the keys in `~/.ssh`, so the agent can use only the Turnkey key. The allowed-hosts file limits the Turnkey SSH agent, but `ssh` does not read it for host trust. `UserKnownHostsFile` makes `ssh` use the same GitHub host keys, so the connection works on a machine where `ssh` has not connected to GitHub before.
 
     Test it from the agent session:
@@ -368,7 +406,7 @@ The agent does the root steps with your admin profile and tells you when it need
     If the test works, `ssh` prints `Hi USERNAME! You've successfully authenticated, but GitHub does not provide shell access.` and exits with status 1. This status is correct, because GitHub gives no shell. `git ls-remote` prints the refs and exits with status 0.
 
     <Warning>
-      `tk ssh agent` stops when you log out or restart. Start it again with `tk --profile agent ssh agent start --allowed-hosts-file ~/.config/turnkey/ssh-allowed-hosts`.
+      `tk ssh agent` stops when you log out or restart. Start it again with the same `ssh agent start` command that you used above. If you set up several agents, start each one again with its own `--key`, `--socket`, and `--pid-file`, as in [Several agents on one machine](#several-agents-on-one-machine). A plain `tk ssh agent start` serves every registered key.
     </Warning>
   </Step>
 
@@ -410,7 +448,7 @@ This needs Git 2.54 or later. The `/usr/bin/git` on macOS is older. It ignores t
 
 Give each agent its own identity: its own Turnkey user, tk profile, keys, policies, wrapper, and SSH agent socket. Then each agent signs with its own key, its commits show its own name, and you can revoke one agent and keep the others.
 
-Do steps 2 to 5 one time for each agent, with that agent's names. Do not use the names `agent` and `tk-sign` from the steps, because each agent would replace the files of the agent before it. This table shows the names for Claude Code and Codex:
+Do steps 2 to 5 one time for each agent, with that agent's names. Use a separate shell for each agent, so that `AGENT_USER_ID`, `WALLET_ID`, `FINGERPRINT`, and `SSH_KEY_ID` do not overwrite each other. Do not use the names `agent` and `tk-sign` from the steps, because each agent would replace the files of the agent before it. In every command and config value, replace the profile and user `agent`, the key user ID, `user.name`, `user.email`, the wrapper path in `gpg.program`, the SSH key name, `agent-ssh.pub`, `ssh-agent.sock`, and the PID file. This table shows the names for Claude Code and Codex:
 
 | | Claude Code | Codex |
 | :--- | :--- | :--- |
@@ -422,6 +460,7 @@ Do steps 2 to 5 one time for each agent, with that agent's names. Do not use the
 | SSH key and policy (step 5) | `claude-ssh`, `agents-ssh-auth-claude` | `codex-ssh`, `agents-ssh-auth-codex` |
 | SSH public key file (step 5) | `~/.config/turnkey/claude-ssh.pub` | `~/.config/turnkey/codex-ssh.pub` |
 | SSH agent socket (step 5) | `~/.config/turnkey/ssh-claude.sock` | `~/.config/turnkey/ssh-codex.sock` |
+| SSH agent PID file (step 5) | `~/.config/turnkey/ssh-claude.pid` | `~/.config/turnkey/ssh-codex.pid` |
 
 Do these one time only, not for each agent:
 
@@ -463,8 +502,8 @@ You can use the same setup to sign your own commits with a Turnkey key, without 
 
 1. Do step 1 for your own user. You do not need step 2.
 2. Do step 3 with your root profile (for example `admin`) in place of both `admin` and `agent`, and your own name and email in the key's user ID. If you are the only member of the root quorum, you do not need a signing policy. If not, create one that names your user.
-3. Use the global config from step 4, and also run `git config --global user.name "Jane Doe"` and `git config --global user.email jane@example.com` with your own name and email. Name the wrapper `~/.local/bin/tk-sign-me` in place of `tk-sign`, so that it does not replace the wrapper of an agent, and set its `TK_PROFILE` to your profile. For GPG, add `export GNUPGHOME="$HOME/.config/turnkey/tk/gnupg"` to the wrapper too, so that `git verify-commit` finds the public key in every shell.
-4. Do steps 5 and 6 with your own profile and email. For step 5, run `git config --global core.sshCommand` with the same value as in step 5, and write full paths in place of `~`. If your Git host is not GitHub, use its host keys in place of `ssh-keyscan github.com`.
+3. Use the global config from step 4. It replaces your old `gpg.program` and `user.signingkey`. Also run `git config --global user.name "Jane Doe"` and `git config --global user.email jane@example.com` with your own name and email. Name the wrapper `~/.local/bin/tk-sign-me` in place of `tk-sign`, so that it does not replace the wrapper of an agent, and set its `TK_PROFILE` to your profile. For GPG, add `export GNUPGHOME="$HOME/.config/turnkey/tk/gnupg"` to the wrapper too, so that `git verify-commit` finds the public key in every shell. If you signed commits with a local GnuPG key before, import its public key into the Turnkey GnuPG home, so that `git verify-commit` can still check those commits: `gpg --export OLD_FINGERPRINT | GNUPGHOME="$HOME/.config/turnkey/tk/gnupg" gpg --import`.
+4. Do steps 5 and 6 with your own profile and email. In step 5, use your own names: the key `me-ssh`, the public key file `~/.config/turnkey/me-ssh.pub`, and the socket `~/.config/turnkey/ssh-me.sock`. Start the SSH agent with `--key`, `--socket`, and `--pid-file`, as in [Several agents on one machine](#several-agents-on-one-machine). If you are the only member of the root quorum, do not create the `agents-ssh-auth` policy. If not, create it with your own user ID in place of `AGENT_USER_ID`. Run `git config --global core.sshCommand` with the same value as in step 5, and write full paths in place of `~`. If your Git host is not GitHub, use its host keys in place of `ssh-keyscan github.com`.
 
 You can then sign from any machine where your profile is set up, and you have no signing key file to copy or lose.
 
@@ -482,7 +521,7 @@ Keep the Turnkey credential out of the agent's sandbox. A broker outside the san
 
 This example uses two OS users on one machine. The `broker` user holds the credential. The `agent` user is the sandbox. With containers or VMs, mount the socket directory and the public key into the sandbox, and give it nothing else from the broker. In production, give the broker an expiring session key. See the `deploying-signing-broker` skill.
 
-1. Create the broker identity. Do step 2 as the `broker` OS user, with `broker` as the Turnkey user name and the profile name. Then do step 3 (GPG tab) up to `gpg keys create`. In the signing policy, use the broker's user ID. Do not import the key into GnuPG as the broker.
+1. Create the broker identity. As the `broker` OS user, install `tk` (step 1, without a profile), and run `tk --organization-id ORG_UUID profile create --profile-name broker`. As the operator, with your admin profile, do the rest of step 2 with `broker` as the Turnkey user name and the broker's public key. Then, as `broker`, run `tk login --profile-name broker` and `tk --profile broker whoami`. As the operator, do step 3 (GPG tab) up to `gpg keys create`. In the signing policy, use the broker's user ID. Do not import the key into GnuPG as the broker.
 
 2. As root, create a group for the socket, add the agent to it, and create the directories. The `2` in `2750` makes the socket get the group of the directory:
 
@@ -493,7 +532,7 @@ This example uses two OS users on one machine. The `broker` user holds the crede
    install -d -o broker -g broker -m 755 /opt/tk-gpg-public
    ```
 
-3. As `broker`, register the key, publish the public key, and start the broker. `serve` runs in the foreground. Run it under a supervisor, such as a systemd service, so that it starts again after a restart:
+3. As `broker`, set `WALLET_ID` and `FINGERPRINT` to the values from step 3. You set them in the operator's shell, so they are empty in the broker's shell. Then register the key, publish the public key, and start the broker. `serve` runs in the foreground. Run it under a supervisor, such as a systemd service, so that it starts again after a restart:
 
    ```bash
    tk --profile broker gpg keys add --wallet-id "$WALLET_ID" --key "$FINGERPRINT"
@@ -518,7 +557,7 @@ This example uses two OS users on one machine. The `broker` user holds the crede
 
    With `TK_GPG_AGENT_SOCK` set, `tk` sends each signature to the socket and needs no profile.
 
-5. In a new login shell as `agent`, make a test commit. Then make sure that the agent has no Turnkey credential: `tk whoami` must fail.
+5. In a new login shell as `agent`, make a test commit in a Git repository, for example a new one from `git init`. Then make sure that the agent has no Turnkey credential: `tk whoami` must fail.
 
    ```bash
    git commit -S --allow-empty -m "test signing"
