@@ -87,6 +87,8 @@ The agent does the root steps with your admin profile and tells you when it need
     tk --version
     ```
 
+    Make sure that `tk --version` shows the latest release. If the download fails, the pipe can still exit 0, and an older `tk` on your `PATH` can answer instead.
+
     Create a profile for your root user. `tk` generates an API key and prints its public key. In the [Turnkey Dashboard](https://app.turnkey.com), open your user, add an API key, open **Advanced settings**, and paste the public key (curve P-256).
 
     ```bash
@@ -95,7 +97,7 @@ The agent does the root steps with your admin profile and tells you when it need
     tk --profile admin whoami
     ```
 
-    If you have a root API key file already, add `--api-key-file ./root-key.json` to `profile create`.
+    If you have a root API key file already, add `--api-key-file /full/path/to/root-key.json` to `profile create`. `tk` then uses that key and does not generate a new one. If the key is already on your root user, go directly to `tk login`.
   </Step>
 
   <Step title="2. Create the agent identity">
@@ -118,7 +120,13 @@ The agent does the root steps with your admin profile and tells you when it need
     tk --profile admin user create --user-name agent --tag-name agent --public-key PUBLIC_KEY
     ```
 
-    Stop all agents from changing credentials. Set `AGENT_TAG` to the tag ID. You do this one time for each organization:
+    Stop all agents from changing credentials. Set `AGENT_TAG` to the ID of the `agent` tag. This policy is for all agents in the organization, so look for it first:
+
+    ```bash
+    tk --profile admin policy list
+    ```
+
+    If `agents-no-credentials` exists, make sure that its consensus has this tag ID and its condition is `activity.resource == 'CREDENTIAL'`, and do not create it again. If it does not exist, create it:
 
     ```bash
     tk --profile admin policy create --name agents-no-credentials --effect deny \
@@ -172,10 +180,11 @@ The agent does the root steps with your admin profile and tells you when it need
         ```
       </Tab>
       <Tab title="SSH">
-        Create an Ed25519 key. Keep its private key ID as `PRIVATE_KEY_ID`:
+        Create an Ed25519 key:
 
         ```bash
-        tk --profile admin ssh keys create --name agent-git-signing
+        PRIVATE_KEY_ID=$(tk --profile admin --message-format json ssh keys create \
+          --name agent-git-signing | jq -r .privateKeyId)
         ```
 
         Let the agent sign with that key, and nothing else:
@@ -278,7 +287,21 @@ The agent does the root steps with your admin profile and tells you when it need
       </Tab>
     </Tabs>
 
-    For SSH signing, use these values instead: `gpg.format` is `ssh`, `gpg.ssh.program` is the wrapper path, `user.signingkey` is `key::` followed by the public key line, and `gpg.ssh.allowedSignersFile` is the full path to `allowed_signers`. Remove `GNUPGHOME`.
+    For SSH signing, change three pairs, add one pair, and remove `GNUPGHOME`. There are 7 pairs, so `GIT_CONFIG_COUNT` is `7`:
+
+    ```json
+    "GIT_CONFIG_COUNT": "7",
+    "GIT_CONFIG_KEY_0": "gpg.format",
+    "GIT_CONFIG_VALUE_0": "ssh",
+    "GIT_CONFIG_KEY_1": "gpg.ssh.program",
+    "GIT_CONFIG_VALUE_1": "/Users/jane/.local/bin/tk-sign",
+    "GIT_CONFIG_KEY_2": "user.signingkey",
+    "GIT_CONFIG_VALUE_2": "key::ssh-ed25519 AAAA...",
+    "GIT_CONFIG_KEY_6": "gpg.ssh.allowedSignersFile",
+    "GIT_CONFIG_VALUE_6": "/Users/jane/.config/git/allowed_signers"
+    ```
+
+    Keep pairs 3, 4, and 5 as they are. For Codex, use the same keys and values in the TOML table.
 
     Start a new agent session, and make a test commit in it:
 
@@ -289,10 +312,11 @@ The agent does the root steps with your admin profile and tells you when it need
   </Step>
 
   <Step title="5. Push over SSH with a Turnkey key">
-    Create an Ed25519 key and let the agent use it. Keep its private key ID as `SSH_KEY_ID`. If you chose SSH signing in step 3, you can use that key and its policy instead: set `SSH_KEY_ID` to `PRIVATE_KEY_ID` and go to the `ssh keys add` command.
+    Create an Ed25519 key and let the agent use it. If you chose SSH signing in step 3, you can use that key and its policy instead: set `SSH_KEY_ID` to `PRIVATE_KEY_ID` and go to the `ssh keys add` command.
 
     ```bash
-    tk --profile admin ssh keys create --name agent-ssh
+    SSH_KEY_ID=$(tk --profile admin --message-format json ssh keys create \
+      --name agent-ssh | jq -r .privateKeyId)
     tk --profile admin policy create --name agents-ssh-auth --effect allow \
       --consensus "approvers.any(user, user.id == '${AGENT_USER_ID}')" \
       --condition "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && private_key.id == '${SSH_KEY_ID}'"
@@ -309,20 +333,25 @@ The agent does the root steps with your admin profile and tells you when it need
 
     Add the public key to the GitHub account that the agent pushes as, under **Settings > SSH and GPG keys > New SSH key**, with the key type **Authentication Key**.
 
-    Then add `core.sshCommand` to the agent's environment from step 4, and increase `GIT_CONFIG_COUNT` by one:
+    Then add `core.sshCommand` to the agent's environment from step 4 as the next pair, and increase `GIT_CONFIG_COUNT` by one. With GPG signing, this is pair 6 and the count is `7`. With SSH signing, this is pair 7 and the count is `8`:
 
     ```json
-    "GIT_CONFIG_KEY_6": "core.sshCommand",
-    "GIT_CONFIG_VALUE_6": "ssh -o IdentityAgent=~/.config/turnkey/ssh-agent.sock -o IdentitiesOnly=yes -o IdentityFile=~/.config/turnkey/agent-ssh.pub"
+    "GIT_CONFIG_KEY_7": "core.sshCommand",
+    "GIT_CONFIG_VALUE_7": "ssh -o IdentityAgent=~/.config/turnkey/ssh-agent.sock -o IdentitiesOnly=yes -o IdentityFile=~/.config/turnkey/agent-ssh.pub -o UserKnownHostsFile=~/.config/turnkey/ssh-allowed-hosts"
     ```
 
-    `ssh` expands `~` in these options. `IdentitiesOnly` stops `ssh` from offering the keys in `~/.ssh`, so the agent can use only the Turnkey key. Test it from the agent session:
+    `ssh` expands `~` in these options. `IdentitiesOnly` stops `ssh` from offering the keys in `~/.ssh`, so the agent can use only the Turnkey key. The allowed-hosts file limits the Turnkey SSH agent, but `ssh` does not read it for host trust. `UserKnownHostsFile` makes `ssh` use the same GitHub host keys, so the connection works on a machine where `ssh` has not connected to GitHub before.
+
+    Test it from the agent session:
 
     ```bash
     ssh -o IdentityAgent=~/.config/turnkey/ssh-agent.sock -o IdentitiesOnly=yes \
-      -o IdentityFile=~/.config/turnkey/agent-ssh.pub -T git@github.com
+      -o IdentityFile=~/.config/turnkey/agent-ssh.pub \
+      -o UserKnownHostsFile=~/.config/turnkey/ssh-allowed-hosts -T git@github.com
     git ls-remote git@github.com:OWNER/REPO.git
     ```
+
+    If the test works, `ssh` prints `Hi USERNAME! You've successfully authenticated, but GitHub does not provide shell access.` and exits with status 1. This status is correct, because GitHub gives no shell. `git ls-remote` prints the refs and exits with status 0.
 
     <Warning>
       `tk ssh agent` stops when you log out or restart. Start it again with `tk --profile agent ssh agent start --allowed-hosts-file ~/.config/turnkey/ssh-allowed-hosts`.
@@ -349,14 +378,17 @@ The agent does the root steps with your admin profile and tells you when it need
 
 ### Optional: co-author trailer
 
-To add `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit, add two more pairs to the agent's environment:
+To add `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit, add two more pairs to the agent's environment, and increase `GIT_CONFIG_COUNT` by two. Use the next two unused numbers. This example follows SSH signing and `core.sshCommand`:
 
 ```json
-"GIT_CONFIG_KEY_7": "hook.turnkey-co-author.event",
-"GIT_CONFIG_VALUE_7": "commit-msg",
-"GIT_CONFIG_KEY_8": "hook.turnkey-co-author.command",
-"GIT_CONFIG_VALUE_8": "/Users/jane/.local/bin/tk git co-author"
+"GIT_CONFIG_COUNT": "10",
+"GIT_CONFIG_KEY_8": "hook.turnkey-co-author.event",
+"GIT_CONFIG_VALUE_8": "commit-msg",
+"GIT_CONFIG_KEY_9": "hook.turnkey-co-author.command",
+"GIT_CONFIG_VALUE_9": "/Users/jane/.local/bin/tk git co-author"
 ```
+
+If a number is missing, Git stops with `missing config key GIT_CONFIG_KEY_n`.
 
 This needs Git 2.54 or later. The `/usr/bin/git` on macOS is older. It ignores the hook and shows no error. Put a newer Git first on the agent's `PATH`.
 
@@ -389,6 +421,9 @@ An agent in CI, a container, or a VM must not keep a long-lived credential. Use 
 | `no OpenPGP key in the registry matches signing key` | The key is not registered in Git's `HOME`. Run `tk --profile agent gpg keys add` there, or set `user.signingkey` to the exact fingerprint. |
 | `git verify-commit` fails after a commit succeeds | For GPG, the agent's process does not have `GNUPGHOME`, or the ownertrust import was not done there. For SSH, the `allowed_signers` line does not pair the committer email with the key. |
 | `git push` fails with `agent refused operation` | Run `tk --profile agent ssh git-sign -Y sign -n git -f ~/.config/turnkey/agent-ssh.pub ./file.txt` to see the Turnkey error. A 429 means the organization is over its signing rate limit. |
+| `gpg: can't connect to the gpg-agent: File name too long` | The socket path in `GNUPGHOME` is longer than the operating system permits (about 104 characters on macOS). Use a shorter `GNUPGHOME`, such as `~/.tk-gnupg`, in step 3 and step 4. |
+| `ssh` says `Host key verification failed` | `ssh` does not trust the GitHub host key. Add `-o UserKnownHostsFile=~/.config/turnkey/ssh-allowed-hosts` as in step 5. |
+| `ssh` says `invalid format` for `agent-ssh.pub`, or `tk ssh agent status` says `ssh-agent is not running` | The SSH agent stopped. Then `ssh` tries to read the public key file as a private key. Start the agent again. Some agent sandboxes stop background processes when a command ends. In that case, start the agent in the same command as `ssh` or `git`. |
 | Commits are signed, but GitHub shows **Unverified** | The committer email is not confirmed on the GitHub account, or the key's user ID does not contain that email. Do step 6. |
 
 ## Next steps
