@@ -102,7 +102,7 @@ The agent does the root steps with your admin profile and tells you when it need
 
   <Step title="2. Create the agent identity">
     <Tip>
-      The steps keep IDs in shell variables. If your agent runs each command in a new shell, write each value to a file after you set it, for example `echo "AGENT_USER_ID=$AGENT_USER_ID" >> ~/.config/turnkey/setup.env`, and run `. ~/.config/turnkey/setup.env` at the start of each later command. Run `profile create` and `user create` in the same shell.
+      Later commands use IDs from earlier ones, such as `PUBLIC_KEY` and `AGENT_USER_ID`. Run each code block in one shell. If your agent runs each command in a new shell, write each value to a file after you set it, for example `mkdir -p ~/.config/turnkey && echo "AGENT_USER_ID=$AGENT_USER_ID" >> ~/.config/turnkey/setup.env`, and run `. ~/.config/turnkey/setup.env` at the start of each later command.
     </Tip>
 
     Create the `agent` tag, if your organization does not have it:
@@ -218,6 +218,8 @@ The agent does the root steps with your admin profile and tells you when it need
   </Step>
 
   <Step title="4. Point Git at tk for the agent only">
+    With several agents on this machine, use the names in [Several agents on one machine](#several-agents-on-one-machine) from the start, such as `tk-sign-claude`.
+
     Git starts `tk` with no `tk` flags, so a small wrapper selects the agent's profile:
 
     ```bash
@@ -237,7 +239,7 @@ The agent does the root steps with your admin profile and tells you when it need
 
     <Tabs>
       <Tab title="Claude Code">
-        In `~/.claude/settings.json`, add these keys to the `env` object. Replace `FINGERPRINT` with the value from step 3, and `/Users/jane` with your home directory:
+        In `~/.claude/settings.json`, add these keys to the `env` object. If the file does not exist, run `mkdir -p ~/.claude` and create it with this content. Replace `FINGERPRINT` with the value from step 3, and `/Users/jane` with your home directory:
 
         ```json
         {
@@ -261,7 +263,7 @@ The agent does the root steps with your admin profile and tells you when it need
         ```
       </Tab>
       <Tab title="Codex">
-        In `~/.codex/config.toml`. Replace `FINGERPRINT` with the value from step 3, and `/Users/jane` with your home directory:
+        In `~/.codex/config.toml` (run `mkdir -p ~/.codex` first if the directory does not exist). Replace `FINGERPRINT` with the value from step 3, and `/Users/jane` with your home directory:
 
         ```toml
         [shell_environment_policy.set]
@@ -497,7 +499,7 @@ SSH_AUTH_SOCK=~/.config/turnkey/ssh-claude.sock ssh-add -L
 You can use the same setup to sign your own commits with a Turnkey key, without an agent:
 
 1. Do step 1 for your own user. You do not need step 2.
-2. Do step 3 with your root profile (for example `admin`) in place of both `admin` and `agent`, and your own name and email in the key's user ID. If you are the only member of the root quorum, you do not need a signing policy. If not, create one that names your user.
+2. Do step 3 with your root profile (for example `admin`) in place of both `admin` and `agent` in every command, including `gpg keys add` and the GnuPG import, and your own name and email in the key's user ID. If you are the only member of the root quorum, you do not need a signing policy. If not, create one that names your user.
 3. Write down your old signing key, if you have one (`git config --global user.signingkey`). This is `OLD_FINGERPRINT` below. Then create a wrapper for your own profile and point your global Git config at it. For SSH signing, leave out the `GNUPGHOME` and `gpg.format openpgp` lines, and use the SSH settings from step 4:
 
    ```bash
@@ -557,8 +559,8 @@ A broker outside the sandbox holds the Turnkey credential and signs through a Un
 This example uses two OS users on one machine: `broker` holds the credential, and `agent` is the sandbox. With containers or VMs, mount only the socket directory and the public key into the sandbox. In production, give the broker an expiring session key.
 
 1. Create the broker identity. The `agent` OS user gets no Turnkey user.
-   - As `broker`, install `tk` (step 1) and run `tk --organization-id ORG_UUID profile create --profile-name broker`. Write down the public key.
-   - As the operator, do step 1, and create the `agent` tag and `agents-no-credentials` policy from step 2 if they do not exist. Then run step 2's `user create` with `--user-name broker` and the broker's public key as `PUBLIC_KEY`. Save the result as `AGENT_USER_ID`. Skip the rest of step 2.
+   - As `broker`, install `tk` and add it to `PATH` (step 1), and run `tk --organization-id ORG_UUID profile create --profile-name broker`. Write down the public key.
+   - As the operator, do step 1, and run step 2's commands for the `agent` tag, `AGENT_TAG`, and the `agents-no-credentials` policy. Then run step 2's `user create` with `--user-name broker` and the broker's public key as `PUBLIC_KEY`. Save the result as `AGENT_USER_ID`. Skip the rest of step 2.
    - As `broker`, run `tk login --profile-name broker` and `tk --profile broker whoami`.
    - As the operator, do step 3 (GPG tab) up to `gpg keys create`. The signing policy then names the broker.
 
@@ -573,7 +575,7 @@ This example uses two OS users on one machine: `broker` holds the credential, an
 
    The new group applies only to new sessions of `agent`. If the agent is running, start it again after this step.
 
-3. As `broker`, set `WALLET_ID` and `FINGERPRINT` to the operator's values from step 3 (they are not secrets). Register the key, publish the public key, and start the broker:
+3. As the operator, print the step 3 values with `echo "$WALLET_ID $FINGERPRINT"`. They are not secrets. As `broker`, set `WALLET_ID` and `FINGERPRINT` to them. Register the key, publish the public key, and start the broker:
 
    ```bash
    tk --profile broker gpg keys add --wallet-id "$WALLET_ID" --key "$FINGERPRINT"
@@ -584,7 +586,7 @@ This example uses two OS users on one machine: `broker` holds the credential, an
 
    `serve` runs in the foreground and prints nothing. Check that `ls -l /run/tk-gpg-agent/agent.sock` shows owner `broker`, group `tk-sign`, and mode `srw-rw----`. In production, run `serve` under a supervisor. For systemd, set `User=broker`, `Environment=HOME=/home/broker`, `Restart=on-failure`, and `RuntimeDirectory=tk-gpg-agent` with `RuntimeDirectoryMode=2750`, because `/run` is cleared at boot.
 
-4. As `agent`, install `tk` (step 1, without a profile), import the public key, and point Git at `tk`. Replace `FINGERPRINT` with the broker's key fingerprint:
+4. As `agent`, install `tk` and add it to `PATH` (step 1, without a profile), import the public key, and point Git at `tk`. Replace `FINGERPRINT` with the broker's key fingerprint:
 
    ```bash
    gpg --import /opt/tk-gpg-public/signing-key.asc
@@ -598,7 +600,7 @@ This example uses two OS users on one machine: `broker` holds the credential, an
    git config --global user.email jane+agent@example.com
    ```
 
-   With `TK_GPG_AGENT_SOCK` set, `tk` signs through the socket and needs no profile. `~/.profile` covers only login shells, so also set it in the environment that starts the agent.
+   With `TK_GPG_AGENT_SOCK` set, `tk` signs through the socket and needs no profile. `~/.profile` covers only login shells, so also set `TK_GPG_AGENT_SOCK` where the agent's runtime gets its environment, such as the `env` map in step 4 or the container's environment.
 
 5. In a new login shell as `agent`, make a test commit in a Git repository. `tk whoami` must fail with `no profile is selected and no credential environment is set`: the agent has no credential.
 
