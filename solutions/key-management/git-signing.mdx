@@ -103,7 +103,7 @@ The agent does the root steps with your admin profile and tells you when it need
   </Step>
 
   <Step title="2. Create the agent identity">
-    The steps keep IDs in shell variables, such as `AGENT_TAG`, `AGENT_USER_ID`, `WALLET_ID`, and `FINGERPRINT` (GPG), or `PRIVATE_KEY_ID` (SSH). If your agent runs each command in a new shell, it loses the variables. Write each value to a file, for example `echo "AGENT_USER_ID=$AGENT_USER_ID" >> ~/.config/turnkey/setup.env`, and run `. ~/.config/turnkey/setup.env` at the start of each later command.
+    The steps keep IDs in shell variables, such as `AGENT_TAG`, `AGENT_USER_ID`, `WALLET_ID`, and `FINGERPRINT` (GPG), `PRIVATE_KEY_ID` (SSH signing), or `SSH_KEY_ID` (step 5). If your agent runs each command in a new shell, it loses the variables. Write each value to a file, for example `echo "AGENT_USER_ID=$AGENT_USER_ID" >> ~/.config/turnkey/setup.env`, and run `. ~/.config/turnkey/setup.env` at the start of each later command.
 
     Create the `agent` tag, if your organization does not have it:
 
@@ -388,12 +388,18 @@ The agent does the root steps with your admin profile and tells you when it need
 
     `ssh keys create` creates the key and registers it for the profile that created it. The agent registers it again for its own profile with `ssh keys add` below. Make sure that `echo "$SSH_KEY_ID"` does not print an empty line or `null`. If it does, read `~/.config/turnkey/ssh-create.json` for the error, and do not run the `policy create` command. Then wait a minute, and run `tk --profile admin ssh keys list` and the `activity list` command below. If neither shows a new key, Turnkey did not create one, and you can run `ssh keys create` again. If a key shows (for example, after a 429 that happened after the key was created), do not run it again, because that makes a second key. Get the ID with `tk --profile admin --message-format json activity list | jq -r '.data.items[].result.createPrivateKeysResultV2.privateKeys[]?.privateKeyId'`. The list starts with the newest key. If you set up several agents, it also lists the keys of the other agents, and it shows no names, so do this right after the failure and take the first ID. Set `SSH_KEY_ID` to it, check it with `echo "$SSH_KEY_ID"`, and run `tk --profile admin ssh keys add --private-key-id "$SSH_KEY_ID"`. Then run the `policy create` command from the block above. If `policy create` or `ssh keys add` fails with 429, wait a few minutes. Run `tk --profile admin policy list`. If the policy is not in the list, run `policy create` again. You can run `ssh keys add` again, because it only registers the key on this machine. Do not run it while `SSH_KEY_ID` is empty or `null`, because it would make a policy for a key that does not exist.
 
-    As the agent, register the key, save its public key, and start the SSH agent. If you set up several agents, do not run the last command in this block. Start the SSH agent with the command in [Several agents on one machine](#several-agents-on-one-machine). The allowed-hosts file limits the agent to the GitHub host keys. After the `ssh-keyscan` command, run `ssh-keygen -lf ~/.config/turnkey/ssh-allowed-hosts`. Each SHA256 value must match one of [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
+    As the agent, register the key, save its public key, and start the SSH agent. If you set up several agents, do not run the last command in this block. Start the SSH agent with the command in [Several agents on one machine](#several-agents-on-one-machine). The allowed-hosts file limits the agent to the GitHub host keys. Each SHA256 value that `ssh-keygen -lf` prints must match one of [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
 
     ```bash
     tk --profile agent ssh keys add --private-key-id "$SSH_KEY_ID"
     tk --profile agent ssh public-key --key "$SSH_KEY_ID" > ~/.config/turnkey/agent-ssh.pub
     ssh-keyscan github.com > ~/.config/turnkey/ssh-allowed-hosts
+    ssh-keygen -lf ~/.config/turnkey/ssh-allowed-hosts
+    ```
+
+    Compare the fingerprints with GitHub's before you go on. Then start the SSH agent:
+
+    ```bash
     tk --profile agent ssh agent start --allowed-hosts-file ~/.config/turnkey/ssh-allowed-hosts
     ```
 
@@ -474,7 +480,7 @@ This needs Git 2.54 or later. The `/usr/bin/git` on macOS is older. It ignores t
 
 Give each agent its own identity: its own Turnkey user, tk profile, keys, policies, wrapper, and SSH agent socket. Then each agent signs with its own key, its commits show its own name, and you can revoke one agent and keep the others.
 
-Do steps 2 to 5 one time for each agent, with that agent's names. Use a separate shell for each agent, so that `AGENT_USER_ID`, `WALLET_ID`, `FINGERPRINT`, and `SSH_KEY_ID` do not overwrite each other. If your agent runs each command in a new shell, use one values file for each agent, such as `~/.config/turnkey/setup-claude.env` and `~/.config/turnkey/setup-codex.env`, in place of `setup.env`. Source only that agent's file in its commands. Do not use the names `agent` and `tk-sign` from the steps, because each agent would replace the files of the agent before it. In every command and config value, replace the profile and user name `agent`, the wallet name, the policy names, the OpenPGP user ID in `gpg keys create --user-id`, `user.name`, `user.email`, the wrapper path in `gpg.program`, the SSH key name, the output file of `ssh keys create` (for example `~/.config/turnkey/ssh-create-claude.json`), `agent-ssh.pub`, `ssh-agent.sock`, and the PID file. Write `AGENT_TAG` into each agent's values file, because the steps for each agent use it. Keep `--tag-name agent`, because all agents use the same `agent` tag. This table shows the names for Claude Code and Codex:
+Do steps 2 to 5 one time for each agent, with that agent's names. Use a separate shell for each agent, so that `AGENT_USER_ID`, `WALLET_ID`, `FINGERPRINT`, and `SSH_KEY_ID` do not overwrite each other. If your agent runs each command in a new shell, use one values file for each agent, such as `~/.config/turnkey/setup-claude.env` and `~/.config/turnkey/setup-codex.env`, in place of `setup.env`. Source only that agent's file in its commands. Do not use the names `agent` and `tk-sign` from the steps, because each agent would replace the files of the agent before it. In every command and config value, replace the profile and user name `agent`, the wallet name, the policy names, the OpenPGP user ID in `gpg keys create --user-id`, `user.name`, `user.email`, the wrapper path in `gpg.program`, the SSH key name, the output file of `ssh keys create` (for example `~/.config/turnkey/ssh-create-claude.json`), `agent-ssh.pub`, `ssh-agent.sock`, and the PID file. Keep `--tag-name agent`, because all agents use the same `agent` tag. This table shows the names for Claude Code and Codex:
 
 | | Claude Code | Codex |
 | :--- | :--- | :--- |
@@ -517,7 +523,7 @@ tk --profile claude ssh agent start --key "$CLAUDE_SSH_FINGERPRINT" \
 
 For Codex, use the same wrapper and command with `codex` in place of `claude`. In each agent's `core.sshCommand`, set `IdentityAgent` to that agent's socket and `IdentityFile` to its public key file. To stop or check one SSH agent, give `tk ssh agent stop` or `tk ssh agent status` the same `--socket` and `--pid-file`.
 
-Make sure that each socket serves only its own key. This command must print exactly one key, and it must be the key in `claude-ssh.pub`:
+Make sure that each socket serves only its own key. This command must print exactly one key, and it must be the key in `claude-ssh.pub`. The output adds a `turnkey:` comment that the `.pub` file does not have:
 
 ```bash
 SSH_AUTH_SOCK=~/.config/turnkey/ssh-claude.sock ssh-add -L
