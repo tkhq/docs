@@ -32,6 +32,47 @@ operations:
 | function   | Timestamp(\<rfc3339>)                 | "Timestamp('2025-01-01T00:00:00Z')"                   | ([string](#type-string)) -> [timestamp](#type-timestamp)            |
 | function   | CronSpan(\<cron>, \<duration>, \<tz>) | "CronSpan('0 9 \* \* 1-5', '8h', 'America/New_York')" | ([string](#type-string), [string](#type-string), [string](#type-string)) -> [bool](#type-bool) |
 
+### Operator precedence
+
+<Warning>
+If you use both `&&` and `||` in a condition, use parentheses. The policy engine gives `&&` and `||`
+the *same* precedence and groups them from left to right (many programming languages group `&&`
+first).
+</Warning>
+
+For example, suppose that you want to match any transaction to address `<A>`, OR a zero-value
+transaction to address `<B>`. The following condition *does not* match these transactions.
+
+```
+eth.tx.to == '<A>' || eth.tx.to == '<B>' && eth.tx.value == 0
+```
+
+The policy engine evaluates this condition as
+`(eth.tx.to == '<A>' || eth.tx.to == '<B>') && eth.tx.value == 0`. As a result, the condition
+matches only zero-value transactions. A non-zero transaction to `<A>` does not match.
+
+To match the transactions that you want, **use parentheses**:
+
+```
+eth.tx.to == '<A>' || (eth.tx.to == '<B>' && eth.tx.value == 0)
+```
+
+The policy engine groups operators in this order, from first to last:
+
+| Order     | Operators                                     | Grouping                                   |
+| --------- | --------------------------------------------- | ------------------------------------------ |
+| 1 (first) | field access (`.`, `[]`) and function calls   | left to right                              |
+| 2         | `!`, `-`                                      | no chaining (i.e. `!!x` is not valid) |
+| 3         | `==`, `!=`, `<`, `>`, `<=`, `>=`, `in`        | left to right                              |
+| 4 (last)  | `&&`, `\|\|`                                  | left to right                              |
+
+- The policy engine groups comparisons before `&&` and `||`. For example, `a == 1 && b == 2` means
+  `(a == 1) && (b == 2)`.
+- `!` and `-` apply only to the single operand immediately after them, so `!x == y` means
+  `(!x) == y`. To negate a larger expression, use parentheses: `!(x == y)`.
+- The policy engine always evaluates both operands of `&&` and `||`, even when the left operand
+  already decides the result. See [Policy evaluation](#policy-evaluation).
+
 ## Keywords
 
 Keywords are reserved words that are dynamically interchanged for real values at evaluation time.
