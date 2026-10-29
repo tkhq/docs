@@ -92,7 +92,7 @@ Each field supports a different set of keywords.
 | **activity**                   | [Activity](#struct-activity)             | The activity metadata of the request                                        |
 | **eth.tx**                     | [EthereumTransaction](#struct-ethereum-transaction)  | The parsed Ethereum transaction payload (see Appendix below)                |
 | **eth.eip_712**                | [Eip712TypedData](#struct-eip-712-typed-data)      | EIP-712 Typed Data (see Appendix below)                                     |
-| **eth.eip_7702_authorization** | [Eip7702Authorization](#struct-eip-7702-authorization) | EIP-7702 Authorization (see Appendix below)                                 |
+| **eth.eip_7702_authorization** | [Eip7702Authorization](#struct-eip-7702-authorization) | An EIP-7702 authorization that the signing key signs (see [EIP-7702](#eip-7702) for supported activities) |
 | **solana.tx**                  | [SolanaTransaction](#struct-solana-transaction)    | The parsed Solana transaction payload (see Appendix below)                  |
 | **tron.tx**                    | [TronTransaction](#struct-tron-transaction)      | The parsed Tron transaction payload (see Appendix below)                    |
 | **bitcoin.tx**                 | [BitcoinTransaction](#struct-bitcoin-transaction)   | The parsed Bitcoin transaction payload (see Appendix below)                 |
@@ -183,7 +183,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | <a id="struct-eip-712-typed-data" href="#struct-eip-712-typed-data">**Eip712TypedData**</a>      | primary_type             | [string](#type-string)                                    | The type of the primary (i.e. outermost) structure in the `message` JSON                                                                                                                                                                                                                                                                                             |
 |                          | domain                   | [Eip712Domain](#struct-eip-712-domain)                              | The `Domain` of the payload                                                                                                                                                                                                                                                                                                                                          |
 |                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serializaiton of the message payload                                                                                                                                                                                                                                                                                                                            |
-| <a id="struct-eip-7702-authorization" href="#struct-eip-7702-authorization">**Eip7702Authorization**</a> | address                  | [string](#type-string)                                    | The address you would like to authorize                                                                                                                                                                                                                                                                                                                              |
+| <a id="struct-eip-7702-authorization" href="#struct-eip-7702-authorization">**Eip7702Authorization**</a> | address                  | [string](#type-string)                                    | The delegate contract that the account delegates to                                                                                                                                                                                                                                                                                                                             |
 |                          | chain_id                 | number                                    | The EVM chain ID                                                                                                                                                                                                                                                                                                                                                     |
 |                          | nonce                    | number                                    | The nonce of the authority                                                                                                                                                                                                                                                                                                                                           |
 | <a id="struct-solana-transaction" href="#struct-solana-transaction">**SolanaTransaction**</a>    | account_keys             | list\<[string](#type-string)\>                            | The accounts (public keys) involved in the transaction                                                                                                                                                                                                                                                                                                               |
@@ -625,22 +625,79 @@ the match to be:
   when you deliberately need one exact version.
 </Note>
 
+## Evaluation errors and short-circuiting
+
+<a id="policy-evaluation" />
+
+A policy `condition` causes an evaluation error when it uses a keyword or field that the activity
+does not populate. For example, `eth.eip_7702_authorization` on `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`,
+or an [activity parameter](#activity-parameters) that the activity does not expose.
+
+If a policy's `condition` causes an evaluation error, the policy is skipped:
+
+- An `ALLOW` policy with an error does not allow the activity.
+- A `DENY` policy with an error does not deny the activity, so another `ALLOW` policy can still
+  allow it.
+
+### Short-circuiting
+
+Note that our policy engine does not short-circuit during evaluation. Specifically, the policy engine evaluates every clause of a condition, because `&&` and `||` **do not**
+short-circuit. If *any* clause causes an error, the entire policy will error, even if *another* passes.
+
+For example, suppose you have a policy with the `condition` as `wallet.id == '<WALLET_ID>' || private_key.id == '<PRIVATE_KEY_ID>'`. This will, by construction,
+always cause an error, because a signing activity can use a wallet or a private key, but not both: when you sign with a
+private key, the `wallet.id` clause causes an error. When you sign with a wallet, the
+`private_key.id` clause causes an error. Short-circuiting in this scenario means that if the first clause passes, the second clause would not be evaluated, thereby preventing such an error -- our policy engine does not behave in this way.
+
+### Example: one policy for two activities
+
+This policy tries to allow two things: signing Type 2 transactions, and signing EIP-7702
+authorizations for one trusted delegate contract:
+
+```json
+{
+  "policyName": "Allow Type 2 transactions and EIP-7702 Authorizations (does not work)",
+  "effect": "EFFECT_ALLOW",
+  "condition": "(activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && eth.tx.type == 'TYPE_2') || (activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP7702_AUTHORIZATION' && eth.eip_7702_authorization.address == '<CHECKSUMMED_ADDRESS>')"
+}
+```
+
+This policy never allows either activity:
+
+- For `ACTIVITY_TYPE_SIGN_TRANSACTION_V2`, the policy engine also evaluates
+  `eth.eip_7702_authorization.address`, which this activity does not populate.
+- For `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2`, the policy engine also evaluates `eth.tx.type`, which
+  this activity does not populate.
+
+In both cases, the condition causes an evaluation error and the policy is skipped. We recommend writing one policy for each activity instead:
+
+```json
+{
+  "policyName": "Allow Type 2 transactions",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2' && eth.tx.type == 'TYPE_2'"
+}
+```
+
+```json
+{
+  "policyName": "Allow signing of EIP-7702 Authorizations",
+  "effect": "EFFECT_ALLOW",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.encoding == 'PAYLOAD_ENCODING_EIP7702_AUTHORIZATION' && eth.eip_7702_authorization.address == '<CHECKSUMMED_ADDRESS>' && eth.eip_7702_authorization.chain_id == <CHAIN_ID>"
+}
+```
+
+### Guidelines
+
+- Keep related clauses for one activity, such as the `address` and `chain_id` limits of one
+  allowlist, in one policy joined with `&&`.
+- Do not join clauses for different activities with `||`. Write a separate policy for each activity.
+- A `DENY` policy that uses a keyword that only some activities populate has no effect on the other
+  activities. For example, a `DENY` policy with the condition
+  `eth.eip_7702_authorization.chain_id == 0` does not deny anything that
+  `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` signs.
+
 ## Appendix
-
-### Policy evaluation
-
-Note that our policy engine does not short circuit during evaluation. In practice, this means that
-if any clause within the `condition` field of a policy results in an error, the evaluated `outcome`
-for that policy will be an error. In such cases, consider breaking up complex policies into separate
-policies.
-
-For example, suppose you're looking to construct a policy with the condition `wallet.id == '\<wallet
-UUID\>' || private*key.id == '\<private key UUID\>'. This condition will \_always* error out during
-evaluation, because only one of the two clauses can ever be valid: an activity cannot target both a
-wallet and private key. That means if you're trying to, say, sign with a private key, then the
-wallet clause will fail (because a wallet isn't being passed into the policy evaluation).
-Conversely, if you're trying to sign with a wallet, the private key clause will fail for the same
-reason.
 
 ### Activity parameters
 
@@ -651,7 +708,7 @@ fields listed below are available to policy conditions.
 Absence from this table does not mean that an activity is unsupported or cannot be targeted with
 `activity.type`, `activity.kind`, or `activity.resource` and `activity.action`. It means that the
 policy evaluator exposes no request fields for that activity. Attempting to access an unavailable
-field produces a `MissingField` evaluation error. To request an additional policy-exposed parameter,
+field produces a `MissingField` evaluation error. See [Evaluation errors and short-circuiting](#evaluation-errors-and-short-circuiting) for more details. To request an additional policy-exposed parameter,
 contact [help@turnkey.com](mailto:help@turnkey.com).
 
 | Category           | Activity Type                                   | Field                | Type                          | Description                                                                                                                                                   |
@@ -855,6 +912,86 @@ selectors, bytes) are **lowercase**. The policy engine expects lowercase hex str
 Ethereum's standard convention. Using uppercase hex strings may result in errors or policy
 rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
 
+#### EIP-7702
+
+`eth.eip_7702_authorization` is an EIP-7702 authorization that the signing key signs as a message.
+It does not describe the authorization list of a Type 4 transaction. Policies on transactions use
+`eth.tx` (see [Type 4 transactions](#type-4-transactions)). The policy engine populates
+`eth.eip_7702_authorization` only for these activities:
+
+- `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD` and `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2`. The policy engine reads
+  the payload as an authorization for all encodings, so an `ALLOW` policy must also contain
+  `activity.params.encoding == 'PAYLOAD_ENCODING_EIP7702_AUTHORIZATION'`. Without this check, the
+  policy also allows EIP-712 typed data, such as a token permit, that contains `address`,
+  `chainId`, and `nonce` fields.
+- `ACTIVITY_TYPE_ETH_SEND_TRANSACTION` and `ACTIVITY_TYPE_ETH_SEND_TRANSACTION_V2`, when Turnkey
+  builds an authorization to its gas delegate contract. This occurs for sponsored transactions and
+  for non-sponsored `ACTIVITY_TYPE_ETH_SEND_TRANSACTION_V2` requests with more than one call, when the account is not yet delegated. A
+  request without an authorization causes an evaluation error, so do not require
+  `eth.eip_7702_authorization` in `ALLOW` policies for these activities.
+- `ACTIVITY_TYPE_ETH_UNDELEGATE_7702`.
+
+For all other activities, the keyword causes an evaluation error. See
+[Evaluation errors and short-circuiting](#evaluation-errors-and-short-circuiting) for more details. There is no plural `eth.eip_7702_authorizations` keyword -- if you attempt to create a policy with it, it'll get rejected.
+
+<Warning>
+  `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` does not populate `eth.eip_7702_authorization` for any encoding.
+  If an `ALLOW` policy for this activity does not limit `activity.params.encoding`, the key can sign
+  authorizations for any contract.
+  [Deny batch signing of EIP-7702 authorizations](/features/policies/examples/ethereum#deny-batch-signing-of-eip-7702-authorizations)
+  blocks only `PAYLOAD_ENCODING_EIP7702_AUTHORIZATION`. The key can still sign authorizations as
+  hexadecimal or UTF-8 payloads (see below). If a key must not sign authorizations, allow this
+  activity only with `activity.params.encoding == 'PAYLOAD_ENCODING_EIP712'`.
+</Warning>
+
+##### What a signed authorization allows
+
+Anyone who has a signed authorization can send it in a Type 4 transaction from any account, with no
+other signature from the key. The network gets the delegated account from the authorization
+signature, not from the sender. After that, calls to the account run the code at `address` until
+another authorization replaces it. If that code does not verify the caller, anyone can move the
+funds of the account. Write the `ALLOW` policy as an allowlist:
+
+- `address`: Only delegate contracts that you trust, with `==` or `in`. A list of bad contracts in a
+  `DENY` policy does not work, because an attacker can deploy a new contract.
+- `chain_id`: The chains that you use. An authorization with `chain_id` 0 is valid on all EVM chains.
+- `nonce`: An authorization is usable only when the account nonce is equal to its `nonce`, so an
+  authorization with a future nonce stays usable until the account nonce is more than its `nonce`.
+
+The policy engine gives `address` in the EIP-55 checksummed (mixed-case) form, and the comparison is
+case-sensitive. Write each address in your policy in the checksummed form. An address in another
+case never matches, so an `ALLOW` policy does not allow the authorization and a `DENY` policy does not
+deny it.
+
+Raw payload signing with other encodings can also sign an authorization. A
+`PAYLOAD_ENCODING_HEXADECIMAL` payload can be the authorization hash (`HASH_FUNCTION_NO_OP`) or the
+authorization message (`HASH_FUNCTION_KECCAK256`). A `PAYLOAD_ENCODING_TEXT_UTF8` payload can be the
+authorization hash if the delegate address makes that hash valid UTF-8. These payloads do not parse
+as authorizations, so `eth.eip_7702_authorization` causes an evaluation error, and a limit on
+`activity.params.hash_function` does not stop this. An `ALLOW` policy that permits these encodings can sign authorizations.
+
+If a key must not sign authorizations, allow raw payload signing only with
+`activity.params.encoding == 'PAYLOAD_ENCODING_EIP712'`. Do not deny encodings one at a time. This
+also blocks `signMessage` in @turnkey/viem and @turnkey/ethers, which signs
+`PAYLOAD_ENCODING_HEXADECIMAL` payloads with `HASH_FUNCTION_NO_OP`. No policy can stop a key that
+signs these payloads from signing an authorization. If you need both, use separate keys. To let
+a key sign only the authorizations that your policy allows, also allow
+`PAYLOAD_ENCODING_EIP7702_AUTHORIZATION`, but only for `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD` and
+`ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2`. Also, `ACTIVITY_TYPE_ETH_SEND_TRANSACTION(_V2)` requests that
+include an authorization sign one to the Turnkey gas delegate contract, and
+`ACTIVITY_TYPE_ETH_UNDELEGATE_7702` signs one to the zero address.
+
+For examples, see
+[Allow signing of EIP-7702 authorizations](/features/policies/examples/ethereum#allow-signing-of-eip-7702-authorizations).
+
+##### Type 4 transactions
+
+`ACTIVITY_TYPE_SIGN_TRANSACTION_V2` does not populate `eth.eip_7702_authorization`, and the policy
+engine does not expose the authorization list of a Type 4 transaction. Signing a Type 4 transaction
+does not delegate the signer, because each entry in the list has its own signature from its
+authority, over a different message format. To control Type 4 transactions, use `eth.tx.type`. For
+more information, see [EIP-7702 (type 4) support](/features/networks/ethereum#eip-7702-type-4-support).
+
 ### Solana
 
 Similarly, our Solana policy language (accessible via `solana.tx`) allows for control over signing
@@ -908,6 +1045,7 @@ For legacy/V0 transactions, access to any of these four fields produces a `Field
   A condition such as `solana.tx.version == 'V1' && solana.tx.priority_fee_lamports <= 1000`
   still evaluates the fee field for legacy/V0 and produces an error.
   Use separate, fully scoped allow policies for the transaction versions you accept.
+  See [Evaluation errors and short-circuiting](#evaluation-errors-and-short-circuiting) for more details.
 </Warning>
 
 #### Account address lookups

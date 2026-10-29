@@ -93,7 +93,7 @@ Rejected: `rlp([tx_payload_body, blobs, commitments, proofs])`
 
 See [https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md#blob-transaction](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md#blob-transaction) and [https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md#networking](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4844.md#networking), respectively, for more.
 
-### EIP-7702 (type 4) support
+### EIP-7702 (Type 4) support
 
 In addition to adding support for Type 3 transactions, Turnkey now also supports Type 4 transactions, which conform to the [EIP-7702 standard](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7702.md). From [https://eip7702.io/](https://eip7702.io/):
 
@@ -105,6 +105,8 @@ Specifically, it allows any EOA to set its code based on any existing smart cont
 This setup allows an EOA to mimic a smart contract account, particularly allowing transaction bundling, gas sponsorships, and custom permissioning schemes.
 ```
 
+#### Use cases
+
 You can take advantage of Type 4 transaction support on Turnkey to:
 
 1. Enable gasless transaction experiences: Design applications where transactions can be sponsored by third parties, removing the ETH requirement barrier for new users and simplifying onboarding.
@@ -113,7 +115,22 @@ You can take advantage of Type 4 transaction support on Turnkey to:
 
 For a turnkey solution to gasless transactions using EIP-7702, check out the [Gas Station SDK](/sdks/web3/gas-station), which provides clean abstractions for authorization, intent signing, and paymaster execution.
 
-Type 4 transaction support is also live for our policy engine. Details about our engine language can be found [here](https://docs.turnkey.com/concepts/policies/language#struct), and an example demonstrating how to use @turnkey/viem to sign Type 4 transactions can be found [here](https://github.com/tkhq/sdk/blob/main/examples/chain-integrations/with-viem/src/eip7702/signTransaction.ts).
+#### Policy engine behavior
+
+The policy engine parses Type 4 transactions (whose `eth.tx.type` is `TYPE_4`), but it currently does not expose the transaction's authorization list (if you need this specifically, please contact us at [hello@turnkey.com](mailto:hello@turnkey.com)). To control the authorizations that a key signs (i.e., the specific EIP-7702 authorizations, via activities like `SignRawPayload`), use `eth.eip_7702_authorization` (see [EIP-7702](/features/policies/language#eip-7702)). For an example that signs Type 4 transactions with @turnkey/viem, see [`signTransaction.ts`](https://github.com/tkhq/sdk/blob/main/examples/chain-integrations/with-viem/src/eip7702/signTransaction.ts).
+
+<Warning>
+  Before you sign EIP-7702 authorizations, read [EIP-7702](/features/policies/language#eip-7702). In short:
+
+  - A signed authorization delegates the account, and anyone can send it from any account. Allow only delegate contracts that you trust. For examples, see [Allow signing of EIP-7702 authorizations](/features/policies/examples/ethereum#allow-signing-of-eip-7702-authorizations).
+  - An authorization with `chain_id` set to 0 is valid on all EVM chains.
+  - Signing a Type 4 transaction does not delegate the signer. `ACTIVITY_TYPE_SIGN_TRANSACTION_V2` does not populate `eth.eip_7702_authorization`, so to allow or deny the Type 4 transactions that you sign, match `eth.tx.type == 'TYPE_4'`.
+  - `ACTIVITY_TYPE_SIGN_RAW_PAYLOADS` does not populate `eth.eip_7702_authorization` either. See [Deny batch signing of EIP-7702 authorizations](/features/policies/examples/ethereum#deny-batch-signing-of-eip-7702-authorizations).
+  - A raw payload with `PAYLOAD_ENCODING_HEXADECIMAL` or `PAYLOAD_ENCODING_TEXT_UTF8` can sign an authorization that policies cannot see. **If a key must not sign authorizations, allow raw payload signing only with `PAYLOAD_ENCODING_EIP712`**. This also blocks `signMessage` in @turnkey/viem and @turnkey/ethers.
+  - Sponsored and multi-call `ACTIVITY_TYPE_ETH_SEND_TRANSACTION(_V2)` requests sign an authorization to the Turnkey gas delegate contract if the account is not yet delegated. These requests populate `eth.eip_7702_authorization`, but requests without an authorization do not, so do not require it in allow policies for these activities.
+  - If an externally owned account has a delegation, any transaction to it can run code.
+  - To remove a delegation, use `ACTIVITY_TYPE_ETH_UNDELEGATE_7702`.
+</Warning>
 
 ### EIP-712
 
