@@ -181,7 +181,7 @@ each with a `token` address and an `amount`.
   "domain": { "name": "Permit2", "chainId": 1, "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3" },
   "message": {
     "permitted": [
-      { "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "amount": "1000000000" }
+      { "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "amount": "50000000" }
     ],
     "spender": "0x<SPENDER_ADDRESS>",
     "nonce": 0,
@@ -239,12 +239,16 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow USDC token permissions below 100 USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
 <Note>
-`in` works for integer fields. For string fields such as token addresses, use `||` instead.
+- Use `.all()` to bound every entry. `.any()` is satisfied by one small entry even if another entry is unbounded.
+- Compare integer fields with unquoted numeric literals (`p['amount'] < 100000000`). This works when the amount is a decimal string, as in the sample payload above.
+- `in [1, 2]` works for integer fields.
+- For string fields such as token addresses, use `||` instead.
+- Send large integers as decimal strings. See the [EIP-712 section of the policy language](/features/policies/language#eip-712) for details.
 </Note>
 
 ### Deny signing of `NO_OP` keccak256 payloads

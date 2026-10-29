@@ -182,7 +182,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | contract_call_args       | Option\<Map\<[String](#type-string), ContractArgument\>\> | ABI field specifying all contract arguments parsed from the contract call data. It is a mapping of the string representations of the arg name to the argument itself. Populated only when a matching [Smart Contract Interface](/features/policies/smart-contract-interfaces) has been uploaded for `eth.tx.to`. Access via `eth.tx.contract_call_args['arg_name']`. |
 | <a id="struct-eip-712-typed-data" href="#struct-eip-712-typed-data">**Eip712TypedData**</a>      | primary_type             | [string](#type-string)                                    | The type of the primary (i.e. outermost) structure in the `message` JSON                                                                                                                                                                                                                                                                                             |
 |                          | domain                   | [Eip712Domain](#struct-eip-712-domain)                              | The `Domain` of the payload                                                                                                                                                                                                                                                                                                                                          |
-|                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serializaiton of the message payload                                                                                                                                                                                                                                                                                                                            |
+|                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serialization of the message payload. Values keep their JSON types. See [EIP-712](#eip-712) for numeric comparisons on integer fields. |
 | <a id="struct-eip-7702-authorization" href="#struct-eip-7702-authorization">**Eip7702Authorization**</a> | address                  | [string](#type-string)                                    | The delegate contract that the account delegates to                                                                                                                                                                                                                                                                                                                             |
 |                          | chain_id                 | number                                    | The EVM chain ID                                                                                                                                                                                                                                                                                                                                                     |
 |                          | nonce                    | number                                    | The nonce of the authority                                                                                                                                                                                                                                                                                                                                           |
@@ -906,11 +906,65 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
 
 #### EIP-712
 
-Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`). When defining
-policies for EIP-712 messages, please ensure that all hex-encoded strings (e.g. addresses, function
-selectors, bytes) are **lowercase**. The policy engine expects lowercase hex strings to conform to
-Ethereum's standard convention. Using uppercase hex strings may result in errors or policy
-rejection. Note that EIP-712 messages passed in as transactions will be normalized to lowercase.
+Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`).
+`eth.eip_712.message` values keep their JSON types, and every comparison that works today behaves
+the same, including quoted comparisons such as `eth.eip_712.message['value'] == '0'`.
+
+<Note>
+  A condition that currently errors on string-encoded integers, for example a numeric cap, may now
+  evaluate. An `ALLOW` policy that used to error may now allow, and a `DENY` policy that used to
+  error may now deny. Review policies that compare string-encoded integer fields.
+</Note>
+
+A message field declared `uintN` or `intN` that is sent as a JSON string can be compared
+numerically. Use `<`, `<=`, `>`, `>=`, `==` and `!=` against an unquoted integer, or `in [1, 2]` and
+`.contains(5)` with a list of integers. For example, `eth.eip_712.message['amount'] <= 100000000000000000000`
+matches `"amount": "30000000000000000000"`.
+
+| Message value                   | Compared with                         | Result                                                                                  |
+| ------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------- |
+| JSON string, declared `uintN`/`intN` | Unquoted integer or integer list | Numeric comparison. An invalid string for the declared type is an evaluation error.     |
+| JSON string                     | Quoted string                         | String comparison, unchanged. `amount == '010'` does not match `"10"`.                  |
+| JSON number up to 2^64 - 1      | Unquoted integer                      | Numeric comparison, unchanged.                                                          |
+| JSON number of 2^64 or more     | Not applicable                        | Rejected at signing with an "invalid EIP-712 payload" error.                            |
+
+Write unquoted integer literals for integer fields: `amount == 10` matches `"10"`, but
+`amount == '010'` does not.
+
+The policy engine reads the string as a number the way the signer does: decimal, `0x` hex, `0b` or
+`0o` prefixed, with optional `_` separators, leading zeros, and an optional sign for `intN`. Values
+cover the full `uint256` and `int256` range for these message fields.
+
+Send large integers as decimal strings, because JSON numbers of 2^64 or more are rejected at
+signing. viem's `serializeTypedData` already does this for `bigint` values.
+
+Integer literals in a policy can be any non-negative value up to `uint256`, or negative down to
+-2^127. A literal list cannot mix values that fit in i128 with larger ones, which is still a
+validation error. A large unsigned value compared with `in` against a list of small integers is
+compared numerically.
+
+EIP-712 types with fixed-size struct arrays, such as `Leaf[2]`, are supported for message access.
+Policies that read such messages used to error.
+
+Comparisons on scalar and dynamic-array `address` and `bytes` message fields are case-insensitive,
+so you do not need to lowercase them in policy conditions.
+
+For example, to allow only messages on one chain and one contract, with a `Transfer` primary type
+and an `amount` field (declared as `uint256`) of at most 100 tokens with 18 decimals:
+
+```json
+{
+  "policyName": "Allow EIP-712 messages with amount up to 100 tokens",
+  "notes": "",
+  "effect": "EFFECT_ALLOW",
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x<TOKEN_CONTRACT>' && eth.eip_712.primary_type == 'Transfer' && eth.eip_712.message['amount'] <= 100000000000000000000 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+}
+```
+
+Pin `chain_id` and `verifying_contract`, not `domain.name`, which any contract can claim. Constrain
+every field you rely on.
+
+See the [Ethereum policy examples](/features/policies/examples/ethereum) for Permit2 and other EIP-712 policies.
 
 #### EIP-7702
 
