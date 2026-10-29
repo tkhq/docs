@@ -1,0 +1,101 @@
+---
+title: "Git signing and SSH"
+description: "Sign Git commits and open SSH connections from agents, with keys that never leave Turnkey."
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+
+Coding agents commit, push, and clone. To do this today, they usually use your signing key and your SSH key, which sit in `~/.ssh` or a GnuPG keyring that the agent can read and copy. Its commits then look like yours, and you cannot revoke its access without rotating your own keys.
+
+With the [`tk` CLI](https://github.com/tkhq/tk), an agent signs Git commits and opens SSH connections without a private key on its machine. Turnkey holds the key, evaluates a [policy](/features/policies/overview) on every signature, and logs every approval.
+
+- **Git signing**: `tk` acts as Git's GPG or SSH signing program, so `git commit -S` and `git verify-commit` work unchanged.
+- **SSH**: `tk ssh agent` serves Turnkey keys on a standard `SSH_AUTH_SOCK`, so `ssh`, `git push`, and `git clone` over SSH work unchanged.
+
+## Why Turnkey for Git signing and SSH?
+
+For an agent on your laptop, such as Claude Code or Codex in a terminal:
+
+- **No key for the agent to read**: the signing and SSH keys stay in Turnkey, not in a file or keyring that the agent can read or copy.
+- **Its own identity**: the agent signs and connects with its own API key, not yours. Its commits are attributable, and you can revoke its access without touching your keys.
+- **Policy and audit**: Turnkey policies decide which keys the agent can use, and Turnkey logs every signature.
+
+For an unattended agent in CI, a container, or a VM:
+
+- **Signing broker**: a separate process holds the signing credential. The agent gets only a Unix socket and a public key.
+- **Expiring session keys from a provisioner**: the agent generates its own API key at startup. A provisioner-only user, such as a task dispatcher or a setup VM or container, registers it with an expiry and renews it. The provisioner cannot sign.
+- **Revocation-only users**: a task dispatcher or another agent can revoke an agent's session key, and do nothing else.
+- **Policy-scoped signing**: each agent can sign only with the keys that a policy names. When you delete its API key, it cannot sign again.
+
+## How it works
+
+Git calls a signing program for each signed commit or tag. You set that program to `tk`. `tk` sends the payload to Turnkey as a sign request, authenticated with the agent's API key. The [policy engine](/features/policies/overview) evaluates the request inside the [secure enclave](/security/secure-enclaves). If a policy allows it, Turnkey returns the signature, and `tk` gives it to Git in the format that Git expects.
+
+SSH works the same way. `tk ssh agent` listens on a Unix socket and speaks the standard SSH agent protocol. When `ssh` or `git push` asks it to sign a login challenge, it sends the challenge to Turnkey.
+
+| Part | What it is |
+| :--- | :--- |
+| **Agent user** | A non-root Turnkey user with the `agent` tag. Its API key is the only credential on the agent's machine. |
+| **Signing key** | An OpenPGP key backed by an account in a wallet, or a Turnkey Ed25519 private key for SSH signing. |
+| **SSH key** | A Turnkey Ed25519 private key that `tk ssh agent` serves for `ssh` and `git push`. |
+| **Policies** | One ALLOW policy for each key. It names the agent user and the exact wallet or private key. A DENY policy stops agents from changing their own credentials. |
+| **`tk` profile** | A named local profile that holds the agent's API key. Git's signing program uses this profile. |
+
+Turnkey denies all requests by default. An agent user that no policy names cannot sign with any key.
+
+## Key implementation decisions
+
+| Decision | What to consider | Learn more |
+| :--- | :--- | :--- |
+| **Signature format** | GPG and SSH signatures both show as Verified on GitHub. With GPG, the agent can use one Ed25519 key for SSH and a separate key for signing. With SSH signing, one key can do both. | [tk Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md) |
+| **Committer identity** | Use your name with `(agent)` and your email address with a plus tag, such as `Jane Doe (agent) <jane+agent@example.com>`. Its commits group with yours in `git shortlog`, and GitHub sends the email confirmation link to your inbox. | [Committer identity](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#committer-identity) |
+| **Where the Git config lives** | If you sign with your own key on the same machine, put the agent's Git config in the agent runtime's environment, not in `~/.gitconfig`. | [Human and agent on one machine](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#human-and-agent-on-one-machine) |
+| **Approval** | Git waits for each signature, so the signing policy must allow the agent to sign without an approval step. Limit what the agent can sign with the policy condition, not with a human approval. | [Policy language](/features/policies/language) |
+| **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
+| **Revocation** | Delete the agent user's API key to stop all signing and SSH at once. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
+
+## Set up with your agent
+
+The `tk` binary contains a set of agent skills. The `signing-git-commits` and `using-ssh` skills do the setup below. Paste this into your agent:
+
+```
+Install the Turnkey tk CLI with
+`curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/tkhq/tk/main/install.sh | sh`.
+Install the tk skills with `tk skills install --into <your skills directory>`,
+read the installed turnkey-tk/SKILL.md, and walk me through bootstrapping my
+Turnkey organization at https://app.turnkey.com. Then give yourself your own
+agent identity, sign your Git commits with a Turnkey key, and push over SSH
+with a Turnkey key.
+```
+
+The agent does the root steps with your admin profile and tells you when it needs you. You do the steps in the dashboard and on GitHub.
+
+## What the setup does
+
+The agent skills and the [tk docs](https://github.com/tkhq/tk/tree/main/docs) have the full commands. In short:
+
+1. **Root profile**: install `tk` and save a profile for your root user. Only this profile creates users, keys, and policies.
+2. **Agent identity**: generate the agent's API key on its machine, and create a non-root user with that key and the `agent` tag. A DENY policy stops users with the tag from changing credentials.
+3. **Signing key**: create an OpenPGP key backed by a wallet account, or an Ed25519 private key for SSH signing. An ALLOW policy lets only the agent user sign, and only with that key.
+4. **Git config for the agent only**: a small wrapper sets the agent's `tk` profile, and Git uses it as its signing program. The config goes in the agent runtime's environment as `GIT_CONFIG_KEY_n` and `GIT_CONFIG_VALUE_n` pairs (the `env` map in Claude Code settings, or `shell_environment_policy.set` in Codex), so your own signing setup does not change. See [Human and agent on one machine](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#human-and-agent-on-one-machine).
+5. **SSH**: `tk ssh agent` serves an Ed25519 key on a Unix socket, limited to your Git host's keys with an allowed-hosts file. `core.sshCommand` points the agent's `ssh` at that socket with `IdentitiesOnly`, so it cannot use the keys in `~/.ssh`. See [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints).
+6. **Verified on GitHub**: add the committer email and the signing public key to the GitHub account.
+
+## Patterns
+
+- **Several agents on one machine**: give each agent its own user, `tk` profile, keys, policies, wrapper, and SSH agent socket. All profiles under one `HOME` share one key registry, so start each SSH agent with `--key` for its own key only. Then you can revoke one agent and keep the others.
+- **Sign your own commits**: use the same setup with your own profile and global Git config. You then have no signing key file to copy or lose. See [Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md).
+- **Sandboxed agents**: a broker outside the sandbox runs `tk gpg agent serve` and holds the credential. The sandbox gets only the socket (`TK_GPG_AGENT_SOCK`) and the public key, so the agent can sign commits but cannot make other Turnkey requests. See the `deploying-signing-broker` skill.
+- **CI**: set `TURNKEY_ORGANIZATION_ID`, `TURNKEY_API_PUBLIC_KEY`, and `TURNKEY_API_PRIVATE_KEY` in the job, and set `gpg.program` to `tk`. See [tk authentication](https://github.com/tkhq/tk/blob/main/docs/authentication.md#ci).
+- **Session keys**: see [tk sessions](https://github.com/tkhq/tk/blob/main/docs/sessions.md) and the `provisioning-session-agent` skill.
+- **Co-author trailer**: `tk git co-author` adds `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit. See [Co-author trailer](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#co-author-trailer).
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <FeatureCard title="tk on GitHub" icon="code-02" href="https://github.com/tkhq/tk" description="The CLI, its agent skills, and the full reference for Git signing, SSH, and sessions." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/overview" description="Scope each agent to the keys and activities that it needs." />
+  <FeatureCard title="Sessions" icon="clock" href="/features/authentication/sessions" description="Expiring credentials for agents that run unattended." />
+  <SolutionCard title="Programmable credential access" icon="programmable-credential-access" href="/solutions/key-management/programmable-credential-access" description="Policy-gated access to passwords and API keys for agents." />
+</div>
