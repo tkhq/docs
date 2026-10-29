@@ -10,7 +10,7 @@ import { NestedParam } from "/snippets/nested-param.mdx";
   <div class="flex items-center space-x-1.5">
     <div class="relative flex-1 flex gap-2 min-w-0 rounded-xl items-center cursor-pointer p-1.5 border-standard">
       <div class="rounded-lg font-bold px-1.5 py-0.5 text-sm leading-5 bg-blue-400/20 dark:bg-blue-400/20 text-blue-700 dark:text-blue-400">POST</div>
-      <div class="text-sm font-mono text-gray-800 dark:text-white">https://authproxy.turnkey.com/v1/signup_v2</div>
+      <div class="text-sm font-mono text-gray-800 dark:text-white">https://authproxy.turnkey.com/v1/signup_v3</div>
     </div>
   </div>
 </div>
@@ -100,7 +100,7 @@ verificationToken field
         </NestedParam>
         
         <NestedParam parentKey="authenticators.attestation" childKey="transports" type="enum<string[]>" required={true} default="">
-        Enum options: `AUTHENTICATOR_TRANSPORT_BLE`, `AUTHENTICATOR_TRANSPORT_INTERNAL`, `AUTHENTICATOR_TRANSPORT_NFC`, `AUTHENTICATOR_TRANSPORT_USB`, `AUTHENTICATOR_TRANSPORT_HYBRID`
+        Enum options: `AUTHENTICATOR_TRANSPORT_BLE`, `AUTHENTICATOR_TRANSPORT_INTERNAL`, `AUTHENTICATOR_TRANSPORT_NFC`, `AUTHENTICATOR_TRANSPORT_USB`, `AUTHENTICATOR_TRANSPORT_HYBRID`, `AUTHENTICATOR_TRANSPORT_SMART_CARD`
         </NestedParam>
       </Expandable>
     </ParamField>
@@ -191,6 +191,26 @@ verificationToken field
     </NestedParam>
   </Expandable>
 </ParamField>
+<ParamField body="walletAuthenticators" type="array" required={true} path="walletAuthenticators">
+  <p>A list of wallet authenticators. This field, if not needed, should be an empty array in your request body.</p>
+  <Expandable title="item details">
+    <NestedParam parentKey="walletAuthenticators" childKey="type" type="enum<string>" required={true} default="">
+    Enum options: `WALLET_AUTHENTICATOR_TYPE_ETHEREUM`, `WALLET_AUTHENTICATOR_TYPE_SOLANA`
+    </NestedParam>
+    
+    <NestedParam parentKey="walletAuthenticators" childKey="address" type="string" required={true} default="">
+    Account address. Ethereum addresses are stored lowercase with a 0x prefix. Solana addresses are canonical base58.
+    </NestedParam>
+    
+    <NestedParam parentKey="walletAuthenticators" childKey="domain" type="string" required={true} default="">
+    SIWE/SIWS domain this authenticator is bound to. Host only, lowercased.
+    </NestedParam>
+    
+    <NestedParam parentKey="walletAuthenticators" childKey="verificationToken" type="string" required={false} default="">
+    Wallet verification JWT for this claim. Omit to attach the authenticator unverified.
+    </NestedParam>
+  </Expandable>
+</ParamField>
 
 <H3Bordered text="Response" />
 A successful response returns the following fields:
@@ -241,7 +261,7 @@ Signature over hashed proof_payload.
 
 ```bash title="cURL"
 curl --request POST \
-  --url https://authproxy.turnkey.com/v1/signup_v2 \
+  --url https://authproxy.turnkey.com/v1/signup_v3 \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --header "X-Auth-Proxy-Config-Id: <string> (see Authorizations)" \
@@ -303,7 +323,15 @@ curl --request POST \
         "scheme": "<CLIENT_SIGNATURE_SCHEME_API_P256>",
         "message": "<string>",
         "signature": "<string>"
-    }
+    },
+    "walletAuthenticators": [
+        {
+            "type": "<WALLET_AUTHENTICATOR_TYPE_ETHEREUM>",
+            "address": "<string>",
+            "domain": "<string>",
+            "verificationToken": "<string>"
+        }
+    ]
 }'
 ```
 
