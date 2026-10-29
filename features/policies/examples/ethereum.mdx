@@ -239,18 +239,17 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow USDC token permissions below 100 USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && Integer(p['amount']) < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
 <Note>
 - Use `.all()` to bound every entry. `.any()` is satisfied by one small entry even if another entry is unbounded.
-- Integer fields compare as numbers, so write numeric literals (`p['amount'] < 100000000`), not quoted strings.
-  Comparing an integer field to a quoted string, such as `== '0'` or `in ['1', '2']`, raises an error instead of matching.
-- `in` works for integer fields (for example `in [1, 2]`) and compares values regardless of integer width.
+- Message values keep their JSON types, so a decimal-string amount is a string. Wrap integer fields with `Integer(...)` for numeric comparison, as in `Integer(p['amount']) < 100000000`.
+- `Integer(x) in [1, 2]` compares numerically.
 - For string fields such as token addresses, use `||` instead.
 - Send large integers as decimal strings, as in the sample payload above. See the
-  [EIP-712 section of the policy language](/features/policies/language#eip-712) for accepted encodings.
+  [EIP-712 section of the policy language](/features/policies/language#eip-712) for `Integer()` and accepted encodings.
 </Note>
 
 ### Deny signing of `NO_OP` keccak256 payloads

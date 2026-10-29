@@ -30,6 +30,7 @@ operations:
 | function   | x.count()                             | "\[1,2,3].count()"                                    | (list\<T>) -> [int](#type-int)                |
 | function   | x.filter(item, \<predicate>)          | "\[1,2,3].filter(x, x == 1)"                          | (list\<T>) -> (list\<T>)         |
 | function   | Timestamp(\<rfc3339>)                 | "Timestamp('2025-01-01T00:00:00Z')"                   | ([string](#type-string)) -> [timestamp](#type-timestamp)            |
+| function   | Integer(\<value>)                    | "Integer(eth.eip_712.message['amount']) \<= 100"       | ([string](#type-string) or integer) -> integer                      |
 | function   | CronSpan(\<cron>, \<duration>, \<tz>) | "CronSpan('0 9 \* \* 1-5', '8h', 'America/New_York')" | ([string](#type-string), [string](#type-string), [string](#type-string)) -> [bool](#type-bool) |
 
 ## Keywords
@@ -137,7 +138,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | contract_call_args       | Option\<Map\<[String](#type-string), ContractArgument\>\> | ABI field specifying all contract arguments parsed from the contract call data. It is a mapping of the string representations of the arg name to the argument itself. Populated only when a matching [Smart Contract Interface](/features/policies/smart-contract-interfaces) has been uploaded for `eth.tx.to`. Access via `eth.tx.contract_call_args['arg_name']`. |
 | <a id="struct-eip-712-typed-data" href="#struct-eip-712-typed-data">**Eip712TypedData**</a>      | primary_type             | [string](#type-string)                                    | The type of the primary (i.e. outermost) structure in the `message` JSON                                                                                                                                                                                                                                                                                             |
 |                          | domain                   | [Eip712Domain](#struct-eip-712-domain)                              | The `Domain` of the payload                                                                                                                                                                                                                                                                                                                                          |
-|                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serialization of the message payload. Values are typed by their declared EIP-712 type: `uintN` as [uint](#type-uint), `intN` as [int](#type-int) ([uint](#type-uint) above the i128 maximum; negative values below -2^127 are not typed numerically), `address` and `bytes`/`bytesN` as case-insensitive [string](#type-string), and everything else as its JSON type. See [EIP-712](#eip-712) for accepted integer encodings. |
+|                          | message                  | Map\<[string](#type-string), Value\>                      | JSON serialization of the message payload. Values keep their JSON types. See [EIP-712](#eip-712) for numeric comparisons with `Integer()`. |
 | <a id="struct-eip-7702-authorization" href="#struct-eip-7702-authorization">**Eip7702Authorization**</a> | address                  | [string](#type-string)                                    | The address you would like to authorize                                                                                                                                                                                                                                                                                                                              |
 |                          | chain_id                 | number                                    | The EVM chain ID                                                                                                                                                                                                                                                                                                                                                     |
 |                          | nonce                    | number                                    | The nonce of the authority                                                                                                                                                                                                                                                                                                                                           |
@@ -783,47 +784,51 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
   {" "}
   The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart contracts support
   signed integers up to 256 bits (`int256`), but values exceeding the 128-bit signed range cannot be
-  used in policy conditions. For EIP-712 messages, positive `intN` values above the i128 range are
-  typed as `uint`; see [EIP-712](#eip-712).{" "}
+  used in policy conditions.{" "}
 </Note>
 
 #### EIP-712
 
 Our policy engine supports EIP-712 typed data signing (accessible via `eth.eip_712`).
 
-<Warning>
-  Comparing an integer field to a quoted string, such as `eth.eip_712.message['value'] == '0'` or
-  `eth.eip_712.message['value'] in ['1', '2']`, raises an evaluation error instead of matching.
-  Write the numeric literal instead: `== 0` or `in [1, 2]`. An ALLOW policy with such a comparison
-  stops allowing. A DENY policy with such a comparison stops denying. Review existing policies that
-  compare integer fields to quoted strings.
-</Warning>
+`eth.eip_712.message` values keep their JSON types. A string stays a string, and a JSON number that
+fits in an i64 or u64 is an integer. A `uint256` sent as a decimal string, which is what viem's
+`serializeTypedData` produces, is a string. Comparing it to a number raises an evaluation error,
+which behaves as no match, so a DENY policy with such a comparison does not deny. Comparing it to a
+quoted string (`== '0'`) is a plain string comparison.
 
-Policy conditions see each `eth.eip_712.message` leaf according to its declared EIP-712 type. This
-applies at any depth, including nested structs and dynamic and fixed-size arrays.
+Use `Integer(<value>)` to compare a message field numerically. Use it on fields declared `uintN` or
+`intN`:
 
-| Declared type             | Policy type                      | Notes                                                                                                          |
-| ------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `uintN`                   | [uint](#type-uint)               | Compared numerically. Accepted encodings are listed below.                                                     |
-| `intN`                    | [int](#type-int), or [uint](#type-uint) above the i128 maximum | Compared numerically. Negative values below -2^127 (the i128 minimum) are not typed numerically, so numeric comparisons on them are not supported. |
-| `address`, `bytes`, `bytesN` | [string](#type-string)        | Compared case-insensitively, including inside fixed-size arrays such as `address[2]`.                          |
-| Any other type            | Its JSON type                    |                                                                                                                |
+```
+Integer(eth.eip_712.message['amount']) <= 100000000000000000000
+```
 
-Unsigned integers (`uintN`) can be encoded in the signed payload in any of these ways:
+`Integer(x)` accepts:
 
-- A decimal string, which covers any `uint256` value (for example `"30000000000000000000"`). Leading zeros are allowed.
-- A hex string (for example `"0x1a055690d9db80000"`).
-- A JSON number up to 2^64 - 1.
+- A string that holds an integer: decimal, `0x` hex, `0b` or `0o` prefixed, with optional `_`
+  separators, leading zeros, and an optional leading `-`. These are the forms the signer accepts for
+  `uintN` and `intN`, so every encoding of a value converts to the same number.
+- An integer, which is returned unchanged.
+
+Anything else is an evaluation error. This includes non-numeric strings, floats, booleans, and
+`address` and `bytes` fields. Negative values below -2^127 are also an error.
+
+Do not use `Integer()` on fields declared `string`. The comparison does not account for different
+spellings of the same number in the signed payload.
+
+With `Integer(x)` on the left, `in` compares by numeric value against a list of integers:
+
+```
+Integer(eth.eip_712.message['value']) in [1, 2, 3]
+```
 
 JSON numbers of 2^64 or more are rejected at signing with an "invalid EIP-712 payload" error. Send
 large integers as decimal strings. viem's `serializeTypedData` already does this for `bigint`
 values.
 
-The `in` operator and `.contains` compare integer values regardless of their declared width. For
-example, a small value matches against a `uint256` list element.
-
-Hex-encoded `address` and `bytes`/`bytesN` message values compare case-insensitively, so you do not
-need to lowercase them in policy conditions.
+Hex-encoded `address` and `bytes`/`bytesN` message values compare case-insensitively for scalars and
+dynamic arrays, so you do not need to lowercase them in policy conditions.
 
 For example, to allow only messages on one chain and one contract, with a `Transfer` primary type
 and an `amount` field (declared as `uint256`) of at most 100 tokens with 18 decimals:
@@ -833,7 +838,7 @@ and an `amount` field (declared as `uint256`) of at most 100 tokens with 18 deci
   "policyName": "Allow EIP-712 messages with amount up to 100 tokens",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x<TOKEN_CONTRACT>' && eth.eip_712.primary_type == 'Transfer' && eth.eip_712.message['amount'] <= 100000000000000000000 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x<TOKEN_CONTRACT>' && eth.eip_712.primary_type == 'Transfer' && Integer(eth.eip_712.message['amount']) <= 100000000000000000000 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
