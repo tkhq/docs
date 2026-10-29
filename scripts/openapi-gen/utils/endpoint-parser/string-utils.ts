@@ -7,9 +7,13 @@ import { EndpointType } from "./types";
 /**
  * Converts a snake_case string to camelCase
  * Example: "create_private_keys" -> "createPrivateKeys"
+ * Also consumes an underscore immediately before a digit (e.g.
+ * "eth_undelegate_7702" -> "ethUndelegate7702"), since toUpperCase() on a
+ * digit is a no-op — without this, names like "eth_undelegate_7702" keep a
+ * stray underscore and silently fail to match their OpenAPI component names.
  */
 export function snakeToCamel(input: string): string {
-  return input.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+  return input.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
 }
 
 /**
