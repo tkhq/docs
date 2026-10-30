@@ -147,6 +147,10 @@ hash of `transfer(address,uint256)`.
 
 #### Allow signing of EIP-712 payloads for Hyperliquid `ApproveAgent` operations
 
+<Warning>
+  Hyperliquid's EIP-712 domain can't identify Hyperliquid. Its `verifyingContract` is the zero address, and its `chainId` is whatever chain the signing wallet uses, not a Hyperliquid chain ID. The environment is set by `eth.eip_712.message['hyperliquidChain']` (`'Mainnet'` or `'Testnet'`). A production policy should restrict message fields, for example `eth.eip_712.message['hyperliquidChain'] == 'Mainnet'` and `eth.eip_712.message['agentAddress']` set to your agent's address.
+</Warning>
+
 ```json
 {
   "policyName": "Allow signing of EIP-712 Payloads for Hyperliquid `ApproveAgent` operations",
@@ -160,6 +164,10 @@ hash of `transfer(address,uint256)`.
 
 The `eth.eip_712.message` map supports nested field access using bracket notation and array iteration operators, 
 allowing policies to inspect and enforce conditions across typed data contents, beyond just the domain and primary type.
+
+<Note>
+  `eth.eip_712.domain.name` is set by whoever builds the payload and is not a security boundary: anyone can deploy a contract whose domain claims any name. Pin `eth.eip_712.domain.chain_id` and `eth.eip_712.domain.verifying_contract` to the contract you intend to authorize. Both are needed, because a verifying contract address alone also matches the same address on another chain.
+</Note>
 
 **Syntax:**
 
@@ -197,7 +205,7 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow Permit2 batch only if first token is USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
@@ -217,7 +225,7 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow Permit2 batch only for USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
@@ -228,7 +236,7 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow Permit2 batches with <= 2 token permissions",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
@@ -239,7 +247,7 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow USDC token permissions below 100 USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0x000000000022D473030F116dDEE9F6B43aC78BA3' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
@@ -247,36 +255,46 @@ To allow signing only when the first permitted token is USDC:
 `in` works for integer fields. For string fields such as token addresses, use `||` instead.
 </Note>
 
-### Deny signing of `NO_OP` keccak256 payloads
+#### Deny signing of `NO_OP` keccak256 payloads
+
+The `activity.kind` values `SIGN_RAW_PAYLOAD` and `SIGN_RAW_PAYLOADS` cover the V1, V2, and batch signing endpoints.
 
 ```json
 {
   "policyName": "Deny NO_OP hash signing",
   "notes": "",
   "effect": "EFFECT_DENY",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
+  "condition": "activity.kind in ['SIGN_RAW_PAYLOAD', 'SIGN_RAW_PAYLOADS'] && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
 }
 ```
 
-#### Allow signing of EIP-712 payloads for EIP-3009 transfers
+#### Allow signing of EIP-712 payloads for EIP-3009 transfers for USDC on Ethereum mainnet
+
+<Warning>
+  This example allows any message content. The `TransferWithAuthorization` policy allows any `to` and `value`, and moves tokens directly with no approval step. A production policy would likely bind one or more of these fields, for example with an allowlist on `eth.eip_712.message['to']`.
+</Warning>
 
 ```json
 {
-  "policyName": "Allow signing of EIP-712 payloads for EIP-3009 Transfers for USD Coin",
+  "policyName": "Allow signing of EIP-712 payloads for EIP-3009 Transfers for USDC on Ethereum mainnet",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'TransferWithAuthorization' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && eth.eip_712.primary_type == 'TransferWithAuthorization' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
-#### Allow signing of EIP-712 payloads for EIP-2612 permits for USD Coin
+#### Allow signing of EIP-712 payloads for EIP-2612 permits for USDC on Ethereum mainnet
+
+<Warning>
+  This example allows any message content. The `Permit` policy allows any `spender`, `value`, and `deadline`, including an unlimited approval. A production policy would likely bind one or more of these fields, for example with an allowlist on `eth.eip_712.message['spender']`.
+</Warning>
 
 ```json
 {
-  "policyName": "Allow signing of EIP-712 payloads for EIP-2612 Permits for USD Coin",
+  "policyName": "Allow signing of EIP-712 payloads for EIP-2612 Permits for USDC on Ethereum mainnet",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'USD Coin' && eth.eip_712.primary_type == 'Permit' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.chain_id == 1 && eth.eip_712.domain.verifying_contract == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && eth.eip_712.primary_type == 'Permit' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
