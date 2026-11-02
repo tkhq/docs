@@ -1,0 +1,158 @@
+---
+title: "Get indicative swap quote"
+description: "Preview the provider's current price for a swap without creating an activity. The quote is not binding and has no quote ID: a market swap executed later fetches its own quote, so its price can differ."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="query" path="get_indicative_swap_quote" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="signWith" type="string" required={true}>
+
+Wallet account address that would send the input asset. It must belong to the organization.
+</ParamField>
+
+<ParamField body="inputToken" type="string" required={true}>
+
+CAIP-19 asset ID for the input asset.
+</ParamField>
+
+<ParamField body="outputToken" type="string" required={true}>
+
+CAIP-19 asset ID for the output asset.
+</ParamField>
+
+<ParamField body="inputAmount" type="string" required={true}>
+
+Exact base-unit amount of the input asset.
+</ParamField>
+
+<ParamField body="slippageBps" type="string" required={false}>
+
+Maximum allowed slippage in basis points, at most 5000. When omitted, the provider chooses the slippage.
+</ParamField>
+
+<ParamField body="destinationAddress" type="string" required={false}>
+
+Raw public address that would receive the output asset. Required for cross-protocol swaps and rejected otherwise.
+</ParamField>
+
+<ParamField body="feeSponsorship" type="boolean" required={false}>
+
+Preview the price with Turnkey paying the provider fees. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
+</ParamField>
+
+<ParamField body="fixedRate" type="boolean" required={false}>
+
+Preview a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
+</ParamField>
+
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="provider" type="string" required={true}>Swap provider that produced this quote.</ResponseField>
+<ResponseField name="outputAmount" type="string" required={true}>Estimated base-unit amount of the output asset.</ResponseField>
+<ResponseField name="minOutputAmount" type="string" required={true}>Minimum base-unit amount of the output asset after slippage.</ResponseField>
+<ResponseField name="slippageBps" type="string" required={false}>Slippage tolerance in basis points the provider applied.</ResponseField>
+<ResponseField name="clientFeeBps" type="string" required={true}>Client app fee in basis points included in this quote. "0" when no client fee applies.</ResponseField>
+<ResponseField name="estimatedTimeSeconds" type="string" required={false}>Provider's estimated time to complete the swap, in seconds.</ResponseField>
+<ResponseField name="feeSponsorship" type="boolean" required={true}>Whether this quote has Turnkey paying the execution costs.</ResponseField>
+<ResponseField name="fixedRate" type="boolean" required={true}>Whether this quote uses a 1:1 fixed rate.</ResponseField>
+<ResponseField name="estimatedFixedRateAdjustmentUsd" type="string" required={false}>Deprecated: use estimated_charges.fixed_rate_adjustment_usd. Estimated fixed-rate adjustment in USD from the customer's side: positive is a cost, negative an earning. Present only for fixed-rate quotes the provider priced.</ResponseField>
+<ResponseField name="estimatedCharges" type="object" required={false}>
+  estimatedCharges field
+  <Expandable title="estimatedCharges details">
+    <NestedParam parentKey="estimatedCharges" childKey="executionUsd" type="string" required={false}>
+Swap Execution: the provider's execution costs Turnkey pays, including DEX fees and price impact, the provider's fixed cost, destination gas, and provider fees. Present when fee_sponsorship is true.
+</NestedParam>
+<NestedParam parentKey="estimatedCharges" childKey="turnkeyFeeUsd" type="string" required={false}>
+Swap Turnkey Fee: Turnkey's fee for a fee-sponsored swap. Present when fee_sponsorship is true.
+</NestedParam>
+<NestedParam parentKey="estimatedCharges" childKey="fixedRateAdjustmentUsd" type="string" required={false}>
+Swap Fixed Rate: the difference between the 1:1 rate and the market rate. Positive is a cost billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. Present when fixed_rate is true.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/query/get_indicative_swap_quote \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "organizationId": "<string>",
+    "signWith": "<string>",
+    "inputToken": "<string>",
+    "outputToken": "<string>",
+    "inputAmount": "<string>",
+    "slippageBps": "<string>",
+    "destinationAddress": "<string>",
+    "feeSponsorship": "<boolean>",
+    "fixedRate": "<boolean>"
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().getIndicativeSwapQuote({
+  organizationId: "<string> (Unique identifier for a given Organization.)",
+  signWith: "<string> (Wallet account address that would send the input asset. It must belong to the organization.)",
+  inputToken: "<string> (CAIP-19 asset ID for the input asset.)",
+  outputToken: "<string> (CAIP-19 asset ID for the output asset.)",
+  inputAmount: "<string> (Exact base-unit amount of the input asset.)",
+  slippageBps: "<string> (Maximum allowed slippage in basis points, at most 5000. When omitted, the provider chooses the slippage.)",
+  destinationAddress: "<string> (Raw public address that would receive the output asset. Required for cross-protocol swaps and rejected otherwise.)",
+  feeSponsorship: true // Preview the price with Turnkey paying the provider fees. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.,
+  fixedRate: true // Preview a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "provider": "<string>",
+  "outputAmount": "<string>",
+  "minOutputAmount": "<string>",
+  "slippageBps": "<string>",
+  "clientFeeBps": "<string>",
+  "estimatedTimeSeconds": "<string>",
+  "feeSponsorship": "<boolean>",
+  "fixedRate": "<boolean>",
+  "estimatedFixedRateAdjustmentUsd": "<string>",
+  "estimatedCharges": {
+    "executionUsd": "<string>",
+    "turnkeyFeeUsd": "<string>",
+    "fixedRateAdjustmentUsd": "<string>"
+  }
+}
+```
+
+</ResponseExample>

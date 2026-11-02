@@ -1,0 +1,334 @@
+---
+title: "Mint JWT"
+description: "Mint a Turnkey-signed JWT with a given profile. JWT semantics switch on profile."
+---
+
+import { Authorizations } from "/snippets/api/authorizations.mdx";
+import { H3Bordered } from "/snippets/h3-bordered.mdx";
+import { NestedParam } from "/snippets/nested-param.mdx";
+import { EndpointPath } from "/snippets/api/endpoint.mdx";
+
+<EndpointPath type="submit" path="mint_jwt" />
+
+<Authorizations />
+
+<H3Bordered text="Body" />
+
+<ParamField body="type" type="enum<string>" required={true}>
+
+Enum options: `ACTIVITY_TYPE_MINT_JWT`
+</ParamField>
+
+<ParamField body="timestampMs" type="string" required={true}>
+
+Timestamp (in milliseconds) of the request, used to verify liveness of user requests.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required={true}>
+
+Unique identifier for a given Organization.
+</ParamField>
+
+<ParamField body="parameters" type="object" required={true} path="parameters">
+  <p>The parameters object containing the specific intent data for this activity.</p>
+  <Expandable title="details">
+    <NestedParam parentKey="parameters" childKey="profile" type="enum<string>" required={true} default="">
+    Enum options: `JWT_PROFILE_HTTP_AUTHZ_V1`
+    </NestedParam>
+    
+    <NestedParam parentKey="parameters" childKey="audience" type="string" required={true} default="">
+    Origin of the receiving service, as `https://<lowercase host>[:port]` with no default port, path, query, or fragment. At most 256 characters. Becomes the `aud` claim.
+    </NestedParam>
+    
+    <ParamField body="httpAuthzV1" type="object" required={false} path="parameters.httpAuthzV1">
+      <p>httpAuthzV1 field</p>
+      <Expandable title="details">
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="method" type="string" required={true} default="">
+        HTTP method of the bound request. One of `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, or `DELETE`.
+        </NestedParam>
+        
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="path" type="string" required={true} default="">
+        Path of the bound request, starting with `/`.
+        </NestedParam>
+        
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="query" type="string" required={false} default="">
+        Query of the bound request without the leading `?`, or empty for no query.
+        </NestedParam>
+        
+        <ParamField body="headerNames" type="array" required={false} path="parameters.httpAuthzV1.headerNames">
+          <p>Lowercase names of the bound request headers, in order. At most 32 unique names of at most 64 characters each. Cannot include `authorization` or hop-by-hop headers (`proxy-authorization`, `connection`, `keep-alive`, `proxy-connection`, `te`, `transfer-encoding`, `upgrade`).</p>
+          <Expandable title="item details">
+                <p>Array item type: <code>string</code></p>
+                <p>item field</p>
+          </Expandable>
+        </ParamField>
+        <ParamField body="headerDigest" type="array" required={false} path="parameters.httpAuthzV1.headerDigest">
+          <p>SHA-256 digest of each bound header value, as `sha-256=:<base64>:`. One entry per entry in `header_names`.</p>
+          <Expandable title="item details">
+                <p>Array item type: <code>string</code></p>
+                <p>item field</p>
+          </Expandable>
+        </ParamField>
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="bodyDigest" type="string" required={true} default="">
+        SHA-256 digest of the bound request body, as `sha-256=:<base64>:`. For a request with no body, the digest of empty content.
+        </NestedParam>
+        
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="subject" type="string" required={true} default="">
+        ID of a user in the organization, as a lowercase UUID. Becomes the `sub` claim.
+        </NestedParam>
+        
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="timeToLiveSeconds" type="string" required={true} default="">
+        Lifetime of the JWT in seconds, from 1 to 300. `exp` is `issued_at + time_to_live_seconds`.
+        </NestedParam>
+        
+        <NestedParam parentKey="parameters.httpAuthzV1" childKey="issuedAt" type="string" required={true} default="">
+        Unix time in seconds. Becomes the `iat` claim.
+        </NestedParam>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<H3Bordered text="Response" />
+A successful response returns the following fields:
+
+<ResponseField name="activity" type="object" required={true}>
+  The activity object containing type, intent, and result
+  <Expandable title="activity details">
+    <NestedParam parentKey="activity" childKey="id" type="string" required={true}>
+Unique identifier for a given Activity object.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="organizationId" type="string" required={true}>
+Unique identifier for a given Organization.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="status" type="string" required={true}>
+The activity status
+</NestedParam>
+<NestedParam parentKey="activity" childKey="type" type="string" required={true}>
+The activity type
+</NestedParam>
+<NestedParam parentKey="activity" childKey="intent" type="object" required={true}>
+      The intent of the activity
+      <Expandable title="intent details">
+        <NestedParam parentKey="activity.intent" childKey="mintJwtIntent" type="object" required={true}>
+      The mintJwtIntent object
+      <Expandable title="mintJwtIntent details">
+        <NestedParam parentKey="activity.intent.mintJwtIntent" childKey="profile" type="enum" required={true}>
+profile field
+  
+Enum options: `JWT_PROFILE_HTTP_AUTHZ_V1`
+
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent" childKey="audience" type="string" required={true}>
+Origin of the receiving service, as `https://<lowercase host>[:port]` with no default port, path, query, or fragment. At most 256 characters. Becomes the `aud` claim.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent" childKey="httpAuthzV1" type="object" required={false}>
+      httpAuthzV1 field
+      <Expandable title="httpAuthzV1 details">
+        <NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="method" type="string" required={true}>
+HTTP method of the bound request. One of `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, or `DELETE`.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="path" type="string" required={true}>
+Path of the bound request, starting with `/`.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="query" type="string" required={false}>
+Query of the bound request without the leading `?`, or empty for no query.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="headerNames" type="array" required={false}>
+      Lowercase names of the bound request headers, in order. At most 32 unique names of at most 64 characters each. Cannot include `authorization` or hop-by-hop headers (`proxy-authorization`, `connection`, `keep-alive`, `proxy-connection`, `te`, `transfer-encoding`, `upgrade`).
+      <Expandable title="headerNames details">
+        <NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1.headerNames" childKey="item" type="string" required={true}>
+item field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="headerDigest" type="array" required={false}>
+      SHA-256 digest of each bound header value, as `sha-256=:<base64>:`. One entry per entry in `header_names`.
+      <Expandable title="headerDigest details">
+        <NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1.headerDigest" childKey="item" type="string" required={true}>
+item field
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="bodyDigest" type="string" required={true}>
+SHA-256 digest of the bound request body, as `sha-256=:<base64>:`. For a request with no body, the digest of empty content.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="subject" type="string" required={true}>
+ID of a user in the organization, as a lowercase UUID. Becomes the `sub` claim.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="timeToLiveSeconds" type="string" required={true}>
+Lifetime of the JWT in seconds, from 1 to 300. `exp` is `issued_at + time_to_live_seconds`.
+</NestedParam>
+<NestedParam parentKey="activity.intent.mintJwtIntent.httpAuthzV1" childKey="issuedAt" type="string" required={true}>
+Unix time in seconds. Becomes the `iat` claim.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="result" type="object" required={true}>
+      The result of the activity
+      <Expandable title="result details">
+        <NestedParam parentKey="activity.result" childKey="mintJwtResult" type="object" required={true}>
+      The mintJwtResult object
+      <Expandable title="mintJwtResult details">
+        <NestedParam parentKey="activity.result.mintJwtResult" childKey="jwt" type="string" required={true}>
+Signed JWT in JWS compact serialization.
+</NestedParam>
+<NestedParam parentKey="activity.result.mintJwtResult" childKey="signingKeyJwk" type="string" required={true}>
+Public JWK of the key that signed the JWT. Verifiers should pin this key or fetch it from the issuer's JWKS, not trust it from this response.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
+
+      </Expandable>
+    </NestedParam>
+<NestedParam parentKey="activity" childKey="votes" type="array" required={true}>
+A list of objects representing a particular User's approval or rejection of a Consensus request, including all relevant metadata.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="fingerprint" type="string" required={true}>
+An artifact verifying a User's action.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canApprove" type="boolean" required={true}>
+Whether the activity can be approved.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="canReject" type="boolean" required={true}>
+Whether the activity can be rejected.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="createdAt" type="string" required={true}>
+The creation timestamp.
+</NestedParam>
+<NestedParam parentKey="activity" childKey="updatedAt" type="string" required={true}>
+The last update timestamp.
+</NestedParam>
+
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/mint_jwt \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Authorizations)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_MINT_JWT",
+    "timestampMs": "<string> (e.g. 1746736509954)",
+    "organizationId": "<string> (Your Organization ID)",
+    "parameters": {
+        "profile": "<JWT_PROFILE_HTTP_AUTHZ_V1>",
+        "audience": "<string>",
+        "httpAuthzV1": {
+            "method": "<string>",
+            "path": "<string>",
+            "query": "<string>",
+            "headerNames": [
+                "<string>"
+            ],
+            "headerDigest": [
+                "<string>"
+            ],
+            "bodyDigest": "<string>",
+            "subject": "<string>",
+            "timeToLiveSeconds": "<string>",
+            "issuedAt": "<string>"
+        }
+    }
+}'
+```
+
+```javascript title="JavaScript"
+import { Turnkey } from "@turnkey/sdk-server";
+
+const turnkeyClient = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.ORGANIZATION_ID!,
+});
+
+const response = await turnkeyClient.apiClient().mintJwt({
+  profile: "<JWT_PROFILE_HTTP_AUTHZ_V1>" // profile field,
+  audience: "<string> (Origin of the receiving service, as `https://<lowercase host>[:port]` with no default port, path, query, or fragment. At most 256 characters. Becomes the `aud` claim.)",
+  httpAuthzV1: { // httpAuthzV1 field,
+    method: "<string> (HTTP method of the bound request. One of `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, or `DELETE`.)",
+    path: "<string> (Path of the bound request, starting with `/`.)",
+    query: "<string> (Query of the bound request without the leading `?`, or empty for no query.)",
+    headerNames: ["<string>"] // Lowercase names of the bound request headers, in order. At most 32 unique names of at most 64 characters each. Cannot include `authorization` or hop-by-hop headers (`proxy-authorization`, `connection`, `keep-alive`, `proxy-connection`, `te`, `transfer-encoding`, `upgrade`).,
+    headerDigest: ["<string>"] // SHA-256 digest of each bound header value, as `sha-256=:<base64>:`. One entry per entry in `header_names`.,
+    bodyDigest: "<string> (SHA-256 digest of the bound request body, as `sha-256=:<base64>:`. For a request with no body, the digest of empty content.)",
+    subject: "<string> (ID of a user in the organization, as a lowercase UUID. Becomes the `sub` claim.)",
+    timeToLiveSeconds: "<string> (Lifetime of the JWT in seconds, from 1 to 300. `exp` is `issued_at + time_to_live_seconds`.)",
+    issuedAt: "<string> (Unix time in seconds. Becomes the `iat` claim.)",
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "activity": {
+    "id": "<activity-id>",
+    "status": "ACTIVITY_STATUS_COMPLETED",
+    "type": "ACTIVITY_TYPE_MINT_JWT",
+    "organizationId": "<organization-id>",
+    "timestampMs": "<timestamp> (e.g. 1746736509954)",
+    "result": {
+      "activity": {
+        "id": "<string>",
+        "organizationId": "<string>",
+        "status": "<string>",
+        "type": "<string>",
+        "intent": {
+          "mintJwtIntent": {
+            "profile": "<JWT_PROFILE_HTTP_AUTHZ_V1>",
+            "audience": "<string>",
+            "httpAuthzV1": {
+              "method": "<string>",
+              "path": "<string>",
+              "query": "<string>",
+              "headerNames": [
+                "<string>"
+              ],
+              "headerDigest": [
+                "<string>"
+              ],
+              "bodyDigest": "<string>",
+              "subject": "<string>",
+              "timeToLiveSeconds": "<string>",
+              "issuedAt": "<string>"
+            }
+          }
+        },
+        "result": {
+          "mintJwtResult": {
+            "jwt": "<string>",
+            "signingKeyJwk": "<string>"
+          }
+        },
+        "votes": "<array>",
+        "fingerprint": "<string>",
+        "canApprove": "<boolean>",
+        "canReject": "<boolean>",
+        "createdAt": "<string>",
+        "updatedAt": "<string>"
+      }
+    }
+  }
+}
+```
+
+</ResponseExample>
