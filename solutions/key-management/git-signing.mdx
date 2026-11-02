@@ -26,7 +26,7 @@ For an unattended agent in a remote container or VM:
 - **Signing broker**: a separate VM or container from the agent holds the signing credential. The agent gets only a Unix socket and a public key.
 - **Expiring session keys from a provisioner**: the broker generates its own session key at startup. A provisioner-only user, such as a task dispatcher in a different VM or a container that provisions agents, registers the session key with an expiry and renews it. The provisioner cannot sign.
 - **Revocation-only users**: a task dispatcher (or another third service) can assume the role of a revoke-only user and revoke the agent's session key, and do nothing else.
-- **Policy-scoped signing**: each agent can sign only with the keys that a policy names. When you delete its API key, it cannot sign again.
+- **Policy-scoped signing**: each agent can sign only with the keys that a policy names. When you revoke its key, it cannot sign again.
 
 ## How it works
 
@@ -40,7 +40,7 @@ SSH works the same way. `tk ssh agent` listens on a Unix socket and speaks the s
 | **Broker user** | A non-root Turnkey user with the `broker` tag that holds the signing credential in a separate VM or container. The agent never sees it. See the `deploying-signing-broker` skill. |
 | **Git signing key** | Either a GPG key (an OpenPGP key backed by an account in a wallet) or an SSH key (a Turnkey Ed25519 private key used for SSH signing). Pick one format for Git signing. |
 | **SSH key** | A Turnkey Ed25519 private key that `tk ssh agent` serves for `ssh` and `git push`. |
-| **Policies** | A small set: one ALLOW for the provisioner user to mint session keys, one ALLOW for the revocation-only user to delete them, one DENY so the broker or agent cannot mint its own keys, and one ALLOW for the broker or agent to sign with a named key. See the `managing-policies` skill. |
+| **Policies** | A small set. An ALLOW lets the provisioner user register expiring keys on named agent or broker users, with a lifetime cap, and DENY policies stop it from doing anything else. An ALLOW lets the revocation-only user delete keys on those users. A DENY stops the agent and broker from changing their own credentials. An ALLOW lets one agent or broker user sign with one named wallet or private key. See the `managing-policies` skill. |
 | **`tk` profile** | Controls which API key, user, and organization ID `tk` authenticates through. Set up several profiles and assume the one that fits the task. |
 
 Turnkey denies all requests by default. Only policies let a user take actions against resources, such as signing keys, in your organization.
@@ -49,12 +49,12 @@ Turnkey denies all requests by default. Only policies let a user take actions ag
 
 | Decision | What to consider | Learn more |
 | :--- | :--- | :--- |
-| **Signature format** | GPG and SSH signatures both show as Verified on GitHub. With GPG, the agent can use one Ed25519 key for SSH and a separate key for signing. With SSH signing, one key can do both. | [tk Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md) |
-| **Committer identity** | Use your name with `(agent)` and your email address with a plus tag, such as `Jane Doe (agent) <jane+agent@example.com>`. Its commits group with yours in `git shortlog`, and GitHub sends the email confirmation link to your inbox. | [Committer identity](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#committer-identity) |
+| **Signature format** | GitHub can show both GPG and SSH signatures as Verified, after you add the public key and a verified committer email to your account. With GPG, the agent can use one Ed25519 key for SSH and a separate key for signing. With SSH signing, one key can do both. | [tk Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md) |
+| **Committer identity** | Use your name with `(agent)` and your email address plus-tagged with the agent's user name, such as `Jane Doe (agent) <jane+agent@example.com>`. Its commits group with yours in `git shortlog`, and GitHub sends the email confirmation link to your inbox. For a GPG key, put the same identity in the key's user ID. | [Committer identity](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#committer-identity) |
 | **Where the Git config lives** | If you sign with your own key on the same machine, put the agent's Git config in the agent runtime's environment, not in `~/.gitconfig`. | [Human and agent on one machine](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#human-and-agent-on-one-machine) |
 | **Approval** | Git waits for each signature, so the signing policy must allow the agent to sign without an approval step. Limit what the agent can sign with the policy condition, not with a human approval. | [Policy language](/features/policies/language) |
-| **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
-| **Revocation** | Delete the agent user's API key to stop all signing and SSH at once. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
+| **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. The agent then signs only for OpenSSH 8.9+ clients. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
+| **Revocation** | Delete the agent's session key to stop all its signing and SSH at once. Delete the user to remove it entirely, because a user's last permanent key cannot be deleted. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
 
 ## Set up with your agent
 
@@ -74,7 +74,7 @@ This walks you through bootstrapping your Turnkey organization and your own admi
 
 The setup forks depending on whether the agent runs locally or behind a broker, and whether it uses API keys or session keys.
 
-- **Agent-driven**: ask your agent to follow the matching `tk` skill: `signing-git-commits`, `using-ssh`, `deploying-signing-broker`, `provisioning-session-agent`, or `revoking-agent-keys`.
+- **Agent-driven**: ask your agent to follow the matching `tk` skill: `provisioning-agent-identity`, `signing-git-commits`, `using-ssh`, `deploying-signing-broker`, `provisioning-session-agent`, or `revoking-agent-keys`.
 - **Human-driven**: read the [tk docs](https://github.com/tkhq/tk/tree/main/docs) for the full commands.
 
 ## Patterns
@@ -84,13 +84,13 @@ The setup forks depending on whether the agent runs locally or behind a broker, 
 - **Sandboxed agents**: a broker outside the sandbox runs `tk gpg agent serve` and holds the credential. The sandbox gets only the socket (`TK_GPG_AGENT_SOCK`) and the public key, so the agent can sign commits but cannot make other Turnkey requests. See the `deploying-signing-broker` skill.
 - **CI**: set `TURNKEY_ORGANIZATION_ID`, `TURNKEY_API_PUBLIC_KEY`, and `TURNKEY_API_PRIVATE_KEY` in the job, and set `gpg.program` to `tk`. See [tk authentication](https://github.com/tkhq/tk/blob/main/docs/authentication.md#ci).
 - **Session keys**: see [tk sessions](https://github.com/tkhq/tk/blob/main/docs/sessions.md) and the `provisioning-session-agent` skill.
-- **Co-author trailer**: `tk git co-author` adds `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit. See [Co-author trailer](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#co-author-trailer).
+- **Co-author trailer**: `tk git co-author` adds `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit. It needs Git 2.54 or later; older Git ignores the hook without an error. See [Co-author trailer](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#co-author-trailer).
 
 ## Next steps
 
 <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
   <FeatureCard title="tk on GitHub" icon="code-02" href="https://github.com/tkhq/tk" description="The CLI, its agent skills, and the full reference for Git signing, SSH, and sessions." />
   <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/overview" description="Scope each agent to the keys and activities that it needs." />
-  <FeatureCard title="Sessions" icon="clock" href="/features/authentication/sessions" description="Expiring credentials for agents that run unattended." />
+  <FeatureCard title="tk sessions" icon="clock" href="https://github.com/tkhq/tk/blob/main/docs/sessions.md" description="Expiring credentials for agents that run unattended." />
   <SolutionCard title="Programmable credential access" icon="programmable-credential-access" href="/solutions/key-management/programmable-credential-access" description="Policy-gated access to passwords and API keys for agents." />
 </div>
