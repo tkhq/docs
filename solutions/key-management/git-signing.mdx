@@ -8,7 +8,7 @@ import { SolutionCard } from '/snippets/solution-card.mdx'
 
 Coding agents commit, push, and clone. To do this today, they usually use your signing key and your SSH key, which sit in `~/.ssh` or a GnuPG keyring that the agent can read and copy. Its commits then look like yours, and you cannot revoke its access without rotating your own keys.
 
-With the [`tk` CLI](https://github.com/tkhq/tk), an agent signs Git commits and opens SSH connections without the private key on its machine. Turnkey holds the key, evaluates a [policy](/features/policies/overview) on every signature, and logs every approval.
+With the [`tk` CLI](https://github.com/tkhq/tk), an agent signs Git commits and opens SSH connections without the private key on its machine. Turnkey holds the key, evaluates a [policy](/features/policies/overview) on every Turnkey request, and logs every approval.
 
 - **Git signing**: `tk` acts as Git's GPG or SSH signing program, so `git commit -S` and `git verify-commit` work unchanged.
 - **SSH**: `tk ssh agent` serves Turnkey keys on a standard `SSH_AUTH_SOCK`, so `ssh`, `git push`, and `git clone` over SSH work unchanged.
@@ -17,14 +17,14 @@ With the [`tk` CLI](https://github.com/tkhq/tk), an agent signs Git commits and 
 
 For an agent on your laptop, such as Claude Code or Codex:
 
-- **No key for the agent to read**: the signing and SSH keys stay in Turnkey, not in a file or keyring that the agent can read or copy.
-- **Its own identity**: the agent connects with its own service user, using either session keys or long-lived API keys. Its commits are attributable, and you can revoke its access without touching your keys.
+- **No key for the agent to read**: the GPG and SSH keys stay in Turnkey, not in a file or keyring that the agent can read or copy.
+- **Its own identity**: the agent connects with its own service user, using either session keys or long-lived API keys. Its Turnkey signing requests and approvals are fully attributable, and you can revoke its access at any time.
 - **Policy and audit**: Turnkey policies decide which keys the agent can use, and Turnkey's activity log tracks every signing request and approval.
 
 For an unattended agent in a remote container or VM:
 
 - **Signing broker**: a separate VM or container from the agent holds the signing credential. The agent gets only a Unix socket and a public key.
-- **Expiring session keys from a provisioner**: the broker generates its own keypair, and only the public key goes to a provisioner. A provisioner-only user, such as a task dispatcher in a different VM or a container that provisions agents, registers that public key as a session key with an expiry and renews it. The provisioner cannot sign, and it never sees the private key.
+- **Expiring session keys from a provisioner**: the broker generates its own keypair, and only the public key goes to a provisioner. A provisioner-only user, such as a task dispatcher in a different VM, registers that public key as a session key with an expiry and renews it. The provisioner cannot sign, and it never sees the private key.
 - **Revocation-only users**: a task dispatcher (or another third service) can assume the role of a revoke-only user and revoke the agent's session key, and do nothing else.
 - **Policy-scoped signing**: each agent can sign only with the keys that a policy names. When you revoke its key, it cannot sign again.
 
@@ -40,7 +40,7 @@ SSH works the same way. `tk ssh agent` listens on a Unix socket and speaks the s
 | **Broker user** | A non-root Turnkey user with the `broker` tag that holds the signing credential in a separate VM or container. The agent never sees it. See the `deploying-signing-broker` skill. |
 | **Git signing key** | Either a GPG key (an OpenPGP key backed by an account in a wallet) or an SSH key (a Turnkey Ed25519 private key used for SSH signing). Pick one format for Git signing. |
 | **SSH key** | A Turnkey Ed25519 private key that `tk ssh agent` serves for `ssh` and `git push`. |
-| **Policies** | A small set. An ALLOW lets the provisioner user register expiring keys on named agent or broker users, with a lifetime cap, and DENY policies stop it from doing anything else. An ALLOW lets the revocation-only user delete keys on those users. A DENY stops the agent and broker from changing their own credentials. An ALLOW lets one agent or broker user sign with one named wallet or private key. See the `managing-policies` skill. |
+| **Policies** | Policies control which users can sign with which keys, and which users can create, register, or delete credentials for other users. Everything else is denied by default. See the `managing-policies` skill. |
 | **`tk` profile** | Controls which API key, user, and organization ID `tk` authenticates through. Set up several profiles and assume the one that fits the task. |
 
 Turnkey denies all requests by default. Only policies let a user take actions against resources, such as signing keys, in your organization.
@@ -49,12 +49,12 @@ Turnkey denies all requests by default. Only policies let a user take actions ag
 
 | Decision | What to consider | Learn more |
 | :--- | :--- | :--- |
-| **Signature format** | GitHub can show both GPG and SSH signatures as Verified, after you add the public key and a verified committer email to your account. With GPG, the agent can use one Ed25519 key for SSH and a separate key for signing. With SSH signing, one key can do both. | [tk Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md) |
+| **Signature format** | GitHub can show both GPG and SSH signatures as Verified, after you add the public key and a verified committer email to your account. | [tk Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md) |
 | **Committer identity** | Use your name with `(agent)` and your email address plus-tagged with the agent's user name, such as `Jane Doe (agent) <jane+agent@example.com>`. Its commits group with yours in `git shortlog`, and GitHub sends the email confirmation link to your inbox. For a GPG key, put the same identity in the key's user ID. | [Committer identity](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#committer-identity) |
 | **Where the Git config lives** | If you sign with your own key on the same machine, put the agent's Git config in the agent runtime's environment, not in `~/.gitconfig`. | [Human and agent on one machine](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#human-and-agent-on-one-machine) |
-| **Approval** | Git waits for each signature, so the signing policy must allow the agent to sign without an approval step. Limit what the agent can sign with the policy condition, not with a human approval. | [Policy language](/features/policies/language) |
-| **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. The agent then signs only for OpenSSH 8.9+ clients. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
-| **Revocation** | Delete the agent's session key to stop all its signing and SSH at once. Delete the user to remove it entirely, because a user's last permanent key cannot be deleted. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
+| **Approval** | Limit what the agent can sign unilaterally, or require human escalation via policy consensus condition. | [Policy language](/features/policies/language) |
+| **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
+| **Revocation** | Delete the agent's session key to stop all its signing and SSH at once. Delete the user to remove it entirely. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
 
 ## Set up with your agent
 
