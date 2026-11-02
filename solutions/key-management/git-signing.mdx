@@ -18,7 +18,7 @@ With the [`tk` CLI](https://github.com/tkhq/tk), an agent signs Git commits and 
 For an agent on your laptop, such as Claude Code or Codex:
 
 - **No key for the agent to read**: the GPG and SSH keys stay in Turnkey, not in a file or keyring that the agent can read or copy.
-- **Its own identity**: the agent connects with its own service user, using either session keys or long-lived API keys. Its Turnkey signing requests and approvals are fully attributable, and you can revoke its access at any time.
+- **Its own identity**: the agent connects with its own service user, using long-lived API keys or session keys. Its Turnkey signing requests and approvals are fully attributable, and you can revoke its access at any time.
 - **Policy and audit**: Turnkey policies decide which keys the agent can use, and Turnkey's activity log tracks every signing request and approval.
 
 For an unattended agent in a remote container or VM:
@@ -37,10 +37,10 @@ SSH works the same way. `tk ssh agent` listens on a Unix socket and speaks the s
 | Part | What it is |
 | :--- | :--- |
 | **Agent user** | A non-root Turnkey user with the `agent` tag. Its API key is the only credential on the agent's machine. Useful for non-brokered setups. |
-| **Broker user** | A non-root Turnkey user with the `broker` tag that holds the signing credential in a separate VM or container. The agent never sees it. See the `deploying-signing-broker` skill. |
+| **Broker user** | A non-root Turnkey user with the `broker` tag that holds the signing credential in a separate VM or container. The agent never sees it. See the [`deploying-signing-broker`](https://github.com/tkhq/tk/blob/main/skills/deploying-signing-broker/SKILL.md) skill. |
 | **Git signing key** | Either a GPG key (an OpenPGP key backed by an account in a wallet) or an SSH key (a Turnkey Ed25519 private key used for SSH signing). Pick one format for Git signing. |
 | **SSH key** | A Turnkey Ed25519 private key that `tk ssh agent` serves for `ssh` and `git push`. |
-| **Policies** | Policies control which users can sign with which keys, and which users can create, register, or delete credentials for other users. Everything else is denied by default. See the `managing-policies` skill. |
+| **Policies** | Policies control which users can sign with which keys, and which users can create, register, or delete credentials for other users. Everything else is denied by default. See the [`managing-policies`](https://github.com/tkhq/tk/blob/main/skills/managing-policies/SKILL.md) skill. |
 | **`tk` profile** | Controls which API key, user, and organization ID `tk` authenticates through. Set up several profiles and assume the one that fits the task. |
 
 Turnkey denies all requests by default. Only policies let a user take actions against resources, such as signing keys, in your organization.
@@ -74,17 +74,16 @@ This walks you through bootstrapping your Turnkey organization and your own admi
 
 The setup forks depending on whether the agent runs locally or behind a broker, and whether it uses API keys or session keys.
 
-- **Agent-driven**: ask your agent to follow the matching `tk` skill: `provisioning-agent-identity`, `signing-git-commits`, `using-ssh`, `deploying-signing-broker`, `provisioning-session-agent`, or `revoking-agent-keys`.
+- **Agent-driven**: ask your agent to walk through the matching skill with `tk skills list`.
 - **Human-driven**: read the [tk docs](https://github.com/tkhq/tk/tree/main/docs) for the full commands.
 
 ## Patterns
 
 - **Several agents on one machine**: agents such as Claude Code and Codex each have their own environment, so give each one its own user, `tk` profile, keys, and policies. You can then tell them apart in the activity log, and revoke one without affecting the others.
 - **Sign your own commits**: use the same setup with your own profile and global Git config. You then have no signing key file to copy or lose. See [Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md).
-- **Sandboxed agents**: a broker outside the sandbox holds the credential. For GPG, it runs `tk gpg agent serve`, and the sandbox gets only the socket (`TK_GPG_AGENT_SOCK`) and the public key. For SSH, the broker runs `tk ssh agent` and the sandbox gets only its socket. Either way, the agent can sign but cannot make other Turnkey requests. See the `deploying-signing-broker` and `using-ssh` skills.
+- **Sandboxed agents**: a broker outside the sandbox holds the credential. For GPG, it runs `tk gpg agent serve`, and the sandbox gets only the socket (`TK_GPG_AGENT_SOCK`) and the public key. For SSH, the broker runs `tk ssh agent` and the sandbox gets only its socket. Either way, the agent can sign but cannot make other Turnkey requests. See the [`deploying-signing-broker`](https://github.com/tkhq/tk/blob/main/skills/deploying-signing-broker/SKILL.md) and [`using-ssh`](https://github.com/tkhq/tk/blob/main/skills/using-ssh/SKILL.md) skills.
 - **CI**: set `TURNKEY_ORGANIZATION_ID`, `TURNKEY_API_PUBLIC_KEY`, and `TURNKEY_API_PRIVATE_KEY` in the job, and set `gpg.program` to `tk`. See [tk authentication](https://github.com/tkhq/tk/blob/main/docs/authentication.md#ci).
-- **Session keys**: see [tk sessions](https://github.com/tkhq/tk/blob/main/docs/sessions.md) and the `provisioning-session-agent` skill.
-- **Co-author trailer**: `tk git co-author` adds `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit. It needs Git 2.54 or later; older Git ignores the hook without an error. See [Co-author trailer](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#co-author-trailer).
+- **Session keys**: see [tk sessions](https://github.com/tkhq/tk/blob/main/docs/sessions.md) and the [`provisioning-session-agent`](https://github.com/tkhq/tk/blob/main/skills/provisioning-session-agent/SKILL.md) skill.
 
 ## Next steps
 
