@@ -24,7 +24,7 @@ For an agent on your laptop, such as Claude Code or Codex:
 For an unattended agent in a remote container or VM:
 
 - **Signing broker**: a separate VM or container from the agent holds the signing credential. The agent gets only a Unix socket and a public key.
-- **Expiring session keys from a provisioner**: the broker generates its own session key at startup. A provisioner-only user, such as a task dispatcher in a different VM or a container that provisions agents, registers the session key with an expiry and renews it. The provisioner cannot sign.
+- **Expiring session keys from a provisioner**: the broker generates its own keypair, and only the public key goes to a provisioner. A provisioner-only user, such as a task dispatcher in a different VM or a container that provisions agents, registers that public key as a session key with an expiry and renews it. The provisioner cannot sign, and it never sees the private key.
 - **Revocation-only users**: a task dispatcher (or another third service) can assume the role of a revoke-only user and revoke the agent's session key, and do nothing else.
 - **Policy-scoped signing**: each agent can sign only with the keys that a policy names. When you revoke its key, it cannot sign again.
 
@@ -81,7 +81,7 @@ The setup forks depending on whether the agent runs locally or behind a broker, 
 
 - **Several agents on one machine**: agents such as Claude Code and Codex each have their own environment, so give each one its own user, `tk` profile, keys, and policies. You can then tell them apart in the activity log, and revoke one without affecting the others.
 - **Sign your own commits**: use the same setup with your own profile and global Git config. You then have no signing key file to copy or lose. See [Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md).
-- **Sandboxed agents**: a broker outside the sandbox runs `tk gpg agent serve` and holds the credential. The sandbox gets only the socket (`TK_GPG_AGENT_SOCK`) and the public key, so the agent can sign commits but cannot make other Turnkey requests. See the `deploying-signing-broker` skill.
+- **Sandboxed agents**: a broker outside the sandbox holds the credential. For GPG, it runs `tk gpg agent serve`, and the sandbox gets only the socket (`TK_GPG_AGENT_SOCK`) and the public key. For SSH, the broker runs `tk ssh agent` and the sandbox gets only its socket. Either way, the agent can sign but cannot make other Turnkey requests. See the `deploying-signing-broker` and `using-ssh` skills.
 - **CI**: set `TURNKEY_ORGANIZATION_ID`, `TURNKEY_API_PUBLIC_KEY`, and `TURNKEY_API_PRIVATE_KEY` in the job, and set `gpg.program` to `tk`. See [tk authentication](https://github.com/tkhq/tk/blob/main/docs/authentication.md#ci).
 - **Session keys**: see [tk sessions](https://github.com/tkhq/tk/blob/main/docs/sessions.md) and the `provisioning-session-agent` skill.
 - **Co-author trailer**: `tk git co-author` adds `Co-authored-by: Turnkey <noreply@turnkey.com>` to each agent commit. It needs Git 2.54 or later; older Git ignores the hook without an error. See [Co-author trailer](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#co-author-trailer).
