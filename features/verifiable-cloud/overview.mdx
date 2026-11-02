@@ -65,7 +65,7 @@ Read more about Applications, Deployments, Manifests, and Operators in the follo
 TVC is programmable infrastructure, enabling you to create and manage verifiable apps. Each TVC App is deployed on Turnkey infrastructure in the exact same way as Turnkey's own [core enclave apps](https://github.com/tkhq/core-enclaves).
 * TVC Applications are deployed within Kubernetes clusters operated by Turnkey, using [QuorumOS](https://github.com/tkhq/qos) ("QOS") as a base OS.
 * Key provisioning, high-availability deployments (minimum of 3 replicas), and in-depth verification workflows are supported by default.
-* Each app runs in an AWS region chosen at creation, currently `us-east-1` (default) or `ap-southeast-1` (Singapore, enabled per organization). See [Regions](/features/verifiable-cloud/managing-apps-and-deployments#regions).
+* Each app runs in an AWS region chosen at creation, currently `us-east-1` (default) or `ap-southeast-1` (Singapore, enabled per organization). See [Regions](#regions).
 * Because TVC relies on Turnkey for its own operations, it's possible to use Consensus in the context of TVC activities (with [Turnkey Policies](/features/policies/overview) or [Root Quorum](/features/users/root-quorum))
 
 A TVC Application has a stable [Quorum Key](https://github.com/tkhq/qos#quorum-key) and set of approvers.
@@ -95,6 +95,31 @@ Once the deployment is submitted and approved, our infrastructure deploys and ma
 Each app is exposed on a dedicated subdomain, `app-<APP_UUID>.app.turnkey.cloud` for apps in `us-east-1` and `app-<APP_UUID>.app-sin.turnkey.cloud` for apps in `ap-southeast-1`, with traffic load-balanced across all replicas of the live deployment. The exact hostname is shown as the Public Domain on your app's dashboard page. When configuring a deployment, you specify the port that external requests are forwarded to (`publicIngressPort`), along with a separate port and type for the health checks Turnkey's infrastructure performs.
 
 Only HTTP/1 applications can receive public ingress right now. HTTP/2 (including gRPC) is not yet supported, so those apps cannot yet be exposed on a public `turnkey.cloud` subdomain.
+
+## Regions
+
+Each TVC app runs in a single AWS region, chosen when the app is created.
+
+| Region           | Location                 | Availability                        |
+| :--------------- | :----------------------- | :---------------------------------- |
+| `us-east-1`      | US East (N. Virginia)    | Default for every organization      |
+| `ap-southeast-1` | Asia Pacific (Singapore) | Enabled per organization by Turnkey |
+
+Set the region with `region` in your app config file, or with `--region` (env `TVC_APP_REGION`)
+on `tvc app create`, which overrides the file. Omitting it means `us-east-1`. The CLI rejects any
+other value before sending a request.
+
+The region cannot be changed after creation. To move an app to another region, create a new app
+in that region and deploy to it.
+
+To see an app's region, run `tvc app list`, which prints `Region` for each app. `tvc app create`
+also prints it on success, and the [Get TVC App](/api-reference/queries/get-tvc-app) and
+[List TVC Apps](/api-reference/queries/list-tvc-apps) endpoints return it as `region`. The region
+also determines the app's public subdomain, as described in [Networking and ingress](#networking-and-ingress).
+
+Creating an app in `ap-southeast-1` for an organization that is not enabled for it fails with
+`region "ap-southeast-1" is not enabled for organization <ORG_ID>`, and nothing is created. To
+enable Singapore for your organization, contact Turnkey through [support](/solutions/support/overview).
 
 ## Manifests
 
