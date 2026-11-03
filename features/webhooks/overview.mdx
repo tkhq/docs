@@ -8,7 +8,7 @@ Webhooks deliver real-time notifications as signed HTTPS POST requests. Register
 
 - Signed deliveries with Ed25519 signatures -- see [Verify signatures](/features/webhooks/verify-signatures)
 - Organization-aware headers including org ID, event type, and timestamps on every delivery
-- Automatic retries for failed deliveries
+- Limited automatic retries for transient delivery failures
 - Dashboard and API management for creating and configuring endpoints
 - Policy-based access control through dedicated activity types
 
@@ -105,7 +105,7 @@ Webhook endpoint URLs are validated when endpoints are created or updated, and d
 
 Redirects are not followed. If your endpoint hostname later resolves to a disallowed destination, delivery will fail even if the endpoint was valid when it was created.
 
-Keep your endpoint publicly reachable and return a `2xx` response after accepting the webhook. Avoid long-running request handling in the delivery path; enqueue work internally and respond quickly. `3xx`, `4xx`, and `429` responses are treated as terminal delivery failures, while network errors and `5xx` responses may be retried.
+Keep your endpoint publicly reachable and return a `2xx` response after accepting the webhook. Avoid long-running request handling in the delivery path; enqueue work internally and respond quickly. `3xx`, `4xx`, and `429` responses are treated as terminal delivery failures, while network errors and `5xx` responses may be retried. See [Retry behavior](#retry-behavior).
 
 ## Delivery contract
 
@@ -127,9 +127,15 @@ Turnkey sends each webhook as an HTTPS `POST` request. The request body is JSON 
 
 ### Retry behavior
 
-Turnkey treats `2xx` responses as successful. Turnkey automatically retries retryable delivery failures. Retry schedules and attempt counts are subject to change.
+Turnkey treats `2xx` responses as successful. Webhooks are best-effort notifications, not a guaranteed long-running retry queue. Do not rely on Turnkey to keep retrying until your endpoint recovers from extended downtime.
 
-Signed retries receive a fresh timestamp and signature. `X-Turnkey-Event-Id` is signed delivery metadata and is stable across retry attempts for the same webhook event. Payload fields such as `msg.idempotencyKey` are event-specific business identifiers. Either may be useful for deduplication depending on the use case, but they are not the same field.
+The current delivery behavior is described below. Specific values may change.
+
+- **Retryable failures:** For transient failures (`5xx` responses, timeouts, and network errors), Turnkey makes up to 2 delivery attempts. Attempts run immediately one after another, with no backoff between them. Each attempt has a timeout of about 1.5 seconds, within an overall budget of about 5 seconds for that delivery.
+- **Non-retryable failures:** `3xx` responses (redirects are not followed) and `4xx` responses, including `429`, are terminal, and Turnkey does not retry that delivery. Invalid or blocked endpoint URLs (see [Endpoint validation and reachability](#endpoint-validation-and-reachability)) and malformed payloads are also not retried.
+- **After failures:** If delivery still fails after the retryable attempts are exhausted, the notification is not held for a later retry window. Assume the event may have been missed. For balance events, reconcile using [Transaction history](/features/transaction-management/transaction-history) or [Get balances](/api-reference/queries/get-balances). For activity updates, query [List activities](/api-reference/queries/list-activities) or [Get activity](/api-reference/queries/get-activity). For transaction status updates, query [Get send transaction status](/api-reference/queries/get-send-transaction-status).
+
+Signed retries receive a fresh timestamp and signature. `X-Turnkey-Event-Id` is signed delivery metadata and is stable across retry attempts for the same webhook event. Payload fields such as `msg.idempotencyKey` are event-specific business identifiers. Either may be useful for deduplication depending on the use case, but they are not the same field. Deduplicate on one of them so that duplicate deliveries do not apply your business logic twice.
 
 ## Payloads
 
