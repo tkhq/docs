@@ -1,37 +1,47 @@
 export const SmsPriceLookup = ({ priceDataJson }) => {
 
 const countries = Object.keys(priceDataJson).sort();
+const fieldWidth = "20rem";
 
-const toggleVisibility = () => {
+const filterCountries = (query) => {
 const targetDiv = document.getElementById('hidden-content-simple');
-if (targetDiv) {
-const isOpen = targetDiv.getAttribute('data-open') === 'true';
-targetDiv.setAttribute('data-open', !isOpen);
-}
-}
+if (!targetDiv) return;
+const normalized = query.trim().toLowerCase();
+targetDiv.querySelectorAll('[data-country]').forEach((item) => {
+const country = (item.getAttribute('data-country') || '').toLowerCase();
+item.style.display = country.includes(normalized) ? 'block' : 'none';
+});
+};
+
+const openList = () => {
+const targetDiv = document.getElementById('hidden-content-simple');
+if (targetDiv) targetDiv.setAttribute('data-open', 'true');
+};
+
+const closeList = () => {
+const targetDiv = document.getElementById('hidden-content-simple');
+if (targetDiv) targetDiv.setAttribute('data-open', 'false');
+};
+
+const isListOpen = () => {
+const targetDiv = document.getElementById('hidden-content-simple');
+return targetDiv && targetDiv.getAttribute('data-open') === 'true';
+};
 
 const selectCountry = (country) => {
-const selectElement = document.getElementById('sms-country-select-simple');
-const buttonElement = document.getElementById('country-toggle-button');
-const targetDiv = document.getElementById('hidden-content-simple');
+const inputElement = document.getElementById('country-toggle-button');
 const priceDisplayElement = document.getElementById('sms-price-display');
 
-if (selectElement) {
-selectElement.value = country;
-}
-if (buttonElement) {
-buttonElement.textContent = country;
+if (inputElement) {
+inputElement.value = country;
 }
 if (priceDisplayElement && priceDataJson[country]) {
-
 const price = priceDataJson[country];
-
 priceDisplayElement.textContent = `${price}¢`;
 }
-if (targetDiv) {
-targetDiv.setAttribute('data-open', 'false');
-}
-}
+closeList();
+filterCountries('');
+};
 
 return (
 
@@ -40,13 +50,42 @@ return (
     Select Your Country To View Pricing
   </div>
   <div className="flex gap-12 items-center items-center rounded-lg callout px-5 py-4 overflow-hidden rounded-2xl flex gap-3 border border-zinc-500/20 bg-zinc-50/50 dark:border-zinc-500/30 dark:bg-zinc-500/10">
-    <button
+    <input
       id="country-toggle-button"
-      onClick={toggleVisibility}
-      className="card w-full block not-prose font-normal group relative py-3 px-3 ring-2 ring-transparent rounded-xl bg-white dark:bg-background-dark border border-gray-950/10 dark:border-white/10 overflow-hidden cursor-pointer hover:!border-primary dark:hover:!border-primary-light"
-    >
-      Select Country
-    </button>
+      type="text"
+      placeholder="Select Country"
+      autoComplete="off"
+      onMouseDown={(event) => {
+        if (isListOpen() && document.activeElement === event.currentTarget) {
+          event.preventDefault();
+          closeList();
+        }
+      }}
+      onFocus={(event) => {
+        openList();
+        event.target.select();
+        filterCountries('');
+      }}
+      onBlur={() => {
+        setTimeout(() => {
+          const input = document.getElementById('country-toggle-button');
+          if (document.activeElement === input) return;
+          closeList();
+        }, 150);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          closeList();
+          event.currentTarget.blur();
+        }
+      }}
+      onInput={(event) => {
+        openList();
+        filterCountries(event.target.value);
+      }}
+      style={{ width: fieldWidth, minWidth: fieldWidth, maxWidth: fieldWidth }}
+      className="card shrink-0 block not-prose font-normal group relative py-3 px-3 ring-2 ring-transparent rounded-xl bg-white dark:bg-background-dark border border-gray-950/10 dark:border-white/10 overflow-hidden cursor-text hover:!border-primary dark:hover:!border-primary-light"
+    />
     <div className="w-full flex flex-col gap-1 items-center">
       <div className="text-sm font-medium text-black/70 dark:text-white">Cost</div>
       <div id="sms-price-display" className="font-medium text-black/70 dark:text-white text-xl">0.000¢</div>
@@ -58,15 +97,20 @@ return (
       data-open="false"
       style={{
         top: "calc(100% + 0px)",
+        width: fieldWidth,
+        minWidth: fieldWidth,
+        maxWidth: fieldWidth,
       }}
-      className="text-base bg-background-light dark:bg-background-dark absolute z-50 max-h-96 max-w-[var(--radix-dropdown-menu-content-available-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto rounded-xl border-standard text-gray-950/70 dark:text-white/70 p-1 gap-2"
+      className="text-base bg-background-light dark:bg-background-dark absolute z-50 max-h-96 overflow-y-auto rounded-xl border-standard text-gray-950/70 dark:text-white/70 p-1 gap-2"
     >
       <div>
         {countries.map((country) => (
           <div
             key={country}
+            data-country={country}
             style={{ padding: "0.5rem", cursor: "pointer" }}
             className="hover:bg-gray-100 rounded-md hover:dark:bg-gray-800"
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => selectCountry(country)}
           >
             {country}
