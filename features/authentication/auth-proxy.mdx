@@ -17,10 +17,17 @@ Enable and configure the Auth Proxy in **Dashboard → Embedded Wallets → Conf
 ## How it works
 
 1. **Enable in Dashboard** — Toggle Auth Proxy ON. Turnkey creates a proxy user and proxy API key, stored encrypted in your org's auth proxy config.
-2. **Configure allowed origins** — Only requests from these origins may call the proxy (CORS + origin validation). Defaults to `*`. Exact URLs only — partial wildcards like `https://*.myapp.com` are not supported.
+2. **Configure allowed origins** — Only browser requests from these origins may call the proxy (CORS + origin validation). Defaults to `*`. Accepts exact URLs and wildcard subdomains such as `https://*.myapp.com`.
 3. **Your frontend calls the Auth Proxy** — Pass your `X-Auth-Proxy-Config-Id` header with every request.
 4. **Proxy signs and forwards** — The proxy decrypts your proxy key in-memory (per request only), signs the activity, and forwards it to the Turnkey API.
 5. **Response returned** — The proxy returns the result (e.g., `organizationId`, `session`) directly to your frontend.
+
+<Note>
+  Wildcards match subdomains only: `https://*.myapp.com` matches
+  `https://app.myapp.com` but not `https://myapp.com` — add the bare domain as a
+  separate entry if you serve the app there too. Include the scheme exactly, and
+  ports must match as well.
+</Note>
 
 **Security notes:**
 - Proxy keys are HPKE-encrypted inside Turnkey's enclaves and decrypted per-request only, in-memory.
@@ -105,7 +112,7 @@ Each auth method can be independently enabled or disabled — including email OT
 |---------|-------------|
 | Enable/Disable | Toggle the Auth Proxy on or off for your org |
 | Config ID | Your `X-Auth-Proxy-Config-Id` value |
-| Allowed Origins | Exact frontend URLs allowed to call the proxy. Defaults to `*` |
+| Allowed Origins | Frontend URLs allowed to call the proxy. Exact URLs or wildcard subdomains (`https://*.myapp.com`). Defaults to `*` |
 | Session expiration | Default session lifetime in seconds (default: 900) |
 | OTP length & type | Code length (6–9 digits) and character set (numeric or alphanumeric) |
 | Email customization | Application name and logo URL shown in OTP emails |
