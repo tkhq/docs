@@ -17,14 +17,20 @@ description: "This checklist contains recommendations and steps specifically for
 
 ## Security
 
-- Lock down your [root quorum](/features/users/root-quorum). We recommend a quorum of at least 3 with a threshold of at least 2, counting only credentials that actually work:
+For the reasoning behind these items, and for organizations that move significant value, see [Securing your Turnkey integration](/security/securing-your-integration).
+
+- Lock down your [root quorum](/features/users/root-quorum). The root quorum bypasses policies entirely, so with a threshold of one, any single root credential can do anything in your organization. We recommend a quorum of at least 3 with a threshold of at least 2, counting only credentials that actually work:
   - Check periodically that every member can still log in. An untested authenticator is not a working credential, and a three-member quorum with one dead credential is a two-member quorum.
   - Rotate the quorum before someone leaves, not after. Updating it requires the current threshold to approve, so once you fall below that, neither you nor Turnkey can fix it.
   - Consider holding one credential institutionally, such as a hardware key in a safe, so that staff changes alone cannot exhaust the quorum.
 - Ensure any team members with critical permissions, especially root quorum members, have set up at least two authenticators for their account (e.g., touchID plus a hardware authenticator like a Yubikey).
 - Apply the same thinking to your end users. A sub-organization root user with a single authenticator is one lost device away from an unreachable wallet. Prompt users to register a second credential, whether a backup passkey or an additional auth method. See [backup and recovery for sub-organizations](/get-started/backup-recovery#sub-organizations).
-- Avoid using root user permissions for routine operations and instead use standard users with permissions explicitly granted via policies to limit the surface area of a compromised user.
-- Confirm that all API keys are stored securely and not embedded in exposed or vulnerable parts of the codebase. API keys should be stored in a secure, encrypted environment and should never be hard-coded in publicly accessible repositories or client-side code.
+- Avoid using root user permissions for routine operations and instead use standard users with permissions explicitly granted via policies to limit the surface area of a compromised user. Give each service and AI agent its own API-only user, so that one leaked key exposes only that service's permissions.
+- Confirm that all API keys are stored securely and not embedded in exposed or vulnerable parts of the codebase. API keys should be stored in a secure, encrypted environment and should never be hard-coded in publicly accessible repositories or client-side code. Restrict production keys to your servers' addresses with an [IP allowlist](/features/ip-allowlisting/overview).
+- Use passkeys for everyone in your parent organization (your Turnkey account), especially root quorum members and anyone who approves transactions or policy changes, and require more than one person for sensitive actions. See [Protect the people in your parent organization](/security/securing-your-integration#protect-the-people-in-your-parent-organization).
+- Require [MFA](/security/securing-your-integration#require-mfa-for-your-end-users) for your end users, at least for signing, exports, and changes to their credentials and MFA policies. Unlike organization policies, MFA policies also apply to a sub-organization's root user. MFA is set per user, so plan which users get which policies, and plan recovery first with [MFA enforcement and recovery](/features/authentication/mfa/enforcement-and-recovery).
+- If your backend submits transfers, avoid letting it approve large ones alone. Require [additional approvers](/security/securing-your-integration#if-your-backend-is-compromised) whose credentials do not live on that backend.
+- Subscribe to [activity webhooks](/features/webhooks/overview) and alert on root quorum updates, policy changes, new credentials, exports, and EIP-7702 authorizations.
 
 ## Backup and recovery
 
@@ -32,9 +38,11 @@ description: "This checklist contains recommendations and steps specifically for
 - Decide whether to expose [wallet export](/features/wallets/export-wallets) to your end users. It is what lets a user take their keys with them, including if your product is discontinued. Some integrations deliberately withhold it, but it is easier to design in than to retrofit, so make it a deliberate choice rather than a default.
 - Consider exposing sub-organization deletion, so a user can remove their data when they leave. Deletion requires that every wallet and private key has already been exported, unless you explicitly override that, so an export step can form part of the deletion flow itself.
 - Decide what happens when a user loses a credential, and what happens when they lose all of them. Turnkey has no write access to your organizations and cannot restore access on your behalf, so whatever path exists has to be one you built. [MFA recovery](/features/authentication/mfa/enforcement-and-recovery) sets out several recovery designs and the practices common to them, most of which apply whether or not you enforce MFA.
+- Make recovery at least as strong as sign-in, since any path that lets a user back in also lets an attacker in. That includes your backend and your support team, if either can add credentials for a user. See [Account recovery is a way in](/security/securing-your-integration#account-recovery-is-a-way-in).
 
 ## Transaction management
 
+- Where you can, send transactions through [transaction management](/features/transaction-management) rather than signing and broadcasting them yourself. Your policies then see every call, even when it is sponsored or batched, and users that only send this way do not need permission to sign transactions as raw payloads. See [Send transactions through Turnkey](/security/securing-your-integration#send-transactions-through-turnkey).
 - If you sponsor transactions, set both the organization-wide and per-sub-organization [spend limits](/features/transaction-management#spend-limits). Enterprise organizations are unlimited by default, so this is an explicit step rather than a default you can rely on.
 - Monitor usage with [`get_gas_usage`](/api-reference/queries/get-gas-usage), and handle the limit-exceeded error as a normal condition rather than an outage, since it is how a runaway spend is meant to stop.
 - On Solana, [rent sponsorship](/features/networks/solana-rent-refunds) is separate and off by default. If you enable it, read the rent extraction risk: rent you pre-fund can be refunded to the signer when the account is closed, not to you.
