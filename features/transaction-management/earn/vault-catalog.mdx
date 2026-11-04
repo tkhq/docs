@@ -22,13 +22,14 @@ Two queries cover vault discovery: [`list_earn_vaults`](/api-reference/queries/g
 Reading the results:
 
 - The catalog is sorted by TVL in USD, descending, and only includes vaults with at least **\$100k TVL**. Sort order does not reflect a recommendation, ranking, or endorsement of any vault.
-- `tvl` is in raw onchain units of the underlying asset; `apyPct` is a decimal fraction (`"0.0812"` = 8.12% gross APY, before fees).
+- `tvl` is in raw onchain units of the underlying asset; `apyPct` is a decimal fraction (`"0.0812"` = 8.12% gross APY, before fees). It includes any protocol rewards (for example Merkl campaigns) on top of the vault's native yield.
+- `rewardsApyPct` is the reward portion of `apyPct`, in the same units. It is `"0"` for vaults with no live reward campaign. Show it separately if your users want to see native yield and rewards apart; see [Claim Merkl rewards](/features/transaction-management/earn/rewards) for how rewards reach a wallet.
 - `display` values are formatted strings for presentation only. Don't do arithmetic with them.
 - `enabled: true` means your organization already has a wrapper deployed for the vault.
 - `name` and `curator` carry the provider's human-readable vault name and curator(s), for building vault pickers.
 
 <Warning>
-  `apyPct` reflects the vault's gross annual percentage yield at the time of query. Yield is variable, driven by borrower demand, market utilization, and the vault curator's allocation strategy, and may change significantly between the time of query and the time of deposit or withdrawal. Do not present APY or yield figures to end users as fixed or guaranteed rates.
+  `apyPct` reflects the vault's gross annual percentage yield at the time of query. Yield is variable, driven by borrower demand, market utilization, the vault curator's allocation strategy, and the reward campaigns running at the time, and may change significantly between the time of query and the time of deposit or withdrawal. Do not present APY or yield figures to end users as fixed or guaranteed rates.
 </Warning>
 
 ### Paging through the catalog
@@ -46,7 +47,7 @@ Results are cursor-paginated via `paginationOptions` (`limit` defaults to 10, ma
 Key fields:
 
 - `wrapperAddress` is the deposit target to pass to [`earn_deposit`](/features/transaction-management/earn/deposit); `vaultAddress` is the underlying vault it wraps.
-- `apyPct` is the gross APY; `netApyPct` is what depositors earn after both fees: `netApy = grossApy × (1 - totalFeeBps / 10000)`.
+- `apyPct` is the gross APY including rewards, and `rewardsApyPct` is the reward portion of it. `netApyPct` is what depositors earn after both fees. Fees are taken on yield that flows through the wrapper only, so rewards pass through untouched: `netApy = (grossApy - rewardsApy) × (1 - totalFeeBps / 10000) + rewardsApy`.
 - `clientFeeBps` is your fee for the wrapper, and `totalDeposited` is the wrapper's TVL in raw units of the underlying asset.
 - `depositsDisabled: true` means deposits to the wrapper are currently paused via [`earn_set_wrapper_state`](/api-reference/activities/set-earn-wrapper-state); withdrawals are unaffected.
 - `claimableClientFee` is your accrued fee that is releasable right now, claimable with [`claim_earn_fees`](/api-reference/activities/claim-earn-fees). It is only returned when the parent organization queries; sub-organizations don't see it.
