@@ -1,0 +1,469 @@
+---
+title: "Migrating to @turnkey/react-native-wallet-kit from @turnkey/sdk-react-native"
+description: "A guide to help you migrate your React Native applications from the legacy `@turnkey/sdk-react-native` to `@turnkey/react-native-wallet-kit`."
+sidebarTitle: "Migrating from @turnkey/sdk-react-native"
+---
+
+## The biggest change: no more credential bundles
+
+With `@turnkey/sdk-react-native`, authentication ended with a **credential bundle**: your app created an embedded key with `createEmbeddedKey`, your backend ran an auth activity such as `OTP_AUTH` with that key as the target, and the app decrypted the result with `createSession({ bundle })`.
+
+`@turnkey/react-native-wallet-kit` has no bundles. The app generates its own key pair, which never leaves the device. Authentication is bound to that key, and login returns a **session JWT** for it. The kit stores the session and refreshes it for you.
+
+This changes your authentication code on both the app and, if you have one, your backend. It is more than a package rename.
+
+<Note>
+  Sessions are stored differently, so existing sessions are not carried over. Users sign in again after you upgrade.
+</Note>
+
+## Install
+
+```bash
+pnpm add @turnkey/react-native-wallet-kit
+# or
+npm i @turnkey/react-native-wallet-kit
+```
+
+The kit also needs a few native modules and a polyfill. See [Getting started](/solutions/embedded-wallets/integration-guide/react-native/getting-started#installation) for the full install, platform setup, and the deep link scheme that OAuth needs.
+
+For a working reference, see the [`with-react-native-wallet-kit`](https://github.com/tkhq/sdk/tree/main/examples/demos/with-react-native-wallet-kit) example app.
+
+## New features and improvements
+
+- **Auth helpers for every method**: email and SMS OTP, passkeys, OAuth (Google, Apple, Facebook, X, Discord), and WalletConnect wallets.
+- **Optional backend**: use Turnkey's [Auth Proxy](/features/authentication/auth-proxy) for signup and login without running your own backend, or keep your backend.
+- **Session lifecycle management**: sessions are stored and refreshed automatically, with `beforeSessionExpiry` and `onSessionExpired` callbacks.
+- **Managed state**: `user`, `wallets`, `session`, and `authState` are kept up to date by the provider.
+- **Signing helpers**: sign messages and transactions, or sign and broadcast, with a wallet account.
+
+The kit has no built-in UI. You build your own screens and call the hook's functions.
+
+## Breaking changes
+
+### Provider and hooks
+
+**Old approach**
+
+```tsx
+import { TurnkeyProvider, useTurnkey } from "@turnkey/sdk-react-native";
+
+<TurnkeyProvider
+  config={{
+    apiBaseUrl: "https://api.turnkey.com",
+    organizationId: "<ORGANIZATION_ID>",
+    onSessionCreated: (session) => {},
+    onSessionExpired: (session) => {},
+  }}
+>
+  {children}
+</TurnkeyProvider>;
+
+const { session, client, user, createEmbeddedKey, createSession } = useTurnkey();
+```
+
+**New approach**
+
+```tsx
+import { TurnkeyProvider, useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+<TurnkeyProvider
+  config={turnkeyConfig}
+  callbacks={{
+    onAuthenticationSuccess: ({ session }) => {},
+    beforeSessionExpiry: ({ sessionKey }) => {},
+    onSessionExpired: ({ sessionKey }) => {},
+    onError: (error) => {},
+  }}
+>
+  {children}
+</TurnkeyProvider>;
+
+const { session, user, wallets, authState, httpClient } = useTurnkey();
+```
+
+Key differences:
+
+- Configuration goes in `config` and lifecycle hooks in `callbacks`.
+- `onSessionCreated`, `onSessionSelected`, `onSessionCleared`, `onSessionEmpty`, and `onInitialized` have no direct equivalent. Use `onAuthenticationSuccess`, or read `authState` and `clientState` from the hook.
+- `client` is replaced by `httpClient`. See [Other API calls](#other-api-calls).
+
+### Configuration
+
+```tsx
+import type { TurnkeyProviderConfig } from "@turnkey/react-native-wallet-kit";
+
+const turnkeyConfig: TurnkeyProviderConfig = {
+  organizationId: "<ORGANIZATION_ID>",
+
+  // Use the Auth Proxy, or leave these out if your backend runs auth
+  authProxyConfigId: "<AUTH_PROXY_CONFIG_ID>",
+
+  passkeyConfig: { rpId: "example.com" },
+
+  auth: {
+    oauth: {
+      appScheme: "myapp",
+      google: { primaryClientId: { webClientId: "<GOOGLE_WEB_CLIENT_ID>" } },
+    },
+    autoRefreshSession: true,
+  },
+};
+```
+
+When you set `authProxyConfigId`, OTP, OAuth client IDs, and session settings come from the Auth Proxy configuration in the Turnkey dashboard. See [Getting started](/solutions/embedded-wallets/integration-guide/react-native/getting-started#provider) for every option.
+
+### Sessions
+
+| `@turnkey/sdk-react-native` | `@turnkey/react-native-wallet-kit` |
+| :-------------------------- | :--------------------------------- |
+| `createEmbeddedKey()` | `createApiKeyPair()`. Returns a compressed public key; the private key stays in the device keychain. |
+| `createSession({ bundle })` | `storeSession({ sessionToken })`, with a session JWT. The login helpers call it for you. |
+| `createSessionFromEmbeddedKey(...)` | No equivalent. Use the login helpers. |
+| `refreshSession({ expirationSeconds })` | `refreshSession({ expirationSeconds })`. `expirationSeconds` is now a string. Automatic when `autoRefreshSession` is on. |
+| `setSelectedSession({ sessionKey })` | `setActiveSession({ sessionKey })` |
+| `clearSession()`, `clearAllSessions()` | Same names, plus `logout()` |
+
+### Authentication
+
+#### Email and SMS OTP
+
+**Old approach**
+
+The app created an embedded key, your backend initialized OTP and then ran `OTP_AUTH` with the embedded key as the target, and the app decrypted the returned credential bundle.
+
+```tsx
+import { useTurnkey } from "@turnkey/sdk-react-native";
+
+const { createEmbeddedKey, createSession } = useTurnkey();
+
+const targetPublicKey = await createEmbeddedKey();
+const { otpId } = await yourBackend.initOtpAuth({ email });
+// ...user enters the code
+const { credentialBundle } = await yourBackend.otpAuth({
+  otpId,
+  otpCode,
+  targetPublicKey,
+});
+await createSession({ bundle: credentialBundle });
+```
+
+**New approach, with the Auth Proxy**
+
+The kit handles the whole exchange. Initialize OTP, then complete it with the code. `completeOtp` signs the user up if they do not have a sub-organization yet.
+
+```tsx
+import { useTurnkey, OtpType } from "@turnkey/react-native-wallet-kit";
+
+const { initOtp, completeOtp } = useTurnkey();
+
+const { otpId, otpEncryptionTargetBundle } = await initOtp({
+  otpType: OtpType.Email,
+  contact: email,
+});
+
+// ...user enters the code
+await completeOtp({
+  otpId,
+  otpCode,
+  otpEncryptionTargetBundle,
+  contact: email,
+  otpType: OtpType.Email,
+});
+```
+
+**New approach, with your own backend**
+
+If your backend runs OTP with `@turnkey/sdk-server`, the flow changes on both sides. The code is encrypted on the device, so your backend never sees it, and login is bound to the app's key pair through a client signature.
+
+1. The app calls `createApiKeyPair()`.
+2. Your backend calls `initOtp` (`INIT_OTP_V3`). `appName` is required. It returns `otpId` and `otpEncryptionTargetBundle`.
+3. The app encrypts the code with `encryptOtpCodeToBundle` from `@turnkey/crypto`.
+4. Your backend calls `verifyOtp` (`VERIFY_OTP_V2`) with the encrypted bundle. It returns a `verificationToken`.
+5. Your backend looks up or creates the user's sub-organization, as before.
+6. The app builds the login message with `getClientSignatureMessageForLogin` and signs it with `signWithApiKey`.
+7. Your backend calls `otpLogin` (`OTP_LOGIN_V2`) on the sub-organization. It returns the session JWT.
+8. The app calls `storeSession`.
+
+<CodeGroup>
+
+```tsx app.tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+import { getClientSignatureMessageForLogin } from "@turnkey/core";
+import { encryptOtpCodeToBundle } from "@turnkey/crypto";
+import type { v1ClientSignature } from "@turnkey/sdk-types";
+
+const { createApiKeyPair, signWithApiKey, storeSession } = useTurnkey();
+
+// Start: create the key pair this login will be bound to
+const publicKey = await createApiKeyPair();
+const { otpId, otpEncryptionTargetBundle } = await yourBackend.initOtp({
+  email,
+  publicKey,
+});
+
+// ...user enters the code
+const encryptedOtpBundle = await encryptOtpCodeToBundle(
+  otpCode,
+  otpEncryptionTargetBundle,
+  publicKey,
+);
+const { verificationToken } = await yourBackend.verifyOtp({
+  otpId,
+  encryptedOtpBundle,
+});
+
+const { message } = getClientSignatureMessageForLogin({ verificationToken });
+const signature = await signWithApiKey({ message, publicKey });
+const clientSignature: v1ClientSignature = {
+  scheme: "CLIENT_SIGNATURE_SCHEME_API_P256",
+  publicKey,
+  message,
+  signature,
+};
+
+const { session } = await yourBackend.otpLogin({
+  email,
+  verificationToken,
+  publicKey,
+  clientSignature,
+});
+await storeSession({ sessionToken: session });
+```
+
+```ts server.ts
+import { Turnkey } from "@turnkey/sdk-server";
+import type { v1ClientSignature } from "@turnkey/sdk-types";
+
+const turnkey = new Turnkey({
+  apiBaseUrl: "https://api.turnkey.com",
+  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+});
+
+export async function initOtp({ email, publicKey }: { email: string; publicKey: string }) {
+  return turnkey.apiClient().initOtp({
+    appName: "My App",
+    otpType: "OTP_TYPE_EMAIL",
+    contact: email,
+    userIdentifier: publicKey,
+  });
+}
+
+export async function verifyOtp(params: { otpId: string; encryptedOtpBundle: string }) {
+  return turnkey.apiClient().verifyOtp(params);
+}
+
+export async function otpLogin(params: {
+  email: string;
+  verificationToken: string;
+  publicKey: string;
+  clientSignature: v1ClientSignature;
+}) {
+  // Look up or create the sub-organization for this email, as before
+  const subOrganizationId = await findOrCreateSubOrg(params.email);
+
+  return turnkey.apiClient().otpLogin({
+    organizationId: subOrganizationId,
+    verificationToken: params.verificationToken,
+    publicKey: params.publicKey,
+    clientSignature: params.clientSignature,
+  });
+}
+```
+
+</CodeGroup>
+
+<Note>
+  `getClientSignatureMessageForLogin` is not re-exported by `@turnkey/react-native-wallet-kit`. Install `@turnkey/core` and import it from there.
+</Note>
+
+The [`otp-auth/with-backend`](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend) example implements this flow with `@turnkey/react-wallet-kit`. The backend is identical for React Native, and the app side differs only in the `@turnkey/core` import above.
+
+Other changes to the OTP flow:
+
+- `OTP_AUTH` returned an API key ID and a credential bundle. Neither exists in the new flow.
+- Email customization moves to the `emailCustomization` parameter of `INIT_OTP_V3`.
+- See the [OTP migration guide](/features/authentication/otp-migration-guide) for the activity changes in detail.
+
+#### Passkeys
+
+**Old approach**
+
+`@turnkey/sdk-react-native` exported `createPasskey` and `PasskeyStamper`, and you wired signup and login to your backend yourself.
+
+**New approach**
+
+```tsx
+import { useTurnkey } from "@turnkey/react-native-wallet-kit";
+
+const { signUpWithPasskey, loginWithPasskey } = useTurnkey();
+
+await signUpWithPasskey({ passkeyDisplayName: "My phone" });
+await loginWithPasskey();
+```
+
+See [Passkey authentication](/solutions/embedded-wallets/integration-guide/react-native/authentication/passkey) for the `rpId` and associated domains setup.
+
+#### OAuth
+
+**Old approach**
+
+`handleGoogleOAuth` returned an OIDC token through `onSuccess`, and your backend used it to sign the user up or log them in.
+
+```tsx
+const { handleGoogleOAuth } = useTurnkey();
+
+await handleGoogleOAuth({
+  clientId,
+  nonce,
+  scheme: "myapp",
+  onSuccess: (oidcToken) => yourBackend.oauthLogin({ oidcToken }),
+});
+```
+
+**New approach**
+
+Each provider has a helper that opens the browser, handles the deep link back to your app, and completes signup or login.
+
+```tsx
+const { handleGoogleOauth, handleAppleOauth } = useTurnkey();
+
+await handleGoogleOauth();
+```
+
+The helpers need `auth.oauth.appScheme` and the provider client IDs in your config. Pass `onOauthSuccess` if you want to receive the OIDC token and complete authentication yourself. See [Social logins](/solutions/embedded-wallets/integration-guide/react-native/authentication/social-logins).
+
+#### Wallet authentication
+
+This is new. Users can sign in with an external wallet through WalletConnect, using `loginOrSignupWithWallet`. It requires `walletConfig` with a WalletConnect project ID; see the [example app](https://github.com/tkhq/sdk/tree/main/examples/demos/with-react-native-wallet-kit) for the configuration.
+
+### Passkey management
+
+Adding and removing passkeys is new:
+
+```tsx
+const { addPasskey, removePasskeys } = useTurnkey();
+
+await addPasskey({ name: "Backup passkey" });
+await removePasskeys({ authenticatorIds: ["<AUTHENTICATOR_ID>"] });
+```
+
+### Wallets
+
+#### List wallets
+
+**Old approach**
+
+Wallets were nested under `user.wallets`.
+
+```tsx
+const { user } = useTurnkey();
+const wallets = user?.wallets ?? [];
+```
+
+**New approach**
+
+Wallets are top-level state, kept up to date by the provider. `user` is now a `v1User`, with fields such as `userId`, `userName`, and `userEmail`.
+
+```tsx
+const { wallets, refreshWallets } = useTurnkey();
+```
+
+#### Create wallets and accounts
+
+`createWallet` now returns the wallet ID instead of an activity, and `createWalletAccounts` is new.
+
+```tsx
+const { createWallet, createWalletAccounts } = useTurnkey();
+
+const walletId = await createWallet({
+  walletName: "My Wallet",
+  accounts: ["ADDRESS_FORMAT_ETHEREUM", "ADDRESS_FORMAT_SOLANA"],
+});
+
+const addresses = await createWalletAccounts({
+  walletId,
+  accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+});
+```
+
+#### Export and import
+
+There is no export iframe on React Native. `exportWallet` decrypts the export on the device and returns the mnemonic to your app, as before, so your app decides how to display it.
+
+```tsx
+const { exportWallet, importWallet } = useTurnkey();
+
+// Returns the mnemonic by default
+const mnemonic = await exportWallet({ walletId });
+
+const importedWalletId = await importWallet({
+  walletName: "Imported Wallet",
+  mnemonic: userEnteredMnemonic,
+  accounts: ["ADDRESS_FORMAT_ETHEREUM"],
+});
+```
+
+`exportWalletAccount`, `exportPrivateKey`, and `importPrivateKey` are also available. See [Importing and exporting wallets](/solutions/embedded-wallets/integration-guide/react-native/using-embedded-wallets#importing-and-exporting-wallets).
+
+### Signing
+
+**Old approach**
+
+```tsx
+const { signRawPayload } = useTurnkey();
+
+await signRawPayload({
+  signWith: "0xYourAddress",
+  payload: "Hello, Turnkey!",
+  encoding: "PAYLOAD_ENCODING_TEXT_UTF8",
+  hashFunction: "HASH_FUNCTION_KECCAK256",
+});
+```
+
+**New approach**
+
+Signing takes a wallet account from `wallets`, not an address string.
+
+```tsx
+const { wallets, signMessage, signTransaction, signAndSendTransaction } = useTurnkey();
+
+const walletAccount = wallets[0]?.accounts[0];
+
+await signMessage({ walletAccount, message: "Hello, Turnkey!" });
+
+await signTransaction({
+  walletAccount,
+  unsignedTransaction,
+  transactionType: "TRANSACTION_TYPE_ETHEREUM",
+});
+```
+
+`signAndSendTransaction` signs and broadcasts in one step. See [Signing](/solutions/embedded-wallets/integration-guide/react-native/signing).
+
+### Other API calls
+
+For any API call without a helper, use `httpClient` instead of the old `client`. It stamps requests with the current session, and takes the activity parameters directly instead of the full request envelope.
+
+**Old approach**
+
+```tsx
+const { client, session } = useTurnkey();
+
+await client.getWallets({ organizationId: session.organizationId });
+```
+
+**New approach**
+
+```tsx
+const { httpClient } = useTurnkey();
+
+await httpClient?.getWallets();
+```
+
+See [Advanced API requests](/solutions/embedded-wallets/integration-guide/react-native/advanced-api-requests).
+
+### Errors
+
+The kit throws `TurnkeyError` with a code from `TurnkeyErrorCodes`, such as `INVALID_OTP_CODE` or `MAX_OTP_INITIATED_ERROR`, instead of raw API errors. Import both from `@turnkey/sdk-types`. You can also handle every error in one place with the `onError` callback on `TurnkeyProvider`.
