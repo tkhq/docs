@@ -158,15 +158,15 @@ hash of `transfer(address,uint256)`.
 
 #### Inspect nested fields in EIP-712 message payloads
 
-The `eth.eip_712.message` map supports nested field access using bracket notation and array iteration operators, 
+The `eth.eip_712.typed_message` map supports nested field access using bracket notation and array iteration operators, 
 allowing policies to inspect and enforce conditions across typed data contents, beyond just the domain and primary type.
 
 **Syntax:**
 
-- Nested struct fields: `eth.eip_712.message['outerField']['innerField']`
-- Array element fields: `eth.eip_712.message['arrayField'][0]['innerField']`
-- Array iteration: `eth.eip_712.message['arrayField'].all(item, <condition>)`
-- Array length: `eth.eip_712.message['arrayField'].count()`
+- Nested struct fields: `eth.eip_712.typed_message['outerField']['innerField']`
+- Array element fields: `eth.eip_712.typed_message['arrayField'][0]['innerField']`
+- Array iteration: `eth.eip_712.typed_message['arrayField'].all(item, <condition>)`
+- Array length: `eth.eip_712.typed_message['arrayField'].count()`
 
 
 **Example: Restrict Permit2 batch token approvals by token address**
@@ -179,9 +179,26 @@ each with a `token` address and an `amount`.
 {
   "primaryType": "PermitBatchTransferFrom",
   "domain": { "name": "Permit2", "chainId": 1, "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3" },
+  "types": {
+    "EIP712Domain": [
+      { "name": "name", "type": "string" },
+      { "name": "chainId", "type": "uint256" },
+      { "name": "verifyingContract", "type": "address" }
+    ],
+    "PermitBatchTransferFrom": [
+      { "name": "permitted", "type": "TokenPermissions[]" },
+      { "name": "spender", "type": "address" },
+      { "name": "nonce", "type": "uint256" },
+      { "name": "deadline", "type": "uint256" }
+    ],
+    "TokenPermissions": [
+      { "name": "token", "type": "address" },
+      { "name": "amount", "type": "uint256" }
+    ]
+  },
   "message": {
     "permitted": [
-      { "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "amount": "1000000000" }
+      { "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "amount": "50000000" }
     ],
     "spender": "0x<SPENDER_ADDRESS>",
     "nonce": 0,
@@ -197,14 +214,14 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow Permit2 batch only if first token is USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.typed_message['permitted'][0]['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
 <Note>
-  Array elements can be accessed by index (`[0]`, `[1]`, etc.). The condition `message['permitted'][0]['token'] == '0xA0b8...'`
+  Array elements can be accessed by index (`[0]`, `[1]`, etc.). The condition `typed_message['permitted'][0]['token'] == '0xA0b8...'`
   checks the first entry. You can also check specific positions explicitly
-  (for example, `message['permitted'][0]['token'] == '0xA0b8...' && message['permitted'][1]['token'] == '0xA0b8...'`).
+  (for example, `typed_message['permitted'][0]['token'] == '0xA0b8...' && typed_message['permitted'][1]['token'] == '0xA0b8...'`).
   Use `.all()` when you want to apply the same token check across the entire `permitted` array. A `.all()` example is included below.
 </Note>
 
@@ -217,7 +234,7 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow Permit2 batch only for USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.typed_message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48') && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
@@ -228,7 +245,7 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow Permit2 batches with <= 2 token permissions",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.typed_message['permitted'].count() <= 2 && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
@@ -239,12 +256,16 @@ To allow signing only when the first permitted token is USDC:
   "policyName": "Allow USDC token permissions below 100 USDC",
   "notes": "",
   "effect": "EFFECT_ALLOW",
-  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.message['permitted'].any(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
+  "condition": "eth.eip_712.domain.name == 'Permit2' && eth.eip_712.primary_type == 'PermitBatchTransferFrom' && eth.eip_712.typed_message['permitted'].all(p, p['token'] == '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' && p['amount'] < 100000000) && activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2'"
 }
 ```
 
 <Note>
-`in` works for integer fields. For string fields such as token addresses, use `||` instead.
+- Use `.all()` to bound every entry. `.any()` is satisfied by one small entry even if another entry is unbounded.
+- `typed_message` integers compare numerically with numeric literals, and `in` works across integer widths (for example `in [1, 2]`).
+- `in` works for integer fields. For string fields such as token addresses, use `||` instead.
+- Send large integers as decimal strings, as in the sample payload above. See the
+  [EIP-712 section of the policy language](/features/policies/language#eip-712) for accepted encodings.
 </Note>
 
 ### Deny signing of `NO_OP` keccak256 payloads
