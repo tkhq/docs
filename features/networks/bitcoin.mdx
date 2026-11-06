@@ -39,6 +39,19 @@ The historical signature scheme for Bitcoin is [ECDSA](https://en.wikipedia.org/
 
 To sign with Schnorr, pass a taproot (P2TR) address inside of your activity's `signWith` parameter. Turnkey's signer will switch to Schnorr and apply the correct cryptographic [tweak](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs) before signing.
 
+## Signature nonces
+
+Turnkey signs with deterministic nonces:
+
+* ECDSA (secp256k1): [RFC 6979](https://www.rfc-editor.org/rfc/rfc6979) with HMAC-SHA256, with no additional entropy mixed in.
+* Schnorr (Taproot): deterministic per [BIP-340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki). Taproot addresses are signed key-path only, using the BIP-341 tweaked key with no script tree.
+
+When you sign with `SIGN_RAW_PAYLOAD` and `HASH_FUNCTION_NO_OP`, the 32-byte payload you submit (for example a sighash) is signed as-is: it is used directly as the ECDSA digest or the BIP-340 message.
+
+Because nonces are deterministic, signing the same payload with the same key always produces the same signature, including when an activity is retried or approved later. Different payloads always produce different nonces, so a nonce is never reused across messages.
+
+To verify this independently, export a test key, sign a digest with Turnkey, sign the same digest locally with a standard RFC 6979 or BIP-340 implementation, and compare the outputs.
+
 ## Policy-enabled Bitcoin transaction signing
 
 Turnkey has built a Bitcoin transaction parser which runs in a secure enclave, to enable Bitcoin-based policies in the policy engine. 
