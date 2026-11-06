@@ -158,7 +158,7 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
     ```
   </Step>
   <Step title="Execute the swap">
-    Execution is pinned to the quote: pass its `quoteId` and restate the economics the user was shown. Turnkey constructs the transaction, batches any required ERC-20 approval into it, signs with the wallet derived from the quote, and broadcasts. The signer is **not** resupplied here — it comes from the bound quote.
+    Execution is pinned to the quote: pass its `quoteId` in `boundQuote` and restate the economics the user was shown. Turnkey constructs the transaction, batches any required ERC-20 approval into it, signs with the wallet derived from the quote, and broadcasts. The signer is **not** resupplied here — it comes from the bound quote.
 
     With `sponsor: false`, the wallet pays its own gas. Set it to `true` to have Gas Station cover it (requires gas sponsorship enabled for your organization).
 
@@ -168,17 +168,19 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
     const { activity: execActivity } = await client.request(
       "/public/v1/submit/execute_swap",
       {
-        type: "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
+        type: "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
         timestampMs: String(Date.now()),
         organizationId,
         parameters: {
-          quoteId: quote.quoteId,
           inputToken,
           outputToken,
           inputAmount,
-          quotedOutputAmount: quote.outputAmount,
-          minOutputAmount: quote.minOutputAmount,
           sponsor: false,
+          boundQuote: {
+            quoteId: quote.quoteId,
+            quotedOutputAmount: quote.outputAmount,
+            minOutputAmount: quote.minOutputAmount,
+          },
         },
       },
     );
@@ -193,17 +195,19 @@ This walkthrough runs the complete Swaps lifecycle against Base mainnet: set you
       --header 'Content-Type: application/json' \
       --header "X-Stamp: <string> (see Stamps)" \
       --data '{
-        "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
+        "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
         "timestampMs": "<string> (e.g. 1745474677453)",
         "organizationId": "<ORGANIZATION_ID>",
         "parameters": {
-          "quoteId": "<QUOTE_ID>",
           "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
           "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
           "inputAmount": "100000000",
-          "quotedOutputAmount": "<EXPECTED_OUTPUT>",
-          "minOutputAmount": "<MINIMUM_OUTPUT>",
-          "sponsor": false
+          "sponsor": false,
+          "boundQuote": {
+            "quoteId": "<QUOTE_ID>",
+            "quotedOutputAmount": "<EXPECTED_OUTPUT>",
+            "minOutputAmount": "<MINIMUM_OUTPUT>"
+          }
         }
       }'
     ```

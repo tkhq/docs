@@ -1,0 +1,224 @@
+---
+title: "Market Swaps"
+description: "Preview a price with an authenticated query, then execute a swap with one signed activity, at the provider's price when the activity is approved."
+mode: "wide"
+---
+
+A market swap executes without a quote activity. You preview the price with [`get_indicative_swap_quote`](/api-reference/queries/get-indicative-swap-quote), which is a query, then submit one [`ACTIVITY_TYPE_EXECUTE_SWAP_V4`](/api-reference/activities/execute-swap) activity with `market` terms. Your user signs once, and policies and consensus run once.
+
+The swap executes at the provider's price when the activity is approved. That price can differ from the preview, so you protect it with the slippage and minimum output in the signed intent.
+
+| | Bound mode | Market mode |
+| :-- | :-- | :-- |
+| Signed activities | Two: `create_swap_quote`, then `execute_swap` | One: `execute_swap` |
+| Price | Fixed by the quote | The provider's price when the activity is approved |
+| Price protection | The quote's minimum output | `slippageBps` and `minOutputAmount` in the signed intent |
+| Time limit | The quote expires 5 minutes after it is issued | None for pending approvals; a new quote is fetched when the activity is approved |
+| Signer | The wallet the quote was created for | `market.signWith` |
+
+Use [bound mode](/features/transaction-management/swap/execute-swap) when your user must approve an exact output. Use market mode when one signature matters more, or when approvals can take longer than a quote lasts.
+
+## Prerequisites
+
+The same requirements apply as for [a quote](/features/transaction-management/swap/get-swap-quote):
+
+- The parent organization must be Pay As You Go, Pro, or Enterprise.
+- A swap configuration is optional. Without one, the swap has a client fee of 0.
+- `signWith` must be a wallet account address in the organization. Private key identifiers are not supported.
+
+The wallet also needs the funds described in [Execute a Swap](/features/transaction-management/swap/execute-swap#prerequisites).
+
+## Preview the price
+
+`get_indicative_swap_quote` returns the provider's current price without creating an activity. It needs an authenticated request, either an API key stamp or a read-only session, like any other query. It does not run policies or consensus.
+
+<ParamField body="organizationId" type="string" required>
+  The organization that owns the swapping wallet.
+</ParamField>
+
+<ParamField body="signWith" type="string" required>
+  The wallet account address that would send the input asset. It must belong to the organization.
+</ParamField>
+
+<ParamField body="inputToken / outputToken" type="string" required>
+  CAIP-19 identifiers for the assets being sold and bought.
+</ParamField>
+
+<ParamField body="inputAmount" type="string" required>
+  In raw onchain units of the input asset.
+</ParamField>
+
+<ParamField body="slippageBps" type="string">
+  Maximum allowed slippage in basis points, at most 5000. If you omit it, the provider chooses the slippage.
+</ParamField>
+
+<ParamField body="destinationAddress" type="string">
+  Required for EVM ↔ SVM, and rejected otherwise. A raw public address on the output token protocol.
+</ParamField>
+
+<ParamField body="feeSponsorship / fixedRate" type="boolean">
+  Preview the price with [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) or a [fixed rate](/features/transaction-management/swap/fixed-rate). Both are available on Enterprise plans.
+</ParamField>
+
+```javascript title="JavaScript"
+const preview = await client.request(
+  "/public/v1/query/get_indicative_swap_quote",
+  {
+    organizationId: "<ORGANIZATION_ID>",
+    signWith: "<WALLET_ACCOUNT_ADDRESS>",
+    inputToken: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+    inputAmount: "1000000",
+    slippageBps: "100",
+  },
+);
+```
+
+The response has the estimated `outputAmount`, the `minOutputAmount` after slippage, and the `slippageBps` the provider applied, with `provider`, `clientFeeBps`, and `estimatedTimeSeconds`.
+
+<Warning>
+  The indicative quote is not binding and has no `quoteId`. A market swap fetches its own quote when the activity is approved, so its price can differ from the preview.
+</Warning>
+
+## Execute the swap
+
+Submit `ACTIVITY_TYPE_EXECUTE_SWAP_V4` with a `market` object instead of `boundQuote`. Set exactly one of the two.
+
+<ParamField body="parameters.inputToken / parameters.outputToken" type="string" required>
+  CAIP-19 identifiers for the assets being sold and bought.
+</ParamField>
+
+<ParamField body="parameters.inputAmount" type="string" required>
+  In raw onchain units of the input asset.
+</ParamField>
+
+<ParamField body="parameters.sponsor" type="boolean" required>
+  When `true`, your organization sponsors gas for the transaction. Set to `false` to have the swapping wallet pay its own gas.
+</ParamField>
+
+<ParamField body="parameters.destinationAddress" type="string">
+  Required for EVM ↔ SVM, and rejected otherwise. A raw public address on the output token protocol.
+</ParamField>
+
+<ParamField body="parameters.market.signWith" type="string" required>
+  The wallet account address that sends the input asset. Private key identifiers are not supported.
+</ParamField>
+
+<ParamField body="parameters.market.slippageBps" type="string">
+  Maximum allowed slippage in basis points, at most 5000. If you omit it, the provider chooses the slippage.
+</ParamField>
+
+<ParamField body="parameters.market.minOutputAmount" type="string">
+  Optional price floor, in raw onchain units of the output asset. The swap fails unless the provider's minimum output after slippage is at least this amount.
+</ParamField>
+
+<ParamField body="parameters.market.feeSponsorship" type="boolean">
+  When `true`, Turnkey pays the provider fees and invoices them to your parent organization. Available on Enterprise plans. See [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship).
+</ParamField>
+
+<ParamField body="parameters.market.fixedRate" type="boolean">
+  When `true`, requests a fixed rate between supported stablecoins. Available on Enterprise plans. See [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate).
+</ParamField>
+
+cURL:
+
+```bash title="cURL"
+curl --request POST \
+  --url https://api.turnkey.com/public/v1/submit/execute_swap \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --header "X-Stamp: <string> (see Stamps)" \
+  --data '{
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
+    "timestampMs": "<string> (e.g. 1745474677453)",
+    "organizationId": "<ORGANIZATION_ID>",
+    "parameters": {
+      "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+      "inputAmount": "1000000",
+      "sponsor": false,
+      "market": {
+        "signWith": "<WALLET_ACCOUNT_ADDRESS>",
+        "slippageBps": "100",
+        "minOutputAmount": "<MINIMUM_OUTPUT>"
+      }
+    }
+  }'
+```
+
+JavaScript:
+
+```javascript title="JavaScript"
+const { activity } = await client.request("/public/v1/submit/execute_swap", {
+  type: "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
+  timestampMs: String(Date.now()),
+  organizationId: "<ORGANIZATION_ID>",
+  parameters: {
+    inputToken: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
+    inputAmount: "1000000",
+    sponsor: false,
+    market: {
+      signWith: "<WALLET_ACCOUNT_ADDRESS>",
+      slippageBps: "100",
+      minOutputAmount: preview.minOutputAmount,
+    },
+  },
+});
+
+const { swapRequestId, outputAmount, minOutputAmount } =
+  activity.result.executeSwapResult;
+```
+
+With `@turnkey/sdk-server`, the typed methods are `getIndicativeSwapQuote` and `executeSwap`:
+
+```javascript title="JavaScript"
+const preview = await client.apiClient().getIndicativeSwapQuote({
+  signWith,
+  inputToken,
+  outputToken,
+  inputAmount,
+  slippageBps: "100",
+});
+
+const { swapRequestId } = await client.apiClient().executeSwap({
+  inputToken,
+  outputToken,
+  inputAmount,
+  sponsor: false,
+  market: {
+    signWith,
+    slippageBps: "100",
+    minOutputAmount: preview.minOutputAmount,
+  },
+});
+```
+
+The result has `swapRequestId`, and `outputAmount` and `minOutputAmount` from the quote that was executed. Then [poll `get_swap_status`](/features/transaction-management/swap/track-swap-status) as for any swap.
+
+## Price protection
+
+The price is set when the activity is approved, after your user has signed. The signed intent can limit that price in two ways:
+
+- `slippageBps` limits how far the swap can settle below the provider's quote. If you omit it, the provider chooses the slippage.
+- `minOutputAmount` is an absolute floor. Turnkey rejects the swap if the provider's minimum output is below it.
+
+Without `minOutputAmount`, the signed intent sets no absolute price. A quote that has moved against your user still executes, within the slippage. To hold the swap to the price you showed, pass the preview's `minOutputAmount` as the floor. If the market then moves below it, the swap fails instead of filling worse.
+
+## Approvals and failures
+
+An activity that needs [consensus](/features/policies/overview) can wait as long as approvals take. Turnkey fetches a new quote on each approval, and the swap uses the quote from the final approval. Your approvers approve the signed terms, not a specific price.
+
+| Failure | Effect |
+| :-- | :-- |
+| No quote is available, the quote is below `minOutputAmount`, or a fixed-rate quote is rejected | The request fails. On a first submission, nothing is saved, so submit it again. On an approval, the vote is not recorded and the activity stays `ACTIVITY_STATUS_CONSENSUS_NEEDED`, so the approver can try again. |
+| The swap fails after the final approval, before broadcast | The activity fails. Submit a new swap. |
+| The swap fails after broadcast | The activity is complete, and [`get_swap_status`](/features/transaction-management/swap/track-swap-status) reports `FAILED`. |
+
+## Fees
+
+Fees work as they do for a quoted swap, and the [same plan rates](/features/transaction-management/swap#fees) apply. A market swap uses the swap configuration in place when the activity is approved, because that is when its quote is fetched.
+
+## Policies
+
+Market swaps have the same `activity.kind` as bound swaps. Policies can tell the two apart with `activity.params.mode`, and can read the verified quote through fields like `activity.params.quote_slippage_bps`. See the [Swaps and Earn policy examples](/features/policies/examples/swaps-earn#market-swaps).
