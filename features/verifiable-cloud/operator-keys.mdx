@@ -15,16 +15,15 @@ Every [operator](/features/verifiable-cloud/overview#operators) in a [manifest s
 
 | | Local key file | Turnkey-hosted | YubiKey |
 | :--- | :--- | :--- | :--- |
-| Private key lives in | A JSON file on the operator's machine | Two wallet accounts in your Turnkey organization | PIV slots on a hardware token |
+| Private key lives in | A plaintext seed file on the operator's machine, readable only by their user account | Two wallet accounts in your Turnkey organization | PIV slots on a hardware token |
 | Who controls it | You. Turnkey only ever sees the public keys | Your organization, through Turnkey's user, API key, and [policy](/features/policies/overview) model | You. Turnkey only ever sees the public keys |
 | Where signing and decryption happen | On the operator's machine | Inside Turnkey's enclaves, via Turnkey activities | On the YubiKey, after a PIN and a touch |
 | Created by | `tvc login` | `tvc operator create` | `ykman` on the device, then registered with `tvc` |
 | Registered with Turnkey | When an operator set is created with `newOperators` | By the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity | When an operator set is created with `newOperators` |
 | `keySource` in the API | `EXTERNAL_KEY` | `ORG_WALLET_ACCOUNT` | `EXTERNAL_KEY` |
-| Can act in CI | Yes, with a seed file | Yes, with API key env vars | No, needs a physical touch |
-| Best for | Development and prototypes | Automated pipelines, and share sets whose members shouldn't hold key material directly | Production manifest and share set members |
+| Can act in CI | Yes, with API key env vars and the seed passed by flag or env var | Yes, if the runner has the `tvc login` profile that registered the operator; API key env vars alone are not enough | No, needs a physical touch |
 
-The kinds can be mixed freely within a set. A production app might use a YubiKey for each human reviewer in the manifest set and hosted operators for a CI pipeline and the share set.
+The kinds can be mixed freely within a set. Each operator is just a pair of public keys to Turnkey, and the CLI picks the signing method per operator from your local configuration.
 
 The [`list_tvc_operators`](/api-reference/queries/list-tvc-operators) query reports each operator's `keySource`. Operators created before the field existed have no `keySource`.
 
@@ -38,13 +37,17 @@ The [`list_tvc_operators`](/api-reference/queries/list-tvc-operators) query repo
 
 The seed never leaves the file unless you move it. Turnkey learns only the public keys, which the CLI auto-populates into the `newOperators` field when you run `tvc app init`, or which you paste into the dashboard when creating an app there.
 
+<Note>
+The seed is stored unencrypted. The CLI writes the file with owner-only permissions, so its protection is the operating system's access control and whatever disk encryption the machine has. Anyone who can read the file can act as that operator.
+</Note>
+
 **Back it up.** A lost local key means a lost operator. If that operator was needed to meet a threshold, you'll need to create a new operator set and a new app. `tvc login` offers to back the key up during onboarding, and you can do it any time:
 
 ```bash
 tvc keys backup-operator-key --output <PATH>
 ```
 
-Treat the backup like any other private key: store it encrypted, off the machine that uses it.
+The backup is a byte-for-byte copy of `operator.json`, so it holds the same plaintext seed as the original.
 
 **Approve manifests.** With the organization active, the CLI reads the key from the file automatically:
 
@@ -54,7 +57,9 @@ tvc deploy approve \
   --operator-id <OPERATOR_UUID>
 ```
 
-To sign from a pipeline or from a machine that hasn't run `tvc login`, pass the seed explicitly with `--operator-seed-path <FILE>` (a file containing the raw hex seed) or `--operator-seed <HEX>`. The two flags are mutually exclusive. Add `--skip-post` to produce an approval offline and post it later.
+To sign from a pipeline or from a machine that hasn't run `tvc login`, pass the seed explicitly with `--operator-seed-path <FILE>` (a file containing the raw hex seed) or `--operator-seed <HEX>`. The two flags are mutually exclusive.
+
+Add `--skip-post` to sign without contacting the API, for example on an air-gapped machine. The CLI writes the approval JSON to stdout or to `--approval-out <PATH>`. There is no CLI command to submit a saved approval; post it with the [`create_tvc_manifest_approvals`](/api-reference/activities/create-tvc-manifest-approvals) activity using the manifest ID, operator ID, and hex-encoded signature.
 
 **Hold Quorum Key shares.** Local operators can be share set members too, but the share lifecycle runs on your machine rather than through Turnkey:
 
@@ -74,11 +79,7 @@ tvc operator create --name <OPERATOR_NAME>
 
 The activity returns the operator ID, the wallet ID, and both public keys. The CLI saves them to the active organization's local profile so later commands can find the operator by ID. To create more than one hosted operator in the same wallet, give each a distinct `--account-path`.
 
-**Who controls the key.** The private keys never leave Turnkey's enclaves, and they are never returned to the CLI. Every use of a hosted operator is a Turnkey activity submitted with your API key, so it is subject to the same controls as any other activity in your organization: the submitting user's permissions, [policies](/features/policies/overview), consensus requirements, and the activity log. Hosted operators are a good fit when you want a team, rather than an individual's laptop, to control who can approve a manifest or release a share.
-
-<Note>
-A hosted operator is only as strong as the credentials allowed to use it. Scope the API keys and users that can sign with the operator's wallet accounts, and consider a policy that requires consensus for `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD` and `ACTIVITY_TYPE_RE_ENCRYPT_TVC_QUORUM_KEY_SHARE` on production operators.
-</Note>
+**Who controls the key.** The private keys never leave Turnkey's enclaves, and they are never returned to the CLI. Every use of a hosted operator is a Turnkey activity submitted with your API key, so it is subject to the same controls as any other activity in your organization: the submitting user's permissions, [policies](/features/policies/overview), consensus requirements, and the activity log. The relevant activity types are `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD` for approvals and `ACTIVITY_TYPE_RE_ENCRYPT_TVC_QUORUM_KEY_SHARE` for share provisioning.
 
 **Approve manifests.** The same command as a local operator. The CLI recognizes the operator ID as a hosted operator and signs the approval through the [`sign_raw_payload`](/api-reference/activities/sign-raw-payload) activity instead of a local key:
 
@@ -96,6 +97,106 @@ Offline approval with `--skip-post` is not available for hosted operators, since
 2. `tvc deploy provision --deploy-id <ID> --operator-id <ID>` verifies the enclave's attestation and approvals, then calls the [`re_encrypt_tvc_quorum_key_share`](/api-reference/activities/re-encrypt-tvc-quorum-key-share) activity to re-encrypt that operator's share to the enclave's Ephemeral Key.
 
 The [manifest sets and share sets](/features/verifiable-cloud/manifest-sets-and-share-sets#worked-example) page walks through a full hosted setup.
+
+## YubiKey
+
+A YubiKey operator keeps the operator's two private keys, the signing key and the encryption key, in the token's PIV application, generated on the device so they can never be exported. Signing and decryption happen on the YubiKey and require the PIV PIN and a physical touch every time.
+
+| PIV slot | Purpose | Requirements |
+| :--- | :--- | :--- |
+| `9c` | Sign manifest approvals | P-256, generated on the device, PIN policy `always`, touch policy `always` |
+| `9d` | Decrypt and re-encrypt Quorum Key shares | P-256, generated on the device, PIN policy `always`, touch policy `always` |
+
+`tvc` only uses operations the PIV PIN unlocks: signing and key agreement with existing keys. It never holds the PIV management key, so it cannot generate, import, or delete keys or certificates on the device. Those changes are made with [YubiKey Manager (`ykman`)](https://docs.yubico.com/software/yubikey/tools/ykman/) commands you run yourself, so you can audit exactly what touches the device.
+
+**Prerequisites.** YubiKey firmware 5.3 or later (check with `ykman info`), the `ykman` CLI, and a current `tvc` installation. The examples assume one YubiKey is connected; with several, unplug the others or pass `--serial <SERIAL>`.
+
+<Steps>
+  <Step title="Harden PIV access">
+    Optional for an already-hardened device, but recommended before generating operator keys. Each command prompts for the current and replacement credential.
+
+    ```sh
+    ykman piv access change-pin
+    ykman piv access change-puk
+    ykman piv access change-management-key --generate --protect
+    ```
+
+    `--protect` stores the generated management key on the YubiKey behind the PIN, so later `ykman` administrative operations can authorize with a PIN prompt. `tvc` never reads or uses this key.
+  </Step>
+  <Step title="Generate the operator keys">
+    Generate both private keys on the device with the policies TVC requires:
+
+    ```sh
+    ykman piv keys generate \
+      --algorithm eccp256 \
+      --pin-policy always \
+      --touch-policy always \
+      9c - >/dev/null
+
+    ykman piv keys generate \
+      --algorithm eccp256 \
+      --pin-policy always \
+      --touch-policy always \
+      9d - >/dev/null
+    ```
+
+    The printed public keys can be discarded; the next step reads them back from device metadata. Algorithm, origin, and policies can't be corrected after the fact. If `tvc` later rejects a slot, regenerate it with the exact options above, but never regenerate a slot whose key is already in use as an operator.
+  </Step>
+  <Step title="Create and import the certificates">
+    QuorumOS expects each slot to carry a self-signed certificate with subject `CN=QuorumOS`. Create them with `tvc`, which prompts for the PIN and one touch per slot, then import them with `ykman`:
+
+    ```sh
+    tvc yubikey create-certs
+
+    ykman piv certificates import --verify 9c tvc-yubikey-<SERIAL>-signing.pem
+    ykman piv certificates import --verify 9d tvc-yubikey-<SERIAL>-key-agreement.pem
+    ```
+
+    `create-certs` writes the two PEM files to the current directory and doesn't modify the device. `--verify` proves each certificate matches the private key in its slot. The PEM files hold public certificates only, so they're safe to keep for auditing.
+  </Step>
+  <Step title="Register the YubiKey with tvc">
+    Cache the device's operator public keys in the local `tvc` configuration. This needs neither the PIN nor a touch:
+
+    ```sh
+    tvc keys refresh-yubikey --serial <SERIAL>
+    ```
+
+    The command prints the canonical hexadecimal serial that later `tvc` commands expect.
+  </Step>
+  <Step title="Add the operator to an organization">
+    With the target organization active, create an operator record that points at the registered serial. `--default` makes YubiKey the organization's default operator kind, so commands pick it without `--serial` when it's the only one:
+
+    ```sh
+    tvc operator create --kind yubikey --serial <SERIAL> --default
+    ```
+
+    This step is local: it uses the cached public keys and doesn't contact Turnkey or modify the device. As with a local key file, Turnkey learns the public keys when the operator is included in an operator set's `newOperators` at app creation. You can also pick **YubiKey** instead of **Local key file** when `tvc login` sets up a new organization.
+  </Step>
+</Steps>
+
+**Approve manifests.** Pass the serial to sign with the `9c` key. The CLI prompts for the PIN and waits for a touch:
+
+```bash
+tvc deploy approve \
+  --deploy-id <DEPLOYMENT_UUID> \
+  --operator-id <OPERATOR_UUID> \
+  --serial <SERIAL>
+```
+
+**Hold Quorum Key shares.** YubiKey operators follow the same local share lifecycle as a [local key file](#local-key-file). The `9d` key decrypts the share during re-encryption:
+
+```bash
+tvc keys re-encrypt-local-share \
+  --quorum-key-metadata <quorum-key-metadata.json> \
+  --provision-bundle <provision-bundle.json> \
+  --serial <SERIAL>
+```
+
+**Retire a YubiKey locally.** After removing the operator from every local organization profile that references it, forget the device with `tvc yubikey unregister --serial <SERIAL>`. This only edits the local configuration. The keys stay on the device, and the operator remains valid for any organization that still trusts its public keys. Remove it from a Turnkey operator set by creating a new set.
+
+<Tip>
+Common errors: "no YubiKey is connected" means the reader can't see the device, so reinsert it and check `ykman info`. "Metadata is unavailable" means the firmware is older than 5.3. A rejected PIN should be fixed with the PUK before the retry counter runs out. A signing timeout means the device blinked and wasn't touched in time.
+</Tip>
 
 ## See also
 
