@@ -35,7 +35,15 @@ A fixed rate is available for a subset of the [supported stablecoins](/features/
 
 The swap provider decides which stablecoins it offers a fixed rate for, so this table can change. Other supported stablecoins still get the stablepair fee tier, but a quote with `fixedRate: true` fails for them.
 
-Fixed rate pauses for a pair while either stablecoin's price is outside the allowed band. If you need a fixed rate for a stablecoin that isn't in this table, or an eligible pair keeps failing, contact Turnkey.
+If you need a fixed rate for a stablecoin that isn't in this table, or an eligible pair keeps failing, contact Turnkey.
+
+## Eligibility band
+
+Turnkey also protects fixed-rate swaps against a depeg. A stablecoin is eligible for a fixed rate only while its USD price is inside the eligibility band, currently $0.95 to $1.05. If either stablecoin in a pair is priced outside the band, fixed rate pauses for that pair, and the swap fails with `SWAP_FIXED_RATE_PRICE_OUT_OF_BAND`. Fixed rate resumes when the price is back inside the band.
+
+The band applies to every organization and every eligible stablecoin. It limits what your organization can be billed during a depeg, and it stops users from receiving a depegged stablecoin at 1:1.
+
+Turnkey checks the band when you request a quote, when you execute it, and each time a market swap fetches its quote. If Turnkey can't get a price for a stablecoin, the swap fails with `SWAP_FIXED_RATE_UNAVAILABLE`.
 
 ## Set the spend limit
 
@@ -83,7 +91,7 @@ Turnkey checks a fixed-rate swap when you request the quote, and again when you 
 | :-- | :-- |
 | `SWAP_FEATURE_NOT_ENABLED` | Fixed rate isn't enabled for the parent organization, or its spend limit is turned off. |
 | `SWAP_FIXED_RATE_PAIR_NOT_ELIGIBLE` | A token in the pair isn't a [supported stablecoin](/features/transaction-management/swap#supported-stablecoins). |
-| `SWAP_FIXED_RATE_PRICE_OUT_OF_BAND` | A stablecoin in the pair is priced outside the allowed band, so fixed rate is paused for the pair. Request the quote without `fixedRate`. |
+| `SWAP_FIXED_RATE_PRICE_OUT_OF_BAND` | A stablecoin in the pair is priced outside the [eligibility band](#eligibility-band), so fixed rate is paused for the pair. Request the quote without `fixedRate`. |
 | `SWAP_FIXED_RATE_UNAVAILABLE` | The provider doesn't offer a fixed rate for this pair, for example because a token isn't in [Eligible stablecoins](#eligible-stablecoins), or Turnkey can't check the stablecoin prices right now. Request the quote without `fixedRate`. |
 | `SWAP_SPENDING_LIMIT_EXCEEDED` | The swap's estimated cost would exceed the organization-wide or sub-organization limit for the current window. [Check usage](#check-usage) or raise the limit. |
 | `SWAP_SPONSORSHIP_BALANCE_INSUFFICIENT` | Turnkey's sponsorship balance with the provider can't cover this swap right now. Try again later, or request the quote without `fixedRate`. |
