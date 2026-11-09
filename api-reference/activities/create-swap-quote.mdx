@@ -57,7 +57,7 @@ Unique identifier for a given Organization.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="feeSponsorship" type="boolean" required={false} default="">
-    When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
+    When true, Turnkey pays the execution costs for this swap and invoices them to the billing parent organization as Swap Execution. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
     </NestedParam>
     
     <NestedParam parentKey="parameters" childKey="fixedRate" type="boolean" required={false} default="">
@@ -114,7 +114,7 @@ Provider-neutral maximum allowed slippage in basis points. Turnkey converts this
 Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.
 </NestedParam>
 <NestedParam parentKey="activity.intent.createSwapQuoteIntentV3" childKey="feeSponsorship" type="boolean" required={false}>
-When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
+When true, Turnkey pays the execution costs for this swap and invoices them to the billing parent organization as Swap Execution. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.
 </NestedParam>
 <NestedParam parentKey="activity.intent.createSwapQuoteIntentV3" childKey="fixedRate" type="boolean" required={false}>
 When true, requests a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
@@ -159,14 +159,29 @@ Client fee in basis points applied for this pair. Informational only; already re
 Provider-estimated completion time in seconds, when available.
 </NestedParam>
 <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="feeSponsorship" type="boolean" required={true}>
-Whether Turnkey pays the provider fees for this quote.
+Whether Turnkey pays the execution costs for this quote.
 </NestedParam>
 <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="fixedRate" type="boolean" required={true}>
 Whether this quote uses a 1:1 fixed rate.
 </NestedParam>
 <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="estimatedFixedRateAdjustmentUsd" type="string" required={false}>
-Estimated USD adjustment for the fixed rate. Present only for fixed-rate quotes. Positive is a cost billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. Informational; the final amount is settled after execution.
+Deprecated: use estimated_charges.fixed_rate_adjustment_usd. Estimated USD adjustment for the fixed rate. Present only for fixed-rate quotes. Positive is a cost billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. Informational; the final amount is settled after execution.
 </NestedParam>
+<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes" childKey="estimatedCharges" type="object" required={false}>
+      estimatedCharges field
+      <Expandable title="estimatedCharges details">
+        <NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes.estimatedCharges" childKey="executionUsd" type="string" required={false}>
+Swap Execution: the provider's execution costs Turnkey pays, including DEX fees and price impact, the provider's fixed cost, destination gas, and provider fees. Present when fee_sponsorship is true.
+</NestedParam>
+<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes.estimatedCharges" childKey="turnkeyFeeUsd" type="string" required={false}>
+Swap Turnkey Fee: Turnkey's fee for a fee-sponsored swap. Present when fee_sponsorship is true.
+</NestedParam>
+<NestedParam parentKey="activity.result.createSwapQuoteResultV2.quotes.estimatedCharges" childKey="fixedRateAdjustmentUsd" type="string" required={false}>
+Swap Fixed Rate: the difference between the 1:1 rate and the market rate. Positive is a cost billed to you; negative is an earning credited against your transaction management charges at the end of the billing period. Present when fixed_rate is true.
+</NestedParam>
+
+      </Expandable>
+    </NestedParam>
 
       </Expandable>
     </NestedParam>
@@ -240,7 +255,7 @@ const response = await turnkeyClient.apiClient().createSwapQuote({
   inputAmount: "<string> (Base-unit amount of the input asset.)",
   slippageBps: "<string> (Provider-neutral maximum allowed slippage in basis points. Turnkey converts this value to each provider's request format. When omitted, each provider applies its default slippage behavior.)",
   destinationAddress: "<string> (Raw public address that receives the output asset. Required for cross-protocol swaps. The address must match the output token protocol. Wallet account IDs, private key IDs, and CAIP account or asset identifiers are not supported.)",
-  feeSponsorship: true // When true, Turnkey pays the provider fees for this swap and invoices them to the billing parent organization. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.,
+  feeSponsorship: true // When true, Turnkey pays the execution costs for this swap and invoices them to the billing parent organization as Swap Execution. Requires the FEATURE_NAME_SWAP_FEE_SPONSORSHIP organization feature. Defaults to false.,
   fixedRate: true // When true, requests a 1:1 conversion before fees between supported stablecoins. Requires the FEATURE_NAME_SWAP_FIXED_RATE organization feature. Defaults to false.
 });
 ```
@@ -289,7 +304,12 @@ const response = await turnkeyClient.apiClient().createSwapQuote({
                 "estimatedTimeSeconds": "<string>",
                 "feeSponsorship": "<boolean>",
                 "fixedRate": "<boolean>",
-                "estimatedFixedRateAdjustmentUsd": "<string>"
+                "estimatedFixedRateAdjustmentUsd": "<string>",
+                "estimatedCharges": {
+                  "executionUsd": "<string>",
+                  "turnkeyFeeUsd": "<string>",
+                  "fixedRateAdjustmentUsd": "<string>"
+                }
               }
             ]
           }
