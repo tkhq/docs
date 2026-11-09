@@ -32,9 +32,9 @@ flowchart LR
 | | Trading firm | Consumer trading platform |
 | :--- | :--- | :--- |
 | Who holds the venue key | The firm's own organization | Each customer's [sub-organization](/features/sub-organizations) |
-| Who mints | A service user for routine requests | The customer, as the root user of their sub-organization |
-| Who approves | Your administrator quorum, for high-risk requests such as withdrawals | The customer, with their passkey |
-| What the platform can't do | Withdraw without the administrators | Trade or withdraw without the customer |
+| Who mints | A service user | Your strategy user for orders, if the customer allows it. The customer for withdrawals |
+| Who sets the rules | Your administrator quorum | The customer, in their own sub-organization |
+| What the platform can't do | Withdraw without the administrators | Act outside the policies the customer sets |
 
 ### Trading firm: administrator quorum
 
@@ -57,14 +57,28 @@ The `jwt.profile.httpz` policy fields are coming soon. See [Mint JWT](/features/
 
 ### Consumer trading platform: the customer approves
 
-Your platform runs trading strategies for customers on their own exchange accounts. The non-custodial setup works like this:
+Your platform runs trading strategies for customers on their own exchange accounts. Auth to your app is non-custodial: each customer owns the policies that decide who can mint tokens for their account, and your platform can't change them.
 
 1. Each customer gets a sub-organization and is its root user. They import their exchange API key there, so it never passes through your systems.
 2. Your TVC app has a [delegated access](/features/policies/delegated-access/overview) user in the sub-organization. Policy lets only that user export the key, encrypted to the app's enclave.
-3. To trade or withdraw, the customer mints a JWT for that request with their passkey.
-4. The app checks that the token's `org` is the customer's sub-organization and that `sub` is the customer, then signs the exchange request.
+3. The customer writes a policy that lets your strategy user mint order tokens for their account:
 
-Your platform runs the app, but it can't act on a customer's key without a token from that customer. Customers can [verify the app's code](/features/verifiable-cloud/proofs-and-verification) before they import their key.
+   ```json
+   {
+     "policyName": "My strategy can place orders for me",
+     "effect": "EFFECT_ALLOW",
+     "consensus": "approvers.any(u, u.id == '<STRATEGY_USER_ID>')",
+     "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
+       jwt.profile.httpz.audience == 'https://app.example.com' &&
+       jwt.profile.httpz.method == 'POST' &&
+       jwt.profile.httpz.path == '/orders'"
+   }
+   ```
+
+4. No policy allows withdrawal tokens, so only the customer can mint one, with their passkey.
+5. The app checks that the token's `org` is the customer's sub-organization, and that `sub` may call that route: the strategy user for orders, the customer for withdrawals.
+
+The customer can delete the policy at any time to stop automated trading. Give your delegated users no permission to create or edit policies, so your platform can only act within the rules each customer sets. Customers can also [verify the app's code](/features/verifiable-cloud/proofs-and-verification) before they import their key.
 
 ## What the app checks
 
