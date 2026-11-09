@@ -4,9 +4,9 @@ description: "How to set up your Turnkey organization and the systems around it 
 sidebarTitle: "Securing your integration"
 ---
 
-Turnkey keeps private keys inside [secure enclaves](/security/secure-enclaves) and checks every request against your root quorum, policies, and MFA requirements before anything is signed. What an attacker can do with your organization therefore comes down to one question: **who can get Turnkey to sign, and what has to be true before it does?** Answering that is your side of the [shared responsibility model](/security/shared-responsibility-model).
+Turnkey keeps private keys inside [secure enclaves](/security/secure-enclaves) and checks every request against your root quorum, policies, and MFA requirements before anything is signed. What an attacker can do with your organization therefore comes down to one question: **what signing does your organization's configuration allow, and what has to be true before it happens?** Answering that is your side of the [shared responsibility model](/security/shared-responsibility-model).
 
-Most recent large thefts did not break any cryptography. They came from how keys were protected and how transactions were approved: a backend that could both request and approve its own transfers, signers persuaded to approve something they could not read, a single credential with full control. Some drained several wallets across several chains within minutes, faster than any alert could be acted on, which is why the controls that matter most are the ones enforced before a signature exists. This page covers each of those failures: what Turnkey enforces, and what you can configure.
+Many large thefts have not required breaking any cryptography. They came from how keys were protected and how transactions were approved: a backend that could both request and approve its own transfers, signers persuaded to approve something they could not read, a single credential with full control. Some drained several wallets across several chains within minutes, faster than any alert could be acted on, which is why the controls that matter most are the ones enforced before a signature exists. This page covers each of those failures: what Turnkey enforces, and what you can configure.
 
 <Note>
   The [production checklist](/get-started/production-checklist) is the short list to work through before launch. This page explains the reasoning behind the security items on it, and goes further for organizations that move significant value.
@@ -28,7 +28,7 @@ A few things about how they fit together:
 
 - **Policies deny by default.** A non-root user can do nothing that a policy does not allow, apart from a few built-in permissions such as reading data and managing their own credentials. If one policy allows an activity and another explicitly denies it, the deny wins.
 - **One policy can both allow and require approvals.** Its `condition` says what is allowed, and its `consensus` says who has to approve it. There is no separate kind of approval policy.
-- **The root quorum sits above policies, but a single root user does not.** Once enough root users approve, Turnkey does not evaluate policies at all. A root user acting alone normally waits for the rest of the quorum. The exception is a matching allow policy: one with no `consensus` requirement lets that root user perform the activity alone, without the other root users. See [Using root users with policies](/features/users/root-quorum#using-root-users-with-policies).
+- **The root quorum sits above policies, but with a threshold above one, a single root user does not.** Once enough root users approve, Turnkey does not evaluate policies at all. With a threshold of one, a single root user is the whole quorum. With a higher threshold, a root user acting alone normally waits for the rest of the quorum. The exception is a matching allow policy: one with no `consensus` requirement lets that root user perform the activity alone, without the other root users. See [Using root users with policies](/features/users/root-quorum#using-root-users-with-policies).
 - **MFA applies to every approver.** When a policy asks for two approvers, each of them is still held to their own MFA policies.
 
 Put together, Turnkey decides each request in this order:
@@ -99,6 +99,8 @@ This section applies if your end users have sub-organizations of their own. Each
 For example, this policy asks for a passkey on top of the user's session for signing, exports, and credential or MFA changes:
 
 ```ts
+// Illustrative example only. For maintained examples, see
+// https://docs.turnkey.com/features/authentication/mfa/examples
 mfaPolicy: {
   userId: "<END_USER_ID>",
   mfaPolicyName: "Passkey for signing, exports, and credential changes",
@@ -160,6 +162,8 @@ So put the limits that matter in Turnkey policies, where they are enforced befor
 For example, use two policies with non-overlapping conditions: one lets the service sign small transfers alone, and one requires two human approvers for anything larger.
 
 ```json
+// Illustrative example only. For maintained examples, see
+// https://docs.turnkey.com/features/policies/examples/ethereum
 {
   "policyName": "Service can sign transfers up to 1 ETH to approved destinations",
   "effect": "EFFECT_ALLOW",
@@ -169,6 +173,8 @@ For example, use two policies with non-overlapping conditions: one lets the serv
 ```
 
 ```json
+// Illustrative example only. For maintained examples, see
+// https://docs.turnkey.com/features/policies/examples/ethereum
 {
   "policyName": "Transfers above 1 ETH need two approvers",
   "effect": "EFFECT_ALLOW",
@@ -184,7 +190,7 @@ The service submits the transfer either way. Above the threshold, the activity w
 </Warning>
 
 <Note>
-  These policies only limit native ETH. An ERC-20 transfer is sent to the token contract, so it is allowed only if you add that contract to the list, and then its recipient and amount, which are in the calldata, are not checked. Treat example policies as a starting point, not something to paste into production, and test them against the transactions you actually send. See [Policies for wallets that move money](#policies-for-wallets-that-move-money).
+  These policies only limit native ETH. An ERC-20 transfer is sent to the token contract, so it is allowed only if you add that contract to the list, and then its recipient and amount, which are in the calldata, are not checked. Treat example policies as a starting point, not something to paste into production, and test them against the transactions you actually send. See [Policies for wallets that move money](#policies-for-wallets-that-move-money) and the [Ethereum policy examples](/features/policies/examples/ethereum).
 </Note>
 
 Where human approval is not practical, you can split the service's own approval across two systems instead. A service user can hold two API keys, and an [MFA policy](/features/authentication/mfa/overview) on that user can require both by their IDs, so that each key has to [approve the activity](/features/authentication/mfa/satisfying-mfa#api-key). This helps only if the two keys live in separate systems. If both sit on the same backend, compromising it gets both. For an independent approver that runs your own checks, see [Add your own checks with Turnkey Verifiable Cloud](#add-your-own-checks-with-turnkey-verifiable-cloud).
@@ -210,7 +216,7 @@ Write them with the following limits in mind.
 - **Not every chain is parsed.** The policy engine parses Ethereum and other EVM chains, Solana, Tron, Bitcoin, and Tempo transactions. On other chains, signing is a raw payload, and conditions on destination or amount cannot apply. For hot wallets on those chains, consider requiring human approval for every signature, keeping balances low, or adding your own parsing with a [TVC policy sidecar](#add-your-own-checks-with-turnkey-verifiable-cloud).
 - **ERC-4337 user operations are signed as raw hashes.** Policies cannot see their sender, target, or calldata. If you need sponsored or batched transactions with policy coverage, see [Send transactions through Turnkey](#send-transactions-through-turnkey). If you use ERC-4337, the controls on those wallets have to come from somewhere other than transaction conditions.
 - **Exported keys are outside Turnkey's control.** Once a wallet or private key is exported, nothing signed with it elsewhere is checked against your policies. Treat permission to export like root permission, and use policies to [restrict which accounts can be exported](/features/policies/examples/access-control#allow-exporting-only-a-specific-wallet-account-address).
-- **Client-side signing is an export.** With [client-side signing](/sdks/advanced/client-side-signing), a key is exported into an iframe in the user's browser so it can sign locally. The iframe keeps the key out of your page's JavaScript, but any script running in your page, whether an XSS bug, a malicious extension, or a drainer bookmarklet, can still ask it to sign, and nothing it signs is checked by policies or MFA. The bigger risk is the session that loads the keys: whoever can use it can export the keys themselves, and unlike a session, an exported key cannot be revoked. If you use it:
+- **Client-side signing is an export.** With [client-side signing](/sdks/advanced/client-side-signing), a key is exported to the user's browser so it can sign locally. Following our recommended setup, it is exported into an iframe using the [iframe stamper](/sdks/advanced/iframe-stamper), which keeps the key out of your page's JavaScript. Handling an exported key any other way, such as decrypting it in your own page, removes that protection. Even in the iframe, any script running in your page, whether an XSS bug, a malicious extension, or a drainer bookmarklet, can still ask it to sign, and nothing it signs is checked by policies or MFA. The bigger risk is the session that loads the keys: whoever can use it can export the keys themselves, and unlike a session, an exported key cannot be revoked. If you use it:
   - Issue sessions from a [session profile](/features/authentication/sessions/session-profiles) that cannot export or add credentials, so loading keys into the iframe requires a passkey.
   - Export only a dedicated wallet holding what you would accept losing, keep the rest in wallets that are never exported, and limit what the session can sign from them.
   - Load only the keys you need, [clear them](/sdks/advanced/client-side-signing#clearing-keys) when you are done, and lock your page down with a strict Content Security Policy.
@@ -258,3 +264,4 @@ Prevention reduces what an attacker can do. Detection decides how long they have
 - **Review access regularly.** Remove users, keys, and policies that are no longer used, and check that every root quorum member can still sign in.
 - **Decide your response in advance.** Know who can delete a compromised user or key, and confirm they can do it quickly. If only the root quorum can, under a threshold of two that means reaching two people. Deleting a service's API keys is usually the fastest way to stop it. Adding a deny policy can be slower if policy changes need several approvals, and it does not bind the root quorum.
 - **Plan for what keeps working after you stop.** Shutting down your own systems does not undo what was already signed. A transaction that was signed and broadcast stays valid until it is mined or replaced with another transaction using the same nonce. An EIP-7702 delegation stays active until the account is undelegated, which Turnkey supports as a single [undelegate activity](/api-reference/activities/undelegate-an-evm-account). Make sure the people in your incident plan are allowed to run it, and try it once before you need it.
+- **Rehearse your response.** Run tabletop exercises that walk through an incident end to end, such as a leaked API key or a phished approver. They show where your plan and reality differ, such as a missing permission or an approver who cannot be reached, before you find out during a real incident.
