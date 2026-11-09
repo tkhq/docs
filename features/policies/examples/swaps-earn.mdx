@@ -11,10 +11,12 @@ list and [Transaction Management](/features/transaction-management) for product 
 Use [`activity.kind`](/features/policies/language#choosing-between-type-kind-and-resource--action)
 when you want policies to survive activity version upgrades. Pin `activity.type` when you rely on
 fields that exist only on a specific version (for example `destination_address` on
-`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`, `ACTIVITY_TYPE_EXECUTE_SWAP_V3`, and
-`ACTIVITY_TYPE_EXECUTE_SWAP_V4`). A policy that pins `activity.type` does not match a newer
-version: a condition on `ACTIVITY_TYPE_EXECUTE_SWAP_V3` does not apply to
-`ACTIVITY_TYPE_EXECUTE_SWAP_V4`.
+`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`, `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`,
+`ACTIVITY_TYPE_EXECUTE_SWAP_V3`, and `ACTIVITY_TYPE_EXECUTE_SWAP_V4`). A policy that pins
+`activity.type` does not match a newer version: a condition on `ACTIVITY_TYPE_EXECUTE_SWAP_V3` does
+not apply to `ACTIVITY_TYPE_EXECUTE_SWAP_V4`, and a condition on
+`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2` does not apply to `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`, which
+the SDKs send by default.
 
 ## Swap quotes
 
@@ -44,7 +46,7 @@ When `slippage_bps` is omitted on the intent, accessing `activity.params.slippag
 }
 ```
 
-#### Require organization-controlled destinations on cross-chain quotes (V2)
+#### Require organization-controlled destinations on cross-chain quotes
 
 ```json
 {
@@ -52,7 +54,7 @@ When `slippage_bps` is omitted on the intent, accessing `activity.params.slippag
   "notes": "",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<USER_ID>')",
-  "condition": "activity.type == 'ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2' && activity.params.destination_address in ['0x<LOWERCASE_TREASURY_ADDRESS>']"
+  "condition": "activity.type in ['ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2', 'ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3'] && activity.params.destination_address in ['0x<LOWERCASE_TREASURY_ADDRESS>']"
 }
 ```
 
@@ -150,6 +152,26 @@ An omitted `minOutputAmount` reads as 0.
   "notes": "",
   "effect": "EFFECT_DENY",
   "condition": "activity.type == 'ACTIVITY_TYPE_EXECUTE_SWAP_V4' && activity.params.mode == 'MARKET' && activity.params.min_output_amount == 0"
+}
+```
+
+## Swap fee sponsorship and fixed rate
+
+[Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) and
+[fixed rate](/features/transaction-management/swap/fixed-rate) bill your parent organization and
+count against its spend limits. `fee_sponsorship` and `fixed_rate` exist on
+`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3` and `ACTIVITY_TYPE_EXECUTE_SWAP_V4` only, so pin those types.
+On `ACTIVITY_TYPE_EXECUTE_SWAP_V4`, both fields come from the verified quote, so they apply to bound
+and market swaps.
+
+#### Deny fee-sponsored and fixed-rate swaps
+
+```json
+{
+  "policyName": "Deny fee-sponsored and fixed-rate swaps",
+  "notes": "",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type in ['ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3', 'ACTIVITY_TYPE_EXECUTE_SWAP_V4'] && (activity.params.fee_sponsorship == true || activity.params.fixed_rate == true)"
 }
 ```
 

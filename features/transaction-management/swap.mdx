@@ -27,7 +27,7 @@ Every swap is a signed intent and a poll, and in bound mode a quote comes first.
 ## How it works
 
 1. **Optionally set your fee.** Submit [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/features/transaction-management/swap/enable-swap) on the parent organization to charge a client fee. `feeBps` sets your rate; `feeReceiverWalletAddress` must be an EVM wallet account in your parent organization. Private key addresses are not accepted. If `feeBps` is a non-empty string and no receiver is provided, Turnkey auto-generates a parent HD wallet. `"0"` is non-empty and still generates a wallet. To charge no client fee, omit both fields. Enterprise organizations can also set a separate stablepair fee (`stableFeeBps`), applied when both assets in a trade are stablecoins.
-2. **Request a quote.** Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote) with the signing address, asset pair, input amount, and optional slippage tolerance. For EVM ↔ SVM, also set `destinationAddress` to a raw address on the output protocol. Each quote returns the output amount net of all fees, a minimum output amount, an expiry, and a quoteId. Quotes reflect your active fee configuration, or a client fee of 0 if you have none.
+2. **Request a quote.** Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/features/transaction-management/swap/get-swap-quote) with the signing address, asset pair, input amount, and optional slippage tolerance. For EVM ↔ SVM, also set `destinationAddress` to a raw address on the output protocol. Each quote returns the output amount net of all fees, a minimum output amount, an expiry, and a quoteId. Quotes reflect your active fee configuration, or a client fee of 0 if you have none.
 3. **Execute the swap.** Submit [`ACTIVITY_TYPE_EXECUTE_SWAP_V4`](/features/transaction-management/swap/execute-swap) from the organization that owns the swapping wallet — parent or sub-organization — referencing the `quoteId` in `boundQuote` and restating the trade parameters, including `destinationAddress` when the quote set one. Turnkey constructs the transaction from the bound quote, handles ERC-20 approvals, and broadcasts it. For cross-chain routes, this broadcasts the origin-chain transaction, with the cross-chain swap provider broadcasting the destination-chain transaction.
 4. **Poll swap status until settlement.** Query [`get_swap_status`](/api-reference/queries/get-swap-status) with the returned `swapRequestId` until a terminal state. Same-chain swaps are `COMPLETED` or `FAILED` from the origin transaction. Cross-chain swaps stay `PENDING` until the destination leg settles or the provider reports a fill failure. Refund fields on a cross-chain `FAILED` can arrive after the status flip. See [Track swap status](/features/transaction-management/swap/track-swap-status).
 
@@ -68,6 +68,8 @@ Two fees apply to a swap: Turnkey's fee and, optionally, your own. Both are dedu
 
 Turnkey's fee and your fee are settled as separate claim payouts — they do not appear in the user's swap transaction itself. With Relay, these are two distinct payouts, one for each party. Regardless of how a provider settles them onchain, the quoted amounts you receive from Turnkey are always net of both.
 
+With [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship), Turnkey's fee is billed to your organization instead of deducted from the output. Your fee is still deducted.
+
 #### Turnkey's fee
 
 | Plan | Standard swaps | Stablepair swaps |
@@ -79,7 +81,7 @@ A stablepair swap is one where both assets carry the `stable` flag in [`list_sup
 
 #### Supported stablecoins
 
-Both assets must appear in the list for their network for a swap to qualify for the stablepair fee tier. Turnkey uses the canonical asset identifiers returned by [`list_supported_assets`](/api-reference/queries/list-supported-assets), not token symbols alone.
+Both assets must appear in the list for their network for a swap to qualify for the stablepair fee tier or a [fixed rate](/features/transaction-management/swap/fixed-rate). Turnkey uses the canonical asset identifiers returned by [`list_supported_assets`](/api-reference/queries/list-supported-assets), not token symbols alone.
 
 **Mainnets**
 
@@ -98,7 +100,7 @@ Both assets must appear in the list for their network for a swap to qualify for 
 | Solana | OUSD, PYUSD, USD1, USDC, USDG, USDS, USDT |
 
 <Note>
-  This list describes fee classification only. A listed asset does not guarantee that a provider offers a route or sufficient liquidity.
+  This list describes fee classification and fixed-rate eligibility only. A listed asset does not guarantee that a provider offers a route or sufficient liquidity.
 </Note>
 
 <Info>
@@ -124,10 +126,10 @@ Fees are configured on the parent organization and apply to every swap submitted
 
 ## Swap fee sponsorship and fixed rate
 
-Two optional features change a quote's economics. Both are available on Enterprise plans, and both are capped by a spend limit that your parent organization sets. A quote requests either one with [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote), which is `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2` plus the `feeSponsorship` and `fixedRate` flags.
+Two optional features change a quote's economics. Both are available on Enterprise plans, and both are capped by a spend limit that your parent organization sets. A quote requests them with the `feeSponsorship` and `fixedRate` flags on [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote). A market swap sets the same flags on its execute intent.
 
 - [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship): your organization pays the swap provider's fees, so the wallet keeps more of the output.
-- [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate): a swap between two supported stablecoins delivers the quoted output at a fixed rate instead of the market rate at settlement.
+- [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate): a swap between two [supported stablecoins](#supported-stablecoins) converts 1:1 before fees, instead of at the market rate at settlement.
 
 ## API surface
 
@@ -137,10 +139,10 @@ Swaps add four activities:
 | :-- | :-- | :-- |
 | [`ACTIVITY_TYPE_UPSERT_SWAP_CONFIG`](/api-reference/activities/upsert-swap-config) | `POST /public/v1/submit/upsert_swap_config` | Set your parent-organization fee configuration |
 | [`ACTIVITY_TYPE_CLAIM_SWAP_FEES`](/api-reference/activities/claim-swap-fees) | `POST /public/v1/submit/claim_swap_fees` | Claim accrued integrator fees to your fee-receiver wallet |
-| [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-reference/activities/create-swap-quote) | `POST /public/v1/submit/create_swap_quote` | Request an executable quote for a token pair |
+| [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) | `POST /public/v1/submit/create_swap_quote` | Request an executable quote for a token pair |
 | [`ACTIVITY_TYPE_EXECUTE_SWAP_V4`](/api-reference/activities/execute-swap) | `POST /public/v1/submit/execute_swap` | Execute a quoted swap with `boundQuote`, or a market swap with `market` |
 
-Swap fee sponsorship and fixed rate add two more activities, and `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`:
+Swap fee sponsorship and fixed rate add two more activities:
 
 | Activity | Endpoint | Purpose |
 | :-- | :-- | :-- |

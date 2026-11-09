@@ -4,7 +4,7 @@ description: "Pay the swap provider's fees on behalf of your users, up to a spen
 mode: "wide"
 ---
 
-With swap fee sponsorship, your organization pays the swap provider's fees (execution, swap, and platform fees), so the wallet keeps more of the output. Your own client fee is not sponsored. Sponsored fees are billed to your organization.
+With swap fee sponsorship, Turnkey pays the swap provider's execution costs and bills them to your parent organization, so the wallet keeps more of the output. Execution costs include DEX fees and price impact, the provider's fixed cost, destination gas, and provider fees. Turnkey's own fee is also billed to you instead of taken from the output. Your client fee is not sponsored.
 
 Swap fee sponsorship is separate from [gas sponsorship](/features/transaction-management/sending-sponsored-transactions). Swap fee sponsorship covers the provider's fees and is set on the quote. Gas sponsorship covers the origin-chain transaction's gas and is set with `sponsor: true` on execute.
 
@@ -24,11 +24,11 @@ Turning swap fee sponsorship on or off changes your organization's signed config
 
 ## Request a sponsored quote
 
-Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) with `feeSponsorship: true`. Everything else is the same as a [regular quote](/features/transaction-management/swap/get-swap-quote).
+Submit [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) with `feeSponsorship: true`. Everything else is the same as a [regular quote](/features/transaction-management/swap/get-swap-quote). The input token must have a USD price, because Turnkey's fee is billed from the input's USD value.
 
-With the Go SDK, use `Client.CreateSwapQuoteV3`. The TypeScript SDK's `createSwapQuote` sends V2; until it adds V3, submit the activity with `client.request`, as in [Enable Swaps](/features/transaction-management/swap/enable-swap#submit-the-configuration).
+With the TypeScript SDK, `createSwapQuote` sends V3 as of v2026.11.1. With the Go SDK, use `Client.CreateSwapQuoteV3`.
 
-A sponsored quote comes back with `feeSponsorship: true`, and its `outputAmount` and `minOutputAmount` are no longer reduced by the provider's fees. Your client fee, if configured, still applies.
+A sponsored quote comes back with `feeSponsorship: true`. Its `outputAmount` and `minOutputAmount` are not reduced by the provider's fees or by Turnkey's fee. Your client fee, if configured, still applies. `estimatedCharges` has the estimated costs. See [Charges](#charges).
 
 To also swap stablecoins at a fixed rate, set `fixedRate` too. See [Fixed-Rate Swaps](/features/transaction-management/swap/fixed-rate).
 
@@ -38,20 +38,35 @@ To also swap stablecoins at a fixed rate, set `fixedRate` too. See [Fixed-Rate S
 
 A [market swap](/features/transaction-management/swap/market-swap) has no quote to bind it, so set `market.feeSponsorship: true` on the execute intent instead. Use `feeSponsorship: true` on `get_indicative_swap_quote` to preview the sponsored price.
 
+## Charges
+
+A fee-sponsored swap adds two lines to your invoice. Responses report them in a `SwapCharges` object:
+
+| Field | Invoice line | What it covers |
+| :-- | :-- | :-- |
+| `executionUsd` | Swap Execution | The provider's execution costs that Turnkey paid. |
+| `turnkeyFeeUsd` | Swap Turnkey Fee | Turnkey's fee, at your plan's rate on the input's USD value. |
+
+- The quote and `get_indicative_swap_quote` return estimates in `estimatedCharges`.
+- `ACTIVITY_TYPE_EXECUTE_SWAP_V4` returns `estimatedCharges` for the quote it executed.
+- [`get_swap_status`](/features/transaction-management/swap/track-swap-status) returns the final amounts in `charges` once they are settled. A swap that fails or is refunded settles at zero.
+
 ## Check usage
 
 [`get_swap_sponsorship_usage`](/api-reference/queries/get-swap-sponsorship-usage) returns whether swap fee sponsorship is permitted for your organization, its spend limit, and what is left in the current window. A swap counts against the limit once its final cost is recorded, shortly after it completes. Pending swaps are not reserved, so what is left does not account for swaps still in progress.
 
 ## Errors
 
-A quote that requests swap fee sponsorship fails, rather than falling back to an unsponsored quote, when:
+Turnkey checks a fee-sponsored swap when you request the quote, and again when you execute it, because limits and balances can change in between. A market swap is checked each time its quote is fetched. A swap that fails a check fails. It does not fall back to an unsponsored swap.
 
 | Error code | Meaning |
 | :-- | :-- |
-| `SWAP_FEATURE_NOT_ENABLED` | Swap fee sponsorship isn't enabled for the parent organization. |
-| `SWAP_FEE_SPONSORSHIP_UNAVAILABLE` | The provider can't sponsor fees for this swap right now. |
+| `SWAP_FEATURE_NOT_ENABLED` | Swap fee sponsorship isn't enabled for the parent organization, or its spend limit is turned off. |
+| `SWAP_SPENDING_LIMIT_EXCEEDED` | The swap's estimated cost would exceed the organization-wide or sub-organization limit for the current window. [Check usage](#check-usage) or raise the limit. |
+| `SWAP_FEE_SPONSORSHIP_UNAVAILABLE` | The provider can't sponsor fees for this swap right now. Request the quote without `feeSponsorship`. |
+| `SWAP_SPONSORSHIP_BALANCE_INSUFFICIENT` | Turnkey's sponsorship balance with the provider can't cover this swap right now. Try again later, or request the quote without `feeSponsorship`. |
 
-A quote is also rejected when the spend limit is turned off, or when the swap's estimated cost would exceed what is left in the window. [Check usage](#check-usage) or raise the limit.
+A quote also fails, with no swap error code, when the provider can't give the input token a USD price.
 
 ## Next steps
 

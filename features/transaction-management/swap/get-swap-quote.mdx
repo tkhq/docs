@@ -16,7 +16,7 @@ mode: "wide"
 
 ## Call create\_swap\_quote
 
-Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-reference/activities/create-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
+Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
 
 <ParamField body="organizationId" type="string" required>
   The organization that owns the swapping wallet. Parent organizations and sub-organizations can both swap; the parent's swap configuration applies in either case.
@@ -46,6 +46,14 @@ Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-re
   Required for EVM ↔ SVM. Raw public address that receives the output asset. It must match the output token protocol (a Solana address for a Solana output; an EVM address for an EVM output). Omit it for same-protocol routes. Wallet account IDs, private key IDs, and CAIP identifiers are not accepted.
 </ParamField>
 
+<ParamField body="parameters.feeSponsorship / parameters.fixedRate" type="boolean">
+  Optional, `false` by default. Request [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) or a [fixed rate](/features/transaction-management/swap/fixed-rate). Both are available on Enterprise plans.
+</ParamField>
+
+<Note>
+  `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2` is still accepted. It takes the same parameters without `feeSponsorship` and `fixedRate`, and returns the same quotes. The TypeScript SDK's `createSwapQuote` sends V3 as of v2026.11.1. A policy that pins `activity.type` to V2 does not match V3; see the [policy examples](/features/policies/examples/swaps-earn).
+</Note>
+
 cURL:
 
 ```bash title="cURL"
@@ -55,7 +63,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
@@ -83,7 +91,7 @@ const client = new TurnkeyClient(
 );
 
 const { activity } = await client.request("/public/v1/submit/create_swap_quote", {
-  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
   timestampMs: String(Date.now()),
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
@@ -106,7 +114,7 @@ Response:
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
     "result": {
       "createSwapQuoteResult": {
         "quotes": [
@@ -162,6 +170,8 @@ The result contains a quotes array. Each quote is executable as-is:
 - `clientFeeBps` — your organization's configured fee, for display or audit. Turnkey's fee is baked into the quoted amounts and is not itemized. See [Fees](/features/transaction-management/swap#fees).
 - `estimatedTimeSeconds` — optional. Provider-estimated time to settlement, when available.
 - `expiresAt` — millisecond epoch after which the quote can no longer be executed.
+- `feeSponsorship`, `fixedRate` — whether the quote uses [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) or a [fixed rate](/features/transaction-management/swap/fixed-rate).
+- `estimatedCharges` — present when `feeSponsorship` or `fixedRate` is true. The estimated USD charges the swap adds to your invoice.
 
 ## Execution price semantics
 

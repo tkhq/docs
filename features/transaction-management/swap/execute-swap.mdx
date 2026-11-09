@@ -4,12 +4,12 @@ description: "Execute a quoted token swap from a Turnkey wallet in one signed ac
 mode: "wide"
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP_V4` runs a swap end-to-end. This page covers bound mode, which executes a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`. To swap without creating a quote first, see [Market swaps](/features/transaction-management/swap/market-swap). You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, minimum output, and `destinationAddress` when the route is EVM ↔ SVM. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V4` runs a swap end-to-end. This page covers bound mode, which executes a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`. To swap without creating a quote first, see [Market swaps](/features/transaction-management/swap/market-swap). You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, minimum output, and `destinationAddress` when the route is EVM ↔ SVM. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
 
 ## Prerequisites
 
 - A swap configuration is not required; without one, the quote already carries a client fee of 0. See [Enable Swaps](/features/transaction-management/swap/enable-swap).
-- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote).
+- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/features/transaction-management/swap/get-swap-quote).
 - The address the quote was created for holds enough of the input asset to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native asset for gas; if `sponsor: true`, your organization can sponsor the gas for the user's trade. To use the sponsored path gas sponsorship must be enabled for your organization.
 - For cross-chain or EVM ↔ SVM routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
 - For EVM ↔ SVM, the quote and execute intents both set `destinationAddress` to the same raw output-protocol address.
@@ -17,7 +17,7 @@ mode: "wide"
 ## Submit the swap
 
 <ParamField body="parameters.boundQuote.quoteId" type="string" required>
-  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
+  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
 </ParamField>
 
 <ParamField body="parameters.inputToken / parameters.outputToken" type="string" required>
@@ -121,7 +121,9 @@ The activity result returns a poll handle:
 }
 ```
 
-`ExecuteSwapResult` returns `swapRequestId` (used to poll status), plus optional `provider` and `quoteId`. `ACTIVITY_TYPE_EXECUTE_SWAP_V4` also sets `outputAmount`, `minOutputAmount`, `feeSponsorship`, and `fixedRate`.
+`ExecuteSwapResult` returns `swapRequestId` (used to poll status), plus optional `provider` and `quoteId`. `ACTIVITY_TYPE_EXECUTE_SWAP_V4` also sets `outputAmount`, `minOutputAmount`, `feeSponsorship`, and `fixedRate`. When `feeSponsorship` or `fixedRate` is true, it sets `estimatedCharges`, the estimated charges the swap adds to your invoice. See [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship#charges) and [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate#charges).
+
+Each quote can be executed once. Executing a quote that another activity already used fails with `SWAP_QUOTE_ALREADY_USED`; request a new quote. A quote with swap fee sponsorship or a fixed rate is checked again at execution, so it can fail with the errors listed on [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship#errors) and [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate#errors).
 
 <Note>
   `ACTIVITY_TYPE_EXECUTE_SWAP_V3` requests are still accepted, with the quote fields at the top level of `parameters`. If you move to `ACTIVITY_TYPE_EXECUTE_SWAP_V4`, update any policy that pins `activity.type`. See the [policy examples](/features/policies/examples/swaps-earn#swap-execution). `executeSwap` in the TypeScript SDK uses `ACTIVITY_TYPE_EXECUTE_SWAP_V4` as of release v2026.11.1, so move the quote fields into `boundQuote` when you upgrade.
