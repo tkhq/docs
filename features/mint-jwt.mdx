@@ -37,7 +37,20 @@ Allow a service user to mint, with two administrators approving each token:
 }
 ```
 
-Use a separate user for each class of request, such as one user for orders and one for withdrawals. Your service then decides what each subject may do.
+Until policies can scope by endpoint, use a separate user for each class of request, such as one user for orders and one for withdrawals. Your service then decides what each subject may do.
+
+### Scope by endpoint (coming soon)
+
+Policies will be able to read `activity.params.audience`, `activity.params.method`, and `activity.params.path`, so a user can mint tokens only for some routes:
+
+```json
+{
+  "policyName": "Trading service can mint order tokens only",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(u, u.id == '<TRADING_SERVICE_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' && activity.params.audience == 'https://app.example.com' && activity.params.method == 'POST' && activity.params.path == '/orders'"
+}
+```
 
 ## Mint a token
 
@@ -68,7 +81,7 @@ await fetch("https://app.example.com/withdrawals", {
 });
 ```
 
-To bind headers too, add `headerNames` and one `headerDigest` per name. You can't bind `authorization` or hop-by-hop headers.
+To bind headers too, add `headerNames` and one `headerDigest` per name. You can't bind `authorization` or hop-by-hop headers. See the [Mint JWT API reference](/api-reference/activities/mint-jwt) for every field.
 
 ## Token claims
 
@@ -96,6 +109,24 @@ Your service checks each request:
 5. **Subject.** `sub` and `org` are a user and organization allowed to make this request.
 
 A token stays valid until it expires. To stop replays, reject a token you have already accepted until its `exp` passes.
+
+In Rust, [`turnkey_jwt_profiles`](https://docs.rs/turnkey_jwt_profiles) runs all of these checks, with an optional `axum` middleware. The source is in [tkhq/rust-sdk](https://github.com/tkhq/rust-sdk/tree/main/jwt_profiles).
+
+```rust
+use std::sync::Arc;
+use turnkey_jwt_profiles::http_authz::jwks::PinnedKeySet;
+use turnkey_jwt_profiles::http_authz::{unix_now, ReceivedRequest, RouteRule, Verifier, VerifierConfig};
+
+// Build once at startup, with the JWKS for your organization.
+let keys = PinnedKeySet::from_jwks_json(jwks)?;
+let verifier = Verifier::new(VerifierConfig::new("https://app.example.com", ORGANIZATION_ID), Arc::new(keys))?;
+
+// For each request:
+let rule = RouteRule { required_headers: vec![], require_body_digest: true };
+let received = ReceivedRequest { method: "POST", path: "/withdrawals", raw_query: None, headers: &headers, body: &body };
+let claims = verifier.authorize(token, &rule, &received, unix_now())?;
+// claims.sub and claims.org identify the caller.
+```
 
 ## Next steps
 
