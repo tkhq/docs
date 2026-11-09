@@ -126,7 +126,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 | Type          | Example                                 | Notes                                                                                                                      |
 | ------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | <a id="type-bool" href="#type-bool">**bool**</a>      | true                                    |                                                                                                                            |
-| <a id="type-int" href="#type-int">**int**</a>       | 256                                     | i128                                                                                                                       |
+| <a id="type-int" href="#type-int">**int**</a>       | 256                                     | i128 for most fields. `eth.eip_712.typed_message` values are not limited to i128; see [EIP-712](#eip-712) |
 | <a id="type-uint" href="#type-uint">**uint**</a>      | 170141183460469231731687303715884105728 | u256                                                                                                                       |
 | <a id="type-string" href="#type-string">**string**</a>    | 'a'                                     | only single quotes are supported                                                                                           |
 | <a id="type-list" href="#type-list">**list\<T\>**</a> | [1, 2, 3]                               | a list of type T                                                                                                           |
@@ -835,7 +835,7 @@ To deny signing raw payloads with the NO_OP hash function (except for EIP-712):
   "policyName": "Deny NO_OP hash signing",
   "notes": "",
   "effect": "EFFECT_DENY",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
+  "condition": "activity.kind in ['SIGN_RAW_PAYLOAD', 'SIGN_RAW_PAYLOADS'] && activity.params.hash_function == 'HASH_FUNCTION_NO_OP' && activity.params.encoding != 'PAYLOAD_ENCODING_EIP712'"
 }
 ```
 
@@ -948,8 +948,9 @@ See the [Ethereum policy examples](/features/policies/examples/ethereum) for sam
 <Note>
   {" "}
   The policy engine's `int` type is limited to 128 bits (i128). Ethereum smart contracts support
-  signed integers up to 256 bits (`int256`), but values exceeding the 128-bit signed range cannot be
-  used in policy conditions.{" "}
+  signed integers up to 256 bits (`int256`), but values exceeding the 128-bit signed range in these
+  fields cannot be used in policy conditions. `eth.eip_712.typed_message` values are not subject to
+  this limit; see [EIP-712](#eip-712).{" "}
 </Note>
 
 #### EIP-712
@@ -963,8 +964,8 @@ any depth, including nested structs and dynamic and fixed-size arrays.
 
 | Declared type                | Policy type                   | Notes                                                                                                              |
 | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `uintN`                      | [uint](#type-uint)            | Full `uint256` range. Compared numerically with an integer literal of any width. Accepted encodings are below.     |
-| `intN`                       | [int](#type-int)              | Full `int256` range. Compared numerically with an integer literal of any width.                                    |
+| `uintN`                      | [uint](#type-uint)            | Full `uint256` range. Compared numerically with integer literals. Accepted encodings are below.                    |
+| `intN`                       | [int](#type-int)              | Full `int256` range. Compared numerically with integer literals; see the literal limits below.                     |
 | `address`, `bytes`, `bytesN` | [string](#type-string)        | Canonical `0x` + hex. Compared case-insensitively, including inside fixed-size arrays such as `address[2]`.        |
 | `string`                     | [string](#type-string)        |                                                                                                                    |
 | `bool`                       | [bool](#type-bool)            |                                                                                                                    |
@@ -977,20 +978,23 @@ Unsigned integers (`uintN`) can be encoded in the signed payload in any of these
 - A hex string (for example `"0x1a055690d9db80000"`).
 - A JSON number up to 2^64 - 1.
 
-JSON numbers of 2^64 or more are rejected at signing with an "invalid EIP-712 payload" error. Send
-large integers as decimal strings. viem's `serializeTypedData` already does this for `bigint`
-values.
+JSON numbers of 2^64 or more are rejected. Send large integers as decimal strings. viem's
+`serializeTypedData` already does this for `bigint` values.
 
 The `in` operator and `.contains` compare integers numerically regardless of declared width, for
 example `eth.eip_712.typed_message['amount'] in [1, 2]`. A list that mixes integers with
-non-integers returns an error, never a false match.
+non-integers returns an error, never a false match. A list literal that mixes integers up to
+2^127 - 1 with integers of 2^127 or more is rejected when the policy is created, so keep all
+literals in a list in the same range.
 
 `address` and `bytes`/`bytesN` values compare case-insensitively, so checksummed, lower-case, and
 upper-case literals all match. Write literals in canonical form: addresses with the `0x` prefix, and
 `bytes32` values padded to the full 32 bytes.
 
-Integer literals in conditions accept values up to 2^256 - 1. Negative literals are limited to
--(2^127 - 1), so `intN` values below that can be read but not matched by a negative literal.
+`typed_message` values cover the full `uint256` and `int256` ranges. The i128 limit applies only to
+integer literals in conditions. Positive literals accept values up to 2^256 - 1. Negative literals
+are limited to -(2^127 - 1), so `intN` values below that can be read but not matched by a negative
+literal.
 
 Other rules:
 
