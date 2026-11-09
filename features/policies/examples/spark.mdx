@@ -143,9 +143,10 @@ without exposing any other key.
 #### Allow exporting only static deposit keys
 
 This policy matches only fully hardened four-component paths with coin type `8797555` and purpose
-`3`, so the delegated user can export static deposit keys and nothing else. It never matches the
-identity key (`0'`), the signing leaf keys (`1'/<index>'`), or accounts of other wallets. It also
-never grants seed export: exporting the wallet seed is a separate activity (`EXPORT_WALLET`).
+`3` in the wallet `<SPARK_WALLET_ID>`, so the delegated user can export that wallet's static deposit
+keys and nothing else. It never matches the identity key (`0'`), the signing leaf keys
+(`1'/<index>'`), or accounts of other wallets. It also never grants seed export: exporting the
+wallet seed is a separate activity (`EXPORT_WALLET`).
 
 ```json
 {
@@ -153,9 +154,14 @@ never grants seed export: exporting the wallet seed is a separate activity (`EXP
   "notes": "",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<DELEGATED_USER_ID>')",
-  "condition": "activity.kind == 'EXPORT_WALLET_ACCOUNT' && wallet_account.path_indexes.count() == 4 && wallet_account.path_indexes[0] == 8797555 && wallet_account.path_indexes[2] == 3 && wallet_account.path_hardened.all(h, h == true)"
+  "condition": "activity.kind == 'EXPORT_WALLET_ACCOUNT' && wallet.id == '<SPARK_WALLET_ID>' && wallet_account.path_indexes.count() == 4 && wallet_account.path_indexes[0] == 8797555 && wallet_account.path_indexes[2] == 3 && wallet_account.path_hardened.all(h, h == true)"
 }
 ```
+
+<Warning>
+  Without the `wallet.id` clause, the derivation-path checks match the static deposit keys of every
+  wallet in the organization, because every Spark wallet derives keys under the same paths.
+</Warning>
 
 <Note>
   The `wallet_account.path_indexes` and `wallet_account.path_hardened` fields are set only for
