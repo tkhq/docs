@@ -53,14 +53,22 @@ When an existing user (the “Sender”) wants to send funds to someone new, her
 
 <Steps>
   <Step title="Create your claim link">
-    Construct a link containing, as query parameters: 
-    - Base64-encoded private key from the Claim Key
-    - Transaction id
+    Construct a link containing:
+    - The transaction id, as a path segment or query parameter
+    - The Base64-encoded private key from the Claim Key, in the URL fragment (after `#`), for example `https://app.example.com/claim/<TX_ID>#key=<CLAIM_KEY>`
 
   </Step>
 </Steps>
 
-You can now show the Sender a “Copy link” or “Share via…” button.
+<Warning>
+  Never put the Claim Key in a query parameter or path. Browsers send those to your server, so the key would end up in server, proxy, and analytics logs. The fragment stays in the browser: read it with `window.location.hash`, and do not send it to your backend.
+</Warning>
+
+You can now show the Sender a “Copy link” or “Share via…” button. Until the funds are claimed, anyone who has the link can claim them, so treat it like cash.
+
+<Tip>
+  For larger amounts, consider requiring a passphrase as well as the link. Encrypt the Claim Key with a key derived from a passphrase (for example with PBKDF2 or Argon2, then AES-GCM), and put the ciphertext in the fragment instead of the raw key. The Sender shares the passphrase over a different channel from the link, such as the link by email and the passphrase in person or by text message, so a forwarded or leaked link is not enough to claim the funds. Use a strong passphrase, such as several random words, not a short PIN: anyone who has the link can try passphrases offline, with no limit on attempts.
+</Tip>
 
 **Step 4: Receiver claims funds**
 
@@ -72,9 +80,11 @@ When the Receiver opens the link in your app:
     sub-org ID
   </Step>
   <Step title="Reconstruct claim key">
-    Reconstruct the Claim Key using the private key from the URL and store it in
-    local storage. Now, the Receiver has an API key in local storage that grants
-    them the ability to send funds out of the escrow wallet. 
+    Reconstruct the Claim Key using the private key from the URL fragment and
+    store it in local storage. Now, the Receiver has an API key in local storage
+    that grants them the ability to send funds out of the escrow wallet. Then
+    remove the fragment from the address bar with `history.replaceState`, so the
+    key is not left visible or copied along with the URL.
   </Step>
   <Step title="Create permanent sub-org">
     Guide the Receiver through your typical signup flow to create a permanent
@@ -87,7 +97,7 @@ When the Receiver opens the link in your app:
   </Step>
   <Step title="Delete temporary sub-org">
     After successful transfer, delete the temporary sub-org using the Claim
-    Key. 
+    Key, then remove the Claim Key from local storage.
   </Step>
 </Steps>
 
