@@ -1,0 +1,221 @@
+---
+title: "Send a transaction"
+description: "Send an EVM or Solana transaction from a Turnkey wallet, sponsored or not, with the React, browser, or server SDK, and batch EVM calls into one atomic transaction."
+---
+
+You send a transaction with one call, `ethSendTransaction` or `solSendTransaction`, and get back a `sendTransactionStatusId`. Turnkey constructs, signs, and broadcasts the transaction; you then poll the status ID, or receive a webhook, until it lands. See [Overview](/features/transaction-management/broadcasting) for what Turnkey handles for you.
+
+## Prerequisites
+
+- A Pay-as-you-go, Pro, or Enterprise plan.
+- A wallet account on a [supported chain](/features/transaction-management#supported-chains).
+- To sponsor the transaction, Gas Sponsorship enabled for your organization. See [Gas sponsorship and spend limits](/features/transaction-management/broadcasting/gas-sponsorship).
+- Otherwise, enough of the chain's native token in the wallet to pay for gas.
+
+## Choose an SDK
+
+| SDK | Use it for |
+| :-- | :-- |
+| `@turnkey/react-wallet-kit` | React apps. `handleSendTransaction` submits, polls, and shows Turnkey's modal with the result and an explorer link. |
+| `@turnkey/core` | Client-side frameworks that do not have a Turnkey wallet kit yet, such as Angular, Vue, or Svelte. |
+| `@turnkey/sdk-server` | Node.js backends, signing with an API key. |
+
+Other SDKs, such as Go, Python, Rust, Swift, and Kotlin, send the same [`eth_send_transaction`](/api-reference/activities/broadcast-evm-transaction) and `sol_send_transaction` activities. See the [SDK reference](/sdks/introduction).
+
+## Send an EVM transaction
+
+<Tabs>
+  <Tab title="React">
+    Configure the provider once:
+
+    ```tsx
+    import { TurnkeyProvider } from "@turnkey/react-wallet-kit";
+
+    const turnkeyConfig = {
+      apiBaseUrl: "https://api.turnkey.com",
+      defaultOrganizationId: process.env.NEXT_PUBLIC_TURNKEY_ORG_ID,
+      rpId: window.location.hostname,
+      iframeUrl: "https://auth.turnkey.com",
+    };
+
+    export default function App({ children }) {
+      return <TurnkeyProvider config={turnkeyConfig}>{children}</TurnkeyProvider>;
+    }
+    ```
+
+    Then send from a component:
+
+    ```tsx
+    const { handleSendTransaction, wallets } = useTurnkey();
+
+    const walletAccount = wallets[0].accounts[0];
+
+    await handleSendTransaction({
+      transaction: {
+        from: walletAccount.address,
+        to: "0xRecipient",
+        value: "1000000000000000",
+        caip2: "eip155:8453",
+        sponsor: true,
+      },
+    });
+    ```
+
+    `handleSendTransaction` opens Turnkey's modal, polls until the transaction is `INCLUDED`, and shows a success screen with an explorer link. To build your own UI, call `ethSendTransaction` and `pollTransactionStatus` from `useTurnkey()` instead. They take the same parameters as in the `@turnkey/core` tab.
+  </Tab>
+  <Tab title="@turnkey/core">
+    ```ts
+    import { TurnkeyClient } from "@turnkey/core";
+
+    const client = new TurnkeyClient({
+      apiBaseUrl: "https://api.turnkey.com",
+      organizationId: process.env.TURNKEY_ORG_ID!,
+    });
+    await client.init();
+
+    // The user must be logged in: the request is stamped with their session.
+    const sendTransactionStatusId = await client.ethSendTransaction({
+      transaction: {
+        from: walletAddress,
+        to: "0xRecipient",
+        value: "1000000000000000",
+        caip2: "eip155:8453",
+        sponsor: true,
+      },
+    });
+
+    const status = await client.pollTransactionStatus({ sendTransactionStatusId });
+    console.log(status.eth?.txHash);
+    ```
+  </Tab>
+  <Tab title="@turnkey/sdk-server">
+    ```ts
+    import { Turnkey } from "@turnkey/sdk-server";
+
+    const client = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY!,
+      apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY!,
+      defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID!,
+    }).apiClient();
+
+    const { sendTransactionStatusId } = await client.ethSendTransaction({
+      from: walletAddress,
+      caip2: "eip155:8453",
+      sponsor: true,
+      calls: [{ to: "0xRecipient", value: "1000000000000000" }],
+    });
+
+    const status = await client.pollTransactionStatus({ sendTransactionStatusId });
+    console.log(status.eth?.txHash);
+    ```
+
+    `@turnkey/sdk-server` sends every EVM transaction as a list of `calls`, so a single transaction is a list with one entry. See [Batch EVM calls](#batch-evm-calls).
+  </Tab>
+</Tabs>
+
+A transaction can carry calldata, so you can call contracts, deploy them, or run any valid EVM operation. Omitted fields, such as nonce and fees, are filled in for you. For sponsored transactions, Turnkey always sets the nonce and fees, so do not pass them.
+
+### Batch EVM calls
+
+Pass up to 50 entries in `calls`, instead of `to`, `value`, and `data`, to send them as one atomic transaction. The calls run in order from your wallet's address, and if any of them reverts, none take effect. A batch is one activity, so it is one policy decision and, if your policies require it, one approval. Each call is still evaluated against your policies on its own, and the batch is allowed only if every call is allowed.
+
+```ts
+const sendTransactionStatusId = await client.ethSendTransaction({
+  transaction: {
+    from: walletAddress,
+    caip2: "eip155:8453",
+    sponsor: true,
+    calls: [
+      { to: USDC, data: approveCalldata },
+      { to: VAULT, data: depositCalldata },
+    ],
+  },
+});
+```
+
+`handleSendTransaction` accepts the same `calls` array. With `@turnkey/sdk-server`, pass `calls` at the top level, as in the server example above.
+
+Every batch, sponsored or not, runs through an [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) delegation to Turnkey's [gas station delegate](https://github.com/tkhq/gas-station), because a plain wallet cannot run several calls in one transaction. Turnkey signs the delegation for you the first time a wallet batches on a chain. With `sponsor: false`, the wallet pays the gas, as it does for a single transaction.
+
+- **Sponsored batches:** calldata across all calls is capped at 64 KiB, and Turnkey sets the nonce and fees.
+- **Non-sponsored batches:** `gasLimit` is required, because later calls can depend on earlier ones and cannot be estimated one by one.
+- **Replay protection:** batches use a nonce on the gas station delegate, which Turnkey fetches if you omit `gasStationNonce`. See [`get_nonces`](/api-reference/queries/get-nonces).
+
+See [`atomic-batch-with-aave`](https://github.com/tkhq/sdk/tree/main/examples/defi/atomic-batch-with-aave) and [`with-scoped-deposit-session`](https://github.com/tkhq/sdk/tree/main/examples/access-control/with-scoped-deposit-session) for complete examples, and [Broadcast EVM transaction](/api-reference/activities/broadcast-evm-transaction) for every field.
+
+## Send a Solana transaction
+
+You build the unsigned transaction, and Turnkey signs it with the listed signers, adds a recent blockhash if you omit one, and broadcasts it.
+
+<Tabs>
+  <Tab title="React">
+    ```tsx
+    const { handleSendTransaction, wallets } = useTurnkey();
+
+    const walletAccount = wallets
+      .flatMap((w) => w.accounts)
+      .find((a) => a.addressFormat === "ADDRESS_FORMAT_SOLANA");
+
+    await handleSendTransaction({
+      transaction: {
+        signWiths: [walletAccount.address],
+        unsignedTransaction: "<hex-serialized-unsigned-solana-tx>",
+        caip2: "solana:mainnet",
+        sponsor: true,
+      },
+    });
+    ```
+  </Tab>
+  <Tab title="@turnkey/core">
+    ```ts
+    const sendTransactionStatusId = await client.solSendTransaction({
+      transaction: {
+        signWiths: [solanaAddress],
+        unsignedTransaction: "<hex-serialized-unsigned-solana-tx>",
+        caip2: "solana:mainnet",
+        sponsor: true,
+      },
+    });
+
+    const status = await client.pollTransactionStatus({ sendTransactionStatusId });
+    console.log(status.sol?.signature);
+    ```
+  </Tab>
+  <Tab title="@turnkey/sdk-server">
+    ```ts
+    const { sendTransactionStatusId } = await client.solSendTransaction({
+      signWiths: [solanaAddress],
+      unsignedTransaction: "<hex-serialized-unsigned-solana-tx>",
+      caip2: "solana:mainnet",
+      sponsor: true,
+    });
+
+    const status = await client.pollTransactionStatus({ sendTransactionStatusId });
+    console.log(status.sol?.signature);
+    ```
+  </Tab>
+</Tabs>
+
+`signWiths` lists every required signer in transaction order. For transaction versions, signature slots, size limits, and compute and fee controls, see [Solana transactions](/features/networks/solana-transactions).
+
+<Note>
+  Turnkey signs the transaction you build, so your application is still responsible for validating its contents. Before sponsoring a transaction that may create accounts, enable `Sponsor Solana Rent` in the dashboard, and check whether the transaction creates or closes accounts or routes rent refunds back to the signer. See [Solana Rent Sponsorship](/features/networks/solana-rent-refunds) and [Solana transaction construction for sponsored flows](/features/networks/solana-transaction-construction).
+</Note>
+
+## Chain-specific notes
+
+### Monad
+
+Sponsored transactions and [batches](#batch-evm-calls) delegate your wallet with [EIP-7702](https://docs.monad.xyz/developer-essentials/eip-7702). On Monad (`eip155:143` and `eip155:10143`), delegated wallets have extra rules:
+
+- **10 MON balance reserve.** A transaction that would reduce a delegated account's balance below 10 MON unconditionally reverts. This is not a minimum balance requirement — an account can hold less than 10 MON and still transact, as long as the transaction leaves its balance unchanged or higher. For example, a delegated EOA holding 5 MON can be called by a gas sponsor and succeed as long as it ends with at least 5 MON.
+- **No `CREATE` / `CREATE2`.** These opcodes are not permitted while code executes in the context of a delegated EOA, and the call frame reverts if used. (A normal contract-creation transaction sent directly from the EOA, with no `to` field, is still allowed.)
+
+See Monad's [EIP-7702 documentation](https://docs.monad.xyz/developer-essentials/eip-7702) for full details.
+
+## Next steps
+
+- [Track transaction status](/features/transaction-management/broadcasting/track-status): statuses, decoded revert reasons, and webhooks.
+- [Gas sponsorship and spend limits](/features/transaction-management/broadcasting/gas-sponsorship): plans, spend limits, and checking usage.
+- Examples: [`with-paymaster`](https://github.com/tkhq/sdk/tree/main/examples/transaction-management/with-paymaster) for sponsored ERC-20 transfers, [`with-solana-paymaster`](https://github.com/tkhq/sdk/tree/main/examples/transaction-management/with-solana-paymaster), [`sweeper`](https://github.com/tkhq/sdk/tree/main/examples/transaction-management/sweeper), and [`eth-usdc-swap`](https://github.com/tkhq/sdk/tree/main/examples/defi/eth-usdc-swap).
