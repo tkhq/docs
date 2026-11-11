@@ -1,24 +1,32 @@
 ---
-title: "Broadcasting (construction, signing, broadcast, gas abstraction)"
-description: "Guide for sending sponsored EVM transactions using @turnkey/core for custom frameworks, Node.js servers, or full manual control."
-sidebarTitle: "Broadcasting"
+title: "Overview"
+description: "Send EVM and Solana transactions through Turnkey: construction, signing, broadcast, inclusion, and optional gas sponsorship from one API call."
 ---
 
-import SendTxConcepts from "/snippets/shared/send-tx-concepts.mdx";
-import SendTxSdkOverview from "/snippets/shared/send-tx-sdk-overview.mdx";
-import SendTxCore from "/snippets/shared/send-tx-core.mdx";
-import SendTxGasUsage from "/snippets/shared/send-tx-gas-usage.mdx";
+Broadcasting lets a Turnkey wallet send a transaction with a single activity. You pass a minimal payload; Turnkey constructs the transaction, signs it in a secure enclave, broadcasts it, and tracks it until it lands. Turnkey can also pay the network fee for you with [gas sponsorship](/features/transaction-management/broadcasting/gas-sponsorship). You do not need your own RPC provider.
 
-<SendTxConcepts />
+## How it works
 
-<SendTxSdkOverview />
+1. **Send.** Call `ethSendTransaction` or `solSendTransaction` with the sending address, the chain's `caip2`, the transaction, and `sponsor`. Your policies are evaluated like any other activity. See [Send a transaction](/features/transaction-management/broadcasting/send-transaction).
+2. **Turnkey builds, signs, and broadcasts.** Turnkey fills in what you omit (on EVM, the nonce and fees; on Solana, a recent blockhash, compute unit limit, and priority fee), signs, and broadcasts.
+3. **Track the result.** You get a `sendTransactionStatusId`. Poll it or subscribe to webhooks until the transaction is `INCLUDED` or `FAILED`. See [Track transaction status](/features/transaction-management/broadcasting/track-status).
 
-This page walks you through the `@turnkey/core` flow with full code examples. For using the React handler, see [Sending Sponsored Transactions (React)](/features/transaction-management/sending-sponsored-transactions).
+The same call sends sponsored and non-sponsored transactions; `sponsor` only controls who pays the fee. Broadcasting is available on Pay-as-you-go, Pro, and Enterprise plans, for both.
 
----
+## What you can send
 
-<SendTxCore />
+- **EVM:** any transaction, not just transfers: contract calls, contract deployments, or any valid EVM operation. Several calls can be sent as one atomic transaction with [batching](/features/transaction-management/broadcasting/send-transaction#batch-evm-calls).
+- **Solana:** any transaction you build, signed by one or more Turnkey signers. See [Solana transactions](/features/networks/solana-transactions). On Solana, fee sponsorship does not cover the rent for accounts a transaction creates; that is [rent sponsorship](/features/networks/solana-rent-refunds), a separate Enterprise feature.
 
----
+See [Supported chains](/features/transaction-management#supported-chains) for the networks.
 
-<SendTxGasUsage />
+## How Turnkey gets a transaction included
+
+- **Simulation.** When Turnkey estimates a transaction's fees, it also checks whether the transaction would fail, and rejects it before it is sent, with the reason. See [Track transaction status](/features/transaction-management/broadcasting/track-status#evm-smart-contract-transaction-errors).
+- **Stuck sponsored transactions.** Turnkey keeps a sponsored transaction moving until it lands or can no longer land, using whatever the chain allows, such as resubmitting it or replacing it with a higher fee.
+- **Stuck non-sponsored transactions.** A replacement needs a new signature from your wallet, so Turnkey does not replace these on its own. Send the transaction again yourself, for example with the same nonce and a higher fee on EVM.
+- **Status.** A transaction can stay `BROADCASTING` for a while and still land. Poll [`get_send_transaction_status`](/api-reference/queries/get-send-transaction-status) or subscribe to the `SEND_TRANSACTION_STATUS_UPDATES` [webhook](/features/webhooks/overview) for the final status.
+
+## Policies
+
+You write policies against sent transactions with the `eth.tx` namespace on EVM and `solana.tx` on Solana. They apply the same way whether or not the transaction is sponsored. See [Policy language](/features/policies/language).

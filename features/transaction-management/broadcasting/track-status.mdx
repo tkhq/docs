@@ -1,120 +1,13 @@
-## Using `@turnkey/core` directly
-
-For custom frameworks or full manual control (client-side).
-
-You will call:
-
-### `ethSendTransaction(params)`
-→ returns `{ sendTransactionStatusId }`
-
-### `solSendTransaction(params)`
-→ returns `{ sendTransactionStatusId }`
-
-### `pollTransactionStatus(params)`
-→ returns chain-specific status (`eth.txHash` or `sol.signature`)
-
-### Step 1 — Create a client
-
-If you're on a Node.js backend, use `@turnkey/sdk-server` and initialize the server client like this:
-
-```ts
-import { Turnkey } from "@turnkey/sdk-server";
-
-const client = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com/",
-  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY,
-  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY,
-  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID,
-}).apiClient();
-```
-
-For `@turnkey/core`, create the client like this:
-
-```ts
-import { Turnkey } from "@turnkey/core";
-
-const client = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com",
-  defaultOrganizationId: process.env.TURNKEY_ORG_ID,
-});
-```
-
 ---
-
-### Step 2 — Submit the transaction (Ethereum)
-
-```ts
-const sendTransactionStatusId = await client.ethSendTransaction({
-  transaction: {
-    from: walletAccount.address,
-    to: "0xRecipient",
-    caip2: "eip155:8453",
-    sponsor: true,
-    value: "0",
-    data: "0x",
-    nonce: "0",
-  },
-});
-```
-
-OR (Solana):
-
-```ts
-const sendTransactionStatusId = await client.solSendTransaction({
-  transaction: {
-    signWith: walletAccount.address, // Solana address
-    unsignedTransaction: "<hex-serialized-unsigned-solana-tx>",
-    caip2: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", // devnet
-    sponsor: true,
-    // recentBlockhash: "<recent blockhash>", // optional
-  },
-});
-```
-
+title: "Track transaction status"
+description: "Follow a transaction sent through Turnkey until it lands or fails, read decoded revert reasons, and receive status updates by webhook."
 ---
-
-### Step 3 — Wait for inclusion
-
-```ts
-const pollResult = await client?.pollTransactionStatus({
-  sendTransactionStatusId,
-});
-
-if (!pollResult) {
-  throw new TurnkeyError(
-    "Polling returned no result",
-    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
-  );
-}
-
-const txHash = pollResult.eth?.txHash; // Ethereum
-const signature = pollResult.sol?.signature; // Solana
-const transactionId = txHash ?? signature;
-
-if (!transactionId) {
-  throw new TurnkeyError(
-    "Missing transaction id in transaction result",
-    TurnkeyErrorCodes.SIGN_AND_SEND_TRANSACTION_ERROR,
-  );
-}
-console.log(transactionId);
-```
-
----
-
-- `ethSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e1dfe3e2eeb0976069aad1799597bbed64ec52f5/packages/core/src/__clients__/core.ts#L2711)
-- `solSendTransaction` Implementation [here](https://github.com/tkhq/sdk/blob/e1dfe3e2eeb0976069aad1799597bbed64ec52f5/packages/core/src/__clients__/core.ts#L2848)
-- `pollTransactionStatus` Implementation [here](https://github.com/tkhq/sdk/blob/e1dfe3e2eeb0976069aad1799597bbed64ec52f5/packages/core/src/__clients__/core.ts#L2936)
-
----
-
-## Transaction status and enriched errors
 
 After you send a transaction, Turnkey monitors its status until it fails or is confirmed onchain.
 You can [query the transaction status](#querying-via-api) or subscribe to status updates [via
 webhooks](#webhooks).
 
-### Transaction statuses
+## Transaction statuses
 
 The following statuses apply to both EVM and Solana transactions:
 
@@ -125,7 +18,7 @@ The following statuses apply to both EVM and Solana transactions:
 | INCLUDED     | The transaction has been included in a block (EVM) or confirmed onchain (Solana).                        |
 | FAILED       | The transaction could not be included onchain and will not be retried automatically.                     |
 
-### EVM smart contract transaction errors
+## EVM smart contract transaction errors
 
 For EVM transactions that revert, Turnkey runs a simulation to produce structured execution traces
 and decode common revert reasons — giving you actionable error messages instead of opaque hex data.
@@ -142,7 +35,7 @@ and decode common revert reasons — giving you actionable error messages instea
   are not classified here and are instead surfaced via `Error.Message`.
 </Note>
 
-### Querying via API
+## Querying via API
 
 Use the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status) endpoint
 to poll for the current status of any transaction by its `sendTransactionStatusId` (returned when
@@ -152,7 +45,7 @@ The response includes a `txStatus` field with the current status and, when appli
 object containing a human-readable `message` and either `eth.revertChain` (for EVM reverts) or
 `solana` (for Solana failures) with full structured details.
 
-### Webhooks
+## Webhooks
 
 Turnkey Webhooks let you react to transaction status updates in real time, without polling. Instead
 of repeatedly calling the [Get Send Transaction Status](/api-reference/queries/get-send-transaction-status)
@@ -162,12 +55,12 @@ transaction status changes (e.g. from `BROADCASTING` to `INCLUDED` or `FAILED`).
 You subscribe to webhooks at the parent organization level. Subscriptions cover transactions across
 the parent organization and all of its sub-organizations.
 
-#### Subscribing
+### Subscribing
 
 Use the [Create Webhook Endpoint](/api-reference/activities/create-webhook-endpoint) API with the
 `SEND_TRANSACTION_STATUS_UPDATES` event type to register your endpoint on the parent organization.
 
-#### Delivery payload
+### Delivery payload
 
 Each delivery is an HTTP POST with a JSON body containing a `type`, `organizationId`,
 `parentOrganizationId`, and a `msg` object. The `type` is always `"transaction:status"`. Fields
@@ -260,6 +153,6 @@ present in `msg` depend on the status:
 ```
 
 <Tip>
-  See the [with-transaction-webhooks](https://github.com/tkhq/sdk/tree/main/examples/transaction-management/with-transaction-webhooks) SDK
+  See the [with-tx-webhooks](https://github.com/tkhq/sdk/tree/main/examples/transaction-management/with-tx-webhooks) SDK
   example for a working integration.
 </Tip>
