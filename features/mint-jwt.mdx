@@ -1,0 +1,144 @@
+---
+title: "Mint JWT"
+tag: "Beta"
+description: "Turn a Turnkey policy decision into a short-lived JWT that authorizes one exact HTTP request to your service."
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+import { MintJwtCallout } from '/snippets/mint-jwt-callout.mdx'
+
+<MintJwtCallout />
+
+Mint JWT lets your service rely on Turnkey's [policy engine](/features/policies/overview) to decide who may call it. A user asks Turnkey to sign a JWT for one HTTP request. Turnkey applies your policies, including any approvals they require, and returns a token that your service verifies with Turnkey's public keys.
+
+The token is bound to one exact request: method, path, query, chosen headers, and body. It can't be reused for a different request, and it expires within five minutes.
+
+## How it works
+
+1. Your client builds the HTTP request it wants to send, then submits `ACTIVITY_TYPE_MINT_JWT` with a digest of that request.
+2. Turnkey evaluates your policies. If they need more approvals, the activity waits for them.
+3. Turnkey signs the JWT with ES256 and returns it.
+4. Your client sends the request with the JWT in the header. Your service checks the signature and that the token matches the request.
+
+## Who can mint
+
+Your [policies](/features/policies/overview) decide who can mint and who must approve. As with any activity, the [root quorum](/features/users/root-quorum) can mint without a policy, and every other user needs one.
+
+<Note>
+  The `jwt.profile.httpz.audience`, `jwt.profile.httpz.method`, and `jwt.profile.httpz.path` policy fields are coming soon.
+</Note>
+
+A trading service can mint order tokens on its own:
+
+```json
+{
+  "policyName": "Trading service can mint order tokens",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(u, u.id == '<TRADING_SERVICE_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
+    jwt.profile.httpz.audience == 'https://app.example.com' &&
+    jwt.profile.httpz.method == 'POST' &&
+    jwt.profile.httpz.path == '/orders'"
+}
+```
+
+Withdrawal tokens also need two administrators:
+
+```json
+{
+  "policyName": "Withdrawal tokens need two administrators",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(u, u.id == '<TRADING_SERVICE_USER_ID>') &&
+    approvers.filter(u, u.tags.contains('<ADMIN_TAG_ID>')).count() >= 2",
+  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
+    jwt.profile.httpz.audience == 'https://app.example.com' &&
+    jwt.profile.httpz.method == 'POST' &&
+    jwt.profile.httpz.path == '/withdrawals'"
+}
+```
+
+## Mint a token
+
+```typescript
+import { createHash } from "node:crypto";
+
+const body = JSON.stringify({ asset: "USDT", amount: "250", address: "0x1111...1111" });
+const digest = (data: string) => `sha-256=:${createHash("sha256").update(data).digest("base64")}:`;
+
+const { jwt } = await turnkey.apiClient().mintJwt({
+  profile: "JWT_PROFILE_HTTP_AUTHZ_V1",
+  audience: "https://app.example.com",
+  httpAuthzV1: {
+    method: "POST",
+    path: "/withdrawals",
+    query: "",
+    bodyDigest: digest(body),
+    subject: userId,
+    timeToLiveSeconds: "60",
+    issuedAt: String(Math.floor(Date.now() / 1000)),
+  },
+});
+
+await fetch("https://app.example.com/withdrawals", {
+  method: "POST",
+  headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+  body,
+});
+```
+
+To bind headers too, add `headerNames` and one `headerDigest` per name. You can't bind `authorization` or hop-by-hop headers. See the [Mint JWT API reference](/api-reference/activities/mint-jwt) for every field.
+
+## Token claims
+
+The `turnkey.io/http-authz/v1` profile produces these claims:
+
+| Claim | Value |
+| :--- | :--- |
+| `iss` | `https://id.turnkey.com/t/<organization ID>`. For a [sub-organization](/features/sub-organizations), this is the parent organization |
+| `org` | `urn:turnkey:org:<organization ID>`, the organization that minted the token |
+| `sub` | `urn:turnkey:user:<user ID>` |
+| `aud` | Your service's origin, such as `https://app.example.com` |
+| `iat`, `exp` | Issue time and expiry. The lifetime is 1 to 300 seconds |
+| `tk_request` | The bound `method`, `path`, `query`, and header names |
+| `tk_body_digest` | SHA-256 digest of the body |
+| `tk_header_digest` | SHA-256 digest of each bound header value |
+
+## Verify a token
+
+Your service checks each request:
+
+1. **Signature.** Verify the ES256 signature with the key from `https://id.turnkey.com/t/<organization ID>/jwks.json`. Use the organization ID from `iss`.
+2. **Issuer and audience.** `iss` is an organization you trust, and `aud` is your own origin.
+3. **Time.** `exp` is in the future.
+4. **Request.** The method, path, query, header digests, and body digest match the request you received.
+5. **Subject.** `sub` and `org` are a user and organization allowed to make this request.
+
+A token stays valid until it expires. To stop replays, reject a token you have already accepted until its `exp` passes.
+
+In Rust, [`turnkey_jwt_profiles`](https://docs.rs/turnkey_jwt_profiles) runs all of these checks, with an optional `axum` middleware. The source is in [tkhq/rust-sdk](https://github.com/tkhq/rust-sdk/tree/main/jwt_profiles).
+
+```rust
+use std::sync::Arc;
+use turnkey_jwt_profiles::http_authz::jwks::PinnedKeySet;
+use turnkey_jwt_profiles::http_authz::{unix_now, ReceivedRequest, RouteRule, Verifier, VerifierConfig};
+
+// Build once at startup, with the JWKS for your organization.
+let keys = PinnedKeySet::from_jwks_json(jwks)?;
+let verifier = Verifier::new(VerifierConfig::new("https://app.example.com", ORGANIZATION_ID), Arc::new(keys))?;
+
+// For each request:
+let rule = RouteRule { required_headers: vec![], require_body_digest: true };
+let received = ReceivedRequest { method: "POST", path: "/withdrawals", raw_query: None, headers: &headers, body: &body };
+let claims = verifier.authorize(token, &rule, &received, unix_now())?;
+// claims.sub and claims.org identify the caller.
+```
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <SolutionCard title="JWT auth for TVC apps" icon="tvc" href="/solutions/verifiable-cloud/jwt-http-auth" description="Let Turnkey policy decide who can call your enclave app." />
+  <FeatureCard title="Turnkey Verifiable Cloud" icon="cpu-chip-01" href="/features/verifiable-cloud/overview" description="Deploy apps with verifiable code and secure keys." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/overview" description="Consensus expressions, conditions, and time windows." />
+  <FeatureCard title="Root quorum" icon="log-in-04" href="/features/users/root-quorum" description="How root users and thresholds work." />
+</div>

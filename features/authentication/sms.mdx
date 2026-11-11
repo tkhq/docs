@@ -1,6 +1,6 @@
 ---
 title: "SMS authentication"
-description: "SMS authentication enables users to authenticate their Turnkey account using their phone number via a 6-9 digit or bech32 alphanumeric one-time password (OTP). When authenticated, users receive an expiring API key stored in memory within an iframe, which functions like a session key to access their wallet."
+description: "SMS authentication enables users to authenticate their Turnkey account using their phone number via a 6-9 digit or alphanumeric (Crockford’s Base32) one-time password (OTP). When authenticated, users receive an expiring API key stored in memory within an iframe, which functions like a session key to access their wallet."
 sidebarTitle: "SMS"
 ---
 
@@ -14,13 +14,12 @@ SMS authentication is available to all Enterprise customers. To enable this feat
 SMS pricing is usage-based and varies depending on the country of the destination phone number and the carrier.
 Prices are shown in U.S. cents per outbound SMS message segment. Taxes/surcharges separate.
 
-Select your country below to view pricing.
 
 <SmsPriceLookup priceDataJson={priceDataJson} />
 
 ## Prerequisites
 
-Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate OTP and create sub-organizations. Check out our [Quickstart guide](/get-started/quickstart) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
+Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate OTP and create sub-organizations. Check out our [Quickstart guide](/get-started/quickstart) if you need help getting started. To allow an API user to initiate SMS auth, you'll need the following policy in your main organization:
 
 ```json
 {
@@ -48,11 +47,11 @@ The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP_V3` using th
 
 - `otpType`: specify `"OTP_TYPE_SMS"`
 - `contact`: user's phone number
-- `emailCustomization`: optional parameters for customizing emails
+- `smsCustomization`: optional parameters for customizing the SMS message
 - `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user.
   We recommend generating this server-side based on the user's IP address or public key.
   See the [OTP Rate Limits](#otp-rate-limits) section below for more details.
-- `alphanumeric`: optional parameter for making this code bech32 alphanumeric or not. default: true
+- `alphanumeric`: optional parameter for making this code alphanumeric or not. default: true
 - `otpLength`: optional parameter for selecting the length of the OTP. default: 9
 - `expirationSeconds`: optional validity window (defaults to 5 minutes)
 
@@ -123,3 +122,23 @@ In order to safeguard users, Turnkey enforces rate limits for OTP auth activitie
 - 3 requests per 3 minutes per unique `userIdentifier`
 - 3 retries max per code, after which point that code will be locked
 - 3 active codes per user, each with a 5 minute TTL
+
+## Protection and safeguards
+
+Anyone who can reach your sign-in form can trigger an SMS before they have proven who they are. The controls below reduce automated OTP abuse. They do not stop every kind of abuse. See [Abuse prevention](/get-started/production-checklist#abuse-prevention) for the full production checklist.
+
+### Captcha
+
+[Captcha](/features/authentication/captcha) uses [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) to challenge the client before Turnkey sends the code. A request that fails the challenge is rejected, so no message is sent.
+
+Enable it in the Turnkey Dashboard. `@turnkey/react-wallet-kit` shows the widget for you. If you build the auth UI yourself, render the widget and pass its token on the OTP request. SDK versions and the other protected flows are in the [Captcha guide](/features/authentication/captcha).
+
+That dashboard setting applies when Turnkey's auth flow sends the OTP. If your own backend calls `INIT_OTP_V3`, add your own check in front of that call.
+
+### SMS country allowlist
+
+The allowlist decides which countries can receive an SMS OTP. Turnkey sends a code only to a country you have allowed. A number in any other country is rejected before the message is sent. If no countries are allowed, no SMS is sent. Allowing only the United States and Canada means only those two destinations receive codes.
+
+Open the [Turnkey Dashboard](https://app.turnkey.com) and go to **Authentication → SMS**. The list is every country Turnkey can send to, the same set as the price table above. Select countries and choose **Allow**. Select allowed countries and choose **Remove** to turn them off.
+
+Allowing a country limits where you pay to send a code. A real user in an allowed country still receives the message, and a carrier failure, such as a phone that cannot be reached, can still cost money.

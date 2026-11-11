@@ -11049,7 +11049,7 @@
         },
         "apyPct": {
           "type": "string",
-          "description": "Gross annual percentage yield, expressed as a decimal fraction (before fees)."
+          "description": "Gross annual percentage yield including protocol rewards, expressed as a decimal fraction (before fees)."
         },
         "totalDeposited": {
           "type": "string",
@@ -11061,7 +11061,7 @@
         },
         "netApyPct": {
           "type": "string",
-          "description": "Annual percentage yield net of fees, expressed as a decimal fraction."
+          "description": "Annual percentage yield net of fees, expressed as a decimal fraction. Fees apply to the non-reward portion only; rewards_apy_pct passes through untouched."
         },
         "clientFeeBps": {
           "type": "string",
@@ -11128,6 +11128,10 @@
         "deployError": {
           "type": "string",
           "description": "Failure detail when deploy_status is FAILED."
+        },
+        "rewardsApyPct": {
+          "type": "string",
+          "description": "The protocol-reward portion of apy_pct (e.g. Merkl campaigns), expressed as a decimal fraction."
         }
       }
     },
@@ -11364,7 +11368,7 @@
         },
         "apyPct": {
           "type": "string",
-          "description": "Current annual percentage yield, expressed as a decimal fraction (e.g., '0.0812' for 8.12%)."
+          "description": "Gross annual percentage yield including protocol rewards, expressed as a decimal fraction (e.g., '0.0812' for 8.12%)."
         },
         "enabled": {
           "type": "boolean",
@@ -11397,6 +11401,10 @@
         "forceDeallocatableLiquidityDisplay": {
           "$ref": "#/definitions/EarnValueDisplay",
           "description": "Normalized force-deallocatable liquidity values for display purposes only (usd + crypto). Do not do arithmetic with these; use force_deallocatable_liquidity instead."
+        },
+        "rewardsApyPct": {
+          "type": "string",
+          "description": "The protocol-reward portion of apy_pct (e.g. Merkl campaigns), expressed as a decimal fraction."
         }
       }
     },
@@ -12195,6 +12203,32 @@
           "type": "string",
           "x-nullable": true,
           "description": "The Ethereum transaction hash, if available."
+        },
+        "fee": {
+          "$ref": "#/definitions/EthTransactionFee",
+          "x-nullable": true,
+          "description": "Fee the landed transaction paid, including when it reverted, when available."
+        }
+      }
+    },
+    "EthTransactionFee": {
+      "type": "object",
+      "properties": {
+        "gasUsed": {
+          "type": "string",
+          "format": "uint64",
+          "x-nullable": true,
+          "description": "Gas units consumed by the landed transaction (receipt.gasUsed)."
+        },
+        "effectiveGasPrice": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Effective gas price paid per gas unit, in wei (decimal string). On OP Stack chains, gasUsed multiplied by this price excludes the L1 data and operator fees."
+        },
+        "totalCostUsd": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Sponsored cost recorded for this transaction, in USD, at the token price used for billing. Unset for non-sponsored and testnet transactions, and until the cost is recorded."
         }
       }
     },
@@ -20655,6 +20689,43 @@
           "type": "string",
           "x-nullable": true,
           "description": "The Solana transaction signature, if available."
+        },
+        "fee": {
+          "$ref": "#/definitions/SolanaTransactionFee",
+          "x-nullable": true,
+          "description": "Fee the landed transaction paid, including when it failed on chain, when available."
+        }
+      }
+    },
+    "SolanaTransactionFee": {
+      "type": "object",
+      "properties": {
+        "feeLamports": {
+          "type": "string",
+          "format": "uint64",
+          "x-nullable": true,
+          "description": "Total fee the landed transaction paid, in lamports (meta.fee). Excludes rent."
+        },
+        "sponsoredRentLamports": {
+          "type": "string",
+          "format": "uint64",
+          "x-nullable": true,
+          "description": "Rent the paymaster covered for accounts this transaction created, in lamports, net of any rent swept back in the same transaction. Unset when none was sponsored. Not reduced if an account is later closed."
+        },
+        "totalCostUsd": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Sponsored cost recorded for this transaction, in USD, at the token price used for billing: fee_cost_usd plus rent_cost_usd. Unset for non-sponsored and testnet transactions, and until the cost is recorded."
+        },
+        "feeCostUsd": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The transaction fee portion of total_cost_usd, in USD."
+        },
+        "rentCostUsd": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "The sponsored rent portion of total_cost_usd, in USD. Unset when no rent was sponsored."
         }
       }
     },
