@@ -4,6 +4,10 @@ description: "Request executable quotes for a token pair from a Turnkey wallet, 
 mode: "wide"
 ---
 
+<Note>
+  A quote is an activity, so it needs a signature before the swap does. To show a price without one, use [`get_indicative_swap_quote`](/features/transaction-management/swap/market-swap#preview-the-price) and execute a [market swap](/features/transaction-management/swap/market-swap).
+</Note>
+
 **Prerequisites:**
 
 - The parent organization must be Pay As You Go, Pro, or Enterprise.
@@ -12,7 +16,7 @@ mode: "wide"
 
 ## Call create\_swap\_quote
 
-Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-reference/activities/create-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
+Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/api-reference/activities/create-swap-quote) activity with the standard envelope (`type`, `timestampMs`, `organizationId`) and a `parameters` object.
 
 <ParamField body="organizationId" type="string" required>
   The organization that owns the swapping wallet. Parent organizations and sub-organizations can both swap; the parent's swap configuration applies in either case.
@@ -42,6 +46,14 @@ Quoting is an activity: submit an [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/api-re
   Required for EVM ↔ SVM. Raw public address that receives the output asset. It must match the output token protocol (a Solana address for a Solana output; an EVM address for an EVM output). Omit it for same-protocol routes. Wallet account IDs, private key IDs, and CAIP identifiers are not accepted.
 </ParamField>
 
+<ParamField body="parameters.feeSponsorship / parameters.fixedRate" type="boolean">
+  Optional, `false` by default. Request [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) or a [fixed rate](/features/transaction-management/swap/fixed-rate). Both are available on Enterprise plans.
+</ParamField>
+
+<Note>
+  `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2` is still accepted. It takes the same parameters without `feeSponsorship` and `fixedRate`, and returns the same quotes. The TypeScript SDK's `createSwapQuote` sends V3 as of v2026.11.1. A policy that pins `activity.type` to V2 does not match V3; see the [policy examples](/features/policies/examples/swaps-earn).
+</Note>
+
 cURL:
 
 ```bash title="cURL"
@@ -51,7 +63,7 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
@@ -79,7 +91,7 @@ const client = new TurnkeyClient(
 );
 
 const { activity } = await client.request("/public/v1/submit/create_swap_quote", {
-  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+  type: "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
   timestampMs: String(Date.now()),
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
@@ -102,7 +114,7 @@ Response:
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2",
+    "type": "ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3",
     "result": {
       "createSwapQuoteResult": {
         "quotes": [
@@ -150,7 +162,7 @@ The result contains a quotes array. Each quote is executable as-is:
 }
 ```
 
-- `quoteId` — identifies this quote. Pass it to `ACTIVITY_TYPE_EXECUTE_SWAP_V3` to execute against this quote's pricing; execution is pinned to the quote it references.
+- `quoteId` — identifies this quote. Pass it in `boundQuote` to `ACTIVITY_TYPE_EXECUTE_SWAP_V4` to execute against this quote's pricing; execution is pinned to the quote it references.
 - `provider` — the provider that produced the quote and will execute the swap.
 - `outputAmount` — expected output in raw onchain units, net of all fees. This is what the recipient receives if the swap fills at the quoted price.
 - `minOutputAmount` — the floor enforced at execution, derived from `outputAmount` and your slippage tolerance. If the swap cannot deliver at least this amount, it fails rather than filling worse.
@@ -158,10 +170,12 @@ The result contains a quotes array. Each quote is executable as-is:
 - `clientFeeBps` — your organization's configured fee, for display or audit. Turnkey's fee is baked into the quoted amounts and is not itemized. See [Fees](/features/transaction-management/swap#fees).
 - `estimatedTimeSeconds` — optional. Provider-estimated time to settlement, when available.
 - `expiresAt` — millisecond epoch after which the quote can no longer be executed.
+- `feeSponsorship`, `fixedRate` — whether the quote uses [swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) or a [fixed rate](/features/transaction-management/swap/fixed-rate).
+- `estimatedCharges` — present when `feeSponsorship` or `fixedRate` is true. The estimated USD charges the swap adds to your invoice.
 
 ## Execution price semantics
 
-Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V3`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
+Execution is pinned to the quote: [`ACTIVITY_TYPE_EXECUTE_SWAP_V4`](/features/transaction-management/swap/execute-swap) references a `quoteId`, and the signed intent carries that quote's `quotedOutputAmount` and `minOutputAmount`. The economics your user signs are the economics that execute.
 
 Within those bounds, the actual fill can move:
 
@@ -169,7 +183,7 @@ Within those bounds, the actual fill can move:
 - `outputAmount` is the expected fill, not a guarantee. The settled amount can be higher or lower than quoted, bounded on the low side by `minOutputAmount`. The actual amount is reported as `outputAmount` in swap status on `COMPLETED`.
 - Quotes expire. A quote can only be executed before its `expiresAt`; after that, request a new quote. Quotes may still be technically valid while the route the quote describes is no longer available in the market due to price movements. In that situation, if the quote cannot be executed with the economic parameters, it will fail at execution time.
 
-For stablecoin pairs, [fixed-rate swaps](/features/transaction-management/swap/fixed-rate) (early access) deliver the quoted output at a fixed rate instead of the market rate at settlement.
+For stablecoin pairs, [fixed-rate swaps](/features/transaction-management/swap/fixed-rate) deliver the quoted output at a fixed rate instead of the market rate at settlement.
 
 **Important:** Neither Turnkey nor the underlying DEX aggregator guarantees execution at any quoted price. Users bear the risk of adverse price movement between the time of quote and the time of execution.
 

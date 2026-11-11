@@ -4,20 +4,20 @@ description: "Execute a quoted token swap from a Turnkey wallet in one signed ac
 mode: "wide"
 ---
 
-`ACTIVITY_TYPE_EXECUTE_SWAP_V3` runs a swap end-to-end against a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`. You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, minimum output, and `destinationAddress` when the route is EVM ↔ SVM. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
+`ACTIVITY_TYPE_EXECUTE_SWAP_V4` runs a swap end-to-end. This page covers bound mode, which executes a quote from `ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`. To swap without creating a quote first, see [Market swaps](/features/transaction-management/swap/market-swap). You sign an execute intent carrying the quote's economics — the `quoteId`, amounts, minimum output, and `destinationAddress` when the route is EVM ↔ SVM. Turnkey matches that intent to the bound quote, then constructs the transaction from the quote's attested execution (including any required ERC-20 approvals), signs it with the wallet derived from the bound quote inside a secure enclave, and broadcasts it. You never construct, see, or sign raw calldata; the intent is the only thing you sign.
 
 ## Prerequisites
 
 - A swap configuration is not required; without one, the quote already carries a client fee of 0. See [Enable Swaps](/features/transaction-management/swap/enable-swap).
-- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote).
+- You are using an unexpired quote from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/features/transaction-management/swap/get-swap-quote).
 - The address the quote was created for holds enough of the input asset to cover `inputAmount`. For non-sponsored swaps it also needs the origin chain's native asset for gas; if `sponsor: true`, your organization can sponsor the gas for the user's trade. To use the sponsored path gas sponsorship must be enabled for your organization.
 - For cross-chain or EVM ↔ SVM routes, the destination chain is supported by the provider. See [Supported providers, chains, and routes](/features/transaction-management/swap#supported-providers-chains-and-routes).
 - For EVM ↔ SVM, the quote and execute intents both set `destinationAddress` to the same raw output-protocol address.
 
 ## Submit the swap
 
-<ParamField body="parameters.quoteId" type="string" required>
-  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V2`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
+<ParamField body="parameters.boundQuote.quoteId" type="string" required>
+  The quote to execute, from [`ACTIVITY_TYPE_CREATE_SWAP_QUOTE_V3`](/features/transaction-management/swap/get-swap-quote). Execution is pinned to this quote's pricing and provider. Must be unexpired.
 </ParamField>
 
 <ParamField body="parameters.inputToken / parameters.outputToken" type="string" required>
@@ -28,11 +28,11 @@ mode: "wide"
   In raw onchain units, matching the quoted amount.
 </ParamField>
 
-<ParamField body="parameters.quotedOutputAmount" type="string" required>
+<ParamField body="parameters.boundQuote.quotedOutputAmount" type="string" required>
   The quote's expected output, in raw onchain units. Informational in settlement but part of the signed intent: the user signs the economics they were shown.
 </ParamField>
 
-<ParamField body="parameters.minOutputAmount" type="string" required>
+<ParamField body="parameters.boundQuote.minOutputAmount" type="string" required>
   The quote's floor, in raw onchain units. Enforced at execution time — if the swap would return less, it fails rather than filling worse.
 </ParamField>
 
@@ -53,17 +53,19 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --header "X-Stamp: <string> (see Stamps)" \
   --data '{
-    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
     "timestampMs": "<string> (e.g. 1745474677453)",
     "organizationId": "<ORGANIZATION_ID>",
     "parameters": {
-      "quoteId": "<QUOTE_ID>",
       "inputToken": "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "outputToken": "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
       "inputAmount": "1000000",
-      "quotedOutputAmount": "<EXPECTED_OUTPUT>",
-      "minOutputAmount": "<MINIMUM_OUTPUT>",
-      "sponsor": false
+      "sponsor": false,
+      "boundQuote": {
+        "quoteId": "<QUOTE_ID>",
+        "quotedOutputAmount": "<EXPECTED_OUTPUT>",
+        "minOutputAmount": "<MINIMUM_OUTPUT>"
+      }
     }
   }'
 ```
@@ -83,17 +85,19 @@ const client = new TurnkeyClient(
 );
 
 const { activity } = await client.request("/public/v1/submit/execute_swap", {
-  type: "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
+  type: "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
   timestampMs: String(Date.now()),
   organizationId: "<ORGANIZATION_ID>",
   parameters: {
-    quoteId: "<QUOTE_ID>",
     inputToken: "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     outputToken: "eip155:8453/erc20:0x4200000000000000000000000000000000000006",
     inputAmount: "1000000",
-    quotedOutputAmount: "<EXPECTED_OUTPUT>",
-    minOutputAmount: "<MINIMUM_OUTPUT>",
     sponsor: false,
+    boundQuote: {
+      quoteId: "<QUOTE_ID>",
+      quotedOutputAmount: "<EXPECTED_OUTPUT>",
+      minOutputAmount: "<MINIMUM_OUTPUT>",
+    },
   },
 });
 ```
@@ -105,7 +109,7 @@ The activity result returns a poll handle:
   "activity": {
     "id": "<ACTIVITY_ID>",
     "status": "ACTIVITY_STATUS_COMPLETED",
-    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V3",
+    "type": "ACTIVITY_TYPE_EXECUTE_SWAP_V4",
     "result": {
       "executeSwapResult": {
         "swapRequestId": "sha256:9a80031c2def40d9294900fb99be914999cea3dbe9a4dd4841a8e52ee29f09f5",
@@ -117,7 +121,13 @@ The activity result returns a poll handle:
 }
 ```
 
-`ExecuteSwapResult` returns `swapRequestId` (used to poll status), plus optional `provider` and `quoteId`.
+`ExecuteSwapResult` returns `swapRequestId` (used to poll status), plus optional `provider` and `quoteId`. `ACTIVITY_TYPE_EXECUTE_SWAP_V4` also sets `outputAmount`, `minOutputAmount`, `feeSponsorship`, and `fixedRate`. When `feeSponsorship` or `fixedRate` is true, it sets `estimatedCharges`, the estimated charges the swap adds to your invoice. See [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship) and [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate#charges).
+
+Each quote can be executed once. Executing a quote that another activity already used fails with `SWAP_QUOTE_ALREADY_USED`; request a new quote. A quote with swap fee sponsorship or a fixed rate is checked again at execution, so it can fail with the errors listed on [Swap fee sponsorship](/features/transaction-management/swap/fee-sponsorship#errors) and [Fixed-rate swaps](/features/transaction-management/swap/fixed-rate#errors).
+
+<Note>
+  `ACTIVITY_TYPE_EXECUTE_SWAP_V3` requests are still accepted, with the quote fields at the top level of `parameters`. If you move to `ACTIVITY_TYPE_EXECUTE_SWAP_V4`, update any policy that pins `activity.type`. See the [policy examples](/features/policies/examples/swaps-earn#swap-execution). `executeSwap` in the TypeScript SDK uses `ACTIVITY_TYPE_EXECUTE_SWAP_V4` as of release v2026.11.1, so move the quote fields into `boundQuote` when you upgrade.
+</Note>
 
 ## Gas: sponsored vs. self-funded
 
@@ -126,7 +136,7 @@ With `sponsor: true`, Gas Station pays the gas and the swapping wallet account n
 With `sponsor: false`, the wallet account performing the swap pays its own gas. The wallet account must be funded with a sufficient amount of the origin chain's gas asset before executing.
 
 <Note>
-  Gas Sponsorship is available on Pay-as-you-go (up to $10 per month), Pro (up to $25 per month), and Enterprise (unlimited spend, with configurable time windows) plans. If you need higher limits, please [reach out](https://www.turnkey.com/contact-us)!
+  Gas Sponsorship is available on Pay-as-you-go (up to \$10 per month), Pro (up to \$25 per month), and Enterprise (unlimited spend, with configurable time windows) plans. If you need higher limits, please [reach out](https://www.turnkey.com/contact-us)!
 </Note>
 
 ## What is abstracted away
