@@ -112,15 +112,13 @@ const walletsResponse = await apiClient.getWallets();
 
 ## Creating API proxies
 
-There are certain actions that are initiated by users, but require the activity to be signed by the
-root organization itself. Examples of this include the initial creation of the user
-`subOrganization` or sending an email to a user with a login credential as part of an `emailAuth`
-flow.
+For parent-initiated authentication, your backend signs the initialization, encrypted verification, and login requests with its parent-organization API key. You can implement dedicated routes with `apiClient()` or expose an explicit set of methods through a proxy handler.
 
-These can be implemented in your backend by creating an `apiClient` and handling requests from your
-browser application at different routes, but we have also provided a convenience method for doing
-this by having allowing a single `apiProxy` to handle requests at a single route and automatically
-sign specific user actions with the root organization's credentials.
+Use `@turnkey/sdk-server` 6.0.0 or later for encrypted OTP support. Upgrade the client packages and update policies before deployment; see the [OTP migration guide](/features/authentication/otp-migration-guide).
+
+The examples below allow existing-user OTP login. They do not grant signup or account-lookup access. A method allowlist is not application authentication or input validation: enforce your application's authorization and rate limits before forwarding requests. Keep parent API keys on the backend and plaintext OTP codes on the client.
+
+`otpLogin` must target the user's sub-organization, so the client needs that ID before it calls the proxy. Return it from a dedicated backend route that resolves the sub-organization only for the contact proven by the verification token; see [Verify the encrypted code](#verify-the-encrypted-code). Do not add `getSubOrgIds` to the allowlist: a proxied lookup lets any caller check whether an email address or phone number has an account.
 
 #### expressProxyHandler()
 
@@ -129,7 +127,7 @@ applications. It provides an API endpoint that forwards requests to the Turnkey 
 
 ```js
 const turnkeyProxyHandler = turnkey.expressProxyHandler({
-  allowedMethods: ["createSubOrganization", "emailAuth", "getSubOrgIds"],
+  allowedMethods: ["initOtp", "verifyOtp", "otpLogin"],
 });
 
 app.post("/apiProxy", turnkeyProxyHandler);
@@ -137,7 +135,7 @@ app.post("/apiProxy", turnkeyProxyHandler);
 // this will sign requests made with the client-side `serverSign` function with the root organization's API key for the allowedMethods in the config
 ```
 
-#### 2. nextProxyHandler()
+#### nextProxyHandler()
 
 The `nextProxyHandler()` method creates a proxy handler designed as a middleware for Next.js
 applications. It provides an API endpoint that forwards requests to the Turnkey API server.
@@ -145,7 +143,7 @@ applications. It provides an API endpoint that forwards requests to the Turnkey 
 ```js
 // Configure the Next.js handler with allowed methods
 const turnkeyProxyHandler = turnkey.nextProxyHandler({
-  allowedMethods: ["createSubOrganization", "emailAuth", "getSubOrgIds"],
+  allowedMethods: ["initOtp", "verifyOtp", "otpLogin"],
 });
 
 export default turnkeyProxyHandler;
@@ -153,256 +151,84 @@ export default turnkeyProxyHandler;
 // this will sign requests made with the client-side `serverSign` function with the root organization's API key for the allowedMethods in the config
 ```
 
-## TurnkeyServerClient
+## Email and SMS authentication
 
-The `@turnkey/sdk-server` exposes NextJS Server Actions. These server actions can be used to
-facilitate implementing common authentication flows.
+Use the following sequence for a custom backend. These are excerpts from separate request handlers, not one server-side function: initialization returns to the client, verification follows client-side encryption, and login follows client-side signing. The `turnkey` instance is initialized on the server as shown above.
 
-### `sendOtp()`
+### Initialize an attempt
 
-Initiate an OTP authentication flow for either an `EMAIL` or `SMS`.
+Submit `ACTIVITY_TYPE_INIT_OTP_V3` through `initOtp` under the parent organization:
 
-```typescript
-import { server } from "@turnkey/sdk-server";
-import { Turnkey } from "@turnkey/sdk-browser";
-
-const turnkey = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com",
-  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
+```ts
+const { otpId, otpEncryptionTargetBundle } = await turnkey.apiClient().initOtp({
+  otpType: "OTP_TYPE_EMAIL", // Use OTP_TYPE_SMS for SMS.
+  contact,
+  appName: "Example App",
 });
-
-const indexedDbClient = turnkey.indexedDbClient();
-
-const initAuthResponse = await server.sendOtp({
-  suborgID: suborgId!,
-  otpType,
-  contact: value,
-  userIdentifier: await indexedDbClient.getPublicKey(),
-  ...(emailCustomization && { emailCustomization }),
-  ...(sendFromEmailAddress && { sendFromEmailAddress }),
-  ...(customSmsMessage && { customSmsMessage }),
-  otpLength: 6,
-  alphanumeric: true,
-});
-
-if (initAuthResponse?.otpId) {
-  // Proceed to verifyOtp
-} else {
-  // Handle error
-}
 ```
 
-#### Parameters
+Return both values to the client. The client generates or selects a P-256 key and encrypts the OTP code and public key with the returned bundle. The private key and plaintext code stay on the client. Keep the ID, bundle, and client key together for the same attempt; replace attempt state on resend.
 
-<ParamField body="request" type="SendOtpRequest" required>
-  An object containing the parameters to initiate an `EMAIL` or `SMS` OTP authentication flow.
-</ParamField>
+See [client-side encryption and signing](/features/authentication/otp-migration-guide#replace-initialization-verification-and-login) for the client implementation. For the full request fields, see [Init generic OTP](/api-reference/activities/init-generic-otp).
 
-<ParamField body="suborgID" type="string" required>
-  The ID of the sub organization for the given request.
-</ParamField>
+### Verify the encrypted code
 
-<ParamField body="otpType" type="string" required>
-  The type of OTP request, either `EMAIL` or `SMS`.
-</ParamField>
+Receive `otpId` and `encryptedOtpBundle` from the client. Use the same organization as initialization:
 
-<ParamField body="contact" type="string" required>
-  The contact information (email or phone number) where the OTP will be sent.
-</ParamField>
-
-<ParamField body="userIdentifier" type="string" required>
-  The public key or other identifier used for rate limiting and logging.
-</ParamField>
-
-<ParamField body="customSmsMessage" type="string">
-  Use to customize the SMS message.
-</ParamField>
-
-<ParamField body="emailCustomization" type="EmailCustomization">
-  Use to customize the OTP email content.
-</ParamField>
-
-<ParamField body="sendFromEmailAddress" type="string">
-  Provide a custom email address which will be used as the sender.
-</ParamField>
-
-<ParamField body="otpLength" type="number">
-  Optionally specify the OTP length.
-</ParamField>
-
-<ParamField body="alphanumeric" type="boolean">
-  Optionally specify whether to use alphanumeric codes. Defaults to true.
-</ParamField>
-
-### `verifyOtp()`
-
-Verify the OTP Code sent to the user via `EMAIL` or `SMS`.
-
-```typescript
-import { server } from "@turnkey/sdk-server";
-import { Turnkey } from "@turnkey/sdk-browser";
-
-const turnkey = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com",
-  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
-});
-
-const indexedDbClient = turnkey.indexedDbClient();
-
-const verifyResponse = await server.verifyOtp({
+```ts
+const { verificationToken } = await turnkey.apiClient().verifyOtp({
   otpId,
-  otpCode,
-  sessionLengthSeconds,
-});
-
-if (verifyResponse?.verificationToken) {
-  const sessionResponse = await server.createOtpSession({
-    suborgID: suborgId,
-    verificationToken: verifyResponse.verificationToken,
-    publicKey: await indexedDbClient.getPublicKey(),
-    sessionLengthSeconds,
-  });
-
-  if (sessionResponse?.token) {
-    await indexedDbClient.loginWithSession(sessionResponse);
-    await onValidateSuccess();
-  } else {
-    // Handle session creation error
-  }
-} else {
-  // Handle verification failure
-}
-```
-
-#### Parameters
-
-<ParamField body="request" type="VerifyOtpRequest" required>
-  An object containing the parameters to verify an OTP authentication attempt.
-</ParamField>
-
-<ParamField body="otpId" type="string" required>
-  The ID returned by `sendOtp()` representing the OTP attempt.
-</ParamField>
-
-<ParamField body="otpCode" type="string" required>
-  The OTP code entered by the user.
-</ParamField>
-
-<ParamField body="sessionLengthSeconds" type="number">
-  Optional. The session lifetime in seconds. Defaults to 900 seconds (15 minutes).
-</ParamField>
-
-### `createOauthSession()`
-
-Complete an OAuth authentication flow after obtaining an OIDC token from the OAuth provider. This
-creates a Turnkey session bound to the provided public key.
-
-```typescript
-import { server } from "@turnkey/sdk-server";
-import { Turnkey } from "@turnkey/sdk-browser";
-
-const turnkey = new Turnkey({
-  apiBaseUrl: "https://api.turnkey.com",
-  defaultOrganizationId: process.env.NEXT_PUBLIC_ORGANIZATION_ID!,
-});
-
-const indexedDbClient = turnkey.indexedDbClient();
-
-const oauthSession = await server.createOauthSession({
-  suborgID: suborgId!,
-  oidcToken: credential,
-  publicKey: await indexedDbClient.getPublicKey(),
-  sessionLengthSeconds: authConfig.sessionLengthSeconds,
-});
-
-if (oauthSession?.session) {
-  await indexedDbClient.loginWithSession(oauthSession);
-  await onAuthSuccess();
-} else {
-  // Handle failure
-}
-```
-
-#### Parameters
-
-<ParamField body="request" type="CreateOauthSessionRequest" required>
-  An object containing the parameters to create a Turnkey session via OIDC.
-</ParamField>
-
-<ParamField body="suborgID" type="string" required>
-  The ID of the sub organization for the authenticated user.
-</ParamField>
-
-<ParamField body="oidcToken" type="string" required>
-  The OIDC token received from the third-party provider.
-</ParamField>
-
-<ParamField body="publicKey" type="string" required>
-  The public key to bind the session to (used for stamping requests).
-</ParamField>
-
-<ParamField body="sessionLengthSeconds" type="number">
-  Optional. Session lifetime in seconds. Defaults to 900 seconds (15 minutes).
-</ParamField>
-
-### `sendCredential()`
-
-Send a login credential to a user's email address.
-
-```typescript
-import { server } from "@turnkey/sdk-server";
-
-const sendCredentialResponse = await server.sendCredential({
-  email,
-  targetPublicKey: authIframeClient?.iframePublicKey!,
-  organizationId: suborgId!,
-  ...(apiKeyName && { apiKeyName }),
-  ...(sendFromEmailAddress && { sendFromEmailAddress }),
-  ...(sessionLengthSeconds && { sessionLengthSeconds }),
-  ...(invalidateExisting && { invalidateExisting }),
-  ...(emailCustomization && { emailCustomization }),
-  ...(sendFromEmailAddress && { sendFromEmailAddress }),
+  encryptedOtpBundle,
 });
 ```
 
-#### Parameters
+This submits `ACTIVITY_TYPE_VERIFY_OTP_V2`. Return the verification token to the client so it can sign the login request with the key bound during verification. Do not accept a plaintext `otpCode` in the backend request or encrypt it on the server.
 
-<ParamField body="request" type="InitEmailAuthRequest" required>
-  An object containing the parameters to send a login credential via email.
-</ParamField>
+Resolve the existing user's sub-organization after verification, using the verified contact and [Get sub-org IDs](/api-reference/queries/get-sub-organizations). For new users, follow [OTP signup](#otp-signup).
 
-<ParamField body="email" type="string" required>
-  The email address provided by the user.
-</ParamField>
+### Create a session
 
-<ParamField body="targetPublicKey" type="string" required>
-  The public key of the target user.
-</ParamField>
+Receive `verificationToken`, the session `publicKey`, and `clientSignature` from the client. The client must construct the protocol's login message and sign it with the private key bound during verification; signing the raw token or arbitrary JSON is not equivalent.
 
-<ParamField body="organizationId" type="string" required>
-  The ID of the sub organization for the given request.
-</ParamField>
+```ts
+const { session } = await turnkey.apiClient().otpLogin({
+  organizationId: subOrgId,
+  verificationToken,
+  publicKey,
+  clientSignature,
+  expirationSeconds: "900",
+});
+```
 
-<ParamField body="apiKeyName" type="string">
-  The name of the API Key.
-</ParamField>
+This submits `ACTIVITY_TYPE_OTP_LOGIN_V2`. Return `session` to the client and store it using that SDK's session API, retaining the matching client-held private key. See [Login with OTP](/api-reference/activities/login-with-otp) for the client signature fields and optional session settings.
 
-<ParamField body="userIdentifier" type="string">
-  IP Address, iframePublicKey, or other unique identifier used for rate limiting.
-</ParamField>
+Initialization, verification, and login have separate expiration settings. `expirationSeconds` on login sets the session lifetime. If you set `invalidateExisting: true`, it invalidates the user's other login sessions, including sessions created through other login methods.
 
-<ParamField body="sessionLengthSeconds" type="number">
-  Specify the length of the session in seconds. Defaults to 900 seconds or 15 minutes.
-</ParamField>
+### OTP signup
 
-<ParamField body="invalidateExisting" type="boolean">
-  Invalidate all pre-existing sessions. Defaults to `false`.
-</ParamField>
+If no existing account matches the verified contact, create a sub-organization with `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` or a later supported version. Pass the enclave-issued `verificationToken` and a signup `clientSignature` generated by the verification-bound key. A login signature cannot be reused for signup. See [Create sub-organization](/api-reference/activities/create-sub-organization) and the [complete backend example](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend).
 
-<ParamField body="emailCustomization" type="EmailCustomization">
-  An option to customize the email.
-</ParamField>
+### Recovery
 
-<ParamField body="sendFromEmailAddress" type="string">
-  Provide a custom email address which will be used as the sender of the email.
-</ParamField>
+Use encrypted OTP authentication and an appropriately restricted recovery session to enroll a replacement authenticator. Preserve MFA requirements and confirm that the replacement authenticator works before completing recovery. See [Replace email recovery](/features/authentication/otp-migration-guide#replace-email-recovery).
+
+## Social authentication
+
+For providers that issue OIDC ID tokens directly, use [Login with OAuth](/api-reference/activities/login-with-oauth). Bind the provider token's nonce to the client-held session key as described in [Social logins](/features/authentication/social-logins#oidc-provider).
+
+Providers such as X and Discord require a separate OAuth 2.0 exchange before login. Follow the [OAuth 2.0-only provider guidance](/features/authentication/social-logins#oauth-2-0-only-provider).
+
+### Create an OAuth session
+
+Receive the provider's `oidcToken` and the session `publicKey` from the client. The client sets the OAuth request's `nonce` to `sha256(publicKey)`, which binds the resulting token to its key pair. Resolve the user's sub-organization with [Get sub-org IDs](/api-reference/queries/get-sub-organizations), filtered by `OIDC_TOKEN`, then submit `ACTIVITY_TYPE_OAUTH_LOGIN` through `oauthLogin`:
+
+```ts
+const { session } = await turnkey.apiClient().oauthLogin({
+  organizationId: subOrgId,
+  oidcToken,
+  publicKey,
+  expirationSeconds: "900",
+});
+```
+
+Turnkey checks that the token's `nonce` matches `sha256(publicKey)` before returning the session JWT. Return `session` to the client and store it using that SDK's session API, retaining the matching client-held private key. See [Login with OAuth](/api-reference/activities/login-with-oauth) for optional fields such as `invalidateExisting` and `sessionProfileId`.

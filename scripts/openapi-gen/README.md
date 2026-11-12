@@ -68,3 +68,13 @@ The tool produces or updates these files/directories:
 - **Contribution:** Please update this README and `Makefile` when adding new CLI flags or output modes.
 - **New swagger tags:** Every tag on the main API's swagger operations must have an entry in `TAG_CATEGORY_ALIASES` (in `openapi-gen.ts`), mapping it to one of the `API_CATEGORIES` used for the REST API sidebar grouping. When mono ships a new tag, `--generate-mdx` throws `API navigation category mapping is missing for operationIds: ...` until that tag is added to `TAG_CATEGORY_ALIASES`.
 - **Renaming a category:** If you rename an entry in `API_CATEGORIES` (and its `TAG_CATEGORY_ALIASES` values), `--generate-mdx` will fail with a "stale group" error naming the old group left behind in `docs.json` — delete that old-named group from `docs.json` and re-run.
+
+### Deprecated authentication references
+
+`utils/deprecated-auth.ts` replaces the deprecated OTP/email authentication recipes
+with migration notices. The generators keep the existing page URLs, but omit these
+pages from navigation and endpoint cards. This prevents regeneration from
+recommending the deprecated flows again.
+
+Historical activity/query schemas are retained so customers can interpret existing
+activity records.

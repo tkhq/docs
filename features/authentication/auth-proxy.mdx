@@ -54,11 +54,11 @@ Used to authenticate users with a one-time code sent to their email or phone num
 
    > `otpEncryptionTargetBundle` is a TEE-signed bundle containing a target P-256 encryption key. The client uses it to encrypt the OTP code before submission, so the code is only decryptable inside the enclave. If you're using `react-wallet-kit` this is handled automatically — see the [otp-auth/without-backend](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/without-backend) example.
 
-2. **[Verify OTP](/api-reference/auth-proxy/otp-verify)** `POST /v1/otp_verify_v2` — Submit the OTP code along with the `otpId`. Returns a `verificationToken` — a short-lived, enclave-signed token proving the user owns the contact.
+2. **[Verify OTP](/api-reference/auth-proxy/otp-verify)** `POST /v1/otp_verify_v2` — Submit `encryptedOtpBundle` along with `otpId`; encrypt the code and client public key on the client first. Returns a `verificationToken` — a short-lived, enclave-signed token proving the user owns the contact.
 
 3. **[OTP Login](/api-reference/auth-proxy/otp-login)** `POST /v1/otp_login_v2` — Exchange the `verificationToken` + a client `publicKey` + `clientSignature` for a session JWT. The session is scoped to the sub-org matching the verified contact.
 
-   > `clientSignature` is the client's signature over the `verificationToken` using the private key corresponding to `publicKey`. This binds the session to the client's keypair and prevents replay attacks.
+   > `clientSignature` must be signed by the key you bound during verification. It covers a login message built from the token ID and the session public key, not the raw token. Use the SDK's message builder and signing helper; see [client signing](/features/authentication/otp-migration-guide#replace-initialization-verification-and-login).
 
 **Pre-verified signup:** You can also pass a `verificationToken` directly to [Signup](#signup-create-sub-organization) to create a new sub-org for a user who has already verified their contact via OTP — skipping a separate OTP round-trip on registration.
 

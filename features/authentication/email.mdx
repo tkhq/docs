@@ -1,14 +1,17 @@
 ---
 title: "Overview"
-description: "Email Authentication enables users to authenticate and recover their Turnkey accounts using email-based verification. There are two methods of email authentication:"
+description: "Authenticate users with encrypted email OTP verification and sessions bound to client-held keys."
 ---
 
-#### One-time password
+Email authentication uses a one-time password (OTP) sent to the user's email address. The client encrypts the code before submitting it for verification, then proves possession of its signing key to create a session.
 
-- Uses a 6-9 digit or alphanumeric (Crockford’s Base32) one-time password sent via email
-- Simple, and familiar user experience
+Codes are 6-9 characters long and either numeric or alphanumeric (Crockford's Base32).
 
-**One-Time Password Sandbox Environment**
+<Note>
+  Updating an existing integration? Legacy OTP activities, credential-bundle email authentication, and email recovery are deprecated; do not start a new integration with them. If you are moving off those flows, or upgrading SDK Browser/Server/React from before 6.0, SDK React Native from before 1.5.21, or Wallet Kit/Core from before 2.0, follow the [OTP migration guide](/features/authentication/otp-migration-guide) for SDK upgrades, activity versions, client signatures, and policy changes.
+</Note>
+
+**Sandbox testing**
 
 To test OTP codes in our sandbox environment you can use the following:
 
@@ -21,27 +24,9 @@ To test OTP codes in our sandbox environment you can use the following:
   OTP sandbox organizations can create real wallets and hold real assets. We recommend using them for testing only and avoiding real funds. See the [shared responsibility model](/security/shared-responsibility-model) for more information.
 </Warning>
 
-#### Credential bundle
-
-- Sends an encrypted API key credential directly via email
-- Alternative method for specific use cases
-- More secure, but requires copying the full credential to the client
-
-Both methods provide users with expiring credentials for authentication or account recovery: OTP login returns a session bound to a client-held key, and the credential bundle method delivers an encrypted API key.
-
-<Warning>
-  **Use the current OTP activities.** The `ACTIVITY_TYPE_INIT_OTP_AUTH` family (including `_V2` and `_V3`) and `ACTIVITY_TYPE_OTP_AUTH` are deprecated. New integrations — and any integration touching OTP today — should use `ACTIVITY_TYPE_INIT_OTP_V3` → `ACTIVITY_TYPE_VERIFY_OTP_V2` → `ACTIVITY_TYPE_OTP_LOGIN_V2`, with `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` for signup. 
-
-  If you call `initOtpAuth` followed by `otpAuth`, follow [Migrating from legacy OTP Auth](/features/authentication/otp-migration-guide#migrating-from-legacy-otp-auth) for the complete replacement flow, policy changes, and the switch from encrypted credential bundles to sessions.
-</Warning>
-
 ## Core mechanism
 
-Email Authentication is built with expiring API keys as the foundation. The two delivery mechanisms are:
-
-### OTP-based method
-
-The current OTP authentication process uses three activities:
+The low-level authentication flow uses three activities. Wallet Kit and Core manage encryption and session creation for you; see the [SDK-specific login behavior](/features/authentication/otp-migration-guide#wallet-kit-and-core-login-activities).
 
 <Steps>
   <Step>
@@ -55,37 +40,20 @@ The current OTP authentication process uses three activities:
   </Step>
 </Steps>
 
-### Credential bundle method
-
-<Note>This method is only supported by **legacy iframe-based flows** and is not available in the current Turnkey SDKs.</Note>
-
-The API key credential is encrypted and delivered directly through email to the user. Once the credential is live on the client side (within the context of an iframe), it is readily available to stamp (authenticate) requests. See the [enclave to end-user secure channel](/security/enclave-secure-channels) for more info on how we achieve secure delivery.
-
-This flow remains available for existing legacy integrations but is not recommended for new implementations.
-As an alternative, we recommend using the email OTP flow, which is fully supported by the current SDKs. An example that sends a magic link using [magicLinkTemplate](https://docs.turnkey.com/authentication/email#email-auth-and-recovery:~:text=height%20of%20124px-,magicLinkTemplate,-%3A%20a%20template%20for) can be found [here](https://github.com/tkhq/sdk/tree/main/examples/authentication/magic-link-auth).
-
 ### Email recovery
 
 In Turnkey, email recovery **does not refer to a separate, recovery-only email address** (as commonly used in consumer products, where a recovery email can reset access but cannot itself be used to sign in).
 Instead, it means **adding email as an authentication method for a user**. Once added, that user can authenticate using email by default, alongside any other configured authenticators (such as passkeys, social logins or external wallets).
 
-The legacy iframe-based flow using `INIT_USER_EMAIL_RECOVERY` and `RECOVER_USER` still exists for backward compatibility with older integrations. These flows ultimately attach new authentication material (for example, a passkey) to the user. They are being deprecated and **should not be used for new integrations**.
+To replace a lost authenticator, authenticate into a session scoped to authenticator enrollment, complete any required MFA challenges, and enroll a replacement with `ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2`. See [Replace email recovery](/features/authentication/otp-migration-guide#replace-email-recovery) for the full sequence and policy requirements.
 
 If you are designing a flow for users who have lost access to their primary authenticator, see [MFA Recovery](/features/authentication/mfa/enforcement-and-recovery). It covers requiring a second independent factor for recovery, landing recovery in a session scoped to authenticator enrollment only, and treating recovery as a security event.
 
 ## Prerequisites
 
-Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate email auth and create suborganizations. Check out our [Quickstart guide](/get-started/quickstart) if you need help getting started. To allow an API user to initiate email auth, you'll need the following policy in your main organization:
+Make sure you have set up your primary Turnkey organization with at least one API user that can programmatically initiate OTP and create suborganizations. Check out our [Quickstart guide](/get-started/quickstart) if you need help getting started.
 
-```json
-{
-  "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.id == '<YOUR_API_USER_ID>')",
-  "condition": "(activity.resource == 'AUTH' && activity.action == 'CREATE') || (activity.resource == 'ORGANIZATION' && activity.action == 'CREATE')"
-}
-```
-
-For OTP Auth signup and login flows you will need a user with the following policy
+For OTP signup and login flows you will need a user with the following policy:
 
 ```json
 {
@@ -105,6 +73,7 @@ The flow begins with a new activity of type `ACTIVITY_TYPE_INIT_OTP_V3` using th
 
 - `otpType`: specify `"OTP_TYPE_EMAIL"`
 - `contact`: user's email address
+- `appName`: required application name, at the top level of the activity parameters
 - `emailCustomization`: optional parameters for customizing emails
 - `userIdentifier`: optional parameter for rate limiting SMS OTP requests per user. We recommend generating this server-side based on the user's IP address or public key. See the [OTP Rate Limits](#otp-rate-limits) section below for more details.
 - `alphanumeric`: optional parameter for making this code alphanumeric or not. default: true
@@ -121,10 +90,10 @@ The response to `ACTIVITY_TYPE_INIT_OTP_V3` includes an `otpEncryptionTargetBund
 - `expirationSeconds`: optional validity window (defaults to 1 hour)
 
 <Note>
-  Plaintext OTP material must remain on the client; any application-server request must carry only `encryptedOtpBundle`.
+  Plaintext OTP material must remain on the client; send the code to your application server only inside `encryptedOtpBundle`, alongside the `otpId`.
 </Note>
 
-After receiving the verification token, users complete OTP authentication flow with `ACTIVITY_TYPE_OTP_LOGIN_V2` using the sub-organization ID associated with the contact from the first step:
+After receiving the verification token, users complete OTP authentication flow with `ACTIVITY_TYPE_OTP_LOGIN_V2` using the user's sub-organization ID. Resolve it after verification with `getSubOrgIds`, filtered by `EMAIL`. If no account exists, follow the signup path instead. Login requires:
 
 - `publicKey`: public key to add to organization data associated with the signing key in IndexedDB or SecureStorage.
 - `verificationToken`: JWT returned from successful `ACTIVITY_TYPE_VERIFY_OTP_V2` activity
@@ -135,8 +104,6 @@ After receiving the verification token, users complete OTP authentication flow w
 <Note>
   For signup, the same `verificationToken` from `ACTIVITY_TYPE_VERIFY_OTP_V2` is passed to `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8`, which requires a signature from the verification-bound client key.
 </Note>
-
-<Note>Upgrading a legacy OTP integration, SDK Browser/Server/React from before 6.0, SDK React Native from before 1.5.21, or Wallet Kit/Core from before 2.0? Follow the [OTP migration guide](/features/authentication/otp-migration-guide) to update activity versions, encrypted bundles, client signatures, and policies.</Note>
 
 <Frame>
   ![auth otp email](/images/authentication/img/auth_otp_email.png)
@@ -153,11 +120,11 @@ All activities are stamped using valid sub-organization credentials, with `organ
     Call `ACTIVITY_TYPE_INIT_OTP_V3` with `organizationId` set to the sub-org ID, stamped with the sub-org's API key
   </Step>
   <Step>
-    Call `ACTIVITY_TYPE_VERIFY_OTP_V2` with the same sub-org ID and API key to receive a `verificationToken`
+    Encrypt the code and client public key on the client. Call `ACTIVITY_TYPE_VERIFY_OTP_V2` with `otpId` and `encryptedOtpBundle`, stamped with the same sub-org API key, to receive a `verificationToken`
   </Step>
   <Step>
     Use the `verificationToken` to complete one of the following:
-    - `ACTIVITY_TYPE_OTP_LOGIN_V2` — authenticate and create a new session
+    - `ACTIVITY_TYPE_OTP_LOGIN_V2` — authenticate and create a new session, including the required `clientSignature` made by the verification-bound key
     - `ACTIVITY_TYPE_UPDATE_USER_EMAIL` — verify and update the user's email address
     - `ACTIVITY_TYPE_UPDATE_USER_PHONE` — verify and update the user's phone number
 
@@ -175,113 +142,30 @@ In order to safeguard users, Turnkey enforces rate limits for OTP auth activitie
 - 3 retries max per code, after which point that code will be locked
 - 3 active codes per user, each with a 5 minute TTL
 
-### Credential bundle authentication flow
-
-This alternative method uses `ACTIVITY_TYPE_EMAIL_AUTH` with these parameters:
-
-- `email`: user's email address (must match their registered email)
-- `targetPublicKey`: public key for credential encryption
-- `apiKeyName`: optional name (defaults to `Email Auth - <Timestamp>`)
-- `expirationSeconds`: optional validity window (defaults to 15 minutes)
-- `emailCustomization`: optional parameters for customizing emails
-- `invalidateExisting`: optional boolean to invalidate previous Email Auth API keys
-
-<Frame>
-  ![auth email](/images/authentication/img/auth_email.png)
-</Frame>
-
 ## Email customization
 
-We offer customization for the following:
+<a id="breaking-change-appname-required" />
 
-- `appName`: the name of the application. This will be used in the email's subject, e.g. `Sign in to ${appName}`
-- `logoUrl`: a link to a PNG with a max width of 340px and max height of 124px
-- `magicLinkTemplate`: a template for the URL to be used in the magic link button, e.g. `https://dapp.xyz/%s`. The auth bundle will be interpolated into the `%s`
+### Breaking change: `appName` required
 
-```js
-// Sign and submits the EMAIL_AUTH activity
-const response = await client.emailAuth({
-  type: "ACTIVITY_TYPE_EMAIL_AUTH",
-  timestampMs: String(Date.now()),
-  organizationId: <sub-organization-id>,
-  parameters: {
-    email: <user-email>,
-    targetPublicKey: <iframe-public-key>,
-    apiKeyName: <optional-api-key-name>,
-    expirationSeconds: <optional-api-key-expiration-in-seconds>,
-    emailCustomization: {
-      appName: <optional-your-app-name>,
-      logoUrl: <optional-your-logo-png>,
-      magicLinkTemplate: <optional-magic-link>
-    }
+`INIT_OTP_V3` requires `appName` at the top level of the activity parameters. For Auth Proxy integrations, configure the application name in **Dashboard → Embedded Wallets → Configuration**. For the Server SDK, pass it directly to `initOtp`.
+
+The following example uses `@turnkey/sdk-server` 6.0.0 or later. `turnkey` is the server-side instance configured with your parent organization's API key:
+
+```ts
+const { otpId, otpEncryptionTargetBundle } = await turnkey.apiClient().initOtp({
+  otpType: "OTP_TYPE_EMAIL",
+  contact: "user@example.com",
+  appName: "Example App",
+  emailCustomization: {
+    logoUrl: "https://example.com/logo.png",
   },
 });
 ```
 
-### Breaking change: `appName` required
+Return both `otpId` and `otpEncryptionTargetBundle` to the client and retain them for the same attempt. On resend, replace both values. Continue with [client-side encryption and verification](#otp-based-authentication-flow).
 
-<Warning>
-  **Effective December 16, 2025**
-
-  Beginning December 16, 2025, all email-based OTP and recovery activities will require the `appName` parameter. Existing SDK versions will continue working, but upgrading without setting an `appName` will break email-based flows.
-
-  **Auth Proxy users** — Set `appName` under [email configuration](https://app.turnkey.com/dashboard/walletKit) in the dashboard.
-
-  **Server SDK users** — If you call `init_otp_auth`, `init_otp`, `email_recovery`, or `email_auth` without `appName`:
-  - For `email_recovery` or `email_auth`: include `appName` in your request
-  - For `init_otp` or `init_otp_auth`: update your API call to match the new input structure when upgrading to the latest server SDK
-</Warning>
-
-<Accordion title="Server SDK code examples">
-
-**`emailAuth` and `emailRecovery`** — both methods use the same parameter structure:
-
-```js
-await client.emailAuth({
-  parameters: {
-    email: "user@example.com",
-    targetPublicKey: "<client-public-key>",
-    emailCustomization: {
-      appName: "Your App Name" // this is now required
-    }
-  }
-});
-```
-
-**`initOtp` and `initOtpAuth`** — both methods use the same parameter structure:
-
-```js
-await client.initOtp({
-  parameters: {
-    otpType: "OTP_TYPE_EMAIL",
-    contact: "user@example.com",
-    appName: "Your App Name", // this is now required
-    emailCustomization: {
-      // other optional customization
-    }
-  }
-});
-```
-
-</Accordion>
-
-<Accordion title="Policy activity type updates">
-
-The table below lists activity-version updates and migration paths. For historical context, the `appName` requirement introduced `EMAIL_AUTH_V3` and `INIT_USER_EMAIL_RECOVERY_V2`. Those version updates retained the credential-bundle flows; they did not migrate an integration to OTP.
-
-For the recommended replacement of legacy email authentication and recovery, follow [Migrating from legacy email authentication and recovery](/features/authentication/otp-migration-guide#migrating-from-legacy-email-authentication-and-recovery). The low-level authentication flow uses `INIT_OTP_V3` → `VERIFY_OTP_V2` → `OTP_LOGIN_V2`; Core and Wallet Kit helpers use [version-specific login activities](/features/authentication/otp-migration-guide#wallet-kit-and-core-login-activities). Recovery additionally enrolls a replacement authenticator with `CREATE_AUTHENTICATORS_V2` using a recovery session.
-
-| **Flow** | **Old activity type** | **Updated activity or migration** |
-| :--- | :--- | :--- |
-| Legacy credential-bundle email auth | `ACTIVITY_TYPE_EMAIL_AUTH`, `ACTIVITY_TYPE_EMAIL_AUTH_V2`, `ACTIVITY_TYPE_EMAIL_AUTH_V3` | Migrate to encrypted OTP authentication; see [Replace email authentication](/features/authentication/otp-migration-guide#replace-email-authentication). |
-| Init OTP auth (deprecated) | `ACTIVITY_TYPE_INIT_OTP_AUTH`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V2`, `ACTIVITY_TYPE_INIT_OTP_AUTH_V3`, `ACTIVITY_TYPE_OTP_AUTH` | Deprecated — migrate to the `ACTIVITY_TYPE_INIT_OTP_V3` + `ACTIVITY_TYPE_VERIFY_OTP_V2` + `ACTIVITY_TYPE_OTP_LOGIN_V2` flow (see the [OTP migration guide](/features/authentication/otp-migration-guide) for policy changes) |
-| Init OTP (signup) | `ACTIVITY_TYPE_INIT_OTP`, `ACTIVITY_TYPE_INIT_OTP_V2` | `ACTIVITY_TYPE_INIT_OTP_V3` |
-| Verify OTP | `ACTIVITY_TYPE_VERIFY_OTP` | `ACTIVITY_TYPE_VERIFY_OTP_V2` |
-| OTP login | `ACTIVITY_TYPE_OTP_LOGIN` | `ACTIVITY_TYPE_OTP_LOGIN_V2` |
-| Legacy credential-bundle email recovery (deprecated) | `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY`, `ACTIVITY_TYPE_INIT_USER_EMAIL_RECOVERY_V2`, followed by `ACTIVITY_TYPE_RECOVER_USER` | Migrate to encrypted OTP login and replacement authenticator enrollment; see [Replace email recovery](/features/authentication/otp-migration-guide#replace-email-recovery). |
-
-</Accordion>
-
+`emailCustomization.logoUrl` accepts a PNG with a maximum width of 340px and height of 124px. For the complete customization fields, see [Init generic OTP](/api-reference/activities/init-generic-otp). For an existing integration, follow the [migration guide](/features/authentication/otp-migration-guide) rather than updating only `appName`.
 
 ### Email templates
 
@@ -339,73 +223,18 @@ Please keep in mind that:
 
 If you are interested in implementing bespoke, fully-customized email templates and sender domain, please reach out to [hello@turnkey.com](mailto:hello@turnkey.com).
 
-### Authorization
+## Authorization and organization settings
 
-Authorization is managed through our [policy engine](/features/policies/overview):
+A root user satisfying the root quorum, or an API user with the required policies, can submit OTP activities. Parent-initiated login is evaluated against the parent organization's policies even though login targets the user's sub-organization. See [Prerequisites](#prerequisites) and [MFA enforcement](/features/authentication/mfa/enforcement-and-recovery).
 
-### Authentication
+Email OTP authentication must be enabled for the organization being authenticated:
 
-Both OTP-based and credential bundle authentication activities:
+- **Top-level organizations:** disabled by default. Enable it with `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` and `FEATURE_NAME_OTP_EMAIL_AUTH`.
+- **Sub-organizations:** enabled by default. To turn it off, set `disableOtpEmailAuth: true` when creating the sub-organization; see [Create sub-organization](/api-reference/activities/create-sub-organization).
 
-- Can be performed by [root quorum](/features/users/root-quorum#root-quorum) or users with proper policy authorization
-- Require the respective feature to be enabled in the organization and sub-organization
-- Can target any user in the organization or sub-organizations
+To disable it later, use `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` with the same feature name.
 
-Specifically:
-
-- For OTP-based auth (current): `ACTIVITY_TYPE_INIT_OTP_V3`, `ACTIVITY_TYPE_VERIFY_OTP_V2`, and `ACTIVITY_TYPE_OTP_LOGIN_V2`
-- For credential bundle auth: `ACTIVITY_TYPE_EMAIL_AUTH`
-
-<Frame>
-  ![email auth authorization](/images/authentication/img/diagrams/email_auth_authorization.png)
-</Frame>
-
-### Example implementations
-
-- [OTP Auth Example](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth)
-- [Email Auth Example](https://github.com/tkhq/sdk/tree/main/examples/authentication/email-auth)
-- [Demo Embedded Wallet](https://wallet.tx.xyz) ([code](https://github.com/tkhq/demo-embedded-wallet))
-
-## Implementation in organizations
-
-For organizations accessed via dashboard:
-
-1. Ensure the required features are enabled:
-   - `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP-based authentication
-   - `FEATURE_NAME_EMAIL_AUTH` for credential bundle authentication
-2. Users initiating the request must have appropriate permissions
-
-## Opting out
-
-Organizations can disable email-based features if their security model requires it:
-
-Use `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` to disable:
-
-- `FEATURE_NAME_OTP_EMAIL_AUTH` for OTP-based authentication
-- `FEATURE_NAME_EMAIL_AUTH` for credential bundle authentication
-
-When creating sub-organizations, use:
-
-- `disableOtpEmailAuth` parameter for OTP-based authentication
-- `disableEmailAuth` parameter for credential bundle authentication
-
-## Implementation notes
-
-- Users are limited to:
-  - 10 long-lived API keys
-  - 10 expiring API keys (oldest are discarded when limit is reached)
-
-### For top-level organizations
-
-- Both authentication methods are disabled by default
-- Must be enabled via `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`
-
-### For sub-organizations
-
-- Both authentication methods are enabled by default
-- Can be disabled during creation using `CreateSubOrganizationIntentV7` activity parameters
-
-Example of enabling OTP-based Email Auth:
+Example of enabling email OTP authentication:
 
 ```bash
 turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization_feature --body '{
@@ -418,15 +247,13 @@ turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization
 }' --organization <YOUR-ORG-ID>
 ```
 
-Example of enabling credential bundle Email Auth:
+### API key limits
 
-```bash
-turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization_feature --body '{
-        "timestampMs": "'"$(date +%s)"'000",
-        "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
-        "organizationId": "<YOUR-ORG-ID>",
-        "parameters": {
-                "name": "FEATURE_NAME_EMAIL_AUTH"
-        }
-}' --organization <YOUR-ORG-ID>
-```
+Each user can hold up to 10 long-lived API keys and 10 expiring API keys. When the expiring-key limit is reached, the oldest expiring key is discarded.
+
+## Example implementations
+
+- [Email OTP with a custom backend](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/with-backend)
+- [Email OTP with Auth Proxy](https://github.com/tkhq/sdk/tree/main/examples/authentication/otp-auth/without-backend)
+
+Both examples use encrypted OTP verification.

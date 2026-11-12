@@ -45,64 +45,23 @@ With the proxy disabled, `TurnkeyContext.client` will be stamper-only after you 
 Implement endpoints that forward to Turnkey's public API. Depending on your flow, you'll typically use:
 
 - [`createSubOrganization`](/api-reference/activities/create-sub-organization) — signup
-- [`initGenericOtp`](/api-reference/activities/init-generic-otp)
-- [`verifyGenericOtp`](/api-reference/activities/verify-generic-otp)
-- [`loginWithOtp`](/api-reference/activities/login-with-otp)
-- [`loginWithOauth`](/api-reference/activities/login-with-oauth)
+- [Init generic OTP](/api-reference/activities/init-generic-otp) — `ACTIVITY_TYPE_INIT_OTP_V3`
+- [Verify generic OTP](/api-reference/activities/verify-generic-otp) — `ACTIVITY_TYPE_VERIFY_OTP_V2`
+- [Login with OTP](/api-reference/activities/login-with-otp) — `ACTIVITY_TYPE_OTP_LOGIN_V2`
+- [Login with OAuth](/api-reference/activities/login-with-oauth) — for an OIDC token bound to the client key
 
 Notes:
 
 - Passkey and external wallet login happen on-device via [`login-with-a-stamp`](/api-reference/activities/login-with-a-stamp). Signup still requires `createSubOrganization` on your backend.
 - You may apply custom validation, logging, and rate limiting in your server.
 
-For a complete server example, see the Swift demo wallet's example server in the Swift SDK repo: [swift-sdk/Examples/with-backend/example-server](https://github.com/tkhq/swift-sdk/tree/main/Examples/with-backend/example-server).
+For a TypeScript backend, use `@turnkey/sdk-server` 6.0.0 or later and the [encrypted OTP server flow](/solutions/company-wallets/integration-guide/javascript-server#email-and-sms-authentication). Turnkey also provides [Rust](https://github.com/tkhq/rust-sdk) and [Go](https://github.com/tkhq/go-sdk) SDKs. Whichever language you use, the activity versions and client/server boundary below are the same.
 
-### Minimal Node/Express signup endpoint
+### OTP signup
 
-```ts
-import express, { Request, Response } from "express";
-import bodyParser from "body-parser";
-import { Turnkey } from "@turnkey/sdk-server";
+An email address in `rootUsers` does not prove ownership of that address. Complete encrypted OTP verification first, then submit `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` or a later supported version with the `verificationToken` and a signup `clientSignature` made by the verification-bound client key. Include the intended root users and credentials as described in [Create sub-organization](/api-reference/activities/create-sub-organization).
 
-const app = express();
-app.use(bodyParser.json());
-
-const turnkey = new Turnkey({
-  apiBaseUrl: process.env.TURNKEY_API_URL ?? "",
-  defaultOrganizationId: process.env.TURNKEY_ORGANIZATION_ID ?? "",
-  apiPublicKey: process.env.TURNKEY_API_PUBLIC_KEY ?? "",
-  apiPrivateKey: process.env.TURNKEY_API_PRIVATE_KEY ?? "",
-}).apiClient();
-
-// SIGNUP (example: email-based)
-app.post("/signup", async (req: Request, res: Response) => {
-  const {
-    userEmail,
-    apiKeys = [],
-    authenticators = [],
-    oauthProviders = [],
-  } = req.body;
-  const result = await turnkey.createSubOrganization({
-    organizationId: process.env.TURNKEY_ORGANIZATION_ID!,
-    subOrganizationName: `Sub Org - ${new Date().toISOString()}`,
-    rootUsers: [
-      {
-        userName: userEmail,
-        userEmail,
-        authenticators,
-        oauthProviders,
-        apiKeys,
-      },
-    ],
-    rootQuorumThreshold: 1,
-  });
-  res.json({ subOrganizationId: result.subOrganizationId });
-});
-
-app.listen(3000, () => console.log("Auth backend listening on :3000"));
-```
-
-Turnkey also offers [Rust](https://github.com/tkhq/rust-sdk) and [Go](https://github.com/tkhq/go-sdk) SDKs that can be used to implement the backend endpoints. You can also use any other backend language you prefer as long as it can make HTTP requests to the Turnkey API.
+Use the signup message format for the selected activity version; do not reuse a login signature. Keep the root-user configuration and the signed signup payload consistent. See the [OTP migration guide](/features/authentication/otp-migration-guide) for policy and SDK requirements.
 
 ## On your iOS app
 
@@ -173,75 +132,26 @@ struct ContentView: View {
 }
 ```
 
-### Example: OTP login
+<a id="example-otp-login" />
 
-Putting it all together, you can implement an OTP login flow like this:
+### OTP login protocol
 
-```swift OtpLoginView.swift expandable focus={3,22,24,31,34,41-65}
-import Foundation
-import SwiftUI
-import TurnkeySwift
+The app must encrypt the code before it leaves the device and sign the login message with the key bound during verification. The table describes the application backend contract; route names are chosen by your application.
 
-struct OtpInitRequest: Codable { let otpType: String; let contact: String }
-struct OtpInitResponse: Codable { let otpId: String }
-struct OtpVerifyRequest: Codable { let otpId: String; let otpCode: String }
-struct OtpVerifyResponse: Codable { let verificationToken: String }
-struct OtpLoginRequest: Codable { let verificationToken: String; let publicKey: String }
-struct OtpLoginResponse: Codable { let sessionToken: String }
+| Step | iOS app | Backend |
+| --- | --- | --- |
+| Initialize | Request an OTP for the user's contact. | Submit `INIT_OTP_V3` under the parent organization with `otpType`, `contact`, and `appName`. Return both `otpId` and `otpEncryptionTargetBundle`. |
+| Encrypt | Generate or select a P-256 key. Use the returned target bundle to encrypt the OTP code and public key on-device. Send `otpId` and `encryptedOtpBundle`. | Receive the encrypted bundle; never require the plaintext code or client private key. |
+| Verify | Retain the key for this attempt. | Submit `VERIFY_OTP_V2` under the same organization as initialization. Return the `verificationToken` to the app and resolve the existing sub-organization for the verified contact. |
+| Sign | Construct the protocol's login message from the verification token and session key, then sign it with the verification-bound private key. Send `verificationToken`, the session `publicKey`, and `clientSignature`. | Submit `OTP_LOGIN_V2` to the resolved sub-organization with those fields. Return its `session` JWT. |
+| Store | Call `storeSession(jwt:)` with the returned JWT. Retain the private key matching the session public key. | — |
 
-func postJSON<T: Encodable, U: Decodable>(_ url: URL, body: T) async throws -> U {
-  var req = URLRequest(url: url)
-  req.httpMethod = "POST"
-  req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-  req.httpBody = try JSONEncoder().encode(body)
-  let (data, _) = try await URLSession.shared.data(for: req)
-  return try JSONDecoder().decode(U.self, from: data)
-}
+The parent organization's API key stays on the backend for every step.
 
-struct OtpLoginView: View {
-  @EnvironmentObject private var turnkey: TurnkeyContext
-  @State private var contact: String = ""
-  @State private var otpCode: String = ""
+`clientSignature` contains `scheme`, `publicKey`, `message`, and `signature`; see [Login with OTP](/api-reference/activities/login-with-otp). Use SDK encryption and signing helpers that implement the encrypted OTP protocol. Signing the raw verification token or an arbitrary JSON object does not produce the required login message. The [OTP migration guide](/features/authentication/otp-migration-guide#replace-initialization-verification-and-login) describes the message construction and client/server sequence.
 
-  let baseURL: String
+Do not move encryption or client signing to the backend to work around a missing helper. If your Swift SDK integration cannot yet implement this protocol, use the supported [Auth Proxy email/SMS flow](/solutions/embedded-wallets/integration-guide/swift/authentication/email-sms) rather than a plaintext backend flow.
 
-  var body: some View {
-    VStack {
-      TextField("Email or phone", text: $contact)
-      TextField("OTP code", text: $otpCode)
-      Button("Log in with OTP") {
-        Task {
-          try? await otpLogin()
-        }
-      }
-    }
-  }
+Keep `otpId`, `otpEncryptionTargetBundle`, and the client key as state for one attempt. On resend, discard the previous attempt state. Surface verification and login errors to the user, and only store a session after login succeeds.
 
-  @MainActor
-  func otpLogin() async throws {
-    // 1) Init OTP
-    let initResp: OtpInitResponse = try await postJSON(
-      URL(string: "\(baseURL)/otp/init")!,
-      body: OtpInitRequest(otpType: contact.contains("@") ? "OTP_TYPE_EMAIL" : "OTP_TYPE_SMS", contact: contact)
-    )
-
-    // 2) Verify OTP -> verificationToken
-    let verifyResp: OtpVerifyResponse = try await postJSON(
-      URL(string: "\(baseURL)/otp/verify")!,
-      body: OtpVerifyRequest(otpId: initResp.otpId, otpCode: otpCode)
-    )
-
-    // 3) Generate public key for the session
-    let publicKey = try turnkey.createKeyPair()
-
-    // 4) Login -> sessionToken
-    let loginResp: OtpLoginResponse = try await postJSON(
-      URL(string: "\(baseURL)/otp-login")!,
-      body: OtpLoginRequest(verificationToken: verifyResp.verificationToken, publicKey: publicKey)
-    )
-
-    // 5) Store session locally
-    try await turnkey.storeSession(jwt: loginResp.sessionToken)
-  }
-}
-```
+For account recovery, follow [Replace email recovery](/features/authentication/otp-migration-guide#replace-email-recovery), including restricted session permissions, MFA, and replacement authenticator enrollment.
