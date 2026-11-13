@@ -86,12 +86,14 @@ Once the deployment is submitted and approved, our infrastructure deploys and ma
 
 | Resource    | Default Allocation   |
 | :-----------| :----------- |
-| vCPUs       | 2 |
-| RAM         | 1 GiB |
+| vCPUs       | 2 (`small` instance size) |
+| RAM         | 1 GiB (`small` instance size) |
 | Filesystem  | RAM-based (no persistence) |
 | Replicas    | 3 |
 | Ingress     | Load-balanced across all replicas |
 | Sub-domain  | Automated (`app-<APP_UUID>.app.turnkey.cloud` in `us-east-1`, `app-<APP_UUID>.app-sin.turnkey.cloud` in `ap-southeast-1`) |
+
+Larger vCPU and RAM allocations are available per deployment. See [Instance sizes](#instance-sizes).
 
 ## Networking and ingress
 
@@ -123,6 +125,46 @@ also determines the app's public subdomain, as described in [Networking and ingr
 Creating an app in `ap-southeast-1` for an organization that is not enabled for it fails with
 `region "ap-southeast-1" is not enabled for organization <ORG_ID>`, and nothing is created. To
 enable Singapore for your organization, contact Turnkey through [support](/support/overview).
+
+## Instance sizes
+
+Each deployment runs on one of three enclave instance sizes. The size sets the vCPUs and RAM that
+every replica of that deployment gets.
+
+| Size     | vCPUs | RAM    | Availability                        |
+| :------- | :---- | :----- | :---------------------------------- |
+| `small`  | 2     | 1 GiB  | Default for every organization      |
+| `medium` | 6     | 24 GiB | Enabled per organization by Turnkey |
+| `large`  | 14    | 48 GiB | Enabled per organization by Turnkey |
+
+Pick a size with `instanceSizeCpus` and `instanceSizeRam` (in GiB) in your deploy config file, or
+with the same fields on [Create TVC Deployment](/api-reference/activities/create-a-tvc-deployment).
+Set both or neither. Omitting both means `small`.
+
+```json
+{
+  "instanceSizeCpus": 6,
+  "instanceSizeRam": 24
+}
+```
+
+The CLI rejects any pair other than the three above before sending a request. The API rejects a
+request that sets only one of the two fields.
+
+Requesting `medium` or `large` for an organization that is not enabled for them fails with
+`ENCLAVE_SIZE feature not enabled for org_id <ORG_ID>, cannot set instance size CPUs or RAM`, and
+no deployment is created. To enable larger sizes for your organization, contact Turnkey through
+[support](/support/overview).
+
+The size is fixed once the deployment is created. To change it, create a new deployment with the
+new size and [direct traffic to it](/features/verifiable-cloud/managing-apps-and-deployments#direct-traffic-to-a-deployment).
+
+To see a deployment's size, open your app on the [TVC dashboard](https://app.turnkey.com/dashboard/v2/tvc),
+which shows **Instance Size** in the deployments table and on each deployment's page. The
+[Get TVC Deployment](/api-reference/queries/get-tvc-deployment) and
+[List TVC Deployments](/api-reference/queries/list-tvc-deployments) endpoints return it as
+`instanceSizeCpus` and `instanceSizeRam`. The dashboard's deployment form does not offer a size
+choice, so deployments created there are `small`. Use the CLI or API to pick another size.
 
 ## Manifests
 
