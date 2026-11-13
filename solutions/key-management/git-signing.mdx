@@ -53,8 +53,64 @@ Turnkey denies all requests by default. Only policies let a user take actions ag
 | **Committer identity** | Use your name with `(agent)` and your email address plus-tagged with the agent's user name, such as `Jane Doe (agent) <jane+agent@example.com>`. Its commits group with yours in `git shortlog`, and GitHub sends the email confirmation link to your inbox. For a GPG key, put the same identity in the key's user ID. | [Committer identity](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#committer-identity) |
 | **Where the Git config lives** | If you sign with your own key on the same machine, put the agent's Git config in the agent runtime's environment, not in `~/.gitconfig`. | [Human and agent on one machine](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#human-and-agent-on-one-machine) |
 | **Approval** | Limit what the agent can sign unilaterally, or require human escalation via policy consensus condition. | [Policy language](/features/policies/language) |
-| **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
+| **SSH destinations** | Run `tk ssh agent --userauth typed`, and Turnkey verifies the server's host key before policy evaluates the login. A policy can then allow only specific hosts, such as GitHub. See [SSH policy examples](#ssh-policy-examples). | [Typed logins](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#typed-logins) |
 | **Revocation** | Delete the agent's session key to stop all its signing and SSH at once. Delete the user to remove it entirely. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
+
+## SSH policy examples
+
+With `tk ssh agent --userauth typed`, each SSH login is an `ACTIVITY_TYPE_SIGN_SSH_USERAUTH` activity. OpenSSH 8.9 and later send the agent a `session-bind@openssh.com` message before a login: it holds the server's host key and the server's signature over the session ID. Turnkey verifies that signature inside the enclave, checks that the login is for the same session, and only then evaluates policy. A caller cannot claim a different host, because only the holder of the host's private key can make that signature.
+
+Policies can read these fields. Each comes from bytes that Turnkey parsed and verified:
+
+| Field | Example | Meaning |
+| :--- | :--- | :--- |
+| `activity.params.host_key_fingerprint` | `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU` | The verified server host key, in OpenSSH `SHA256:` format. |
+| `activity.params.host_key_algorithm` | `ssh-ed25519` | The host key type. Ed25519 and ECDSA P-256 host keys are supported. |
+| `activity.params.username` | `git` | The SSH user name in the login request. |
+| `activity.params.service` | `ssh-connection` | The service the client asks for after login. |
+| `activity.params.host_bound` | `true` | Whether the client used the `publickey-hostbound-v00@openssh.com` method, which the server also checks. |
+| `private_key.id` | | The Turnkey SSH key that signs. |
+
+Print GitHub's current host key fingerprints with `tk ssh github-host-keys`. It reads them from `https://api.github.com/meta` over TLS, so you do not have to trust whichever server answers an `ssh-keyscan`.
+
+### Only GitHub, as the `git` user
+
+```json
+{
+  "policyName": "agent-ssh: github.com only, as git",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<agent-user-tag-id>'))",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_SSH_USERAUTH' && private_key.id == '<ssh-key-id>' && activity.params.username == 'git' && activity.params.service == 'ssh-connection' && activity.params.host_key_fingerprint in ['SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU', 'SHA256:p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM']"
+}
+```
+
+The key can then log in only to GitHub. It cannot log in to another host, even if the agent's machine is compromised. When GitHub rotates a host key, logins fail until you update the policy, so the change fails closed.
+
+### Only the repositories of one GitHub organization
+
+The SSH login does not contain the repository path. Git sends it later, on the encrypted connection, so neither the agent nor Turnkey sees it. Turnkey enforces the host. GitHub enforces the repositories, through the account that holds the public key:
+
+- Register the key on a machine user that belongs only to your organization, with team permissions as narrow as the work allows.
+- Or use one read-only deploy key per repository, with one Turnkey key per deploy key. The policy's `private_key.id` then selects the repository.
+
+### Approval for each new host
+
+```json
+{
+  "policyName": "agent-ssh: other hosts need approval",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.tags.contains('<agent-user-tag-id>')) && approvers.any(user, user.tags.contains('<human-user-tag-id>'))",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_SSH_USERAUTH' && private_key.id == '<ssh-key-id>' && activity.params.host_key_fingerprint in ['<host-fingerprint>']"
+}
+```
+
+SSH waits for the signature while the connection is open, so a login that needs approval fails. `tk ssh agent` logs the activity fingerprint. Approve the activity, then connect again. Each connection has a new session ID, so a signature approved for an earlier connection cannot be used for a new one, and each connection needs its own approval.
+
+### Keep raw signing off SSH keys
+
+An Ed25519 key signs any bytes it is given. If a policy also allows `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2` with the SSH key, a caller can sign a login for any host as a raw payload, and the host policy does not apply. On SSH keys, allow only `ACTIVITY_TYPE_SIGN_SSH_USERAUTH`, and check `activity.type` in each condition: a broad condition such as `activity.action == 'SIGN' && private_key.id == '<ssh-key-id>'` also matches raw signing. The agent must be a non-root user, because root users skip policy.
+
+In typed mode, `tk ssh agent` never falls back to raw signing. It refuses a login without a session-bind (clients older than OpenSSH 8.9, or a socket relay), and a login through a forwarded agent.
 
 ## Set up with your agent
 
