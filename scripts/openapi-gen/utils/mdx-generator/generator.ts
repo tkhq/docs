@@ -1,3 +1,4 @@
+import { getDeprecatedAuthNotice } from "../deprecated-auth";
 import fs from "fs";
 import path from "path";
 import { ApiEndpoint, ApiField, EnumOption } from "../endpoint-parser/types";
@@ -704,6 +705,9 @@ export function generateMdxFile(
 
 // --- Main MDX Content Generation ---
 export function generateMdxContent(endpoint: ApiEndpoint): string {
+  const notice = getDeprecatedAuthNotice(endpoint);
+  if (notice) return notice;
+
   const rootEndpointPath = endpoint.path.split("/").filter(Boolean).pop();
 
   // 1. Frontmatter and Imports
