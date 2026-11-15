@@ -1,24 +1,44 @@
 ---
 title: "Personal Agent Protocol"
-description: "Keep a Personal Agent Protocol agent's identity key in Turnkey, with policy on every client assertion and delegation it signs."
+description: "Run a personal agent that companies can trust, with an identity key that never leaves Turnkey and your policies on everything it signs."
 ---
 
 import { FeatureCard } from '/snippets/feature-card.mdx'
 import { SolutionCard } from '/snippets/solution-card.mdx'
+import { MintJwtCallout } from '/snippets/mint-jwt-callout.mdx'
 
-[Personal Agent Protocol](https://personalagentprotocol.org) (PAP, or "Poppy") defines how a personal agent, acting for one user, works with a company on that user's behalf: discovery, sign-in, and requests to the company's APIs, website, and conversations. The agent is an OAuth client. Its `client_id` is an HTTPS URL that returns its metadata, and that metadata names a `jwks_uri` with the agent's public keys.
+<MintJwtCallout />
 
-A key in `jwks_uri` is the agent's whole identity. It signs the client assertion the agent sends with every token request, and the delegations that vouch for the short-lived keys that sign each request. A refresh token is useless without a new client assertion, and an access token is useless without a request signed under a delegation. So whoever holds the identity key is the agent, for every user and every company at once.
+A personal agent books, buys, and signs in at companies for the people who use it. Each company needs to know which agent is calling, so the agent proves who it is with one key. Whoever holds that key is the agent, for every user and every company at once. If the key sits on the agent's servers, one breach lets an attacker become the agent.
 
-With Turnkey, the identity key stays in Turnkey and the agent never holds it. The key signs only through two [Mint JWT](/features/mint-jwt) profiles, one for client assertions and one for delegations. Turnkey builds the claims, so your [policies](/features/policies/overview) can read them: which companies the agent may sign in to, which delegated keys it may vouch for, and for how long. Policies can also require a person to approve, for example with a passkey on their phone. Deleting one policy stops new signatures. Every signature has an activity record.
+With Turnkey, the agent never holds that key. It asks Turnkey to sign for it, your policies decide what Turnkey signs, a person can be required to approve, and every signature is recorded.
+
+[Personal Agent Protocol](https://personalagentprotocol.org) (PAP) is the open standard from Sierra and Meta for agents that act for a user at a company.
+
+## Why Turnkey for Personal Agent Protocol?
+
+- **No key to steal**: the agent's identity key stays in Turnkey's [secure enclaves](/security/secure-enclaves). The agent's servers never see it, so a breach there doesn't hand over the agent.
+- **Your rules on every signature**: [policies](/features/policies/overview) decide which companies the agent may sign in to, and how long each signature stays valid.
+- **A person in the loop**: a policy can require someone to approve before Turnkey signs, for example with a passkey on their phone.
+- **A record of every signature**: each signature is a Turnkey activity, so you can see what the agent signed, when, and who approved it. Deleting a policy stops new signatures at once.
 
 ## How it works
 
-1. You register the agent with Turnkey. Turnkey hosts its metadata document and `jwks_uri`, and the `agent.json` URL is the agent's `client_id`. The key in `jwks_uri` is a P-256 private key in Turnkey.
-2. To get or refresh a token at a company, the agent mints a client assertion whose `aud` is the company's issuer.
-3. To sign requests, the agent makes a delegated key on its own side and mints a delegation for it.
-4. Turnkey evaluates your policies for each mint, waits for any approvals they require, signs, and records the activity.
-5. The company verifies the client assertion and the delegation against the agent's `jwks_uri`.
+```mermaid
+flowchart LR
+    A["Agent"] -- "ask to sign" --> T["Turnkey<br/>policy and approvals"]
+    T -- "signature" --> A
+    A -- "sign in and send requests" --> C["Company"]
+    C -- "check identity" --> I["Agent's public identity,<br/>hosted by Turnkey"]
+```
+
+1. You register the agent and create its identity key in Turnkey. Turnkey publishes the public half at a URL that companies check.
+2. To sign in at a company, or to keep its access fresh, the agent asks Turnkey to sign a short-lived proof of who it is, called a client assertion.
+3. For everyday requests, the agent makes its own short-lived session key and asks Turnkey to vouch for it, with a delegation. The agent then signs requests itself, without a call to Turnkey each time.
+4. Turnkey checks each signing request against your policies, waits for any approvals they require, signs, and records it.
+5. The company checks what the agent sends against the agent's published identity.
+
+The rest of this page sets up an agent, then walks through how it signs in at a company.
 
 ## Set up an agent
 
