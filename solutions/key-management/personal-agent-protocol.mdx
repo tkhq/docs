@@ -177,7 +177,6 @@ const { jwt: delegation } = await turnkey.apiClient().mintJwt({
     delegatedKeyY: y!,
     jti: randomBytes(16).toString("base64url"),
     timeToLiveSeconds: "3600",
-    issuedAt: String(Math.floor(Date.now() / 1000)),
   },
 });
 ```
@@ -189,7 +188,8 @@ const { jwt: delegation } = await turnkey.apiClient().mintJwt({
 | `delegatedKeyX`, `delegatedKeyY` | The delegated P-256 public key's `x` and `y`, as in its JWK. Public members only. Must not be the `signWith` key. Becomes `cnf.jwk` |
 | `jti` | 22 to 256 base64url characters, such as 16 random bytes. Becomes `jti` |
 | `timeToLiveSeconds` | 1 to 86400 |
-| `issuedAt` | Unix time in seconds. Becomes `iat` |
+
+Turnkey sets `iat` to the time the request was approved, so `exp` is that time plus `timeToLiveSeconds`.
 
 This profile has no `audience`: a delegation names no company and no user. The resulting JWT has this header and these claims, and nothing else:
 
@@ -221,7 +221,6 @@ const { jwt: clientAssertion, signingKeyJwk } = await turnkey.apiClient().mintJw
     clientId: "https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json",
     jti: randomBytes(16).toString("base64url"),
     timeToLiveSeconds: "60",
-    issuedAt: String(Math.floor(Date.now() / 1000)),
   },
 });
 ```
@@ -233,7 +232,8 @@ const { jwt: clientAssertion, signingKeyJwk } = await turnkey.apiClient().mintJw
 | `clientId` | The agent's `client_id`, an HTTPS URL of at most 512 characters. Becomes `iss` and `sub` |
 | `jti` | 22 to 256 base64url characters, such as 16 random bytes. Becomes `jti` |
 | `timeToLiveSeconds` | 1 to 300 |
-| `issuedAt` | Unix time in seconds, within 24 hours of now. Becomes `iat` |
+
+Turnkey sets `iat` to the time the request was approved, so `exp` is that time plus `timeToLiveSeconds`.
 
 The resulting JWT has this header and these claims, and nothing else:
 
@@ -281,6 +281,7 @@ The organization ID is the parent organization, as in [Mint JWT](/features/mint-
 - **Revoking the policy doesn't end delegations.** Deleting the ALLOW policies stops new signatures at once, so refreshes and new sign-ins stop. Delegations already signed keep working until they expire, up to 24 hours, and so do access tokens. Shorter delegations are better. PAP says a delegation can't be withdrawn. Removing the key from `jwks_uri` ends them once companies' cached copies of the key set expire.
 - **No blind signing.** PAP section 10.7 says an agent should have its client assertions and delegations signed blindly, with RSA blind signatures, unless its own systems need to see which companies a user works with. Turnkey doesn't do RSA blind signing. It checks what it signs against your policies and records it, so the agent operator's records show which companies its users signed in to. PAP allows this for operators whose systems need to see that.
 - **Root users skip policy.** The DENY policies stop the agent user, not the sub-organization's [root quorum](/features/users/root-quorum). Keep the identity key out of root-held automation.
+- **Device Sign-In mints on every poll.** PAP Device Sign-In sends a fresh client assertion each time the agent polls the token endpoint, so each poll is one MINT_JWT activity. At the spec's example values (`expires_in` 600, `interval` 5), one pending sign-in can take about 120 mints. Set your policies and rate limits to allow for that.
 - **Mediated Sign-In retires on 2027-03-17.** PAP retires the Mediated Sign-In extension on that date. Direct Sign-In is PAP's preferred sign-in.
 
 ## Next steps
