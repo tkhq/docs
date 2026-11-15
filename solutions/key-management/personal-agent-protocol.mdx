@@ -10,21 +10,22 @@ import { SolutionCard } from '/snippets/solution-card.mdx'
 
 A key in `jwks_uri` is the agent's whole identity. It signs the client assertion the agent sends with every token request, and the delegations that vouch for the short-lived keys that sign each request. A refresh token is useless without a new client assertion, and an access token is useless without a request signed under a delegation. So whoever holds the identity key is the agent, for every user and every company at once.
 
-With Turnkey, the identity key stays in Turnkey and the agent never holds it. Your [policies](/features/policies/overview) decide which companies the key may sign in to and for how long, and can require a person to approve, for example with a passkey on their phone. Deleting one policy stops new signatures. Every signature has an activity record.
+With Turnkey, the identity key stays in Turnkey and the agent never holds it. The key signs only through two [Mint JWT](/features/mint-jwt) profiles, one for client assertions and one for delegations. Turnkey builds the claims, so your [policies](/features/policies/overview) can read them: which companies the agent may sign in to, which delegated keys it may vouch for, and for how long. Policies can also require a person to approve, for example with a passkey on their phone. Deleting one policy stops new signatures. Every signature has an activity record.
 
 ## How it works
 
-1. The agent publishes its metadata document and `jwks_uri`. The public key in `jwks_uri` belongs to a P-256 private key in Turnkey.
-2. To get or refresh a token at a company, the agent asks Turnkey to sign a client assertion whose `aud` is the company's issuer.
-3. To sign requests, the agent makes a delegated key on its own side and asks Turnkey to sign a delegation for it.
-4. Turnkey evaluates your policies for each signature, waits for any approvals they require, signs, and records the activity.
+1. You register the agent with Turnkey. Turnkey hosts its metadata document and `jwks_uri`, and the `agent.json` URL is the agent's `client_id`. The key in `jwks_uri` is a P-256 private key in Turnkey.
+2. To get or refresh a token at a company, the agent mints a client assertion whose `aud` is the company's issuer.
+3. To sign requests, the agent makes a delegated key on its own side and mints a delegation for it.
+4. Turnkey evaluates your policies for each mint, waits for any approvals they require, signs, and records the activity.
 5. The company verifies the client assertion and the delegation against the agent's `jwks_uri`.
 
 ## Set up an agent
 
-A reference agent and stub company use this setup. We will publish them.
-
 <Steps>
+  <Step title="Register the agent">
+    Register the agent with Turnkey under your organization and a slug, such as `shopper`. Its `client_id` is its [hosted](#hosted-agent-identity) `agent.json` URL, such as `https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json`.
+  </Step>
   <Step title="Create a sub-organization for the agent">
     Give each agent its own [sub-organization](/features/sub-organizations). Its [root user](/features/users/root-quorum) is an administrator that holds your API key. Root users skip policy, so the agent must not be one.
   </Step>
@@ -32,96 +33,172 @@ A reference agent and stub company use this setup. We will publish them.
     Create a user with its own API key, and give it no other permissions. Policy applies to this user, so the policies below are all it can do.
   </Step>
   <Step title="Create the identity key">
-    Create a P-256 private key in the sub-organization, with `curve: "CURVE_P256"` and `addressFormats: ["ADDRESS_FORMAT_UNCOMPRESSED"]`. Publish its public key, as a JWK, in the agent's `jwks_uri`.
+    Create a P-256 private key in the sub-organization, with `curve: "CURVE_P256"` and `addressFormats: ["ADDRESS_FORMAT_UNCOMPRESSED"]`. This is the key Turnkey publishes in the agent's `jwks_uri`.
   </Step>
   <Step title="Write the policies">
-    Allow the agent user to sign with the key, and deny export of the key.
+    Write one ALLOW policy per profile for the agent user, and a DENY that keeps the key from signing any other way.
   </Step>
 </Steps>
 
-The ALLOW policy lets the agent user sign with the identity key and nothing else:
+### Allow client assertions
+
+This policy lets the agent user sign in to one company, for at most 60 seconds per assertion, with the identity key:
 
 ```json
 {
-  "policyName": "PAP agent can sign assertions with <IDENTITY_KEY_ID>",
+  "policyName": "PAP agent can sign in to auth.example.com",
   "effect": "EFFECT_ALLOW",
   "consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>')",
-  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2' && private_key.id == '<IDENTITY_KEY_ID>'"
+  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
+    activity.params.profile == 'JWT_PROFILE_CLIENT_ASSERTION_V1' &&
+    activity.params.audience == 'https://auth.example.com' &&
+    activity.params.client_assertion_v1.client_id == '<CLIENT_ID>' &&
+    activity.params.client_assertion_v1.time_to_live_seconds <= 60 &&
+    private_key.id == '<IDENTITY_KEY_ID>'"
 }
 ```
 
-The DENY policy stops anyone bound by policy, including the agent user, from exporting the key:
+Write one such policy per company, or drop the `audience` clause to allow any company.
+
+### Allow delegations
+
+This policy lets the agent user mint delegations that last at most two hours:
 
 ```json
 {
-  "policyName": "Nobody exports the PAP agent key <IDENTITY_KEY_ID>",
-  "effect": "EFFECT_DENY",
-  "condition": "activity.resource == 'PRIVATE_KEY' && activity.action == 'EXPORT' && private_key.id == '<IDENTITY_KEY_ID>'"
+  "policyName": "PAP agent can mint delegations",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
+    activity.params.profile == 'JWT_PROFILE_POPPY_DELEGATION_V1' &&
+    activity.params.poppy_delegation_v1.client_id == '<CLIENT_ID>' &&
+    activity.params.poppy_delegation_v1.time_to_live_seconds <= 7200 &&
+    private_key.id == '<IDENTITY_KEY_ID>'"
 }
 ```
 
-To stop the agent, delete the ALLOW policy with the administrator's key. To start it again, create the policy again.
+`time_to_live_seconds` is a number in both profiles, so compare it with `<=`, not with a string. For both profiles, `private_key` is the `signWith` key, so `private_key.id` and `private_key.tags` work. `activity.params.poppy_delegation_v1.delegated_key_thumbprint` is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint of the delegated key, if you want to allow only known keys.
 
-## Sign a client assertion
+To have a person approve each mint as well, require a second approver in `consensus`, such as the user's passkey user:
 
-The agent authenticates at a company's token endpoint with `private_key_jwt` ([RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)). PAP requires `aud` to be the company's issuer, `exp` at most five minutes after `iat`, and a unique, unguessable `jti`.
-
-### With raw signing
-
-Today, the agent builds the JWS signing input itself and signs it with `SIGN_RAW_PAYLOAD`. Turnkey hashes the input with SHA-256 and signs it, so the result is an ordinary ES256 signature:
-
-```typescript
-import { randomBytes } from "node:crypto";
-
-const b64url = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
-const iat = Math.floor(Date.now() / 1000);
-
-const header = b64url({ alg: "ES256", typ: "JWT", kid: identityKeyKid });
-const claims = b64url({
-  iss: clientId,
-  sub: clientId,
-  aud: "https://auth.example.com",
-  iat,
-  exp: iat + 60,
-  jti: randomBytes(16).toString("base64url"),
-});
-const signingInput = `${header}.${claims}`;
-
-const { r, s } = await turnkey.apiClient().signRawPayload({
-  organizationId: agentSubOrganizationId,
-  signWith: identityKeyId,
-  payload: signingInput,
-  encoding: "PAYLOAD_ENCODING_TEXT_UTF8",
-  hashFunction: "HASH_FUNCTION_SHA256",
-});
-
-// JOSE wants r || s, each padded to 32 bytes.
-const signature = Buffer.from(r.padStart(64, "0") + s.padStart(64, "0"), "hex").toString("base64url");
-const clientAssertion = `${signingInput}.${signature}`;
+```json
+"consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>') && approvers.any(user, user.id == '<OWNER_USER_ID>')"
 ```
 
-Delegations are signed the same way, with `typ: "poppy-delegation+jwt"` and the delegation's claims.
+### Make the profiles the only way to sign
 
-Policy sees only the key and an opaque payload. It can't limit which companies the agent signs in to, or how long an assertion or delegation lasts.
+A user who can raw-sign with the identity key can sign any claims, with another `aud`, a longer `exp`, or a reused `jti`, and get around every limit above. This DENY closes that path, so the key signs only through the two profiles and your ALLOW policies decide every signature:
 
-### With the client-assertion profile
+```json
+{
+  "policyName": "PAP identity key signs only through Mint JWT",
+  "effect": "EFFECT_DENY",
+  "condition": "activity.type in ['ACTIVITY_TYPE_SIGN_RAW_PAYLOAD', 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2', 'ACTIVITY_TYPE_SIGN_RAW_PAYLOADS', 'ACTIVITY_TYPE_SIGN_TRANSACTION', 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2', 'ACTIVITY_TYPE_EXPORT_PRIVATE_KEY'] &&
+    private_key.id == '<IDENTITY_KEY_ID>'"
+}
+```
 
-<Warning>
-  The `turnkey.io/client-assertion/v1` profile is in review and not yet available. Field names and policy fields may change before it ships.
-</Warning>
+Put `activity.type` first, so `private_key` is only read for activities that have one.
 
-The `JWT_PROFILE_CLIENT_ASSERTION_V1` profile of [Mint JWT](/features/mint-jwt) signs the client assertion with one of your P-256 private keys. Turnkey builds the claims, so policy can read and limit them.
+Policy sees a mint as resource `JWT` and action `MINT`, not `PRIVATE_KEY` and `SIGN`. A DENY written on `activity.action == 'SIGN'` or `activity.resource == 'PRIVATE_KEY'` doesn't stop the profiles. To stop the agent at once, delete its ALLOW policies with the administrator's key, or create a DENY that also names the two profiles:
+
+```json
+{
+  "policyName": "PAP identity key is stopped",
+  "effect": "EFFECT_DENY",
+  "condition": "(activity.type in ['ACTIVITY_TYPE_SIGN_RAW_PAYLOAD', 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2', 'ACTIVITY_TYPE_SIGN_RAW_PAYLOADS', 'ACTIVITY_TYPE_SIGN_TRANSACTION', 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2', 'ACTIVITY_TYPE_EXPORT_PRIVATE_KEY'] ||
+    (activity.type == 'ACTIVITY_TYPE_MINT_JWT' && activity.params.profile in ['JWT_PROFILE_CLIENT_ASSERTION_V1', 'JWT_PROFILE_POPPY_DELEGATION_V1'])) &&
+    private_key.id == '<IDENTITY_KEY_ID>'"
+}
+```
+
+The profile check keeps `private_key` from being read for other Mint JWT profiles, which have no key. Delete this DENY to start the agent again.
+
+## Sign in at a company
+
+At each company, the agent works through these steps. The identity key signs in steps 1 and 3. Everything else happens on the agent's side.
+
+<Steps>
+  <Step title="Mint a delegation for a fresh session key">
+    Make a new P-256 key pair locally and mint a delegation for its public key. A delegation lasts at most 24 hours. One to two hours is better.
+  </Step>
+  <Step title="Sign Session JWTs locally">
+    Sign the `Poppy-Session` header of each request with the session key, and send the delegation with it. The session key never goes to Turnkey.
+  </Step>
+  <Step title="Mint a client assertion to sign in or refresh">
+    Mint a client assertion for the company's issuer and send it to the company's token endpoint, both to sign in and to refresh a token.
+  </Step>
+</Steps>
+
+DPoP keys, which sign the proofs for DPoP-bound tokens, also stay local.
+
+### Mint a delegation
+
+The `JWT_PROFILE_POPPY_DELEGATION_V1` profile (`turnkey.io/poppy-delegation/v1`) signs a PAP delegation for a delegated P-256 public key:
+
+```typescript
+import { randomBytes, webcrypto } from "node:crypto";
+
+// The session key stays on the agent's side.
+const sessionKey = await webcrypto.subtle.generateKey(
+  { name: "ECDSA", namedCurve: "P-256" },
+  false,
+  ["sign"],
+);
+const { x, y } = await webcrypto.subtle.exportKey("jwk", sessionKey.publicKey);
+
+const { jwt: delegation } = await turnkey.apiClient().mintJwt({
+  organizationId: agentSubOrganizationId,
+  profile: "JWT_PROFILE_POPPY_DELEGATION_V1",
+  poppyDelegationV1: {
+    signWith: identityKeyId,
+    clientId: "https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json",
+    delegatedKeyX: x!,
+    delegatedKeyY: y!,
+    jti: randomBytes(16).toString("base64url"),
+    timeToLiveSeconds: "3600",
+    issuedAt: String(Math.floor(Date.now() / 1000)),
+  },
+});
+```
+
+| Field | Value |
+| :--- | :--- |
+| `signWith` | ID of a P-256 private key in the organization. Wallet accounts are not supported |
+| `clientId` | The agent's `client_id`, an HTTPS URL of at most 512 characters. Becomes `iss` |
+| `delegatedKeyX`, `delegatedKeyY` | The delegated P-256 public key's `x` and `y`, as in its JWK. Public members only. Must not be the `signWith` key. Becomes `cnf.jwk` |
+| `jti` | 22 to 256 base64url characters, such as 16 random bytes. Becomes `jti` |
+| `timeToLiveSeconds` | 1 to 86400 |
+| `issuedAt` | Unix time in seconds. Becomes `iat` |
+
+This profile has no `audience`: a delegation names no company and no user. The resulting JWT has this header and these claims, and nothing else:
+
+```json
+{ "alg": "ES256", "typ": "poppy-delegation+jwt", "kid": "<RFC 7638 thumbprint of the identity key>" }
+.
+{
+  "iss": "https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json",
+  "cnf": { "jwk": { "kty": "EC", "crv": "P-256", "x": "<x>", "y": "<y>" } },
+  "iat": 1790900000,
+  "exp": 1790903600,
+  "jti": "Kp8mR3vT1nWc4AYx2b7Qd_"
+}
+```
+
+### Mint a client assertion
+
+The agent authenticates at a company's token endpoint with `private_key_jwt` ([RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)). PAP requires `aud` to be the company's issuer, `exp` at most five minutes after `iat`, and a unique, unguessable `jti`. The `JWT_PROFILE_CLIENT_ASSERTION_V1` profile (`turnkey.io/client-assertion/v1`) signs it:
 
 ```typescript
 import { randomBytes } from "node:crypto";
 
-const { jwt, signingKeyJwk } = await turnkey.apiClient().mintJwt({
+const { jwt: clientAssertion, signingKeyJwk } = await turnkey.apiClient().mintJwt({
   organizationId: agentSubOrganizationId,
   profile: "JWT_PROFILE_CLIENT_ASSERTION_V1",
   audience: "https://auth.example.com",
   clientAssertionV1: {
     signWith: identityKeyId,
-    clientId: "https://agent.example/agent.json",
+    clientId: "https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json",
     jti: randomBytes(16).toString("base64url"),
     timeToLiveSeconds: "60",
     issuedAt: String(Math.floor(Date.now() / 1000)),
@@ -141,11 +218,11 @@ const { jwt, signingKeyJwk } = await turnkey.apiClient().mintJwt({
 The resulting JWT has this header and these claims, and nothing else:
 
 ```json
-{ "alg": "ES256", "typ": "JWT", "kid": "<RFC 7638 thumbprint of the key>" }
+{ "alg": "ES256", "typ": "JWT", "kid": "<RFC 7638 thumbprint of the identity key>" }
 .
 {
-  "iss": "https://agent.example/agent.json",
-  "sub": "https://agent.example/agent.json",
+  "iss": "https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json",
+  "sub": "https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json",
   "aud": "https://auth.example.com",
   "iat": 1790900000,
   "exp": 1790900060,
@@ -153,57 +230,18 @@ The resulting JWT has this header and these claims, and nothing else:
 }
 ```
 
-`signingKeyJwk` is the key's public JWK, ready to publish in `jwks_uri`. The same request always returns the same token, so a retried activity is safe.
-
-This policy lets the agent user sign in to one company, for at most 60 seconds per assertion, with one key:
-
-```json
-{
-  "policyName": "Agent can sign in to auth.example.com",
-  "effect": "EFFECT_ALLOW",
-  "consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>')",
-  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
-    activity.params.profile == 'JWT_PROFILE_CLIENT_ASSERTION_V1' &&
-    activity.params.audience == 'https://auth.example.com' &&
-    activity.params.client_assertion_v1.client_id == 'https://agent.example/agent.json' &&
-    activity.params.client_assertion_v1.time_to_live_seconds <= 60 &&
-    private_key.id == '<IDENTITY_KEY_ID>'"
-}
-```
-
-`time_to_live_seconds` is a number, so compare it with `<=`, not with a string. For this profile, `private_key` is the `signWith` key, so `private_key.id` and `private_key.tags` work.
-
-A user who can raw-sign with the same key can sign any claims, with another `aud`, a longer `exp`, or a reused `jti`, and get around every limit above. Pair the profile with a DENY on raw signing, batch signing, transaction signing, and export for the identity key:
-
-```json
-{
-  "policyName": "Identity key signs only through Mint JWT",
-  "effect": "EFFECT_DENY",
-  "condition": "activity.type in ['ACTIVITY_TYPE_SIGN_RAW_PAYLOAD', 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2', 'ACTIVITY_TYPE_SIGN_RAW_PAYLOADS', 'ACTIVITY_TYPE_SIGN_TRANSACTION', 'ACTIVITY_TYPE_SIGN_TRANSACTION_V2', 'ACTIVITY_TYPE_EXPORT_PRIVATE_KEY'] &&
-    private_key.id == '<IDENTITY_KEY_ID>'"
-}
-```
-
-Put `activity.type` first, so `private_key` is only read for activities that have one. The [root quorum](/features/users/root-quorum) skips policy, so keep the identity key out of root-held automation.
-
-<Note>
-  Delegations still need raw signing until the delegation profile is available. While the DENY above is in place, the identity key can't sign delegations.
-</Note>
+For both profiles, `signingKeyJwk` is the identity key's public JWK, and the same request always returns the same token, so a retried activity is safe.
 
 ## Hosted agent identity
 
-<Warning>
-  Hosted agent identity is in review and not yet available.
-</Warning>
-
-A company fetches the agent's `client_id` without following redirects and checks that the document's `client_id` equals the URL it fetched. With hosted agent identity, Turnkey serves both documents, so the key you hold in Turnkey is the key companies see.
+A company fetches the agent's `client_id` without following redirects and checks that the document's `client_id` equals the URL it fetched. Turnkey serves both of the agent's documents, and the key it publishes is the same P-256 key the profiles sign with, so the key you hold in Turnkey is the key companies see.
 
 | Method | Path | Returns |
 | :--- | :--- | :--- |
 | GET | `https://id.turnkey.com/t/<organization ID>/agents/<agent>/agent.json` | The agent's client ID metadata document |
 | GET | `https://id.turnkey.com/t/<organization ID>/agents/<agent>/jwks.json` | The agent's public P-256 keys, its `jwks_uri` |
 
-The organization ID is the parent organization, as in [Mint JWT](/features/mint-jwt#token-claims) issuers. `<agent>` is a slug of 1 to 64 lowercase letters, digits, and hyphens. The agent's `client_id` is the `agent.json` URL itself, such as `https://id.turnkey.com/t/<organization ID>/agents/shopper/agent.json`. Pass that value as `clientId` when the agent signs a client assertion.
+The organization ID is the parent organization, as in [Mint JWT](/features/mint-jwt#token-claims) issuers. `<agent>` is the agent's slug, 1 to 64 lowercase letters, digits, and hyphens. The agent's `client_id` is the `agent.json` URL itself. Pass that value as `clientId` in both profiles.
 
 `agent.json` holds:
 
@@ -216,21 +254,14 @@ The organization ID is the parent organization, as in [Mint JWT](/features/mint-
 | `token_endpoint_auth_method` | `private_key_jwt` |
 | `token_endpoint_auth_signing_alg` | `ES256` |
 
-`jwks.json` lists each key with `kty`, `crv`, `x`, `y`, `kid` (the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint), `use: sig`, and `alg: ES256`. It never has private members. Turnkey serves both documents with a five-minute cache lifetime, so a key rotation reaches companies quickly.
-
-Turnkey only serves these documents. The agent still signs its client assertions and delegations itself, under your policies.
-
-## Delegated keys and DPoP keys
-
-Delegated keys sign the `Poppy-Session` header on every request, and DPoP keys sign the proofs for DPoP-bound tokens. Both stay on the agent's side by design, in the agent's process or on the user's device. They sign on every request, and PAP keeps those signatures off the identity key. The agent uses each one for one user only. They are not Turnkey keys. The Turnkey key signs the delegation that vouches for each delegated key, so a delegated key is only as good as its delegation, and a delegation lasts at most 24 hours. A Mint JWT profile for delegations is planned, so policy can cap their lifetime too.
+`jwks.json` lists each key with `kty`, `crv`, `x`, `y`, `kid` (the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint, the same `kid` the profiles put in the header), `use: sig`, and `alg: ES256`. It never has private members. Turnkey serves both documents with a five-minute cache lifetime, so a key rotation reaches companies quickly.
 
 ## Limits
 
-- **Policy can't see claims under raw signing.** With `SIGN_RAW_PAYLOAD`, policy sees the key, not the `aud` or `exp` of what it signs.
-- **Revoking the policy doesn't end delegations.** Deleting the ALLOW policy stops new signatures at once, so refreshes and new sign-ins stop. Delegations already signed keep working until they expire, up to 24 hours, and so do access tokens. Shorter delegations are better. PAP says a delegation can't be withdrawn. Removing the key from `jwks_uri` ends them once companies' cached copies of the key set expire.
+- **Revoking the policy doesn't end delegations.** Deleting the ALLOW policies stops new signatures at once, so refreshes and new sign-ins stop. Delegations already signed keep working until they expire, up to 24 hours, and so do access tokens. Shorter delegations are better. PAP says a delegation can't be withdrawn. Removing the key from `jwks_uri` ends them once companies' cached copies of the key set expire.
 - **No blind signing.** PAP section 10.7 says an agent should have its client assertions and delegations signed blindly, with RSA blind signatures, unless its own systems need to see which companies a user works with. Turnkey doesn't do RSA blind signing. It checks what it signs against your policies and records it, so the agent operator's records show which companies its users signed in to. PAP allows this for operators whose systems need to see that.
-- **Root users skip policy.** The DENY on export stops the agent user, not the sub-organization's root user.
-- **Mediated Sign-In retires on 2027-03-17.** The reference agent signs in with the Mediated Sign-In extension, which PAP retires on that date. Direct Sign-In is PAP's preferred sign-in.
+- **Root users skip policy.** The DENY policies stop the agent user, not the sub-organization's [root quorum](/features/users/root-quorum). Keep the identity key out of root-held automation.
+- **Mediated Sign-In retires on 2027-03-17.** PAP retires the Mediated Sign-In extension on that date. Direct Sign-In is PAP's preferred sign-in.
 
 ## Next steps
 
