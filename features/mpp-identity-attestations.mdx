@@ -1,0 +1,173 @@
+---
+title: "MPP identity attestations"
+sidebarTitle: "MPP identity attestations"
+tag: "Beta"
+description: "Make your Turnkey organization an identity issuer for the Machine Payments Protocol, so your agents can prove who they are to paid APIs before they pay."
+---
+
+import { FeatureCard } from '/snippets/feature-card.mdx'
+import { SolutionCard } from '/snippets/solution-card.mdx'
+import { MintJwtCallout } from '/snippets/mint-jwt-callout.mdx'
+
+<MintJwtCallout />
+
+The [Machine Payments Protocol](https://mpp.dev) (MPP) identity extension lets a paid API require an identity attestation before it shows a price. An issuer signs the attestation, and the API verifies it against the issuer's public keys.
+
+With [Mint JWT](/features/mint-jwt), your Turnkey organization is that issuer. Your agents mint attestations with the `turnkey.io/mpp-attestation/v1` profile, and your [policies](/features/policies/overview) decide every mint. A paid API that trusts your organization verifies the attestation with the stock `mppx` attestation verifier. It needs no Turnkey SDK.
+
+## How it works
+
+1. Your agent calls a paid API. The API answers `401` with `Identity-Attestation-Required: turnkey-agent;issuer="https://id.turnkey.com/t/<organization ID>"`.
+2. The agent's `mppx` client submits `ACTIVITY_TYPE_MINT_JWT` with the `JWT_PROFILE_MPP_ATTESTATION_V1` profile and the API's origin as the audience.
+3. Turnkey evaluates your policies and signs an EdDSA attestation bound to that origin.
+4. The client retries with the attestation in `Identity-Attestation`. The API verifies it with the keys at `https://id.turnkey.com/t/<organization ID>/.well-known/jwks.json`, then sends its `402` payment challenge.
+5. The agent pays, for example with a [Turnkey wallet on Tempo](/solutions/company-wallets/agentic-payments#3-mpp-payment). The paid retry carries the attestation again.
+
+## Set up your organization
+
+<Steps>
+<Step title="Turn on Mint JWT">
+
+Mint JWT is enabled per organization. [Contact sales](https://www.turnkey.com/contact-us) to turn it on.
+
+</Step>
+
+<Step title="Create a user for the agent">
+
+Give each agent its own user with an API key, outside the [root quorum](/features/users/root-quorum). See [Agentic Wallets](/solutions/company-wallets/agentic-wallets) for provisioning patterns.
+
+Only the agent itself can mint an attestation that names it: Turnkey rejects a mint whose `subject` is not the user who submits it.
+
+</Step>
+
+<Step title="Allow the agent to mint">
+
+Every user outside the root quorum needs a policy to mint. Scope it to the profile, the paid APIs the agent may call, and the longest lifetime you accept:
+
+```json
+{
+  "policyName": "Agent can present itself to the data API",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(u, u.id == '<AGENT_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_MINT_JWT' &&
+    activity.params.profile == 'JWT_PROFILE_MPP_ATTESTATION_V1' &&
+    activity.params.audience == 'https://api.example.com' &&
+    activity.params.mpp_attestation_v1.time_to_live_seconds <= 60"
+}
+```
+
+| Policy field | Value |
+| :--- | :--- |
+| `activity.params.profile` | `'JWT_PROFILE_MPP_ATTESTATION_V1'` |
+| `activity.params.audience` | The paid API's origin, such as `'https://api.example.com'` |
+| `activity.params.mpp_attestation_v1.time_to_live_seconds` | The requested lifetime in seconds, as a number |
+
+</Step>
+
+<Step title="Mint attestations from the agent's MPP client">
+
+Add an attestation prover to the agent's `mppx` client. When an API asks for a `turnkey-agent` attestation from your issuer, the prover mints one through Turnkey for that API's origin:
+
+```ts
+import { Mppx, tempo } from "mppx/client";
+import { Attestation } from "mppx/extensions/identity";
+
+const issuer = `https://id.turnkey.com/t/${organizationId}`;
+
+const mppx = Mppx.create({
+  methods: [tempo({ account: turnkeyAccount })],
+  identity: [
+    Attestation.Client.prover({
+      // The APIs that may receive the agent's attestations and ask for new ones.
+      scope: ["https://api.example.com"],
+      issuers: [issuer],
+      types: ["turnkey-agent"],
+      acquire: async ({ audience }) => {
+        const { jwt } = await turnkey.apiClient().mintJwt({
+          profile: "JWT_PROFILE_MPP_ATTESTATION_V1",
+          audience,
+          mppAttestationV1: {
+            subject: agentUserId,
+            timeToLiveSeconds: "60",
+            issuedAt: String(Math.floor(Date.now() / 1000)),
+          },
+        });
+        return jwt;
+      },
+    }),
+  ],
+  polyfill: false,
+});
+
+const response = await mppx.fetch("https://api.example.com/paid-resource");
+```
+
+`organizationId` is the organization the agent belongs to. For a [sub-organization](/features/sub-organizations), the issuer uses the parent organization's ID. `scope` and `issuers` keep a server from obtaining an attestation it could replay elsewhere: the audience is always the origin of the request the prover answers.
+
+</Step>
+</Steps>
+
+## Accept attestations in a paid API
+
+A paid API that wants to require Turnkey-governed agents adds one verifier per organization it trusts:
+
+```ts
+import { Attestation } from "mppx/extensions/identity";
+
+const turnkeyAgent = Attestation.Server.verifier({
+  issuer: "https://id.turnkey.com/t/<organization ID>",
+  type: "turnkey-agent",
+  audience: "https://api.example.com",
+  // Optional: accept only agents of one sub-organization.
+  validate: (claims) =>
+    (claims as { org?: string }).org === "urn:turnkey:org:<sub-organization ID>"
+      ? undefined
+      : "unknown organization",
+});
+
+mppx.charge({ amount: "1", identity: [turnkeyAgent] });
+```
+
+The verifier checks the EdDSA signature against the issuer's JSON Web Key Set, then `iss`, `type`, `aud`, and the token's times. `validate` receives every claim, including the Turnkey claims below.
+
+The issuer is per organization, so a paid API trusts each Turnkey organization separately. To accept agents from several organizations, add one verifier for each, or combine them with `Identity.anyOf`.
+
+## Attestation claims
+
+The header is `{"alg": "EdDSA", "typ": "mpp-attestation+jwt", "kid": "<RFC 7638 thumbprint>"}`. The claims are:
+
+| Claim | Value |
+| :--- | :--- |
+| `iss` | `https://id.turnkey.com/t/<organization ID>`. For a sub-organization, this is the parent organization |
+| `sub` | `urn:turnkey:user:<agent user ID>` |
+| `aud` | The paid API's origin, such as `https://api.example.com`. Never a path |
+| `type` | `turnkey-agent` |
+| `iat`, `exp` | Issue time and expiry. The lifetime is 1 to 300 seconds |
+| `org` | `urn:turnkey:org:<organization ID>`, the organization that minted the attestation |
+
+What an attestation says: your organization's policy allowed this agent user to present itself to this origin until `exp`. It doesn't say what software the agent runs or which wallet pays.
+
+## Keys
+
+Turnkey signs attestations with an Ed25519 key that Turnkey's enclave derives for this purpose. It is separate from the ES256 key that signs other Mint JWT profiles. Both keys are published at:
+
+- `https://id.turnkey.com/t/<organization ID>/.well-known/jwks.json`, where `mppx` looks for them.
+- `https://id.turnkey.com/t/<organization ID>/jwks.json`, the same key set.
+- `https://id.turnkey.com/t/<organization ID>/jwks.jwt`, the same key set as a signed JWK Set (`typ: jwk-set+jwt`), signed by the Turnkey Signer enclave's quorum key, for verifiers that pin that key instead of trusting the network path.
+
+The keys change only in a key rotation, and Turnkey publishes both the old and new keys while verifiers move.
+
+## Limits
+
+- **Bearer tokens.** An attestation proves nothing about the request that carries it. Its short lifetime is the only limit on replay, so keep `time_to_live_seconds` low.
+- **No payer or key binding yet.** Attestations don't carry `uid` or `cnf` claims, so a paid API can't yet check that the attested agent is the one paying. Support follows the `mppx` attestation claims as they are standardized.
+- **One issuer per organization.** A paid API that wants any Turnkey-governed agent must list each organization's issuer.
+
+## Next steps
+
+<div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px'}}>
+  <SolutionCard title="Agentic Payments" icon="agentic-payments" href="/solutions/company-wallets/agentic-payments" description="Pay MPP and x402 challenges with Turnkey wallets." />
+  <FeatureCard title="Mint JWT" icon="key-01" href="/features/mint-jwt" description="Turn a Turnkey policy decision into a short-lived JWT." />
+  <SolutionCard title="Agentic Wallets" icon="agentic-wallets" href="/solutions/company-wallets/agentic-wallets" description="Provision agent users and wallets with scoped authority." />
+  <FeatureCard title="Policy Engine" icon="file-shield-02" href="/features/policies/overview" description="Consensus expressions, conditions, and time windows." />
+</div>
