@@ -10,7 +10,7 @@ Coding agents commit, push, and clone. To do this today, they usually use your s
 
 With the [`tk` CLI](https://github.com/tkhq/tk), an agent signs Git commits and opens SSH connections without the private key on its machine. Turnkey holds the key, evaluates a [policy](/features/policies/overview) on every Turnkey request, and logs every approval.
 
-- **Git signing**: `tk` acts as Git's GPG or SSH signing program, so `git commit -S` and `git verify-commit` work unchanged.
+- **Git signing**: `tk` acts as Git's GPG or SSH signing program, so `git commit -S` and `git verify-commit` work unchanged. Turnkey builds each signature from the commit or tag itself, so a policy can check what is being signed, such as the committer or the tag name, before it signs.
 - **SSH**: `tk ssh agent` serves Turnkey keys on a standard `SSH_AUTH_SOCK`, so `ssh`, `git push`, and `git clone` over SSH work unchanged.
 
 ## Why Turnkey for Git signing and SSH?
@@ -19,7 +19,7 @@ For an agent on your laptop, such as Claude Code or Codex:
 
 - **No key for the agent to read**: the GPG and SSH keys stay in Turnkey, not in a file or keyring that the agent can read or copy.
 - **Its own identity**: the agent connects with its own service user, using long-lived API keys or session keys. Its Turnkey signing requests and approvals are fully attributable, and you can revoke its access at any time.
-- **Policy and audit**: Turnkey policies decide which keys the agent can use, and Turnkey's activity log tracks every signing request and approval.
+- **Policy and audit**: Turnkey policies decide which keys the agent can use and what it can sign with them, down to the committer email or tag name. Turnkey's activity log tracks every signing request and approval.
 
 For an unattended agent in a remote container or VM:
 
@@ -30,7 +30,7 @@ For an unattended agent in a remote container or VM:
 
 ## How it works
 
-Git calls a signing program for each signed commit or tag. You set that program to `tk`. `tk` sends the payload to Turnkey as a sign request, authenticated with the agent's session key. The [policy engine](/features/policies/overview) evaluates the request inside Turnkey's [secure enclave](/security/secure-enclaves). If a policy allows it, Turnkey returns the signature, and `tk` gives it to Git in the format that Git expects. In the broker setup, the `tk` git signing program talks over a Unix socket to a `tk` server in another container that holds the session key, so the session key is never exposed inside the agent's container.
+Git calls a signing program for each signed commit or tag. You set that program to `tk`. `tk` sends the commit or tag to Turnkey as a Sign Git object request (`ACTIVITY_TYPE_SIGN_GIT_OBJECT`), authenticated with the agent's session key, and names the signature format: GPG or SSH. Inside Turnkey's [secure enclave](/security/secure-enclaves), Turnkey reads the commit or tag, and the [policy engine](/features/policies/overview) evaluates the request against its fields. If a policy allows it, Turnkey hashes the object, signs it, and returns the finished signature block that Git expects. `tk` passes it to Git unchanged. In the broker setup, the `tk` git signing program talks over a Unix socket to a `tk` server in another container that holds the session key, so the session key is never exposed inside the agent's container.
 
 SSH works the same way. `tk ssh agent` listens on a Unix socket and speaks the standard SSH agent protocol. When `ssh` or `git push` asks it to sign a login challenge, it sends the challenge to Turnkey.
 
@@ -38,12 +38,88 @@ SSH works the same way. `tk ssh agent` listens on a Unix socket and speaks the s
 | :--- | :--- |
 | **Agent user** | A non-root Turnkey user with the `agent` tag. Its API key is the only credential on the agent's machine. Useful for non-brokered setups. |
 | **Broker user** | A non-root Turnkey user with the `broker` tag that holds the signing credential in a separate VM or container. The agent never sees it. See the [`deploying-signing-broker`](https://github.com/tkhq/tk/blob/main/skills/deploying-signing-broker/SKILL.md) skill. |
-| **Git signing key** | Either a GPG key (an OpenPGP key backed by an account in a wallet) or an SSH key (a Turnkey Ed25519 private key used for SSH signing). Pick one format for Git signing. |
+| **Git signing key** | Either a GPG key (a P-256 OpenPGP key backed by an account in a wallet) or an SSH key (a Turnkey Ed25519 private key used for SSH signing). Pick one format for Git signing. Each sign request names its format. |
 | **SSH key** | A Turnkey Ed25519 private key that `tk ssh agent` serves for `ssh` and `git push`. |
 | **Policies** | Policies control which users can sign with which keys, and which users can create, register, or delete credentials for other users. Everything else is denied by default. See the [`managing-policies`](https://github.com/tkhq/tk/blob/main/skills/managing-policies/SKILL.md) skill. |
 | **`tk` profile** | Controls which API key, user, and organization ID `tk` authenticates through. Set up several profiles and assume the one that fits the task. |
 
 Turnkey denies all requests by default. Only policies let a user take actions against resources, such as signing keys, in your organization.
+
+## Policies for Git signing
+
+Every Git signature is a Sign Git object request (`ACTIVITY_TYPE_SIGN_GIT_OBJECT`, kind `SIGN_GIT_OBJECT`). Turnkey reads the commit or tag inside the enclave and exposes these fields to policy conditions:
+
+| Field | Description |
+| :--- | :--- |
+| `activity.params.format` | `GIT_SIGNATURE_FORMAT_SSH` or `GIT_SIGNATURE_FORMAT_OPENPGP` (GPG) |
+| `activity.params.key_fingerprint` | The signing key's fingerprint as Git tools print it: `SHA256:...` for an SSH key, the 40-character uppercase hex fingerprint for a GPG key |
+| `activity.params.git.object_type` | `commit` or `tag` |
+| `activity.params.git.committer_email` | The commit's committer email |
+| `activity.params.git.author_email` | The commit's author email |
+| `activity.params.git.tree` | The commit's tree ID |
+| `activity.params.git.parents` | The commit's parent IDs, in order |
+| `activity.params.git.tag_name` | The tag's name |
+| `activity.params.git.tag_target` | The ID of the object that the tag points at |
+| `activity.params.git.tag_target_type` | The type of the object that the tag points at, usually `commit` |
+| `activity.params.git.tagger_email` | The tag's tagger email |
+
+Fields that do not apply to the object are empty strings (or an empty list for `parents`), so a condition on a tag field never matches a commit.
+
+Let the agent sign its own commits with its SSH key, and nothing else:
+
+```json
+{
+  "policyName": "Agent signs its own commits",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_GIT_OBJECT' && activity.params.format == 'GIT_SIGNATURE_FORMAT_SSH' && private_key.id == '<SSH_KEY_ID>' && activity.params.git.object_type == 'commit' && activity.params.git.committer_email == 'jane+agent@example.com'"
+}
+```
+
+Require a human to approve every release tag signed with the agent's GPG key:
+
+```json
+{
+  "policyName": "Release tags need approval",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<AGENT_USER_ID>') && approvers.any(user, user.id == '<YOUR_USER_ID>')",
+  "condition": "activity.type == 'ACTIVITY_TYPE_SIGN_GIT_OBJECT' && activity.params.format == 'GIT_SIGNATURE_FORMAT_OPENPGP' && activity.params.key_fingerprint == '<GPG_KEY_FINGERPRINT>' && activity.params.git.object_type == 'tag' && activity.params.git.tag_target_type == 'commit'"
+}
+```
+
+Things to know when you write these conditions:
+
+- **Emails match exactly.** The policy compares the email as it appears in the commit or tag, including case. Pin the identity that you set in the agent's Git config.
+- **Pin GPG keys by fingerprint.** A GPG fingerprint covers the public key and the key's creation time. `tk` sends the creation time of the wallet account that backs the key. A request with any other creation time produces a different fingerprint, which a policy on `key_fingerprint` does not match and `gpg` does not verify.
+- **Only commits and tags.** Turnkey rejects a request whose payload is not a well-formed commit or annotated tag, so the agent cannot use this request to sign other data.
+- **Signatures carry Turnkey's time.** The creation time inside a GPG signature is the time Turnkey approved the request, not the time on the agent's machine.
+
+### Call the API directly
+
+`tk` makes this request for you. To sign from your own code, call `POST /public/v1/submit/sign_git_object` with the hex-encoded object exactly as Git passes it to its signing program:
+
+```json
+{
+  "type": "ACTIVITY_TYPE_SIGN_GIT_OBJECT",
+  "timestampMs": "<TIMESTAMP_MS>",
+  "organizationId": "<ORGANIZATION_ID>",
+  "parameters": {
+    "signWith": "<WALLET_ACCOUNT_ADDRESS>",
+    "format": "GIT_SIGNATURE_FORMAT_OPENPGP",
+    "message": "<HEX_ENCODED_COMMIT_OR_TAG>",
+    "openpgpKeyCreationTime": "<WALLET_ACCOUNT_CREATED_AT_SECONDS>"
+  }
+}
+```
+
+| Parameter | Description |
+| :--- | :--- |
+| `signWith` | For SSH, the ID or address of an Ed25519 private key. For GPG, the address of a P-256 wallet account with the uncompressed address format, or a P-256 private key. |
+| `format` | `GIT_SIGNATURE_FORMAT_SSH` or `GIT_SIGNATURE_FORMAT_OPENPGP`. |
+| `message` | The hex-encoded commit or tag object, up to 128 KiB. |
+| `openpgpKeyCreationTime` | GPG only: the key's creation time in Unix seconds. For a wallet account, its `createdAt.seconds`. Omit it for SSH. |
+
+The result's `signature` is the armored block that Git expects: `-----BEGIN SSH SIGNATURE-----` for SSH, or `-----BEGIN PGP SIGNATURE-----` for GPG. Both verify with standard tools, such as `ssh-keygen -Y verify`, `gpg --verify`, and `git verify-commit`.
 
 ## Key implementation decisions
 
@@ -52,7 +128,7 @@ Turnkey denies all requests by default. Only policies let a user take actions ag
 | **Signature format** | GitHub can show both GPG and SSH signatures as Verified, after you add the public key and a verified committer email to your account. | [tk Git signing](https://github.com/tkhq/tk/blob/main/docs/git-signing.md) |
 | **Committer identity** | Use your name with `(agent)` and your email address plus-tagged with the agent's user name, such as `Jane Doe (agent) <jane+agent@example.com>`. Its commits group with yours in `git shortlog`, and GitHub sends the email confirmation link to your inbox. For a GPG key, put the same identity in the key's user ID. | [Committer identity](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#committer-identity) |
 | **Where the Git config lives** | If you sign with your own key on the same machine, put the agent's Git config in the agent runtime's environment, not in `~/.gitconfig`. | [Human and agent on one machine](https://github.com/tkhq/tk/blob/main/docs/git-signing.md#human-and-agent-on-one-machine) |
-| **Approval** | Limit what the agent can sign unilaterally, or require human escalation via policy consensus condition. | [Policy language](/features/policies/language) |
+| **Approval** | Limit what the agent can sign unilaterally, such as only commits with its own committer email, and require human approval for the rest, such as release tags, with a policy consensus condition. | [Policies for Git signing](#policies-for-git-signing) |
 | **SSH destinations** | A Turnkey policy cannot see which host an SSH challenge is for. To limit the hosts, start `tk ssh agent` with an allowed-hosts file. | [Destination constraints](https://github.com/tkhq/tk/blob/main/docs/ssh-agent.md#destination-constraints) |
 | **Revocation** | Delete the agent's session key to stop all its signing and SSH at once. Delete the user to remove it entirely. Delete one policy to stop the use of one key. | [Users](/features/users/introduction) |
 
