@@ -1,99 +1,34 @@
 ---
 title: "Operator keys"
-description: "The three kinds of TVC operator keys: where each private key lives, who controls it, and how it is created and used."
+description: "Self-hosted and Turnkey-hosted TVC operator keys: where each private key lives, who controls it, and how it is created and used."
 sidebarTitle: "Operator keys"
 ---
 
-Every [operator](/features/verifiable-cloud/overview#operators) in a [manifest set or share set](/features/verifiable-cloud/manifest-sets-and-share-sets) is identified by a pair of P-256 public keys: one for signing manifest approvals and one for encryption, used to receive and re-encrypt Quorum Key shares. The private half of that pair can live in one of three places. This page describes each option so you can pick the right custody model for each operator.
+Every [operator](/features/verifiable-cloud/overview#operators) in a [manifest set or share set](/features/verifiable-cloud/manifest-sets-and-share-sets) is identified by a pair of P-256 public keys: one for signing manifest approvals and one for encryption, used to receive and re-encrypt Quorum Key shares. The private half of that pair is either self-hosted, on a YubiKey or in a local key file, or Turnkey-hosted, in wallet accounts in your organization. This page describes each option so you can pick the right custody model for each operator.
 
 ## Compare the options
 
-| | Local key file | Turnkey-hosted | YubiKey |
+| | Self-hosted: YubiKey | Self-hosted: local key file | Turnkey-hosted |
 | :--- | :--- | :--- | :--- |
-| Private key lives in | A plaintext seed file on the operator's machine, readable only by their user account | Two wallet accounts in your Turnkey organization | PIV slots on a hardware token |
-| Who controls it | You. Turnkey only ever sees the public keys | Your organization, through Turnkey's user, API key, and [policy](/features/policies/overview) model | You. Turnkey only ever sees the public keys |
-| Where signing and decryption happen | On the operator's machine | Inside Turnkey's enclaves, via Turnkey activities | On the YubiKey, after a PIN and a touch |
-| Created by | `tvc login` | `tvc operator create` | `ykman` on the device, then registered with `tvc` |
-| Registered with Turnkey | When an operator set is created with `newOperators` | By the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity | When an operator set is created with `newOperators` |
-| `keySource` in the API | `EXTERNAL_KEY` | `ORG_WALLET_ACCOUNT` | `EXTERNAL_KEY` |
-| Can act in CI | Yes, with API key env vars and the seed passed by flag or env var | Yes, if the runner has the `tvc login` profile that registered the operator; API key env vars alone are not enough | No, needs a physical touch |
+| Private key lives in | PIV slots on a hardware token | A plaintext seed file on the operator's machine, readable only by their user account | Two wallet accounts in your Turnkey organization |
+| Who controls it | You. Turnkey only ever sees the public keys | You. Turnkey only ever sees the public keys | Your organization, through Turnkey's user, API key, and [policy](/features/policies/overview) model |
+| Where signing and decryption happen | On the YubiKey, after a PIN and a touch | On the operator's machine | Inside Turnkey's enclaves, via Turnkey activities |
+| Created by | `ykman` on the device, then registered with `tvc` | `tvc login` | `tvc operator create` |
+| Registered with Turnkey | When an operator set is created with `newOperators` | When an operator set is created with `newOperators` | By the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity |
+| `keySource` in the API | `EXTERNAL_KEY` | `EXTERNAL_KEY` | `ORG_WALLET_ACCOUNT` |
+| Can act in CI | No, needs a physical touch | Yes, with API key env vars and the seed passed by flag or env var | Yes, if the runner has the `tvc login` profile that registered the operator; API key env vars alone are not enough |
+
+For production operators, use a YubiKey or a Turnkey-hosted operator. A local key file is a plaintext seed, so keep it to development, or to CI pipelines where the seed is injected from a secrets manager through `TVC_OPERATOR_SEED` and never written to disk.
 
 The kinds can be mixed freely within a set. Each operator is just a pair of public keys to Turnkey, and the CLI picks the signing method per operator from your local configuration.
 
 The [`list_tvc_operators`](/api-reference/queries/list-tvc-operators) query reports each operator's `keySource`. Operators created before the field existed have no `keySource`.
 
-## Local key file
+## Self-hosted keys
 
-`tvc login` generates a 32-byte master seed on your machine. Both the signing key and the encryption key are derived from that seed following the [QOS key set](https://github.com/tkhq/qos/blob/main/src/qos_p256/SPEC.md) specification. The seed is written as JSON to:
+Self-hosted operators keep their private keys with you. Turnkey learns only the public keys, when the operator is included in an operator set's `newOperators` at app creation, and every signature and decryption happens on your hardware.
 
-```
-~/.config/turnkey/orgs/<alias>/operator.json
-```
-
-The seed never leaves the file unless you move it. Turnkey learns only the public keys, which the CLI auto-populates into the `newOperators` field when you run `tvc app init`, or which you paste into the dashboard when creating an app there.
-
-<Note>
-The seed is stored unencrypted. The CLI writes the file with owner-only permissions, so its protection is the operating system's access control and whatever disk encryption the machine has. Anyone who can read the file can act as that operator.
-</Note>
-
-**Back it up.** A lost local key means a lost operator. If that operator was needed to meet a threshold, you'll need to create a new operator set and a new app. `tvc login` offers to back the key up during onboarding, and you can do it any time:
-
-```bash
-tvc keys backup-operator-key --output <PATH>
-```
-
-The backup is a byte-for-byte copy of `operator.json`, so it holds the same plaintext seed as the original.
-
-**Approve manifests.** With the organization active, the CLI reads the key from the file automatically:
-
-```bash
-tvc deploy approve \
-  --deploy-id <DEPLOYMENT_UUID> \
-  --operator-id <OPERATOR_UUID>
-```
-
-To sign from a pipeline or from a machine that hasn't run `tvc login`, pass the seed explicitly with `--operator-seed-path <FILE>` (a file containing the raw hex seed) or `--operator-seed <HEX>`. The two flags are mutually exclusive.
-
-Add `--skip-post` to sign without contacting the API, for example on an air-gapped machine. The CLI writes the approval JSON to stdout or to `--approval-out <PATH>`. There is no CLI command to submit a saved approval; post it with the [`create_tvc_manifest_approvals`](/api-reference/activities/create-tvc-manifest-approvals) activity using the manifest ID, operator ID, and hex-encoded signature.
-
-**Hold Quorum Key shares.** Local operators can be share set members too, but the share lifecycle runs on your machine rather than through Turnkey:
-
-1. `tvc keys generate-local-quorum-key` generates a Quorum Key, splits it with Shamir's Secret Sharing, and encrypts each share to an operator's encryption key.
-2. When an enclave boots, `tvc keys re-encrypt-local-share` verifies the enclave's attestation and manifest approvals, then re-encrypts your share to the enclave's Ephemeral Key.
-3. `tvc deploy post-share` submits the re-encrypted share.
-
-Each step accepts the same `--operator-seed` and `--operator-seed-path` flags as `deploy approve`. Run `tvc keys init-local-quorum-key` to generate a template configuration for step 1.
-
-## Turnkey-hosted
-
-A hosted operator's keys are two P-256 wallet accounts in your Turnkey organization. `tvc operator create` calls the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity, which creates a wallet named `tvc-wallet` (or reuses one you pass with `--wallet-id`) and derives two accounts under a base path. The default base path is `m/5527107'/0'/0'`, where `5527107` is the ASCII bytes of `TVC`. Turnkey appends `/0` for the encryption account and `/1` for the signing account.
-
-```bash
-tvc operator create --name <OPERATOR_NAME>
-```
-
-The activity returns the operator ID, the wallet ID, and both public keys. The CLI saves them to the active organization's local profile so later commands can find the operator by ID. To create more than one hosted operator in the same wallet, give each a distinct `--account-path`.
-
-**Who controls the key.** The private keys never leave Turnkey's enclaves, and they are never returned to the CLI. Every use of a hosted operator is a Turnkey activity submitted with your API key, so it is subject to the same controls as any other activity in your organization: the submitting user's permissions, [policies](/features/policies/overview), consensus requirements, and the activity log. The relevant activity types are `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD` for approvals and `ACTIVITY_TYPE_RE_ENCRYPT_TVC_QUORUM_KEY_SHARE` for share provisioning.
-
-**Approve manifests.** The same command as a local operator. The CLI recognizes the operator ID as a hosted operator and signs the approval through the [`sign_raw_payload`](/api-reference/activities/sign-raw-payload) activity instead of a local key:
-
-```bash
-tvc deploy approve \
-  --deploy-id <DEPLOYMENT_UUID> \
-  --operator-id <OPERATOR_UUID>
-```
-
-Offline approval with `--skip-post` is not available for hosted operators, since signing requires the API.
-
-**Hold Quorum Key shares.** Hosted operators have a shorter share lifecycle because Turnkey holds the encrypted shares:
-
-1. `tvc keys create-quorum-key --threshold <N> --operator-ids <IDS>` creates the Quorum Key inside Turnkey's enclaves with one share encrypted to each hosted operator.
-2. `tvc deploy provision --deploy-id <ID> --operator-id <ID>` verifies the enclave's attestation and approvals, then calls the [`re_encrypt_tvc_quorum_key_share`](/api-reference/activities/re-encrypt-tvc-quorum-key-share) activity to re-encrypt that operator's share to the enclave's Ephemeral Key.
-
-The [manifest sets and share sets](/features/verifiable-cloud/manifest-sets-and-share-sets#worked-example) page walks through a full hosted setup.
-
-## YubiKey
+### YubiKey
 
 A YubiKey operator keeps the operator's two private keys, the signing key and the encryption key, in the token's PIV application, generated on the device so they can never be exported. Signing and decryption happen on the YubiKey and require the PIV PIN and a physical touch every time.
 
@@ -192,6 +127,77 @@ tvc keys re-encrypt-local-share \
 <Tip>
 Common errors: "no YubiKey is connected" means the reader can't see the device, so reinsert it and check `ykman info`. "Metadata is unavailable" means the firmware is older than 5.3. A rejected PIN should be fixed with the PUK before the retry counter runs out. A signing timeout means the device blinked and wasn't touched in time.
 </Tip>
+
+### Local key file
+
+`tvc login` generates a 32-byte master seed on your machine. Both the signing key and the encryption key are derived from that seed following the [QOS key set](https://github.com/tkhq/qos/blob/main/src/qos_p256/SPEC.md) specification. The seed is written as JSON to:
+
+```
+~/.config/turnkey/orgs/<alias>/operator.json
+```
+
+The seed never leaves the file unless you move it. Turnkey learns only the public keys, which the CLI auto-populates into the `newOperators` field when you run `tvc app init`, or which you paste into the dashboard when creating an app there.
+
+<Note>
+The seed is stored unencrypted. The CLI writes the file with owner-only permissions, so its protection is the operating system's access control and whatever disk encryption the machine has. Anyone who can read the file can act as that operator.
+</Note>
+
+**Back it up.** A lost local key means a lost operator. If that operator was needed to meet a threshold, you'll need to create a new operator set and a new app. `tvc login` offers to back the key up during onboarding, and you can do it any time:
+
+```bash
+tvc keys backup-operator-key --output <PATH>
+```
+
+The backup is a byte-for-byte copy of `operator.json`, so it holds the same plaintext seed as the original.
+
+**Approve manifests.** With the organization active, the CLI reads the key from the file automatically:
+
+```bash
+tvc deploy approve \
+  --deploy-id <DEPLOYMENT_UUID> \
+  --operator-id <OPERATOR_UUID>
+```
+
+To sign from a pipeline or from a machine that hasn't run `tvc login`, pass the seed explicitly with `--operator-seed-path <FILE>` (a file containing the raw hex seed) or `--operator-seed <HEX>`. The two flags are mutually exclusive.
+
+Add `--skip-post` to sign without contacting the API, for example on an air-gapped machine. The CLI writes the approval JSON to stdout or to `--approval-out <PATH>`. There is no CLI command to submit a saved approval; post it with the [`create_tvc_manifest_approvals`](/api-reference/activities/create-tvc-manifest-approvals) activity using the manifest ID, operator ID, and hex-encoded signature.
+
+**Hold Quorum Key shares.** Local operators can be share set members too, but the share lifecycle runs on your machine rather than through Turnkey:
+
+1. `tvc keys generate-local-quorum-key` generates a Quorum Key, splits it with Shamir's Secret Sharing, and encrypts each share to an operator's encryption key.
+2. When an enclave boots, `tvc keys re-encrypt-local-share` verifies the enclave's attestation and manifest approvals, then re-encrypts your share to the enclave's Ephemeral Key.
+3. `tvc deploy post-share` submits the re-encrypted share.
+
+Each step accepts the same `--operator-seed` and `--operator-seed-path` flags as `deploy approve`. Run `tvc keys init-local-quorum-key` to generate a template configuration for step 1.
+
+## Turnkey-hosted keys
+
+A Turnkey-hosted operator keeps its keys in two P-256 wallet accounts in your Turnkey organization. `tvc operator create` calls the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity, which creates a wallet named `tvc-wallet` (or reuses one you pass with `--wallet-id`) and derives two accounts under a base path. The default base path is `m/5527107'/0'/0'`, where `5527107` is the ASCII bytes of `TVC`. Turnkey appends `/0` for the encryption account and `/1` for the signing account.
+
+```bash
+tvc operator create --name <OPERATOR_NAME>
+```
+
+The activity returns the operator ID, the wallet ID, and both public keys. The CLI saves them to the active organization's local profile so later commands can find the operator by ID. To create more than one hosted operator in the same wallet, give each a distinct `--account-path`.
+
+**Who controls the key.** The private keys never leave Turnkey's enclaves, and they are never returned to the CLI. Every use of a hosted operator is a Turnkey activity submitted with your API key, so it is subject to the same controls as any other activity in your organization: the submitting user's permissions, [policies](/features/policies/overview), consensus requirements, and the activity log. The relevant activity types are `ACTIVITY_TYPE_SIGN_RAW_PAYLOAD` for approvals and `ACTIVITY_TYPE_RE_ENCRYPT_TVC_QUORUM_KEY_SHARE` for share provisioning.
+
+**Approve manifests.** The same command as a local operator. The CLI recognizes the operator ID as a hosted operator and signs the approval through the [`sign_raw_payload`](/api-reference/activities/sign-raw-payload) activity instead of a local key:
+
+```bash
+tvc deploy approve \
+  --deploy-id <DEPLOYMENT_UUID> \
+  --operator-id <OPERATOR_UUID>
+```
+
+Offline approval with `--skip-post` is not available for hosted operators, since signing requires the API.
+
+**Hold Quorum Key shares.** Hosted operators have a shorter share lifecycle because Turnkey holds the encrypted shares:
+
+1. `tvc keys create-quorum-key --threshold <N> --operator-ids <IDS>` creates the Quorum Key inside Turnkey's enclaves with one share encrypted to each hosted operator.
+2. `tvc deploy provision --deploy-id <ID> --operator-id <ID>` verifies the enclave's attestation and approvals, then calls the [`re_encrypt_tvc_quorum_key_share`](/api-reference/activities/re-encrypt-tvc-quorum-key-share) activity to re-encrypt that operator's share to the enclave's Ephemeral Key.
+
+The [manifest sets and share sets](/features/verifiable-cloud/manifest-sets-and-share-sets#worked-example) page walks through a full hosted setup.
 
 ## See also
 
