@@ -1,0 +1,34 @@
+---
+title: "Init OAuth 2.0 Authenticate V2"
+description: "Initialize an enclave encryption target through Auth Proxy."
+---
+
+`POST https://authproxy.turnkey.com/v1/init_oauth2_authenticate_v2`
+
+## Authorization
+
+Send `X-Auth-Proxy-Config-Id: <your Auth Proxy config ID>` and `Content-Type: application/json`. OAuth must be allowed in that proxy configuration. Follow the [Auth Proxy origin requirements](/features/authentication/auth-proxy).
+
+## Request body
+
+```json
+{
+  "clientId": "<provider client ID>",
+  "encryptionSuite": "TRANSPORT_ENCRYPTION_SUITE_ENCLAVE_ENCRYPT_V1"
+}
+```
+
+Both fields are required. The proxy selects the credential registered for `clientId` in its configured parent organization. This is a flat body, not a public API activity envelope.
+
+## Response
+
+```json
+{
+  "oauth2CredentialId": "<selected OAuth credential UUID>",
+  "enclaveTargetMessage": "<signed TLS Fetcher target message>"
+}
+```
+
+Verify the signed target and encrypt on the client. Include the returned credential ID in the encrypted payload and the subsequent [OAuth 2.0 Authenticate V2](/api-reference/auth-proxy/oauth2-authenticate-v2) request. A target completes one exchange and expires after five minutes, so initialize a new target for each login attempt.
+
+Take the parent organization ID, provider client ID, and provider for the encrypted payload from your client configuration. See [Auth Proxy auth flows](/features/authentication/auth-proxy#auth-flows) for the full sequence.
