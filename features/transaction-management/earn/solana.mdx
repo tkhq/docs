@@ -1,0 +1,98 @@
+---
+title: "Earn on Solana"
+description: "Offer Kamino yield to Solana wallets with the same Earn API: enable a reserve, deposit, withdraw, and claim fees."
+sidebarTitle: "Earn on Solana"
+mode: "wide"
+---
+
+Earn on Solana uses the same activities and queries as Earn on EVM. The provider is [Kamino](https://kamino.finance): the catalog lists Kamino Lend (K-Lend) reserves, and enabling one creates a Kamino vault for your organization that deposits into that reserve. This page covers what differs on Solana; the per-activity pages describe the shared flow.
+
+<Note>
+  Solana Earn is in early access and gated separately from EVM Earn. Reach out to Turnkey to have it enabled for your organization.
+</Note>
+
+## What is different
+
+| | EVM (Morpho, Aave) | Solana (Kamino) |
+| :-- | :-- | :-- |
+| Catalog entry | Morpho vault or Aave reserve | K-Lend reserve on Kamino's main market |
+| `vaultAddress` | Vault, or the Aave reserve's asset | Reserve address (base58) |
+| Enabling | Deploys a fee wrapper contract | Creates a Kamino vault (kVault) allocated to the reserve |
+| `wrapperAddress` | Fee wrapper (deposit target) | The kVault (deposit target) |
+| `splitterAddress` | Fee splitter contract | Empty: fees accrue inside the vault |
+| Fee claim | Released by the splitter to your wallet | One Turnkey-signed transaction withdraws accrued fees and pays your share and Turnkey's |
+| Gas | ETH or sponsored (EIP-7702) | SOL or sponsored (Turnkey fee payer) |
+| Rewards | Merkl campaigns | None; `rewardsApyPct` is `0` |
+
+Addresses are base58 Solana addresses and case-sensitive; compare them exactly. Chain ids are canonical CAIP-2: `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` for mainnet and `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for devnet. The `solana:mainnet` and `solana:devnet` aliases are accepted on every Earn activity and normalized to these.
+
+## Browse Kamino reserves
+
+[`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) takes the asset as a Solana CAIP-19 id, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:<mint>`, for example `.../token:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` for USDC. Filter with `provider: "EARN_PROVIDER_KAMINO"` or omit it.
+
+Each entry is a K-Lend reserve on Kamino's main market. The catalog is limited to stablecoin and SOL reserves (USDC, USDT, USDG, USDS, PYUSD, SOL) with at least \$100k supplied. `vaultAddress` is the reserve address, `name` is the market plus the token (for example `Main Market USDC`), and `curator` is empty. `apyPct` is the median hourly supply APY of the reserve over the trailing three days, which smooths the utilization spikes that a spot value would show.
+
+A reserve whose status is not `Active` cannot be enabled. Kamino's catalog API covers mainnet only; on devnet `list_earn_vaults` returns nothing and you pass the reserve address to `earn_deploy_wrapper` directly.
+
+## Enable a reserve
+
+Submit [`earn_deploy_wrapper`](/features/transaction-management/earn/deploy-wrapper) with the reserve as `vaultAddress`, the Solana `caip2`, your `clientFeeBps`, and a `clientFeeWallet` that is a Solana wallet account in your organization. Turnkey verifies the reserve against its pinned Kamino markets, then its Solana deployer key creates a Kamino vault for your organization with the reserve as its only allocation and your fee configured on it. Turnkey pays the creation transaction and the vault's rent.
+
+The result's `wrapperAddress` is the vault, the address every deposit and withdrawal targets. `splitterAddress` is empty. Poll [`get_earn_deploy_status`](/api-reference/queries/get-earn-deploy-status) until `COMPLETED` before accepting deposits; the `deployTxHash` is the base58 transaction signature.
+
+The vault address is deterministic for your organization, the reserve, and your fee configuration, so resubmitting is idempotent: if the vault already exists and verifies as Turnkey's, no transaction is sent. To change your fee, enable the reserve again with the new configuration and point deposits at the new vault, as on EVM.
+
+Only reserves whose token uses the SPL Token program can be enabled. Token-2022 mints are rejected with `EARN_UNSUPPORTED_TOKEN_PROGRAM`.
+
+## Deposit and withdraw
+
+[`earn_deposit`](/features/transaction-management/earn/deposit) and [`earn_withdraw`](/features/transaction-management/earn/withdraw) take the vault's `wrapperAddress`, the Solana wallet in `signWith`, the amount in the token's atomic units (`"1000000"` for 1 USDC), and the Solana `caip2`. Turnkey builds a single Solana transaction, the wallet signs it, and Turnkey broadcasts it.
+
+- A deposit creates the wallet's share token account if needed and deposits into the vault. For a SOL reserve, the deposit wraps the lamports into wSOL first.
+- A withdrawal converts the amount to vault shares at the current share price, redeems them from the reserve, and credits the wallet's token account, creating it if needed. `"MAX"` redeems the wallet's entire share balance. For a SOL reserve, the withdrawal unwraps back to SOL.
+- With `sponsor: true`, Turnkey's fee payer pays the transaction fee and any rent for accounts the transaction creates. Without it, `signWith` needs SOL for the fee and the share account's rent.
+- Deposits land in the vault's idle balance and are moved into the reserve by a Turnkey-run invest step shortly after. Idle deposits are redeemable at any time; yield accrues once invested.
+
+The status queries report `COMPLETED` or `FAILED` once the transaction is confirmed. The tx hash fields carry the base58 transaction signature.
+
+[`list_earn_positions`](/features/transaction-management/earn/positions) works unchanged: `currentValue` is the wallet's share balance at the vault's current share price, net of fees.
+
+## Fees and claims
+
+The fee model is the same as on EVM: your fee and Turnkey's fee are basis points of yield, principal is never charged, and the same caps apply. On Solana the fees are configured on the Kamino vault and accrue inside it as yield is earned.
+
+`claimableClientFee` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) is your share of the vault's accrued, unclaimed fees. The vault's fee counter advances when the vault is interacted with, so the figure can trail the amount a claim pays out.
+
+[`claim_earn_fees`](/api-reference/activities/claim-earn-fees) with the vault's `wrapperAddress` builds one transaction, signed by Turnkey's deployer key as the vault admin, that withdraws the accrued fees from the vault and transfers your share to `clientFeeWallet` and Turnkey's share to Turnkey's wallet. Turnkey's enclave verifies that the destinations are the pinned fee wallets and that the split matches the configured basis points before signing, so the transaction can pay out only what the fee configuration allows. Turnkey pays the transaction fee.
+
+<Warning>
+  `clientFeeWallet` must already hold a token account for the reserve's mint (for example a USDC associated token account). The claim does not create one and fails with an explicit error when it is missing.
+</Warning>
+
+## Pause deposits
+
+[`earn_set_wrapper_state`](/api-reference/activities/set-earn-wrapper-state) works for Kamino vaults as it does for EVM wrappers: while `depositsDisabled` is true, Turnkey refuses to build deposits into the vault and withdrawals continue. The vault remains a permissionless Kamino program account that anyone can interact with directly onchain.
+
+## How Turnkey operates the vault
+
+On EVM, Turnkey deploys immutable contracts and holds no key over them. On Solana, Kamino vaults have an admin, and for Earn that admin is a key held in Turnkey's signing enclave. That key signs three things: the vault's creation, the periodic invest that moves idle deposits into the reserve, and fee claims. Each of these is built by Turnkey's services and checked by its enclave against pinned accounts before the key signs it.
+
+The admin key can change the vault's fee configuration, change its allocation between Kamino reserves, claim accrued fees, and transfer the admin role. It cannot withdraw or transfer depositors' funds: a Kamino vault's shares are redeemable only by the wallet that holds them. Turnkey does not exercise discretion over the vault beyond this fixed flow; the allocation is set to the single reserve you chose when you enabled it.
+
+## Kamino risk disclosure
+
+In addition to the general [risk disclosures](/features/transaction-management/earn#what-is-earn) that apply to every Earn vault, the following apply to Kamino and should be reflected in what you disclose to your users:
+
+- **Upgradeable programs.** The Kamino vault and K-Lend programs are upgradeable by Kamino. A program upgrade can change the behavior of vaults and reserves, including how deposits, withdrawals, and fees work, without any action by you, your users, or Turnkey.
+- **Deposit caps and reserve controls.** Kamino's global admin can set and lower deposit caps on reserves and vaults, and can change a reserve's status. A deposit can fail when a cap is reached or a reserve is restricted, until Kamino changes the parameter. Withdrawals also depend on the reserve's available liquidity: when a reserve is highly utilized, a withdrawal may be limited until borrowers repay or liquidity is added.
+- **No high-water mark.** The vault's performance fee is charged on yield as it accrues and is not offset against earlier losses in the vault. If a vault's value falls and later recovers, fees are charged on the recovery.
+- **Lending risk.** Yield comes from borrowers of the K-Lend reserve. Deposited assets are exposed to the reserve's borrowers, collateral, oracle, and liquidation parameters, which Kamino sets and can change.
+
+**Important:** Kamino is an independent third-party protocol and is not a subcontractor, agent, or affiliate of Turnkey. Turnkey does not manage, audit, or guarantee any Kamino program, reserve, or vault, or its returns. Turnkey's role is limited to providing the API infrastructure and the vault administration described above.
+
+## Next steps
+
+- [Browse the vault catalog](/features/transaction-management/earn/vault-catalog) with a Solana CAIP-19 asset
+- [Deploy a vault wrapper](/features/transaction-management/earn/deploy-wrapper) to enable a reserve
+- [Deposit into a vault](/features/transaction-management/earn/deposit) and [withdraw](/features/transaction-management/earn/withdraw) from a Solana wallet
+- The [`with-earn`](https://github.com/tkhq/sdk/tree/main/examples/defi/with-earn) SDK example runs the whole flow on Solana mainnet or devnet with `CHAIN_CAIP2` set to a Solana chain

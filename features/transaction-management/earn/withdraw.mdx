@@ -10,7 +10,7 @@ When a user initiates a withdrawal, you pass their instruction through the Turnk
 
 - The `signWith` wallet holds a position in the wrapper you are withdrawing from. Get its `wrapperAddress` from [`list_earn_positions`](/api-reference/queries/get-earn-positions).
 - The withdrawal amount is at most the position's `currentValue`, or the literal `"MAX"` for a full exit.
-- For non-sponsored withdrawals, the `signWith` wallet needs the chain's native token for gas.
+- For non-sponsored withdrawals, the `signWith` wallet needs the chain's native token for gas (SOL on Solana).
 
 <Note>
   Withdrawals are never blocked by a [paused](/features/transaction-management/earn/manage-wrappers#pause-or-resume-deposits) wrapper, and sub-organization wallets can withdraw from wrappers deployed by their parent organization. The wrapper configuration lives on the parent, the sub-org wallet signs, and no per-sub-org deployment is needed.
@@ -29,7 +29,7 @@ See [Withdraw from Earn vault](/api-reference/activities/withdraw-from-earn-vaul
 
 ## Full exit with MAX
 
-`"amountValue": "MAX"` redeems the wallet's exact live share balance in the wrapper, so the position closes completely without leaving dust.
+`"amountValue": "MAX"` redeems the wallet's exact live share balance in the wrapper, so the position closes completely without leaving dust. On Solana, a partial amount is converted to vault shares at the current share price, rounded up, before it is redeemed (see [Earn on Solana](/features/transaction-management/earn/solana#deposit-and-withdraw)).
 
 <Note>
   A `MAX` withdrawal resets the position's lifetime accounting: after it confirms, `totalDeposited` and `totalWithdrawn` in [`list_earn_positions`](/features/transaction-management/earn/positions) start again from zero for that wrapper.
@@ -39,7 +39,7 @@ Positions in wrappers you have since replaced (after a [fee change](/features/tr
 
 ## Gas: sponsored vs self-funded
 
-With `sponsor: true`, network fees are covered through Turnkey’s Gas Station and the withdrawal executes as an EIP-7702 sponsored transaction. The `signWith` wallet does not need a gas token.
+With `sponsor: true`, network fees are covered through Turnkey’s Gas Station. On EVM the withdrawal executes as an EIP-7702 sponsored transaction; on Solana Turnkey's fee payer co-signs and pays the fee and any rent. The `signWith` wallet does not need a gas token.
 
 With `sponsor: false`, the `signWith` wallet pays gas itself, and the user initiating the withdrawal will need the relevant chain’s gas token.
 
@@ -49,7 +49,7 @@ With `sponsor: false`, the `signWith` wallet pays gas itself, and the user initi
   A `COMPLETED` activity means the transaction was enqueued for broadcast, not that it landed onchain. A transaction that later fails is invisible in the activity result. Poll [`get_earn_withdraw_status`](/api-reference/queries/get-earn-withdraw-status) until it reports `COMPLETED` (included onchain) or `FAILED`.
 </Warning>
 
-Poll with the `withdrawRequestId` from the activity result. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `withdrawTxHash`, and on `FAILED` it includes an `error` field with the reason. See [Submissions](/api-reference/activities/overview) for general activity semantics.
+Poll with the `withdrawRequestId` from the activity result. `status` is `PENDING`, `COMPLETED`, or `FAILED`; on `COMPLETED` the response carries the `withdrawTxHash` (on Solana, the base58 transaction signature), and on `FAILED` it includes an `error` field with the reason. See [Submissions](/api-reference/activities/overview) for general activity semantics.
 
 ## Next steps
 

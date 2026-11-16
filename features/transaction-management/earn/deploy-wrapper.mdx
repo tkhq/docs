@@ -7,6 +7,8 @@ mode: "wide"
 
 Before your users can deposit into a vault, your organization must deploy a **fee wrapper** for it. The wrapper is the contract users actually deposit into. It routes funds to the underlying vault, and the applicable fees accrue onchain to a fee splitter as yield accrues. Deploying it is a one-time activity per vault, with gas sponsored by Turnkey.
 
+On Solana the same activity creates a Kamino vault for your organization instead of deploying a contract; see [Earn on Solana](/features/transaction-management/earn/solana#enable-a-reserve) for the differences noted below.
+
 ## When to deploy
 
 Deploy once per vault you want to offer, per fee configuration. Deposits into a vault with no deployed wrapper fail with `EARN_SETUP_REQUIRED` (see [Deposit into a vault](/features/transaction-management/earn/deposit#prerequisites)). Pick vaults from the [vault catalog](/features/transaction-management/earn/vault-catalog); the catalog's `enabled` flag tells you which vaults your organization has already enabled.
@@ -16,15 +18,15 @@ Deploy once per vault you want to offer, per fee configuration. Deposits into a 
 The deploy intent carries your fee:
 
 - `clientFeeBps`: your fee on gross yield, in basis points (`"2000"` = 20%). It is capped at 4,000 bps; combined with Turnkey's fee (10% of yield by default), the total cannot exceed 5,000 bps (50% of yield); deployments above the cap are rejected. See the [fee model](/features/transaction-management/earn#fees) for current rates and caps.
-- `clientFeeWallet`: the address that receives your fee payouts onchain. It must be a wallet account owned by your organization; addresses outside your org are rejected.
+- `clientFeeWallet`: the address that receives your fee payouts onchain. It must be a wallet account owned by your organization on the vault's chain; addresses outside your org are rejected.
 
 <Warning>
-  The fee configuration is bound into the wrapper's deterministic (CREATE2) address. Deploying the same vault with a different `clientFeeBps` or `clientFeeWallet` produces a new wrapper at a new address. Positions in the old wrapper remain fully withdrawable; new deposits should target the new wrapper. To change your fee, redeploy and point deposits at the new address.
+  The fee configuration is bound into the wrapper's deterministic address (CREATE2 on EVM, the derived vault account on Solana). Deploying the same vault with a different `clientFeeBps` or `clientFeeWallet` produces a new wrapper at a new address. Positions in the old wrapper remain fully withdrawable; new deposits should target the new wrapper. To change your fee, redeploy and point deposits at the new address.
 </Warning>
 
 ## Submit the activity
 
-Submit an [`ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`](/api-reference/activities/deploy-earn-wrapper) activity with the vault's address (from the catalog), its CAIP-2 chain, and your fee configuration. For Aave, the catalog's `vaultAddress` is the reserve's underlying asset address; pass it through as-is. See [Deploy Earn wrapper](/api-reference/activities/deploy-earn-wrapper) in the API reference for the full request/response schema and cURL example.
+Submit an [`ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`](/api-reference/activities/deploy-earn-wrapper) activity with the vault's address (from the catalog), its CAIP-2 chain, and your fee configuration. For Aave, the catalog's `vaultAddress` is the reserve's underlying asset address; for Kamino it is the K-Lend reserve address. Pass it through as-is. See [Deploy Earn wrapper](/api-reference/activities/deploy-earn-wrapper) in the API reference for the full request/response schema and cURL example.
 
 <Note>
   **Aave only:** Aave takes a small initial deposit at deployment and permanently locks it in the reserve, so a newly deployed Aave wrapper shows a small position straight away, about \$1 for stablecoin reserves. Turnkey currently funds this deposit from its own wallet. See [Aave's deployment docs](https://aave.com/docs/vaults/simple-earn/deploy#define-configuration).
@@ -32,8 +34,8 @@ Submit an [`ACTIVITY_TYPE_EARN_DEPLOY_WRAPPER`](/api-reference/activities/deploy
 
 The activity result returns the deployed addresses immediately; they are derived deterministically before the transaction confirms:
 
-- `wrapperAddress`: the deposit target for this vault.
-- `splitterAddress`: the fee splitter that distributes fees between you and Turnkey (a `PaymentSplitter` for Morpho, a `RevenueSplitterOwner` for Aave).
+- `wrapperAddress`: the deposit target for this vault. On Solana this is the Kamino vault Turnkey created for your organization.
+- `splitterAddress`: the fee splitter that distributes fees between you and Turnkey (a `PaymentSplitter` for Morpho, a `RevenueSplitterOwner` for Aave). Empty for Kamino, where fees accrue inside the vault.
 - `deployRequestId`: poll handle for the deployment transaction.
 
 ## Poll deployment status
