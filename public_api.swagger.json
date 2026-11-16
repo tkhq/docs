@@ -9076,8 +9076,8 @@
           "$ref": "#/definitions/UsageControlDataSource",
           "description": "Data source for the Usage Control."
         },
-        "aggregation": {
-          "$ref": "#/definitions/UsageControlAggregation",
+        "budget": {
+          "$ref": "#/definitions/UsageControlBudget",
           "description": "Aggregation expression that the Usage Control evaluates."
         },
         "identifier": {
@@ -9085,7 +9085,7 @@
           "description": "Identifier for the Usage Control. Policies reference it as `controls.\u003cidentifier\u003e`. It must be unique within the Organization."
         }
       },
-      "required": ["name", "dataSource", "aggregation", "identifier"]
+      "required": ["name", "dataSource", "budget", "identifier"]
     },
     "CreateUsageControlResult": {
       "type": "object",
@@ -23623,73 +23623,11 @@
       },
       "required": ["organizationId"]
     },
-    "UsageControlAggregation": {
-      "type": "object",
-      "properties": {
-        "method": {
-          "$ref": "#/definitions/UsageControlAggregationMethod",
-          "description": "Method that aggregates matching data points."
-        },
-        "operator": {
-          "$ref": "#/definitions/UsageControlAggregationOperator",
-          "description": "Comparison between the aggregate and the threshold."
-        },
-        "threshold": {
-          "type": "string",
-          "description": "Non-negative base-10 decimal string with at most 46 integer digits and 32 fractional digits."
-        },
-        "window": {
-          "$ref": "#/definitions/UsageControlAggregationWindow",
-          "description": "Time window for the aggregation."
-        },
-        "groupBy": {
-          "$ref": "#/definitions/UsageControlAggregationGroupBy",
-          "description": "Scope that partitions matching data before aggregation."
-        }
-      },
-      "required": ["method", "operator", "threshold", "window", "groupBy"]
-    },
-    "UsageControlAggregationGroupBy": {
-      "type": "object",
-      "properties": {
-        "organization": {
-          "$ref": "#/definitions/UsageControlAggregationGroupByOrganization",
-          "description": "Uses one shared bucket for the Organization."
-        },
-        "user": {
-          "$ref": "#/definitions/UsageControlAggregationGroupByUser",
-          "description": "Uses one bucket for each User."
-        },
-        "wallet": {
-          "$ref": "#/definitions/UsageControlAggregationGroupByWallet",
-          "description": "Uses one bucket for each Wallet."
-        }
-      }
-    },
-    "UsageControlAggregationGroupByOrganization": {
-      "type": "object"
-    },
-    "UsageControlAggregationGroupByUser": {
-      "type": "object"
-    },
-    "UsageControlAggregationGroupByWallet": {
-      "type": "object"
-    },
     "UsageControlAggregationMethod": {
       "type": "string",
       "enum": [
         "USAGE_CONTROL_AGGREGATION_METHOD_SUM",
         "USAGE_CONTROL_AGGREGATION_METHOD_COUNT"
-      ]
-    },
-    "UsageControlAggregationOperator": {
-      "type": "string",
-      "enum": [
-        "USAGE_CONTROL_AGGREGATION_OPERATOR_LESS_THAN",
-        "USAGE_CONTROL_AGGREGATION_OPERATOR_LESS_THAN_OR_EQUAL",
-        "USAGE_CONTROL_AGGREGATION_OPERATOR_EQUAL",
-        "USAGE_CONTROL_AGGREGATION_OPERATOR_GREATER_THAN_OR_EQUAL",
-        "USAGE_CONTROL_AGGREGATION_OPERATOR_GREATER_THAN"
       ]
     },
     "UsageControlAggregationWindow": {
@@ -23719,6 +23657,24 @@
       },
       "required": ["duration"]
     },
+    "UsageControlBudget": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/UsageControlAggregationMethod",
+          "description": "Method that aggregates matching data points."
+        },
+        "limit": {
+          "type": "string",
+          "description": "Non-negative base-10 decimal string with at most 46 integer digits and 32 fractional digits."
+        },
+        "window": {
+          "$ref": "#/definitions/UsageControlAggregationWindow",
+          "description": "Time window for the aggregation."
+        }
+      },
+      "required": ["method", "limit", "window"]
+    },
     "UsageControlDataSource": {
       "type": "object",
       "properties": {
@@ -23733,27 +23689,7 @@
       }
     },
     "UsageControlDataSourceActivityExecution": {
-      "type": "object",
-      "properties": {
-        "filter": {
-          "$ref": "#/definitions/UsageControlDataSourceActivityExecutionFilter",
-          "x-nullable": true,
-          "description": "Filters activity executions by type."
-        }
-      }
-    },
-    "UsageControlDataSourceActivityExecutionFilter": {
-      "type": "object",
-      "properties": {
-        "activity": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/UsageControlDataSourceFilterActivity"
-          },
-          "description": "Activity types whose executions are included."
-        }
-      }
+      "type": "object"
     },
     "UsageControlDataSourceChainAssetTransfer": {
       "type": "object",
@@ -23765,16 +23701,6 @@
             "$ref": "#/definitions/UsageControlDataSourceChainAssetTransferDefinition"
           },
           "description": "Assets whose transfers are included in the data source."
-        },
-        "filter": {
-          "$ref": "#/definitions/UsageControlDataSourceChainAssetTransferFilter",
-          "x-nullable": true,
-          "description": "Filters asset transfers by activity type."
-        },
-        "phase": {
-          "$ref": "#/definitions/UsageControlDataSourcePhase",
-          "x-nullable": true,
-          "description": "Selects when to measure an asset transfer."
         }
       },
       "required": ["definition"]
@@ -23794,48 +23720,6 @@
         }
       },
       "required": ["caip19", "decimals"]
-    },
-    "UsageControlDataSourceChainAssetTransferFilter": {
-      "type": "object",
-      "properties": {
-        "activity": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/UsageControlDataSourceFilterActivity"
-          },
-          "description": "Activity types whose asset transfers are included."
-        }
-      }
-    },
-    "UsageControlDataSourceFilterActivity": {
-      "type": "object",
-      "properties": {
-        "activityType": {
-          "type": "string",
-          "description": "Name of an activity type to include, such as `ACTIVITY_TYPE_SOL_SEND_TRANSACTION`."
-        }
-      },
-      "required": ["activityType"]
-    },
-    "UsageControlDataSourcePhase": {
-      "type": "object",
-      "properties": {
-        "signature": {
-          "$ref": "#/definitions/UsageControlDataSourcePhaseSignature",
-          "description": "Measures the transfer when Turnkey signs the transaction and returns it to the user."
-        },
-        "submission": {
-          "$ref": "#/definitions/UsageControlDataSourcePhaseSubmission",
-          "description": "Reserved for future use. Measures the transfer after the transaction lands on chain."
-        }
-      }
-    },
-    "UsageControlDataSourcePhaseSignature": {
-      "type": "object"
-    },
-    "UsageControlDataSourcePhaseSubmission": {
-      "type": "object"
     },
     "UsageType": {
       "type": "string",
