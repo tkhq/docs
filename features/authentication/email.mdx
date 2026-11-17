@@ -227,25 +227,11 @@ If you are interested in implementing bespoke, fully-customized email templates 
 
 A root user satisfying the root quorum, or an API user with the required policies, can submit OTP activities. Parent-initiated login is evaluated against the parent organization's policies even though login targets the user's sub-organization. See [Prerequisites](#prerequisites) and [MFA enforcement](/features/authentication/mfa/enforcement-and-recovery).
 
-Email OTP authentication must be enabled for the organization being authenticated:
+Email OTP login works only for sub-organizations. Parent organizations can send and verify codes for their sub-organizations, but cannot log in with OTP themselves. Setting `FEATURE_NAME_OTP_EMAIL_AUTH` on a parent organization does not enable parent-organization login.
 
-- **Top-level organizations:** disabled by default. Enable it with `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` and `FEATURE_NAME_OTP_EMAIL_AUTH`.
-- **Sub-organizations:** enabled by default. To turn it off, set `disableOtpEmailAuth: true` when creating the sub-organization; see [Create sub-organization](/api-reference/activities/create-sub-organization).
+Email OTP authentication is enabled by default for sub-organizations. To turn it off, set `disableOtpEmailAuth: true` when creating the sub-organization; see [Create sub-organization](/api-reference/activities/create-sub-organization).
 
-To disable it later, use `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` with the same feature name.
-
-Example of enabling email OTP authentication:
-
-```bash
-turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization_feature --body '{
-        "timestampMs": "'"$(date +%s)"'000",
-        "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
-        "organizationId": "<YOUR-ORG-ID>",
-        "parameters": {
-                "name": "FEATURE_NAME_OTP_EMAIL_AUTH"
-        }
-}' --organization <YOUR-ORG-ID>
-```
+To disable it later, use `ACTIVITY_TYPE_REMOVE_ORGANIZATION_FEATURE` with `FEATURE_NAME_OTP_EMAIL_AUTH`. To re-enable it, use `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE` with the same feature name. These changes require the sub-organization's own root quorum; see [Organization features](/features/organizations#features).
 
 ### API key limits
 

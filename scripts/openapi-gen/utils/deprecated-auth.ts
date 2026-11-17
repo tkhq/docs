@@ -11,8 +11,11 @@ export function getDeprecatedAuthNotice(endpoint: ApiEndpoint): string | undefin
   switch (endpoint.path) {
     case "/public/v1/submit/init_otp_auth":
     case "/public/v1/submit/otp_auth":
-    case "/public/v1/submit/email_auth":
       guide = OTP_GUIDE;
+      replacement = "Use encrypted OTP verification and client-bound sessions: `INIT_OTP_V3` → `VERIFY_OTP_V2` → `OTP_LOGIN_V2`.";
+      break;
+    case "/public/v1/submit/email_auth":
+      guide = `${OTP_GUIDE}#replace-email-authentication`;
       replacement = "Use encrypted OTP verification and client-bound sessions: `INIT_OTP_V3` → `VERIFY_OTP_V2` → `OTP_LOGIN_V2`.";
       break;
     case "/public/v1/submit/init_user_email_recovery":
