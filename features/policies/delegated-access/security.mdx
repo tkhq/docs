@@ -1,0 +1,203 @@
+---
+title: "Securing delegated access"
+description: "Scope the delegated user's policies, manage its API keys, and rotate a key in case of a leak."
+---
+
+The delegated access (DA) user's API key lives on your backend, and in each end user's sub-organization it can do whatever the DA user's policies allow. If the key leaks, whoever holds it gets the same access. Narrow policies limit what a leaked key can do, careful key management makes a leak less likely, and knowing how to rotate the key lets you cut it off quickly.
+
+## Scope the policies
+
+Give the DA user only what your backend needs. A broad policy, such as one with the condition `true`, lets anyone holding the key do almost anything in the sub-organization, including exporting wallets.
+
+Never let the DA user export wallets or keys. An exported seed can't be revoked, so a leaked key that can export lets its holder drain those wallets onchain long after you rotate the key. Exports are denied unless a policy allows them, but a broad policy such as `true` allows them too. If you rely on a broad policy, add a deny policy for exports, which overrides it:
+
+```json
+{
+  "policyName": "Deny exports by the delegated user",
+  "effect": "EFFECT_DENY",
+  "consensus": "approvers.any(user, user.id == '<DA_USER_ID>')",
+  "condition": "activity.action == 'EXPORT'"
+}
+```
+
+Define strict transaction conditions. For example, on Solana, a single transfer to one address:
+
+```javascript
+solana.tx.instructions.count() == 1 &&
+solana.tx.transfers.count() == 1 &&
+solana.tx.transfers.all(transfer, transfer.to == '<SPECIFIC_ADDRESS>')
+```
+
+Other useful restrictions:
+
+- Recipient address allowlists
+- Contract functions and their arguments
+- Transaction structure invariants, such as the number of instructions
+
+### Contract and token limits on EVM
+
+Upload the contract's ABI as a [smart contract interface](/features/policies/smart-contract-interfaces), and policies can check the function and its arguments by name. For example, an ERC-20 `transfer` capped at an amount, to one recipient:
+
+```javascript
+eth.tx.to == '<TOKEN_CONTRACT>' &&
+eth.tx.function_name == 'transfer' &&
+eth.tx.contract_call_args['to'] == '<RECIPIENT>' &&
+eth.tx.contract_call_args['value'] <= 1000000000
+```
+
+The argument names (`to`, `value`) come from the ABI you upload. Without an ABI, you can match the raw calldata instead, for example `eth.tx.data[0..10] == '0xa9059cbb'` to match the ERC-20 `transfer` selector. For limits on native ETH, use `eth.tx.value`. See the [Ethereum policy examples](/features/policies/examples/ethereum) for more.
+
+### Limit when a policy applies
+
+A policy's [`time` field](/features/policies/time-based-policies) limits when it applies, on any chain. The window can be fixed, for example until an order expires, or recurring, for example during business hours. Outside the window the policy doesn't apply.
+
+On Solana, a transaction is also only valid onchain for about 60–90 seconds after its `recent_blockhash`, which suits immediate, single-use actions but not delayed ones such as limit orders.
+
+### Routers and other contracts you don't control
+
+Allowlisting a router such as Jupiter isn't enough on its own, because a leaked key could still use it to swap all of the user's assets. You can't control what a contract does downstream unless you control the contract. Only allow the DA user to call contracts you fully trust or control, and limit the scope as much as possible, for example to specific instructions, amounts, or recipients.
+
+### Policies that let the DA user create policies
+
+A DA user allowed to create or update policies can write one that allows itself anything, which undoes every other restriction on it.
+
+If your backend needs a policy per operation, for example one per limit order, create those policies from the end user's session ([client-side setup](/features/policies/delegated-access/frontend)), or use one policy that covers every order, for example by recipient, contract, or amount cap, with a [`time` field](#limit-when-a-policy-applies) if orders expire.
+
+If the DA user deletes policies, limit it to specific ones with `activity.params.policy_id`, and never let it delete a deny policy that constrains it.
+
+## Manage the keys
+
+- **Store keys securely,** for example in an HSM, a KMS, or a secrets manager, not in source code or plain environment variables.
+- **Use short-lived keys where you can.** An expiring key can't be a user's only credential, so the DA user also needs a long-lived key. Keep that one away from the system that uses the short-lived keys.
+- **Rotate keys regularly,** using the same steps as for a [leaked key](#if-a-key-leaks).
+- **Monitor usage,** for example with [activity webhooks](/features/webhooks/overview).
+
+## If a key leaks
+
+Rotate the key. Add a new API key to the DA user, then delete every other API key on that user. The new key keeps the same permissions, because delegated access policies name the user, not the key. Deleting every other key, not only the leaked one, also removes any key that whoever held the leaked key may have added.
+
+Users can add and delete their own API keys without a policy allowing it, so this works however narrow the DA user's policies are, unless a policy explicitly denies it or an [MFA policy](/features/authentication/mfa/overview) covers it. Your parent organization can read its sub-organizations but can't write in them, so the leaked key signs the request that adds the new key, and the new key signs the one that deletes the rest.
+
+<Steps>
+  <Step title="Generate a new key and find the affected sub-organizations">
+    Generate the new key pair and store its private key in your secrets manager. Then, signed by your parent organization's API key, find every sub-organization where the leaked key is present with [`getSubOrgIds`](/api-reference/queries/get-sub-organizations):
+
+    ```typescript
+    import { Turnkey } from "@turnkey/sdk-server";
+    import { generateP256KeyPair } from "@turnkey/crypto";
+
+    const newKey = generateP256KeyPair();
+
+    const createTurnkeyClient = (organizationId: string, apiPublicKey: string, apiPrivateKey: string) =>
+      new Turnkey({
+        apiBaseUrl: "https://api.turnkey.com",
+        apiPublicKey,
+        apiPrivateKey,
+        defaultOrganizationId: organizationId,
+      }).apiClient();
+
+    const turnkeyClient = createTurnkeyClient(PARENT_ORG_ID, PARENT_PUBLIC_KEY, PARENT_PRIVATE_KEY);
+
+    const subOrgIds: string[] = [];
+    let after: string | undefined;
+    do {
+      const { organizationIds } = await turnkeyClient.getSubOrgIds({
+        filterType: "PUBLIC_KEY",
+        filterValue: LEAKED_PUBLIC_KEY,
+        paginationOptions: { limit: "100", ...(after && { after }) },
+      });
+      subOrgIds.push(...organizationIds);
+      after = organizationIds.length === 100 ? organizationIds.at(-1) : undefined;
+    } while (after);
+    ```
+
+    Run each of the next steps for every sub-organization in `subOrgIds`. Your plan's [rate limit](/reference/rate-limits) is shared by your parent organization and all its sub-organizations, reads included, so a script that runs too fast can throttle your live traffic. This helper runs a step across the sub-organizations, one at a time, while staying under `maxRps` requests per second:
+
+    ```typescript
+    async function forEachSubOrg(
+      requestsPerSubOrg: number,
+      maxRps: number,
+      step: (subOrgId: string) => Promise<void>,
+    ) {
+      const minMsPerSubOrg = (requestsPerSubOrg / maxRps) * 1000;
+      for (const subOrgId of subOrgIds) {
+        const started = Date.now();
+        await step(subOrgId);
+        const elapsed = Date.now() - started;
+        await new Promise((resolve) => setTimeout(resolve, Math.max(0, minMsPerSubOrg - elapsed)));
+      }
+    }
+    ```
+
+    For example, if `addNewKey` wraps the code in the next step, which makes two requests per sub-organization, `forEachSubOrg(2, 1, addNewKey)` runs it at no more than one request per second. Leave headroom for your live traffic. If you have many sub-organizations, [contact support](/support/overview) to raise your rate limit while you rotate.
+  </Step>
+  <Step title="Add the new key">
+    Find the DA user that holds the leaked key, and add the new key to it, signed by the leaked key:
+
+    ```typescript
+    const { users } = await turnkeyClient.getUsers({ organizationId: subOrgId });
+    const daUser = users.find((user) =>
+      user.apiKeys.some((key) => key.credential.publicKey === LEAKED_PUBLIC_KEY),
+    );
+    if (!daUser) throw new Error(`no user holds the leaked key in ${subOrgId}`);
+
+    const turnkeyLeakedKeyClient = createTurnkeyClient(subOrgId, LEAKED_PUBLIC_KEY, LEAKED_PRIVATE_KEY);
+    await turnkeyLeakedKeyClient.createApiKeys({
+      userId: daUser.userId,
+      apiKeys: [
+        {
+          apiKeyName: "delegated-access-key-rotated",
+          publicKey: newKey.publicKey,
+          curveType: "API_KEY_CURVE_P256",
+        },
+      ],
+    });
+    ```
+  </Step>
+  <Step title="Switch your backend to the new key">
+    Deploy your backend with the new key before deleting the leaked one. Both keys work until the next step, so your backend keeps working throughout.
+  </Step>
+  <Step title="Delete every other key">
+    Signed by the new key, delete every key on the DA user except the new one:
+
+    ```typescript
+    const turnkeyNewKeyClient = createTurnkeyClient(subOrgId, newKey.publicKey, newKey.privateKey);
+    const { user } = await turnkeyNewKeyClient.getUser({ userId: daUser.userId });
+
+    await turnkeyNewKeyClient.deleteApiKeys({
+      userId: daUser.userId,
+      apiKeyIds: user.apiKeys
+        .filter((key) => key.credential.publicKey !== newKey.publicKey)
+        .map((key) => key.apiKeyId),
+    });
+    ```
+  </Step>
+  <Step title="Check what the leaked key did">
+    Rotating doesn't undo what the leaked key already did. List the activities it signed, such as wallet exports or new users and policies:
+
+    ```typescript
+    const { activities } = await turnkeyClient.getActivities({
+      organizationId: subOrgId,
+      paginationOptions: { limit: "100" },
+    });
+
+    const signedByLeakedKey = activities.filter((activity) =>
+      activity.votes.some((vote) => vote.publicKey === LEAKED_PUBLIC_KEY),
+    );
+    for (const activity of signedByLeakedKey) {
+      console.log(activity.id, activity.type, activity.status);
+    }
+    ```
+
+    Activities are returned newest first. To go further back, pass the last activity's ID as `paginationOptions.after`. An exported seed can't be revoked. If the leaked key exported wallets, create new wallets for those users and move the funds as soon as possible.
+  </Step>
+  <Step title="Narrow the DA user's policies">
+    If the DA user's policies are broad, [scope them](#scope-the-policies) to what your backend needs, so that a future leak exposes less.
+  </Step>
+</Steps>
+
+<Warning>
+  Whoever holds the leaked key can also add a key of their own to the DA user and delete yours. In those sub-organizations your backend no longer has a working key, and `getSubOrgIds` won't find them by the leaked key. To find them, list all your sub-organizations and look for a DA user whose keys you didn't create.
+
+  Only the end user can fix those sub-organizations. From their authenticated session in your app, they can delete the attacker's key and add your new key to the DA user, or delete the DA user and set up delegated access again with the [client-side setup](/features/policies/delegated-access/frontend).
+</Warning>
