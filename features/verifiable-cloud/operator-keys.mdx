@@ -4,25 +4,23 @@ description: "Self-hosted and Turnkey-hosted TVC operator keys: where each priva
 sidebarTitle: "Operator keys"
 ---
 
-Every [operator](/features/verifiable-cloud/overview#operators) in a [manifest set or share set](/features/verifiable-cloud/manifest-sets-and-share-sets) is identified by a pair of P-256 public keys: one for signing manifest approvals and one for encryption, used to receive and re-encrypt Quorum Key shares. The private half of that pair is either self-hosted, on a YubiKey or in a local key file, or Turnkey-hosted, in wallet accounts in your organization. This page describes each option so you can pick the right custody model for each operator.
+Every [operator](/features/verifiable-cloud/overview#operators) in a [manifest set or share set](/features/verifiable-cloud/manifest-sets-and-share-sets) is identified by a pair of P-256 public keys: one for signing manifest approvals and one for encryption, used to receive and re-encrypt Quorum Key shares. The private keys can be either self-hosted or Turnkey-hosted. This page describes each option so you can pick the right custody model for each operator.
 
 ## Compare the options
 
 | | Self-hosted: YubiKey | Self-hosted: local key file | Turnkey-hosted |
 | :--- | :--- | :--- | :--- |
-| Private key lives in | PIV slots on a hardware token | A plaintext seed file on the operator's machine, readable only by their user account | Two wallet accounts in your Turnkey organization |
-| Who controls it | You. Turnkey only ever sees the public keys | You. Turnkey only ever sees the public keys | Your organization, through Turnkey's user, API key, and [policy](/features/policies/overview) model |
+| Private key lives in | PIV slots on a hardware token | A plaintext seed file on the operator's machine | Two wallet accounts in your Turnkey organization |
+| Who controls it | The holder of the YubiKey | Whoever can access the file | Your organization, through Turnkey's user, API key, and [policy](/features/policies/overview) model |
 | Where signing and decryption happen | On the YubiKey, after a PIN and a touch | On the operator's machine | Inside Turnkey's enclaves, via Turnkey activities |
-| Created by | `ykman` on the device, then registered with `tvc` | `tvc login` | `tvc operator create` |
-| Registered with Turnkey | When an operator set is created with `newOperators` | When an operator set is created with `newOperators` | By the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity |
-| `keySource` in the API | `EXTERNAL_KEY` | `EXTERNAL_KEY` | `ORG_WALLET_ACCOUNT` |
-| Can act in CI | No, needs a physical touch | Yes, with API key env vars and the seed passed by flag or env var | Yes, if the runner has the `tvc login` profile that registered the operator; API key env vars alone are not enough |
+| Created by | `ykman` on the device, then registered with `tvc` | `tvc login`, locally | `tvc operator create`, with keys generated inside Turnkey's enclaves |
+| Registered with Turnkey | When an operator set is posted with `newOperators` | When an operator set is posted with `newOperators` | By the [`create_tvc_operator`](/api-reference/activities/create-tvc-operator) activity |
 
 For production operators, use a YubiKey or a Turnkey-hosted operator. A local key file is a plaintext seed, so keep it to development, or to CI pipelines where the seed is injected from a secrets manager through `TVC_OPERATOR_SEED` and never written to disk.
 
-The kinds can be mixed freely within a set. Each operator is just a pair of public keys to Turnkey, and the CLI picks the signing method per operator from your local configuration.
+A manifest set can include both self-hosted and Turnkey-hosted operators. A share set must be all self-hosted or all Turnkey-hosted.
 
-The [`list_tvc_operators`](/api-reference/queries/list-tvc-operators) query reports each operator's `keySource`. Operators created before the field existed have no `keySource`.
+The [`list_tvc_operators`](/api-reference/queries/list-tvc-operators) query lists the operators registered in your organization.
 
 ## Self-hosted keys
 
