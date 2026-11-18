@@ -58,14 +58,14 @@ For most end-user applications, it’s recommended to perform delegated access s
 
 For a detailed step-by-step guide see [Server-side Delegated Access setup](/features/policies/delegated-access/backend).
 
+Before going to production, read [Securing delegated access](/features/policies/delegated-access/security) to learn how to scope the delegated user's policies, manage its API keys, and rotate a key in case of a leak.
+
 ## Frequently asked questions
 
-### Policy design and creation
-
 <Accordion title="Can I create policies on behalf of a user without their explicit approval?">
-  Yes — if the delegated access (DA) user is part of the root quorum, they can create policies unilaterally. Once removed from the root quorum, only the remaining quorum member (typically the end-user) can make further policy changes.
+  Yes, in two cases. If the delegated access (DA) user is in the root quorum and can meet its threshold alone, it can create policies unilaterally, because the root quorum isn't bound by policies. Once it's removed from the root quorum, it can still create policies if a policy explicitly allows it to. Otherwise, only the root quorum (typically the end user) can change policies.
 
-  Note: This can also be done even if the initiating (delegated) user is not a root user, provided a policy explicitly grants them permission to create policies. However, such a configuration should be carefully scoped — additional restrictive policies are typically required to prevent the delegated user from granting themselves broader or unintended access.
+  Be careful with a policy that lets the DA user create policies, because the DA user could use it to grant itself broader access. See [Securing delegated access](/features/policies/delegated-access/security#policies-that-let-the-da-user-create-policies).
 </Accordion>
 
 <Accordion title="When does the user 'approve' a delegated access setup?">
@@ -76,93 +76,25 @@ For a detailed step-by-step guide see [Server-side Delegated Access setup](/feat
   For typical end-user applications, the client-side setup is the recommended and more secure approach.
 </Accordion>
 
-<Accordion title="After a limit order is filled, how can I remove/null a policy programmatically?">
-  As long as the DA user remains authorized, they can remove policies programmatically. If they’ve been removed from the quorum, policy deletion will require the user’s explicit approval.
-
-  **<u>NOTE:</u>** Turnkey is looking to support the concept of 'one-time-use policies' to make it easier to manage redundant policies.
-</Accordion>
-
-### Security and risk management
-
-<Accordion title="If a delegated API key is leaked, does that allow someone to act on behalf of the user?">
-  Yes — if the key is attached to a broad policy. That’s why it’s important to limit the scope of policies and enforce API hygiene practices.
-  It's also recommended to have a policy in place that would allow this user to self-delete in case of a potential key leak:
-
-  ```json
-  {
-    policyName: `Allow the Delegated user to self-delete`,
-    effect: "EFFECT_ALLOW",
-    consensus: `approvers.any(user, user.id == '${delegated_userid}')`,
-    condition: `activity.type == 'ACTIVITY_TYPE_DELETE_USERS' && activity.params.user_ids.count() == 1 && '${delegated_userid}' in activity.params.user_ids`,
-    notes: "Allow the Delegated user to delete itself in case of a key leak"
-  }
-  ```
-</Accordion>
-
-<Accordion title="Is this the same risk as having a master delegate account?">
-  In effect, yes. The key difference is that granular policies **can restrict** what a DA user can do, offering better security hygiene even if there's still elevated access.
-</Accordion>
-
-<Accordion title="What are best practices for storing and rotating Delegate Access API keys?">
-  Typically this is a combination of, or all of the following practices, though not exclusive to just these:
-
-  - Using short-lived keys whenever viable
-  - Rotating API keys regularly
-  - Monitoring the usage
-  - Secure storage (e.g. in HSMs or vaults)
-</Accordion>
-
-### Best practices
-
-<Accordion title="How do I scope a delegated access policy to reduce signing risk?">
-  You can define strict transaction conditions. For example:
-
-  ```javascript
-  solana.tx.instructions.count() == 1 &&
-  solana.tx.transfers.count() == 1 &&
-  solana.tx.transfers.all(transfer, transfer.to == '<SPECIFIC_ADDRESS>')
-  ```
-
-  You can also consider the following:
-
-  - Recipient address restrictions (ie allowlisting addresses)
-  - Contract method selectors
-  - Transaction structure invariants
-  - Blockhash constraints (on Solana)
-</Accordion>
-
 <Accordion title="Can I dynamically add policies per limit order without user friction?">
-  Yes — this is a common pattern. You can add a policy per order (limit, stop loss, TWAP, etc.) using either the end-user’s authenticated session or a Delegated Access (DA) user, as long as the DA user has the necessary permissions defined by policy.
+  Yes — this is a common pattern. You can add a policy per order (limit, stop loss, TWAP, etc.) using either the end-user’s authenticated session or a Delegated Access (DA) user, as long as the DA user has the necessary permissions defined by policy. Prefer the end user's session, because a DA user that can create policies can grant itself broader access. See [Securing delegated access](/features/policies/delegated-access/security#policies-that-let-the-da-user-create-policies).
+</Accordion>
+
+<Accordion title="After a limit order is filled, how can I remove/null a policy programmatically?">
+  The DA user can delete it, if a policy allows it to delete policies (`ACTIVITY_TYPE_DELETE_POLICY`). Otherwise, deleting it needs the end user's approval.
+
+  To avoid cleaning up at all, give the policy a [time window](/features/policies/time-based-policies#time-bound-policies-one-shot). Once the window ends, the policy stops applying. It isn't deleted, and it doesn't stop after its first use, so still scope the condition to the order.
+</Accordion>
+
+<Accordion title="Is a delegated access user the same risk as a master delegate account?">
+  In effect, yes. The key difference is that granular policies **can restrict** what a DA user can do, offering better security hygiene even if there's still elevated access.
 </Accordion>
 
 <Accordion title="What are common implementation patterns among Turnkey clients using Delegated Access?">
   Turnkey's Policy Engine shines through its flexibility. There are many different approaches you can take based on your requirements, but various themes we see include:
 
   - Using **broad policies** with business-controlled API keys
-  - Using \*\*fine-grained policies, \*\*scoped to predictable transaction shapes
+  - Using **fine-grained policies**, scoped to predictable transaction shapes
   - Using delegated access to implement **limit orders, automation flows, or advanced trading logic** (e.g. perps, TWAPs)
   - Ensuring **strong operational security** (e.g. tight scoping & expiring keys) is increasingly common
-</Accordion>
-
-### EVM and SVM-specific strategies
-
-<Accordion title="Are time-bound transactions supported?">
-  Yes, on Solana via `solana.tx.recent_blockhash`, which restricts a transaction’s validity to a ~60–90 second window. Not ideal for delayed executions (e.g. limit orders), but useful for immediate, single-use actions.
-</Accordion>
-
-<Accordion title="For EVM transactions, can I enforce token-specific or contract-specific limits?">
-  Yes, though it’s limited today. You can inspect calldata (e.g., using `eth.tx.data[...]`) and enforce conditions like:
-
-  ```javascript
-  eth.tx.to == '<TOKEN_CONTRACT>' &&
-  eth.tx.data[0..4] == '<ERC20_FUNCTION_SELECTOR>'
-  ```
-
-  Granular support for calldata parsing and value limits is coming soon.
-</Accordion>
-
-<Accordion title="Is it safe to whitelist routers (e.g. Jupiter) in delegated access policies?">
-  Not entirely. Even if you allowlist the router, it could still be abused to swap all assets. You can’t control downstream behavior unless you control the contract.
-
-  > **Suggestion:** Only allow DA keys to interact with contracts you fully trust or control. Limit scope as much as possible (e.g., to specific instructions, amounts, or recipients).
 </Accordion>
