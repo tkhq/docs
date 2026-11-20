@@ -7,6 +7,8 @@ mode: "wide"
 
 A deployed wrapper's code is fixed at deployment and points at the same underlying vault, which cannot change. The wrapper contract contains no function permitting Turnkey or your organization to block, restrict, or reverse a withdrawal as those gates are permanently disabled at deployment. Withdrawal timing may still depend on the underlying vault's available liquidity and network conditions, which Turnkey does not control. A wrapper's fee configuration is fixed in the product; changing it requires deploying a new wrapper.
 
+On Solana the wrapper is a Kamino vault administered by Turnkey rather than an immutable contract. The management operations below work the same way; [Earn on Solana](/features/transaction-management/earn/solana#how-turnkey-operates-the-vault) describes what Turnkey's admin key can and cannot do.
+
 What you control after deployment:
 
 - whether new deposits are accepted
@@ -19,7 +21,7 @@ Management operations are parent-organization only; sub-organization wallets can
 
 [`earn_set_wrapper_state`](/api-reference/activities/set-earn-wrapper-state) sets `depositsDisabled` on a wrapper. While true, earn\_deposit against that wrapper is rejected. Withdrawals, position queries, and fee claims are unaffected, so a paused wrapper can never trap funds. Set it back to false to resume deposits.
 
-Pausing gates deposits submitted through the Turnkey API; it is not an onchain lock. The wrapper remains a permissionless ERC-4626 contract that anyone can interact with directly onchain.
+Pausing gates deposits submitted through the Turnkey API; it is not an onchain lock. The wrapper remains a permissionless ERC-4626 contract (or Kamino vault, on Solana) that anyone can interact with directly onchain.
 
 Read the current state from `depositsDisabled` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults), or on each row of [`list_earn_positions`](/api-reference/queries/get-earn-positions) so your UI can hide the deposit button for paused wrappers.
 
@@ -27,7 +29,7 @@ Common uses: stopping new deposits into a vault that looks compromised while use
 
 ## Claim your fees
 
-Fees accrue onchain to the wrapper's fee splitter. They accumulate without any action from you and never expire. Claiming pays them out in the underlying asset.
+Fees accrue onchain to the wrapper's fee splitter (on Solana, inside the Kamino vault). They accumulate without any action from you and never expire. Claiming pays them out in the underlying asset.
 
 1. Check the claimable amount. `claimableClientFee` on [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults) is the releasable fee for that wrapper, denominated in the underlying asset with USD and asset display values. This field and `clientFeeWallet` are only returned to parent-organization callers.
 2. Submit [`claim_earn_fees`](/api-reference/activities/claim-earn-fees) with the `wrapperAddress`. One transaction releases your accrued fees from the splitter to your `clientFeeWallet`, and the payout arrives as the underlying asset (for example USDC), not as vault shares.
@@ -36,7 +38,7 @@ Fees accrue onchain to the wrapper's fee splitter. They accumulate without any a
 Details:
 
 - The claim releases exactly what is claimable. If your fee wallet also holds a deposit position in the same wrapper, the claim never touches that principal.
-- The claim signs from your `clientFeeWallet`, so your organization's policies apply to it.
+- On EVM the claim signs from your `clientFeeWallet`, so your organization's policies apply to it. On Solana the claim is signed by Turnkey's vault admin key and pays your share to `clientFeeWallet`, which must already hold a token account for the asset; see [Fees and claims on Solana](/features/transaction-management/earn/solana#fees-and-claims).
 - Claim transactions require gas sponsorship. Gas is covered at transaction time and billed on your next invoice.
 - Claiming with nothing accrued fails with an explicit error.
 - Fees are per wrapper. If you run more than one wrapper for a vault, each has its own splitter and claimable balance; iterate over every wrapper in [`list_earn_enabled_vaults`](/api-reference/queries/get-earn-enabled-vaults).

@@ -7,9 +7,9 @@ Earn lets wallets in your organization deposit into DeFi yield vaults, query pos
 
 ## What is Earn
 
-Earn connects Turnkey wallets to ERC-4626 yield vaults. The vaults are deployed and operated by independent third-party protocols; Turnkey provides the API infrastructure to interact with them but does not operate, manage, or guarantee them. Morpho vaults and Aave v3 reserves are supported today.
+Earn connects Turnkey wallets to yield vaults. The vaults are deployed and operated by independent third-party protocols; Turnkey provides the API infrastructure to interact with them but does not operate, manage, or guarantee them. Morpho vaults and Aave v3 reserves on EVM chains and Kamino reserves on Solana are supported today.
 
-Users don't deposit into vaults directly. They deposit into a fee wrapper, a smart contract that holds the position in the underlying vault. A vault may be enabled via either the dashboard or the API. Once you enable a vault, a wrapper is automatically deployed with your fee parameters. The wrapper collects fees as yield accrues. Fees come out of yield only, never principal, and users never sign a separate fee transaction.
+Users don't deposit into vaults directly. They deposit into a fee wrapper that holds the position in the underlying vault: an ERC-4626 smart contract on EVM, a Kamino vault on Solana (see [Earn on Solana](/features/transaction-management/earn/solana)). A vault may be enabled via either the dashboard or the API. Once you enable a vault, a wrapper is automatically deployed with your fee parameters. The wrapper collects fees as yield accrues. Fees come out of yield only, never principal, and users never sign a separate fee transaction.
 
 A wrapper is deployed once per vault and fee configuration. After that, deposits, withdrawals, and position queries are each a single API call.
 
@@ -46,8 +46,9 @@ You, and not Turnkey, are responsible for determining whether any digital asset 
 | Robinhood Chain | `eip155:4663` | Morpho |
 | OP Mainnet | `eip155:10` | Aave |
 | BNB Chain | `eip155:56` | Aave |
+| Solana | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` | Kamino |
 
-Earn is EVM-only in V1. The vault catalog only includes vaults with at least \$100k TVL.
+The vault catalog only includes vaults with at least \$100k TVL.
 
 Morpho covers every curated vault above the TVL floor.
 
@@ -63,6 +64,8 @@ Aave covers a fixed set of reserves per chain:
 | OP Mainnet | USDC, USDT, DAI, WETH, WBTC |
 | BNB Chain | USDC, USDT, BTCB |
 
+Kamino covers the stablecoin and SOL reserves of its main market on Solana (USDC, USDT, USDG, USDS, PYUSD, SOL). Solana Earn is in early access and gated separately; see [Earn on Solana](/features/transaction-management/earn/solana) for how the flow differs.
+
 ## Fees
 
 Earn fees are charged only on yield: a percentage of the yield a position earns. Principal is never charged. Two fees apply, both in basis points of gross yield:
@@ -70,7 +73,7 @@ Earn fees are charged only on yield: a percentage of the yield a position earns.
 - **Your fee (the "Client Fee")**: you set it per wrapper at deploy time (`clientFeeBps`), along with the payout wallet (`clientFeeWallet`, a wallet account owned by your organization). Fees accrue onchain and are released to that wallet when you claim them.
 - **Turnkey's fee (The "Turnkey fee")**: resolved automatically when you deploy. The Turnkey Fee is up to 10% of yield (1,000 bps). Your applicable rate is set in your Order Form or Turnkey's published pricing, which control over the figures shown here.
 
-Client fees are capped at 4,000 bps (40% of yield). Deployments above this cap are rejected. Both Client fees and Turnkey’s fee accrue onchain to a fee splitter contract deployed alongside the wrapper, which splits them between you and Turnkey.
+Client fees are capped at 4,000 bps (40% of yield). Deployments above this cap are rejected. On EVM, both Client fees and Turnkey’s fee accrue onchain to a fee splitter contract deployed alongside the wrapper, which splits them between you and Turnkey. On Solana they accrue inside the Kamino vault and are split between you and Turnkey when [claimed](/features/transaction-management/earn/solana#fees-and-claims).
 
 Fees apply to the yield that flows through the wrapper. Protocol rewards (for example Merkl campaigns) are paid to depositors directly and are not subject to fees, so the net yield your users earn is `(grossApy - rewardsApy) × (1 - totalFeeBps / 10000) + rewardsApy`. The [`list_earn_enabled_vaults`](/features/transaction-management/earn/vault-catalog#list-your-enabled-vaults) endpoint returns gross APY, the rewards portion, net APY, and your fee rate for every wrapper you've deployed, along with `claimableClientFee`: the fee amount accrued to your organization that is actively claimable. Claim it onchain with the [`claim_earn_fees`](/api-reference/activities/claim-earn-fees) activity; the claimed amount is paid out to your fee wallet.
 
@@ -160,6 +163,10 @@ and holds the position.
 
   <Card title="Claim rewards" href="/features/transaction-management/earn/rewards">
     — Check and claim Merkl rewards on your Earn positions.
+  </Card>
+
+  <Card title="Earn on Solana" href="/features/transaction-management/earn/solana">
+    — Kamino reserves, vault administration, and the Solana risk disclosure.
   </Card>
 
   <Card title="End-to-end example" href="/features/transaction-management/earn/end-to-end-example">

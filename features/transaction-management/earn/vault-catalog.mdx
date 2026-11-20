@@ -17,7 +17,7 @@ Two queries cover vault discovery: [`list_earn_vaults`](/api-reference/queries/g
   them.
 </Note>
 
-[`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) takes a required CAIP-19 asset identifier (e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` for USDC on Base) and returns every wrappable vault for that asset. The chain is derived from the identifier, and you can optionally filter by provider.
+[`list_earn_vaults`](/api-reference/queries/get-earn-vault-catalog) takes a required CAIP-19 asset identifier (e.g. `eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` for USDC on Base, or `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` for USDC on Solana) and returns every wrappable vault for that asset. The chain is derived from the identifier, and you can optionally filter by provider.
 
 Reading the results:
 
@@ -54,14 +54,15 @@ Key fields:
 
 ## Providers
 
-Morpho and Aave are both supported, with an identical API shape. Filter with `provider` (`EARN_PROVIDER_MORPHO` or `EARN_PROVIDER_AAVE`), or omit it to get both. See the [chain and asset support tables](/features/transaction-management/earn#supported-protocols-and-chains).
+Morpho and Aave on EVM and Kamino on Solana are supported, with an identical API shape. Filter with `provider` (`EARN_PROVIDER_MORPHO`, `EARN_PROVIDER_AAVE`, or `EARN_PROVIDER_KAMINO`), or omit it to get every provider on the asset's chain. See the [chain and asset support tables](/features/transaction-management/earn#supported-protocols-and-chains).
 
 A few fields read differently per provider:
 
 - **Morpho**: curated ERC-4626 vaults. `name` is the vault's name and `curator` lists its curator(s).
 - **Aave**: each entry is an Aave v3 reserve. `vaultAddress` is the reserve's underlying asset address, `name` is the reserve symbol, and `curator` is empty (Aave reserves have no curator).
+- **Kamino**: each entry is a Kamino Lend reserve on Kamino's main market. `vaultAddress` is the reserve address, `name` is the market and token (for example `Main Market USDC`), and `curator` is empty. `apyPct` is the reserve's median supply APY over the trailing three days and `rewardsApyPct` is `0`. See [Earn on Solana](/features/transaction-management/earn/solana).
 
-Reserves that Aave has frozen or paused are excluded from the catalog. If a reserve is frozen or paused after you deploy its wrapper, new deposits fail onchain; withdrawals are unaffected.
+Reserves that Aave has frozen or paused, and Kamino reserves whose status is not active, are excluded from the catalog. If a reserve is frozen or paused after you deploy its wrapper, new deposits fail onchain; withdrawals are unaffected.
 
 **Important:** The vaults accessible through Earn are operated by independent third-party protocols. These providers are not subcontractors, agents, or affiliates of Turnkey. Turnkey does not manage, audit, or guarantee any vault, its strategy, its curator, or its returns. Turnkey's role is limited to providing the API infrastructure that enables wallet-level interaction with these protocols.
 
