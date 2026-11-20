@@ -1,3 +1,4 @@
+import { getDeprecatedAuthNotice } from "../deprecated-auth";
 import fs from "fs";
 import path from "path";
 import { ApiEndpoint } from "../endpoint-parser/types";
@@ -63,6 +64,9 @@ function generateResponseExample(endpoint: ApiEndpoint): string {
 
 // --- Main MDX content generation for auth proxy endpoints ---
 function generateAuthProxyMdxContent(endpoint: ApiEndpoint): string {
+  const notice = getDeprecatedAuthNotice(endpoint);
+  if (notice) return notice;
+
   let mdxContent = `---
 title: "${endpoint.title || "API Endpoint"}"
 description: "${endpoint.description || "API endpoint documentation"}"

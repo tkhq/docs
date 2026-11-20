@@ -17,6 +17,7 @@ import {
   ApiEndpointParserResult,
 } from "./utils/endpoint-parser";
 import { generateMdxFile, generateAuthProxyMdxFile } from "./utils/mdx-generator";
+import { getDeprecatedAuthNotice } from "./utils/deprecated-auth";
 import path from "path";
 import fs from "fs";
 
@@ -168,16 +169,18 @@ async function main() {
           .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
       // Build raw list with name, id, type, tags
-      const rawList = endpointResult.endpoints.map(ep => {
-        const name = ep.title.replace(/\?/g, '').trim();
-        const id = kebabCase(name);
-        const type = ep.type;
-        const tags = (ep.tags || []).map(t => ({
-          id: kebabCase(t),
-          label: t,
-        }));
-        return { name, id, type, tags };
-      });
+      const rawList = endpointResult.endpoints
+        .filter(ep => !getDeprecatedAuthNotice(ep))
+        .map(ep => {
+          const name = ep.title.replace(/\?/g, '').trim();
+          const id = kebabCase(name);
+          const type = ep.type;
+          const tags = (ep.tags || []).map(t => ({
+            id: kebabCase(t),
+            label: t,
+          }));
+          return { name, id, type, tags };
+        });
 
       // Deduplicate by id + tag ids
       const uniqueList: { name: string; id: string; type: string; tags: { id: string; label: string }[] }[] = [];
@@ -293,7 +296,7 @@ export const tags = ${tagsStr};`;
           ? generateAuthProxyMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly)
           : generateMdxFile(endpoint, absoluteMdxOutputDir, options.mdxAddOnly);
 
-        if (generatedPath) {
+        if (generatedPath && !getDeprecatedAuthNotice(endpoint)) {
           // Construct the full path needed for docs.json
           const fullDocsPath = path.join(relativeMdxBaseDir, generatedPath);
 
