@@ -104,58 +104,39 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant Frontend
-    participant OAuth Provider
+    participant Provider as OAuth Provider
     participant Backend
     participant Turnkey
 
-    User->>Frontend: Clicks "Log in with <OAuth provider>"
-    Frontend->>OAuth Provider: Start OAuth flow
-    OAuth Provider->>User: Prompt to grant permission
-    User->>OAuth Provider: Grants permission
-    OAuth Provider->>Frontend: User redirected to redirect_uri and delivered auth_code
-    Frontend->>Backend: Send auth_code + redirect_uri + API publicKey + nonce=sha256(API publicKey)
-    Backend->>Turnkey: Send auth_code + redirect_uri + nonce via `OAuth2Authenticate` call
-    Turnkey->>Backend: Issue and return OIDC Token (nonce embedded)
-    Backend->>Turnkey: Gets subOrgIds with that associated oidcToken
-    Turnkey->>Backend: Return subOrgId (or null)
-    alt SubOrgId not found
-        Backend->>Turnkey: Create sub-org using oidcToken
-        Turnkey->>Backend: Return new subOrgId
-    end
-    Backend->>Turnkey: Call oauth_login with oidcToken, API publicKey
-    Turnkey->>Backend: Return session JWT
-    Backend->>Frontend: Return session JWT
+    Frontend->>Frontend: Create session keypair and PKCE verifier
+    User->>Frontend: Choose X or Discord login
+    Frontend->>Provider: Start authorization with PKCE challenge
+    Provider->>User: Request consent
+    User->>Provider: Grant consent
+    Provider->>Frontend: Redirect with authorization code
+    Frontend->>Backend: Request encryption initialization
+    Backend->>Turnkey: INIT_OAUTH2_AUTHENTICATE
+    Turnkey->>Backend: Signed enclave target
+    Backend->>Frontend: Signed enclave target
+    Frontend->>Frontend: Verify target and encrypt authentication inputs
+    Frontend->>Backend: Credential ID, encrypted message, target public key, session public key
+    Backend->>Turnkey: OAUTH2_AUTHENTICATE_V2
+    Turnkey->>Backend: OIDC token bound to session key
+    Backend->>Turnkey: Look up or create sub-organization using token
+    Turnkey->>Backend: Sub-organization ID
+    Backend->>Turnkey: OAuth login with token and session public key
+    Turnkey->>Backend: Session JWT
+    Backend->>Frontend: Session JWT
 ```
 
-<Steps>
-  <Step title="Create API Key">
-    The frontend generates an API keypair before starting the OAuth login flow. This keypair will later become the session keypair once the user is authenticated via Turnkey.
-  </Step>
-  <Step title="Start the OAuth Login Flow">
-    The user begins the login process by clicking "Log in with \<OAuth provider\>" on the frontend.
-  </Step>
-  <Step title="Initiate OAuth">
-    The frontend initiates the OAuth Authentication flow with the provider.
-  </Step>
-  <Step title="User Grants Permission">
-    The OAuth provider prompts the user to grant permission to share their identity. Once approved, the provider redirects the user back to your `redirect_uri` with a short-lived `auth_code`. Unlike OIDC providers, OAuth 2.0-only providers do not issue an ID token.
-  </Step>
-  <Step title="Send Credentials to Backend">
-    The frontend computes the `nonce` as `sha256(publicKey)` and sends it to your backend, along with the `auth_code`, the `redirect_uri` and the API public key. The public key is needed again at the final step, for `oauth_login`.
-  </Step>
-  <Step title="Get OIDC Token">
-    The backend exchanges the `auth_code` + `redirect_uri` + `nonce` for an OIDC ID Token using the `OAuth2Authenticate` activity. Turnkey issues this token, not the provider, and embeds the `nonce` in it. This binds the resulting OIDC token to the keypair.
-  </Step>
-  <Step title="Get or Create a Turnkey Sub-organization">
-    The backend gets subOrgIds that are associated with that `oidcToken`. If no sub-organization exists, it creates one using the identity in the token.
-  </Step>
-  <Step title="Create a Session">
-    The backend calls `oauth_login` with the `oidcToken`, and API public key. Turnkey validates that the token’s `nonce` matches `sha256(publicKey)` and returns a session JWT. The backend sends this JWT to the frontend.
-  </Step>
-  <Step title="You're Now Authenticated">
-    Your frontend now treats the API keypair as the session keypair. It can use the private key to sign requests to Turnkey using the `x-stamp` header.
-  </Step>
-</Steps>
+1. **Your frontend** creates the session keypair and PKCE verifier. The private key and verifier stay on the client.
+2. **Your frontend** completes provider authorization and receives the authorization code on its callback. The code and verifier stay on the client until they're encrypted.
+3. **Your backend** initializes under the parent organization with `ACTIVITY_TYPE_INIT_OAUTH2_AUTHENTICATE` and the registered OAuth credential ID, then returns the signed target to the frontend.
+4. **Your frontend** verifies the signed target and encrypts the [authentication inputs](/api-reference/activities/oauth-20-authentication-v2#encrypted-payload), including a nonce derived from the session public key.
+5. **Your backend** forwards `oauth2CredentialId`, `encryptedMessage`, and `targetPublicKey` using `ACTIVITY_TYPE_OAUTH2_AUTHENTICATE_V2`.
+6. **Your backend** uses the returned `oidcToken` to look up or create the sub-organization, then calls OAuth login with the same session public key.
+
+Turnkey issues the token after decrypting and validating inputs in the enclave. For managed Auth Proxy, use the [two V2 proxy routes](/features/authentication/auth-proxy#auth-flows) instead of your own backend.
 
 ## What does Turnkey use from the OIDC tokens to prove identity?
 
@@ -372,7 +353,7 @@ Select the provider you want to add from the dropdown, and fill in the required 
 
 ![Adding an OAuth2.0 provider](/images/sdks/img/add-provider-modal.png)
 
-Once uploaded, you can then use the **Credential Id**  from the table shown to make requests to the `OAUTH2_AUTHENTICATE` activity.
+Once uploaded, use the **Credential Id** to initialize with `ACTIVITY_TYPE_INIT_OAUTH2_AUTHENTICATE`, then submit `ACTIVITY_TYPE_OAUTH2_AUTHENTICATE_V2`. See [Initialize OAuth 2.0 authentication](/api-reference/activities/initialize-oauth-20-authentication) and [OAuth 2.0 authentication V2](/api-reference/activities/oauth-20-authentication-v2) for request details.
 
 ![Facebook OAuth flow](/images/authentication/img/social-logins-table.png)
 
@@ -380,8 +361,10 @@ You can also see the example [here](https://github.com/tkhq/sdk/blob/main/exampl
 
 ### Returning the encrypted bearer token
 
-When using OAuth 2.0-Only Social Providers, it is also possible to have the bearer token returned by the `OAuth2Authenticate` endpoint, which can be useful if you would like your app to have additional integrations involving this Social Provider.
+To request the provider bearer token in V2, include optional `bearer_token_target_public_key` inside the **client-encrypted payload**. It replaces the legacy outer `bearerTokenTargetPublicKey` parameter.
 
-In order to guarantee the secure transfer of the bearer token, it must be encrypted to a P256 Encryption Key inside our secure enclave, returned to the caller, and then finally decrypted. Therefore, the return of the encrypted bearer token is dependent on the caller providing an optional `bearerTokenTargetPublicKey` parameter in the request to `OAuth2Authenticate`.
+This is an uncompressed P-256 public key whose private key is held by the intended recipient. Turnkey encrypts the bearer token to that key inside the enclave and returns it in the OIDC token's `encrypted_bearer_token` claim. This recipient key serves a different purpose from the enclave target key used to encrypt the request.
 
-An example demonstrating this flow can be seen [here](https://github.com/tkhq/sdk/blob/main/examples/authentication/with-x/src/app/auth/turnkey/x/route.ts).
+See [encrypted payload fields](/api-reference/activities/oauth-20-authentication-v2#encrypted-payload) for where the field goes.
+
+{/* TODO: link a tested V2 bearer-token example and minimum SDK versions. */}
