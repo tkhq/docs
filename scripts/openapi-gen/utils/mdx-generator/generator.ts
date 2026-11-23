@@ -388,8 +388,15 @@ function getSdkMethodName(endpoint: ApiEndpoint): string {
   return lastPart.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
+// --- Helper: Escape text for use inside a double-quoted JavaScript string ---
+function escapeJsString(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 // --- Helper: Generate SDK parameter value for a field ---
-function generateSdkParameterValue(field: ApiField, indent: number = 2): string {
+// `trailing` is the separator after the value (usually ","). It goes before the field's
+// description comment, so it isn't swallowed by the comment.
+function generateSdkParameterValue(field: ApiField, indent: number = 2, trailing: string = ""): string {
   const indentStr = " ".repeat(indent);
   const fieldName = field.name;
   const fieldType = field.type;
@@ -401,13 +408,13 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
   if (isEnum && options.length > 0) {
     // For enum fields, show the first option as an example
     const firstOption = options[0].value;
-    return `${indentStr}${fieldName}: "<${firstOption}>"${description}`;
+    return `${indentStr}${fieldName}: "<${firstOption}>"${trailing}${description}`;
   } else if (fieldType === "string") {
-    return `${indentStr}${fieldName}: "<string>${field.description ? ` (${field.description})` : ''}"`;
+    return `${indentStr}${fieldName}: "<string>${field.description ? ` (${escapeJsString(field.description)})` : ''}"${trailing}`;
   } else if (fieldType === "number") {
-    return `${indentStr}${fieldName}: 0${description}`;
+    return `${indentStr}${fieldName}: 0${trailing}${description}`;
   } else if (fieldType === "boolean") {
-    return `${indentStr}${fieldName}: true${description}`;
+    return `${indentStr}${fieldName}: true${trailing}${description}`;
   } else if (fieldType === "array") {
     if (field.childFields && field.childFields.length > 0) {
       // If the array is of objects (multiple fields, or first child is an object)
@@ -417,10 +424,10 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
       ) {
         const lines = [`${indentStr}${fieldName}: [{${description}`];
         for (const child of field.childFields) {
-          lines.push(generateSdkParameterValue(child, indent + 2));
+          lines.push(generateSdkParameterValue(child, indent + 2, ","));
         }
-        lines.push(`${indentStr}}]`);
-        return lines.join(",\n");
+        lines.push(`${indentStr}}]${trailing}`);
+        return lines.join("\n");
       } else if (
         field.childFields.length === 1 &&
         field.childFields[0].name === "item"
@@ -429,31 +436,31 @@ function generateSdkParameterValue(field: ApiField, indent: number = 2): string 
         const itemField = field.childFields[0];
         const { isEnum, options } = getEnumDetails(itemField);
         if (isEnum && options.length > 0) {
-          return `${indentStr}${fieldName}: ["<${options[0].value}>"]${description}`;
+          return `${indentStr}${fieldName}: ["<${options[0].value}>"]${trailing}${description}`;
         } else {
-          return `${indentStr}${fieldName}: ["<string>"]${description}`;
+          return `${indentStr}${fieldName}: ["<string>"]${trailing}${description}`;
         }
       } else {
         // Fallback
-        return `${indentStr}${fieldName}: ["<string>"]${description}`;
+        return `${indentStr}${fieldName}: ["<string>"]${trailing}${description}`;
       }
     } else {
-      return `${indentStr}${fieldName}: ["<string>"]${description}`;
+      return `${indentStr}${fieldName}: ["<string>"]${trailing}${description}`;
     }
   } else if (fieldType === "object") {
     if (field.childFields && field.childFields.length > 0) {
       const lines = [`${indentStr}${fieldName}: {${description}`];
       for (const childField of field.childFields) {
-        lines.push(generateSdkParameterValue(childField, indent + 2));
+        lines.push(generateSdkParameterValue(childField, indent + 2, ","));
       }
-      lines.push(`${indentStr}}`);
-      return lines.join(",\n");
+      lines.push(`${indentStr}}${trailing}`);
+      return lines.join("\n");
     } else {
-      return `${indentStr}${fieldName}: { /* object */ }${description}`;
+      return `${indentStr}${fieldName}: { /* object */ }${trailing}${description}`;
     }
   }
 
-  return `${indentStr}${fieldName}: "<unknown>"${description}`;
+  return `${indentStr}${fieldName}: "<unknown>"${trailing}${description}`;
 }
 
 // --- Helper: Generate SDK parameters from endpoint ---
@@ -464,11 +471,11 @@ function generateSdkParameters(endpoint: ApiEndpoint): string {
   if (parametersWrapper) {
     if (parametersWrapper.childFields && parametersWrapper.childFields.length > 0) {
       // For activity endpoints, extract parameters from the parameters wrapper only
-      const paramLines: string[] = [];
-      for (const field of parametersWrapper.childFields) {
-        paramLines.push(generateSdkParameterValue(field));
-      }
-      return paramLines.join(",\n");
+      const children = parametersWrapper.childFields;
+      const paramLines = children.map((field, i) =>
+        generateSdkParameterValue(field, 2, i < children.length - 1 ? "," : ""),
+      );
+      return paramLines.join("\n");
     } else {
       // parameters exists but has no child fields, so no endpoint-specific parameters
       return "";
@@ -481,11 +488,10 @@ function generateSdkParameters(endpoint: ApiEndpoint): string {
     if (endpointSpecificFields.length === 0) {
       return ""; // No endpoint-specific parameters
     }
-    const paramLines: string[] = [];
-    for (const field of endpointSpecificFields) {
-      paramLines.push(generateSdkParameterValue(field));
-    }
-    return paramLines.join(",\n");
+    const paramLines = endpointSpecificFields.map((field, i) =>
+      generateSdkParameterValue(field, 2, i < endpointSpecificFields.length - 1 ? "," : ""),
+    );
+    return paramLines.join("\n");
   }
 }
 
