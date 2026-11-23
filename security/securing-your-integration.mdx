@@ -154,6 +154,13 @@ An API key carries the full permissions of the user it belongs to. Assume that a
 - **Keep session keys in the device's secure storage.** A session is an API key generated on the user's device, and whoever can read its private key can act as that user until the session expires. Turnkey's SDKs store it as a non-extractable key in IndexedDB on the web, and in the Keychain on iOS or the Keystore on Android. If you handle session keys yourself, do the same, and keep them out of files, `localStorage`, `UserDefaults`, `AsyncStorage`, and `SharedPreferences`. The session JWT, which the SDKs keep in regular app storage, is not enough to sign requests on its own.
 - **When a key leaks, deleting it is not the whole response.** There is no separate revoke step: you revoke a key by deleting it with [`DELETE_API_KEYS`](/api-reference/activities/delete-api-keys) and issuing a replacement. [Users can manage their own credentials](/features/organizations) unless a policy denies it or an MFA policy covers it, so whoever held the key may also have added another API key or authenticator to the same user. List that user's credentials and delete anything you did not create, or delete the user and recreate it. For a leaked [delegated access](/features/policies/delegated-access/overview) key, see [If a key leaks](/features/policies/delegated-access/security#if-a-key-leaks) in Securing delegated access.
 
+## Protect the keys that decrypt exports
+
+An [export](/features/wallets/export-wallets) is encrypted to the target key you provide, so whoever holds that key can decrypt it.
+
+- **If your users export their own wallets**, decrypt on the user's device with a fresh target key for each export. On the web, use the export iframe, which does this for you. On mobile, generate the key on the device and keep it in the Keychain on iOS or the Keystore on Android. Never use a key your backend holds.
+- **If your backend exports keys in a custodial setup**, treat the target key like the wallets themselves: keep it in a KMS or HSM, use it only for exports, and keep it and the decrypted keys out of logs.
+
 ## If your backend is compromised
 
 Your backend probably runs its own checks before it asks Turnkey to sign: withdrawal limits, fraud rules, internal approvals. Those checks run on the same system an attacker would control. Once they are inside your backend, they can skip the checks and call Turnkey directly.
