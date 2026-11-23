@@ -25,7 +25,27 @@ A target completes one exchange and expires after five minutes. Initialize a new
 
 ## Encrypted payload
 
-Build this JSON object on the client, then encrypt it to the verified enclave target with a supported helper. The helper returns the `encryptedMessage` string and the matching `targetPublicKey`.
+Build this JSON object on the client, then encrypt it to the verified enclave target with `encryptOauth2ToBundle` from `@turnkey/crypto`. The helper verifies the target's TLS Fetcher signature, checks that the target was signed for `organization_id`, and returns the `encryptedMessage` string and the matching `targetPublicKey`.
+
+```ts
+import { encryptOauth2ToBundle } from "@turnkey/crypto";
+
+const { encryptedMessage, targetPublicKey } = await encryptOauth2ToBundle({
+  bundle: {
+    organizationId,
+    oauth2CredentialId,
+    clientId,
+    provider: "OAUTH2_PROVIDER_DISCORD",
+    authCode,
+    codeVerifier,
+    redirectUri,
+    nonce,
+  },
+  enclaveTargetMessage, // from init_oauth2_authenticate
+});
+```
+
+The helper takes camelCase inputs and serializes them to the snake_case object below:
 
 ```json
 {
@@ -48,7 +68,11 @@ Build this JSON object on the client, then encrypt it to the verified enclave ta
 - Compute `nonce` as `sha256(publicKey)` over the client session public key, as described in [nonce restrictions](/features/authentication/social-logins#nonce-restrictions-in-oidc-tokens). It must be 64 lowercase hex characters. Use the same session key for OAuth login.
 - To receive the provider bearer token, add optional `bearer_token_target_public_key`: an uncompressed P-256 public key. Turnkey returns the bearer token encrypted to that key in the OIDC token's `encrypted_bearer_token` claim. Omit the field when unused rather than sending an empty string.
 
-Before encrypting, verify the target's TLS Fetcher signature against Turnkey's production signing key. Don't log the unencrypted object.
+### Purpose binding
+
+`TRANSPORT_ENCRYPTION_SUITE_ENCLAVE_ENCRYPT_V2` adds a purpose binding to the HPKE associated data. The binding contains the purpose `ENCRYPTED_INGRESS_PURPOSE_OAUTH2_AUTHENTICATE` and the `oauth2_credential_id`. The enclave rebuilds the binding from the outer `parameters.oauth2CredentialId`. If that value differs from the credential ID the client encrypted under, decryption fails. This stops a ciphertext from being replayed against a different credential or a different encrypted-ingress activity.
+
+If you encrypt without the helper, verify the target's TLS Fetcher signature against Turnkey's production signing key and apply the same purpose binding. Don't log the unencrypted object.
 
 ## Result
 
