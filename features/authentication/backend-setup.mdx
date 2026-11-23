@@ -164,23 +164,27 @@ sequenceDiagram
     User->>Frontend: Begin login (enter email/phone)
     Frontend->>Backend: Request OTP
     Backend->>Turnkey: Call initOtp()
-    Turnkey->>Backend: Return otpId
-    Backend->>Frontend: Return otpId
+    Turnkey->>Backend: Return otpId + otpEncryptionTargetBundle
+    Backend->>Frontend: Return otpId + otpEncryptionTargetBundle
+    Frontend->>Frontend: Create client key pair
     Frontend->>User: Prompt for OTP code
     User->>Frontend: Enter OTP code
-    Frontend->>Backend: Verify OTP
+    Frontend->>Frontend: Encrypt OTP code + client public key
+    Frontend->>Backend: Send otpId + encryptedOtpBundle
     Backend->>Turnkey: Call verifyOtp()
-    Turnkey->>Backend: Return verification token
-    Backend->>Frontend: Return verification token
-    Frontend->>Frontend: Create API key
-    Frontend->>Backend: Send API public key + verification token
-    Backend->>Turnkey: Call getSubOrgIds() with contact info
+    Turnkey->>Backend: Return verification token (bound to client key)
+    Backend->>Turnkey: Call getSubOrgIds() with verified contact
     Turnkey->>Backend: Return existing subOrgId (if any)
+    Backend->>Frontend: Return verification token + whether an account exists
     alt SubOrgId not found
-        Backend->>Turnkey: Create new sub-org with contact
+        Frontend->>Frontend: Sign signup message with client key
+        Frontend->>Backend: Send signup clientSignature
+        Backend->>Turnkey: Create sub-org with verification token + clientSignature
         Turnkey->>Backend: Return new subOrgId
     end
-    Backend->>Turnkey: Call otpLogin() with subOrgId, public key, and token
+    Frontend->>Frontend: Sign login message with client key
+    Frontend->>Backend: Send client public key + login clientSignature
+    Backend->>Turnkey: Call otpLogin() with subOrgId, token, public key, clientSignature
     Turnkey->>Backend: Return session JWT
     Backend->>Frontend: Return session JWT
     User->>Frontend: Action requiring Backend Authentication
@@ -196,22 +200,28 @@ sequenceDiagram
   The user begins the login flow by entering their email or phone number on the frontend.
   </Step>
 
-  <Step title="Request and Verify OTP">
-  The frontend sends the contact info to your backend, which requests an OTP from Turnkey. Once the user receives and enters the code, your backend verifies it with Turnkey and receives a verification token.
+  <Step title="Request an OTP">
+  The frontend sends the contact info to your backend, which calls `initOtp()` with its parent-organization API key. Turnkey sends the code and returns an `otpId` and an `otpEncryptionTargetBundle`, which the backend passes back to the frontend. The frontend creates its client key pair now; the private key never leaves the frontend.
+  </Step>
+
+  <Step title="Encrypt and Verify the Code">
+  When the user enters the code, the frontend encrypts it, together with the client public key, to the `otpEncryptionTargetBundle`. It sends only the `otpId` and the resulting `encryptedOtpBundle` to your backend. The backend calls `verifyOtp()` and receives a verification token bound to the client key. The plaintext code never reaches your backend.
   </Step>
 
   <Step title="Get or Create a Turnkey Sub-organization">
-  The frontend generates an API key, then sends the API public key and verification token to the backend. The backend checks with Turnkey whether a sub-organization already exists for the contact. If not, it creates a new one.
+  The backend reads the verified contact from the verification token and calls `getSubOrgIds()` to find the user's sub-organization. Do not look up a contact supplied by the client. If none exists, the frontend signs a signup message with its client key, and the backend creates the sub-organization with the verification token and that signup `clientSignature`. The signup signature covers the root-user fields, such as the email, phone number, API keys, and authenticators, so the backend must submit exactly the fields the frontend signed.
   </Step>
 
   <Step title="Create a Session">
-  The backend calls `otpLogin()` with the subOrgId, public key, and verification token. Turnkey returns a session JWT representing the authenticated user session, which the backend then returns to the frontend.
+  The frontend signs the login message with its client key and sends the public key and login `clientSignature` to your backend. The backend calls `otpLogin()` for the user's sub-organization with the verification token, public key, and `clientSignature`. Turnkey returns a session JWT, which the backend returns to the frontend.
   </Step>
 
   <Step title="You're Now Authenticated">
   Your frontend can now make requests to your backend and attach the session JWT. The backend will validate the token on each request and verify that the user has permission to perform the requested action.
   </Step>
 </Steps>
+
+On the frontend, encrypt the code with `encryptOtpCodeToBundle` from `@turnkey/crypto`, and build the signup and login messages with `getClientSignatureMessageForSignup` and `getClientSignatureMessageForLogin` from `@turnkey/core`. Signing the raw verification token does not produce a valid `clientSignature`. For the request-level code, see [Email and SMS authentication](/solutions/company-wallets/integration-guide/javascript-server#email-and-sms-authentication) in the JavaScript server guide. To upgrade an existing OTP backend, follow the [OTP migration guide](/features/authentication/otp-migration-guide).
 
 ## Sending the JWT from the frontend
 After a user completes Turnkey authentication and a session is created (via passkey, OTP, or another supported method), your backend returns a session JWT to the frontend. This token proves the user’s identity and is the frontend’s responsibility to store and include in all future authenticated requests to your backend.

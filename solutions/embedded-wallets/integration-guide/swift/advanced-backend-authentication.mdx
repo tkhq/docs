@@ -59,9 +59,9 @@ For a TypeScript backend, use `@turnkey/sdk-server` 6.0.0 or later and the [encr
 
 ### OTP signup
 
-An email address in `rootUsers` does not prove ownership of that address. Complete encrypted OTP verification first, then submit `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` or a later supported version with the `verificationToken` and a signup `clientSignature` made by the verification-bound client key. Include the intended root users and credentials as described in [Create sub-organization](/api-reference/activities/create-sub-organization).
+An email address in `rootUsers` does not prove ownership of that address. Complete encrypted OTP verification first, then submit `ACTIVITY_TYPE_CREATE_SUB_ORGANIZATION_V8` with the `verificationToken` and a signup `clientSignature` made by the verification-bound client key. Include the intended root users and credentials as described in [Create sub-organization](/api-reference/activities/create-sub-organization).
 
-Use the signup message format for the selected activity version; do not reuse a login signature. Keep the root-user configuration and the signed signup payload consistent. See the [OTP migration guide](/features/authentication/otp-migration-guide) for policy and SDK requirements.
+In the app, build the signup message with `ClientSignature.forSignup(verificationToken:)`, passing the same email, phone number, API keys, authenticators, and OAuth providers that your backend will submit; the signature covers them. The helper builds the `signupV2` message that V8 expects; sign it the same way as the [login message](#otp-login-protocol). Do not reuse a login signature. See the [OTP migration guide](/features/authentication/otp-migration-guide) for policy and SDK requirements.
 
 ## On your iOS app
 
@@ -141,16 +141,16 @@ The app must encrypt the code before it leaves the device and sign the login mes
 | Step | iOS app | Backend |
 | --- | --- | --- |
 | Initialize | Request an OTP for the user's contact. | Submit `INIT_OTP_V3` under the parent organization with `otpType`, `contact`, and `appName`. Return both `otpId` and `otpEncryptionTargetBundle`. |
-| Encrypt | Generate or select a P-256 key. Use the returned target bundle to encrypt the OTP code and public key on-device. Send `otpId` and `encryptedOtpBundle`. | Receive the encrypted bundle; never require the plaintext code or client private key. |
+| Encrypt | Create a key with `createKeyPair()`. Encrypt the OTP code and public key on-device with `TurnkeyCrypto.encryptOtpCodeToBundle(otpCode:otpEncryptionTargetBundle:publicKey:)`. Send `otpId` and `encryptedOtpBundle`. | Receive the encrypted bundle; never require the plaintext code or client private key. |
 | Verify | Retain the key for this attempt. | Submit `VERIFY_OTP_V2` under the same organization as initialization. Return the `verificationToken` to the app and resolve the existing sub-organization for the verified contact. |
-| Sign | Construct the protocol's login message from the verification token and session key, then sign it with the verification-bound private key. Send `verificationToken`, the session `publicKey`, and `clientSignature`. | Submit `OTP_LOGIN_V2` to the resolved sub-organization with those fields. Return its `session` JWT. |
+| Sign | Build the login message with `ClientSignature.forLogin(verificationToken:)`, which also returns the verification-bound public key. Sign the message with `Stamper(apiPublicKey:)` and `sign(payload:format: .raw)`. Send `verificationToken`, the session `publicKey`, and `clientSignature`. | Submit `OTP_LOGIN_V2` to the resolved sub-organization with those fields. Return its `session` JWT. |
 | Store | Call `storeSession(jwt:)` with the returned JWT. Retain the private key matching the session public key. | — |
 
 The parent organization's API key stays on the backend for every step.
 
-`clientSignature` contains `scheme`, `publicKey`, `message`, and `signature`; see [Login with OTP](/api-reference/activities/login-with-otp). Use SDK encryption and signing helpers that implement the encrypted OTP protocol. Signing the raw verification token or an arbitrary JSON object does not produce the required login message. The [OTP migration guide](/features/authentication/otp-migration-guide#replace-initialization-verification-and-login) describes the message construction and client/server sequence.
+`clientSignature` contains `scheme`, `publicKey`, `message`, and `signature`; see [Login with OTP](/api-reference/activities/login-with-otp). Signing the raw verification token or an arbitrary JSON object does not produce the required login message. The SDK's own [Auth Proxy OTP flow](/solutions/embedded-wallets/integration-guide/swift/authentication/email-sms) uses these same helpers, and the [OTP migration guide](/features/authentication/otp-migration-guide#replace-initialization-verification-and-login) describes the full client/server sequence.
 
-Do not move encryption or client signing to the backend to work around a missing helper. If your Swift SDK integration cannot yet implement this protocol, use the supported [Auth Proxy email/SMS flow](/solutions/embedded-wallets/integration-guide/swift/authentication/email-sms) rather than a plaintext backend flow.
+Keep encryption and client signing in the app. The backend receives only the encrypted bundle, the verification token, the session public key, and the `clientSignature`.
 
 Keep `otpId`, `otpEncryptionTargetBundle`, and the client key as state for one attempt. On resend, discard the previous attempt state. Surface verification and login errors to the user, and only store a session after login succeeds.
 
