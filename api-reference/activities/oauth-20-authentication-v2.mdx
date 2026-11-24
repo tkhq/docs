@@ -1,0 +1,85 @@
+---
+title: "OAuth 2.0 authentication V2"
+description: "Exchange client-encrypted OAuth 2.0 authentication inputs for a Turnkey OIDC token."
+---
+
+`POST https://api.turnkey.com/public/v1/submit/oauth2_authenticate`
+
+This URL is shared with the original `ACTIVITY_TYPE_OAUTH2_AUTHENTICATE` activity. Select V2 with `type: ACTIVITY_TYPE_OAUTH2_AUTHENTICATE_V2` and its encrypted payload. Use normal signed [API authentication](/api-reference/overview/stamps).
+
+## Request body
+
+| Field | Required | Value |
+| --- | --- | --- |
+| `type` | Yes | `ACTIVITY_TYPE_OAUTH2_AUTHENTICATE_V2` |
+| `timestampMs` | Yes | Current Unix timestamp in milliseconds, as a string |
+| `organizationId` | Yes | Same parent organization UUID used for initialization |
+| `parameters.oauth2CredentialId` | Yes | Same credential UUID used for initialization and inside the encrypted payload |
+| `parameters.encryptedMessage` | Yes | JSON string containing the serialized encrypted client message returned by the helper |
+| `parameters.targetPublicKey` | Yes | Hex target public key returned by the helper for the verified target |
+| `generateAppProofs` | No | Boolean requesting App Proofs |
+
+First [initialize a target](/api-reference/activities/initialize-oauth-20-authentication), verify its signature, and encrypt the [authentication inputs](#encrypted-payload) on the client. Send only the fields above; the authentication inputs travel inside `encryptedMessage`.
+
+A target completes one exchange and expires after five minutes. Initialize a new target for each login attempt.
+
+## Encrypted payload
+
+Build this JSON object on the client, then encrypt it to the verified enclave target with `encryptOauth2ToBundle` from `@turnkey/crypto`. The helper verifies the target's TLS Fetcher signature, checks that the target was signed for `organization_id`, and returns the `encryptedMessage` string and the matching `targetPublicKey`.
+
+```ts
+import { encryptOauth2ToBundle } from "@turnkey/crypto";
+
+const { encryptedMessage, targetPublicKey } = await encryptOauth2ToBundle({
+  bundle: {
+    organizationId,
+    oauth2CredentialId,
+    clientId,
+    provider: "OAUTH2_PROVIDER_DISCORD",
+    authCode,
+    codeVerifier,
+    redirectUri,
+    nonce,
+  },
+  enclaveTargetMessage, // from init_oauth2_authenticate
+});
+```
+
+The helper takes camelCase inputs and serializes them to the snake_case object below:
+
+```json
+{
+  "organization_id": "<parent organization UUID>",
+  "oauth2_credential_id": "<OAuth credential UUID>",
+  "client_id": "<provider client ID>",
+  "provider": "OAUTH2_PROVIDER_DISCORD",
+  "auth_code": "<authorization code from this provider redirect>",
+  "code_verifier": "<PKCE verifier for this authorization attempt>",
+  "redirect_uri": "<redirect URI used in the provider flow>",
+  "nonce": "<lowercase hex SHA-256 digest of the client session public key>"
+}
+```
+
+- Fields inside the encrypted object are **snake_case**; the outer request uses **camelCase**.
+- Set `provider` to `OAUTH2_PROVIDER_X` or `OAUTH2_PROVIDER_DISCORD`.
+- Take `organization_id`, `client_id`, and `provider` from your client configuration.
+- `code_verifier` must be 43 to 128 characters from `A-Z`, `a-z`, `0-9`, `-`, `.`, `_`, and `~`, as required by PKCE.
+- `redirect_uri` must be an absolute URI without a fragment.
+- Compute `nonce` as `sha256(publicKey)` over the client session public key, as described in [nonce restrictions](/features/authentication/social-logins#nonce-restrictions-in-oidc-tokens). It must be 64 lowercase hex characters. Use the same session key for OAuth login.
+- To receive the provider bearer token, add optional `bearer_token_target_public_key`: an uncompressed P-256 public key. Turnkey returns the bearer token encrypted to that key in the OIDC token's `encrypted_bearer_token` claim. Omit the field when unused rather than sending an empty string.
+
+### Purpose binding
+
+`TRANSPORT_ENCRYPTION_SUITE_ENCLAVE_ENCRYPT_V2` adds a purpose binding to the HPKE associated data. The binding contains the purpose `ENCRYPTED_INGRESS_PURPOSE_OAUTH2_AUTHENTICATE` and the `oauth2_credential_id`. The enclave rebuilds the binding from the outer `parameters.oauth2CredentialId`. If that value differs from the credential ID the client encrypted under, decryption fails. This stops a ciphertext from being replayed against a different credential or a different encrypted-ingress activity.
+
+If you encrypt without the helper, verify the target's TLS Fetcher signature against Turnkey's production signing key and apply the same purpose binding. Don't log the unencrypted object.
+
+## Result
+
+A completed activity contains `activity.result.oauth2AuthenticateResult.oidcToken`. This field is not renamed to `oauth2AuthenticateResultV2`. SDKs may unwrap the result.
+
+Use the token for existing account lookup, signup, or [OAuth login](/api-reference/activities/login-with-oauth) with the same client session key you used to compute the nonce. It is not the final session JWT.
+
+If the provider rejects the exchange, the activity fails with a generic authentication error that doesn't include provider details.
+
+See [social logins](/features/authentication/social-logins#authentication-sequence-diagrams) for the complete flow.

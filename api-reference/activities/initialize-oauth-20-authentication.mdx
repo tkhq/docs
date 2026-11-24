@@ -1,0 +1,27 @@
+---
+title: "Initialize OAuth 2.0 authentication"
+description: "Create a signed enclave encryption target for an OAuth 2.0 authentication exchange."
+---
+
+`POST https://api.turnkey.com/public/v1/submit/init_oauth2_authenticate`
+
+Use normal signed [API authentication](/api-reference/overview/stamps). Submit under the parent organization that owns the credential. This returns an encryption target, not an OIDC token or session.
+
+## Request body
+
+| Field | Required | Value |
+| --- | --- | --- |
+| `type` | Yes | `ACTIVITY_TYPE_INIT_OAUTH2_AUTHENTICATE` |
+| `timestampMs` | Yes | Current Unix timestamp in milliseconds, as a string |
+| `organizationId` | Yes | Parent organization UUID |
+| `parameters.oauth2CredentialId` | Yes | OAuth credential UUID belonging to that parent |
+| `parameters.encryptionSuite` | Yes | `TRANSPORT_ENCRYPTION_SUITE_ENCLAVE_ENCRYPT_V2`, the only suite accepted for OAuth 2.0. It binds the ciphertext to the credential ID. |
+| `generateAppProofs` | No | Boolean requesting App Proofs |
+
+## Result
+
+A completed activity contains `activity.result.initOauth2AuthenticateResult.enclaveTargetMessage`: the signed TLS Fetcher target message. SDKs may unwrap this result.
+
+A target completes one exchange and expires after five minutes. Initialize a new target for each login attempt, near the code exchange, then verify and encrypt on the client using a supported helper. Keep the organization and credential consistent when submitting [OAuth 2.0 authentication V2](/api-reference/activities/oauth-20-authentication-v2).
+
+See [social logins](/features/authentication/social-logins#authentication-sequence-diagrams) for the complete flow.

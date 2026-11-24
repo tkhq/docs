@@ -76,9 +76,12 @@ Used when your app receives an OIDC token directly from a provider like Google o
 
 Used for providers that don't issue OIDC tokens natively. Turnkey acts as an OIDC wrapper.
 
-1. **[OAuth2 Authenticate](/api-reference/auth-proxy/oauth2-authenticate)** `POST /v1/oauth2_authenticate` — Submit the OAuth 2.0 `authCode`, `redirectUri`, PKCE `codeVerifier`, `nonce`, and `clientId`. Turnkey exchanges the code, calls the provider's user-info endpoint, and returns a Turnkey-issued OIDC token.
+1. **[Init OAuth 2.0 Authenticate V2](/api-reference/auth-proxy/init-oauth2-authenticate-v2)** `POST /v1/init_oauth2_authenticate_v2` — Submit the provider `clientId` and `encryptionSuite`. Keep `oauth2CredentialId` and the signed `enclaveTargetMessage`.
+2. **Encrypt on the client** — Verify the target and encrypt the authentication inputs, including a nonce derived from the client session public key.
+3. **[OAuth 2.0 Authenticate V2](/api-reference/auth-proxy/oauth2-authenticate-v2)** `POST /v1/oauth2_authenticate_v2` — Submit `oauth2CredentialId`, `encryptedMessage`, and `targetPublicKey`. Turnkey validates and exchanges the inputs inside the enclave and returns an `oidcToken`.
+4. **[OAuth Login](/api-reference/auth-proxy/oauth-login)** `POST /v1/oauth_login` — Use the OIDC token and the same client session public key you used to compute the nonce.
 
-2. **[OAuth Login](/api-reference/auth-proxy/oauth-login)** `POST /v1/oauth_login` — Use the Turnkey-issued token from step 1, same as a standard OIDC flow.
+Both new requests use `X-Auth-Proxy-Config-Id`. See the [encrypted payload](/api-reference/activities/oauth-20-authentication-v2#encrypted-payload) for the fields to encrypt. Enabling the V2 proxy routes doesn't update existing clients; each client must adopt client-side encryption.
 
 ---
 
