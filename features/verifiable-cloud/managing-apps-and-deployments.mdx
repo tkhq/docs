@@ -1,11 +1,11 @@
 ---
 title: "Managing TVC apps and deployments"
 og:image: "https://docs.turnkey.com/images/tee-social-preview.png"
-description: "Direct traffic, delete, and restore TVC apps and deployments."
+description: "Direct traffic, delete, and restore TVC apps and deployments, and scope policies to a specific app."
 sidebarTitle: "Managing apps and deployments"
 ---
 
-This guide covers how to direct traffic to a specific deployment, delete a deployment or app, and restore a deleted deployment.
+This guide covers how to direct traffic to a specific deployment, delete a deployment or app, restore a deleted deployment, and scope policies to a specific app.
 
 For creating and approving your first deployment, see the [TVC quickstart](/features/verifiable-cloud/quickstart).
 
@@ -109,3 +109,20 @@ Deployment ID: <DEPLOYMENT_UUID>
 Activity ID: <ACTIVITY_UUID>
 Activity Status: Completed
 ```
+
+## Scope policies to a specific app
+
+TVC activities are governed by your organization's [policies](/features/policies/overview). To write a policy that applies to one app, match its ID with `activity.params.tvc_app_id`. This lets a single organization hold production and non-production apps under different rules: for example, a permissive policy for a staging app, while the production app stays behind stricter policies or consensus.
+
+```json
+{
+  "policyName": "Allow deployments to the staging app",
+  "effect": "EFFECT_ALLOW",
+  "consensus": "approvers.any(user, user.id == '<USER_ID>')",
+  "condition": "activity.kind in ['CREATE_TVC_DEPLOYMENT', 'DELETE_TVC_APP_AND_DEPLOYMENTS'] && activity.params.tvc_app_id == '<STAGING_APP_UUID>'"
+}
+```
+
+`tvc_app_id` is available for two activity types only: `ACTIVITY_TYPE_CREATE_TVC_DEPLOYMENT` and `ACTIVITY_TYPE_DELETE_TVC_APP_AND_DEPLOYMENTS`. Activities that act on a deployment or a manifest, such as directing traffic, deleting or restoring a deployment, and approving a manifest, do not expose the app ID, so a policy cannot scope them to one app. If you need full separation between environments today, use a separate organization for each.
+
+See the [policy language reference](/features/policies/language#activity-parameters) for all activity parameters.
