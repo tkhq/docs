@@ -74,10 +74,10 @@ In the sandbox environment, SMS delivery is simulated. Use the fixed OTP code `0
 - `encryptedOtpBundle`: bundle generated using the otpEncryptionTargetBundle received during `ACTIVITY_TYPE_INIT_OTP_V3` and contains the 6-9 digit or alphanumeric code received via SMS, and the public key of a client-side generated keypair.
 - `expirationSeconds`: optional validity window (defaults to 1 hour)
 
-After receiving the verification token, users complete OTP authentication flow with `ACTIVITY_TYPE_OTP_LOGIN_V2` using the sub-organization ID associated with the contact from the first step:
+After receiving the verification token, users complete the OTP authentication flow with `ACTIVITY_TYPE_OTP_LOGIN_V2` using the user's sub-organization ID. Resolve it after verification with [`getSubOrgIds`](/api-reference/queries/get-sub-organizations), filtered by `PHONE_NUMBER` using the verified phone number. If no account exists, follow the [signup path](/solutions/company-wallets/integration-guide/javascript-server#otp-signup) instead. Login requires:
 
 - `publicKey`: public key to add to organization data associated with the signing key in IndexedDB or SecureStorage.
-- `verificationToken`: JWT returned from successful `VERIFY_OTP` activity
+- `verificationToken`: JWT returned from successful `ACTIVITY_TYPE_VERIFY_OTP_V2` activity
 - `clientSignature`: This proves authorization for the verification token being used, and is generated using the keypair whose public key was provided in the `encryptedOtpBundle` during verification.
 - `expirationSeconds`: optional validity window (defaults to 15 minutes)
 - `invalidateExisting`: optional boolean to invalidate previous login sessions
@@ -89,20 +89,7 @@ SMS authentication requires proper permissions through policies or parent organi
 
 ## Enabling/disabling SMS auth
 
-### For top-level organizations
-
-SMS authentication is disabled by default. Enable it using `ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE`:
-
-```bash
-turnkey request --host api.turnkey.com --path /public/v1/submit/set_organization_feature --body '{
-        "timestampMs": "'"$(date +%s)"'000",
-        "type": "ACTIVITY_TYPE_SET_ORGANIZATION_FEATURE",
-        "organizationId": "<YOUR-ORG-ID>",
-        "parameters": {
-                "name": "FEATURE_NAME_SMS_AUTH"
-        }
-}' --organization <YOUR-ORG-ID>
-```
+SMS OTP login works only for sub-organizations. Parent organizations can send and verify codes for their sub-organizations, but cannot log in with OTP themselves. Setting `FEATURE_NAME_SMS_AUTH` on a parent organization does not enable parent-organization login.
 
 ### For sub-organizations
 
