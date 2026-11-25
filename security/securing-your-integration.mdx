@@ -14,28 +14,32 @@ Many large thefts have not required breaking any cryptography. They came from ho
 
 ## Policies, root quorum, and MFA
 
-Turnkey decides whether a request goes ahead using three controls. They answer different questions, and most of this page is about choosing the right ones for each kind of user.
+Turnkey decides whether a request goes ahead using four controls. They answer different questions, and most of this page is about choosing the right ones for each kind of user.
 
 | Control | What it decides | Who it binds | Use it for |
 |---|---|---|---|
 | [Policies](/features/policies/overview) | With `condition` and `effect`: whether a user may do something at all, such as which activities, wallets, destinations, and amounts.<br />With `consensus`: which users, or how many, have to approve. | Non-root users.<br />Root users only where an allow policy explicitly covers them. | Defining what each service, agent, and team member may do, and requiring more than one person for sensitive actions |
 | [Root quorum](/features/users/root-quorum) | How many root users have to approve | Root users acting together. It overrides policies. | The people who ultimately control the organization |
 | [MFA policies](/features/authentication/mfa/overview) | Whether the same user has to present another factor | Every user, including root | Mainly end users in sub-organizations |
+| [Session scopes](/features/authentication/sessions/session-profiles) | What a session issued with a session profile may do | Every session issued with that profile, including a root user's | Limiting a session to one job, such as a recovery session that can only add a passkey |
 
-In short: policies say what users may do and who has to approve it. The root quorum lets root users, acting together, do anything without a policy. MFA asks the same person for more proof.
+In short: policies say what users may do and who has to approve it. The root quorum lets root users, acting together, do anything without a policy. MFA asks the same person for more proof. A session scope limits what one session can do, whoever it belongs to.
 
 A few things about how they fit together:
 
 - **Policies deny by default.** A non-root user can do nothing that a policy does not allow, apart from a few built-in permissions such as reading data and managing their own credentials. If one policy allows an activity and another explicitly denies it, the deny wins.
 - **One policy can both allow and require approvals.** Its `condition` says what is allowed, and its `consensus` says who has to approve it. There is no separate kind of approval policy.
 - **The root quorum sits above policies, but with a threshold above one, a single root user does not.** Once enough root users approve, Turnkey does not evaluate policies at all. With a threshold of one, a single root user is the whole quorum. With a higher threshold, a root user acting alone normally waits for the rest of the quorum. The exception is a matching allow policy: one with no `consensus` requirement lets that root user perform the activity alone, without the other root users. See [Using root users with policies](/features/users/root-quorum#using-root-users-with-policies).
+- **Session scopes and MFA bind root users too.** A session issued with a [session profile](/features/authentication/sessions/session-profiles) can only do what its scope allows, and MFA policies apply to every user. Both are checked before the root quorum, so being root skips neither.
 - **MFA applies to every approver.** When a policy asks for two approvers, each of them is still held to their own MFA policies.
 
 Put together, Turnkey decides each request in this order:
 
 ```mermaid
 flowchart LR
-    R[Request] --> M{MFA satisfied?}
+    R[Request] --> S{Session scope<br/>allows it?}
+    S -- No --> D0[Denied]
+    S -- "Yes, or no scope" --> M{MFA satisfied?}
     M -. No .-> H1["Held until the user<br/>presents the MFA factors"]
     M -- Yes --> U{Root user?}
     H1 ~~~ P
@@ -57,7 +61,7 @@ Which controls apply depends on who is acting, and in particular on whether they
 
 - **Your team in the parent organization.** Root quorum members are protected by the threshold itself, together with passkeys. Team members outside the root quorum act under policies, with consensus on anything sensitive. See [Protect the people in your parent organization](#protect-the-people-in-your-parent-organization).
 - **Your services and agents, in any organization.** They should be non-root users acting under narrow allow policies, and anything large needs approval from people whose credentials are not on the same system. See [If your backend is compromised](#if-your-backend-is-compromised).
-- **Your end users, if they have their own sub-organizations.** An end user is then usually the only root user of their sub-organization, with a threshold of one, so they are the whole quorum and policies do not constrain them. MFA policies do. See [Require MFA for your end users](#require-mfa-for-your-end-users).
+- **Your end users, if they have their own sub-organizations.** An end user is then usually the only root user of their sub-organization, with a threshold of one, so they are the whole quorum and policies do not constrain them. MFA policies and session scopes do. See [Require MFA for your end users](#require-mfa-for-your-end-users).
 
 ## The root quorum is not bound by policies
 
@@ -261,6 +265,14 @@ An agent that can sign is a user like any other, and should be constrained the s
 - **Give each agent its own non-root user.** Avoid letting an agent act with a person's credentials or session.
 - **Put the agent's limits in Turnkey policies.** Limits written in the agent's prompt or its own code can be talked around. Policies are evaluated in the enclave before anything is signed, whatever the agent was told. For rules a policy cannot express, a [TVC policy sidecar](#add-your-own-checks-with-turnkey-verifiable-cloud) can approve or reject the agent's requests with checks of your own.
 - See [Agentic wallets](/features/policies/delegated-access/agentic-wallets) and [Delegated access](/features/policies/delegated-access/overview) for patterns.
+
+## Keep your SDKs and activity versions current
+
+New protections reach your integration through SDK releases and new activity versions, so an integration that stays current gets them without extra work.
+
+- **Use the current packages.** Build on the packages the [SDK reference](/sdks/introduction) recommends for your platform, and move off any marked as deprecated, since they no longer get new features.
+- **Use the latest activity versions when you pick them yourself.** The current SDKs submit the latest version of each activity for you, so this only applies where you choose the version: calling the API directly, or naming an activity type such as `ACTIVITY_TYPE_CREATE_USERS_V3` in your code. Newer versions often add protections on top of the previous ones.
+- **Stay up to date within a major version.** Pin the major version of each SDK so minor and patch releases reach you, and read the changelog for breaking changes before moving to a new major version.
 
 ## Detect and respond
 
