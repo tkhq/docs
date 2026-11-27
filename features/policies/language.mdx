@@ -73,6 +73,25 @@ The policy engine groups operators in this order, from first to last:
 - The policy engine always evaluates both operands of `&&` and `||`, even when the left operand
   already decides the result. See [Policy evaluation](#policy-evaluation).
 
+### Matching against a list of values
+
+To check a field against several values, use `in` with a list rather than a chain of `||`
+comparisons:
+
+```
+eth.tx.to in ['0xAbc…', '0xDef…', '0x123…']
+```
+
+instead of:
+
+```
+eth.tx.to == '0xAbc…' || eth.tx.to == '0xDef…' || eth.tx.to == '0x123…'
+```
+
+A list is easier to read and maintain, and it is the recommended form for allowlists of any
+length. `in` follows the same letter-case rules as `==`; see
+[Letter case in comparisons](#letter-case-in-comparisons).
+
 ## Keywords
 
 Keywords are reserved words that are dynamically interchanged for real values at evaluation time.
@@ -133,6 +152,23 @@ The language is strongly typed which makes policies easy to author and maintain.
 | <a id="type-struct" href="#type-struct">**struct**</a>    | \{ id: 'abc' \}                         | a key-value map of \{ field: T \} (defined below)                                                                          |
 | <a id="type-timestamp" href="#type-timestamp">**timestamp**</a> | Timestamp('2025-01-01T00:00:00Z')       | a point in time; construct with `Timestamp('<rfc3339>')`, zero UTC offset only (see [Time expressions](#time-expressions)) |
 
+### Letter case in comparisons
+
+String comparisons are exact unless the field is marked as case-insensitive. Fields that hold
+addresses are not all treated the same way:
+
+| Field                                                                       | Comparison       | Write literals as                     |
+| --------------------------------------------------------------------------- | ---------------- | ------------------------------------- |
+| `eth.tx.to`, `eth.tx.from`                                                  | Case-insensitive | Any case                              |
+| `eth.eip_712` `address` and `bytes` values                                  | Case-insensitive | Any case                              |
+| `eth.tx.data` and slices of it                                              | Exact            | `0x` followed by lowercase hex        |
+| `wallet_account.address`                                                    | Exact            | The address exactly as Turnkey returns it (EIP-55 checksummed for EVM) |
+| `eth.eip_7702_authorization.address`                                        | Exact            | EIP-55 checksummed                    |
+| `eth.eip_712` `string` values                                               | Exact            | The exact value that is signed        |
+
+When a comparison is exact, a literal in a different case never matches. An `ALLOW` policy then
+does not allow the request, and a `DENY` policy does not deny it.
+
 ### Struct
 
 | Struct                   | Field                    | Type                                      | Description                                                                                                                                                                                                                                                                                                                                                          |
@@ -155,7 +191,7 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | imported                 | [bool](#type-bool)                                      | Boolean indicating whether or not this wallet has been imported                                                                                                                                                                                                                                                                                                      |
 |                          | exported                 | [bool](#type-bool)                                      | Boolean indicating whether or not this wallet has been exported                                                                                                                                                                                                                                                                                                      |
 |                          | label                    | [string](#type-string)                                    | The label of this wallet                                                                                                                                                                                                                                                                                                                                             |
-| <a id="struct-wallet-account" href="#struct-wallet-account">**Wallet Account**</a>       | address                  | [string](#type-string)                                    | The wallet account address                                                                                                                                                                                                                                                                                                                                           |
+| <a id="struct-wallet-account" href="#struct-wallet-account">**Wallet Account**</a>       | address                  | [string](#type-string)                                    | The wallet account address. Compared exactly with string literals, including letter case. EVM addresses use the EIP-55 checksummed (mixed-case) form, so write them checksummed: a lower-case literal never matches                                                                                                                                                                                                                                                                                                                                           |
 |                          | path_indexes             | list\<[int](#type-int)\>                               | The account's BIP32 derivation path indexes. The hardening bit is stripped (e.g. `m/44'/60'/0'/0/0` → `[44, 60, 0, 0, 0]`). This field is set only for wallet account exports (`EXPORT_WALLET_ACCOUNT`). A policy that uses this field does not match other activities                                                                                                |
 |                          | path_hardened            | list\<[bool](#type-bool)\>                              | Whether each component of the account's derivation path is hardened (e.g. `m/44'/60'/0'/0/0` → `[true, true, true, false, false]`). This field is set only for wallet account exports (`EXPORT_WALLET_ACCOUNT`). A policy that uses this field does not match other activities                                                                                        |
 | <a id="struct-private-key" href="#struct-private-key">**PrivateKey**</a>           | id                       | [string](#type-string)                                    | The identifier of the private key                                                                                                                                                                                                                                                                                                                                    |
@@ -165,9 +201,9 @@ The language is strongly typed which makes policies easy to author and maintain.
 |                          | label                    | [string](#type-string)                                    | The label of this private key                                                                                                                                                                                                                                                                                                                                        |
 | <a id="struct-secret" href="#struct-secret">**Secret**</a> | id                       | [string](#type-string)                    | The identifier of the secret |
 |                          | static_properties        | map\<[string](#type-string), [string](#type-string)\> | The static properties bound to the secret at import. Access via `secret.static_properties['key']` |
-| <a id="struct-ethereum-transaction" href="#struct-ethereum-transaction">**EthereumTransaction**</a>  | from                     | [string](#type-string)                                    | The sender address of the transaction                                                                                                                                                                                                                                                                                                                                |
-|                          | to                       | [string](#type-string)                                    | The receiver address of the transaction (can be an EOA or smart contract)                                                                                                                                                                                                                                                                                            |
-|                          | data                     | [string](#type-string)                                    | The arbitrary calldata of the transaction (hex-encoded). Prefer `function_name` / `contract_call_args` when an ABI is available — see [Smart Contract Interfaces](/features/policies/smart-contract-interfaces).                                                                                                                                                     |
+| <a id="struct-ethereum-transaction" href="#struct-ethereum-transaction">**EthereumTransaction**</a>  | from                     | [string](#type-string)                                    | The sender address of the transaction. Compared case-insensitively                                                                                                                                                                                                                                                                                                                                |
+|                          | to                       | [string](#type-string)                                    | The receiver address of the transaction (can be an EOA or smart contract). Compared case-insensitively                                                                                                                                                                                                                                                                                            |
+|                          | data                     | [string](#type-string)                                    | The calldata of the transaction, as `0x` followed by lowercase hex. Compared exactly, so write literals in lowercase. The function selector is `data[0..10]`. Prefer `function_name` / `contract_call_args` when an ABI is available — see [Smart Contract Interfaces](/features/policies/smart-contract-interfaces).                                                                                                                                                     |
 |                          | value                    | [int](#type-int)                                       | The amount being sent (in wei)                                                                                                                                                                                                                                                                                                                                       |
 |                          | gas                      | [int](#type-int)                                       | The maximum allowed gas for the transaction                                                                                                                                                                                                                                                                                                                          |
 |                          | gas_price                | [int](#type-int)                                       | The price of gas for the transaction (Note: this field was used in legacy transactions and was replaced with max_fee_per_gas in EIP 1559 transactions, however when evaluating policies on EIP 1559 transactions, this field will be populated with the same value as max_fee_per_gas)                                                                               |
